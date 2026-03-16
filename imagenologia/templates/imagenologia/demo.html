@@ -1,0 +1,58 @@
+{% extends 'core/base.html'%}
+
+{% block title %}Demo{% endblock title %}
+{% block content %}
+
+
+<div class="contenedor2 contenedorFormulario"> 
+    <div class="tituloFormulario">
+        <div class="tituloFormulario-texto"> 
+            <i class="bi  bi-radioactive"></i>
+            <h2> Demo imagenes de prueba  </h2>
+        </div>
+        <div class="tituloFormulario-subrallado"></div>
+    </div>
+    </div>
+
+    <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+
+    <input 
+        type="file" 
+        class="filepond"
+        name="imagen"
+        accept="image/*"
+        capture="environment"
+    >
+
+    <button type="submit" class="btn btn-primary mt-3">
+        Enviar imagen
+    </button>
+</form>
+
+
+{% endblock content %}
+
+{% load static %}
+
+{% block extra_js %}
+
+<link href="https://unpkg.com/filepond@^4/dist/filepond.css" rel="stylesheet" />
+<script src="https://unpkg.com/filepond@^4/dist/filepond.js"></script>
+
+<link href="https://unpkg.com/filepond-plugin-image-preview/dist/filepond-plugin-image-preview.css" rel="stylesheet" />
+<script src="https://unpkg.com/filepond-plugin-image-preview/dist/filepond-plugin-image-preview.js"></script>
+
+
+<script>
+    
+
+</script>
+
+
+
+{% comment "" %}
+
+{% endcomment %}
+<script src="{% static 'core/scripts/demo.js' %}"></script>
+{% endblock extra_js %}

@@ -1,0 +1,60 @@
+{% extends 'core/base.html'%}
+
+
+
+
+{% block title %}Expediente{% endblock title %}
+
+{% block content %}
+    <div class="contenedor2 dataTables_wrapper"> 
+        <div class="tituloFormulario" style="margin-bottom: 3rem;">
+            <div class="tituloFormulario-texto"> 
+                <i class="bi bi-clipboard2-heart"></i>
+                <h2 class="sin-margen">Listado General de Expedientes</h2>
+            </div>
+            <div class="tituloFormulario-subrallado"></div>
+        </div>
+    
+        <table id="data_table_expediente" class="dataTable stripe hover  row-border" >
+            <thead>
+                <tr>
+                    
+                    <th>Numero</th>
+                    <th>Ubicacion</th>
+                    <th>Est</th>
+                    <th>Prop. DNI</th>
+                    <th>Prop. Nombre</th>
+                    <th>Prop. Apellido</th>
+                    <th>Asig.</th>
+                    <th>Actualizado</th>
+                </tr>
+            </thead>
+        <tbody>
+        </tbody>
+        <tfoot>
+                <tr>
+                    <th>Numero</th>
+                    <th>Ubicacion</th>
+                    <th>Est</th>
+                    <th>Prop. DNI</th>
+                    <th>Prop. Nombre</th>
+                    <th>Prop. Apellido</th>
+                    <th>Asig.</th>
+                    <th>Actualizado</th>
+                </tr>
+        </tfoot>
+        </table>
+    </div>
+    
+{% endblock content %}
+
+{% load static %}
+
+
+{% block extra_js %}
+
+<script src="{% static 'core/scripts/tablas/dataTablesExpediente.js' %}"></script>
+
+
+
+{% endblock extra_js %}

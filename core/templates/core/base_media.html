@@ -1,0 +1,30 @@
+{% extends "core/base.html" %}
+{% load static %}
+
+{% block extra_css %}
+{{ block.super }}
+
+<link rel="stylesheet"
+href="{% static 'core/vendor/panzoom/panzoom.css' %}">
+
+<link rel="stylesheet"
+href="{% static 'core/vendor/cropper/cropper.min.css' %}">
+
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+
+<script src="{% static 'core/vendor/panzoom/panzoom.umd.js' %}"></script>
+
+<script src="{% static 'core/vendor/cropper/cropper.min.js' %}"></script>
+
+<script src="{% static 'core/scripts/media/imageHelper.js' %}"></script>
+<script src="{% static 'core/scripts/media/editorImageHelper.js' %}"></script>
+<script src="{% static 'core/scripts/media/visorImageHelper.js' %}"></script>
+
+{% block media_js %}
+{% endblock media_js %}
+
+
+{% endblock %}

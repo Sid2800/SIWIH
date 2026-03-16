@@ -1,0 +1,96 @@
+{% extends 'core/base.html' %}
+
+{% block title %}
+    Expediente {{ object.numero }}
+{% endblock title %}
+
+{% block content %}
+
+
+<div id="contenedorEstructuraExpediente" class="contenedor2">
+
+    <fieldset class="fieldsetExp">
+        <legend>Detalles del expediente número: <b>{{ object.numero }}</b></legend>          
+        
+
+        <fieldset class="frmExpedienteCampos">
+            <legend>Expediente</legend>
+
+            <div class="formularioCampo">
+                <label for="numero">Número</label>
+                <input type="number" name="numero" value="{{ object.numero }}" readonly class="formularioCampo-text">
+            </div>
+
+            <div class="formularioCampo">
+                <label for="ubicacion">Ubicación</label>
+                <input type="text" name="ubicacion" value="{{ object.localizacion }}" readonly class="formularioCampo-text">
+            </div>
+
+            <div class="formularioCampo">
+                <label for="estado">Estado</label>
+                <input type="text" name="estado" 
+                    value="{% if object.estado == 2 %}Libre{% else %}Ocupado{% endif %}" 
+                    readonly class="formularioCampo-text">
+            </div>
+        </fieldset>
+
+        <fieldset class="detallesRegistro">
+            <legend>Detalles del Registro</legend>
+
+            <div class="formularioCampo">
+                <label>Creado:</label>
+                <input type="text" class="formularioCampo-text" 
+                    value="{{ object.fecha_creado }} por {{ object.creado_por }}">
+            </div>
+
+            <div class="formularioCampo">
+                <label>Actualizado:</label>
+                <input type="text" class="formularioCampo-text" 
+                    value="{{ object.fecha_modificado }} por {{ object.modificado_por }}">
+            </div>
+        </fieldset>
+
+        
+    
+    </fieldset>
+
+    <div class="fieldsetExp">
+        <legend>Historial Propietarios</legend>
+
+            <table id="data_table_expediente_propietarios" class="dataTable stripe hover row-border">
+                <thead>
+                    <tr>
+                        <th>DNI</th>
+                        <th>Tipo</th>
+                        <th>Nombre Completo</th>
+                        <th>Asignación</th>
+                        <th>Liberación</th>
+                        <th>id_paciente</th>
+                        <th>id</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+    </div>
+
+    <div class="formularioBotones">
+        <a href="{% url 'listar_expedientes' %}" class="formularioBotones-boton">
+            <i class="bi bi-arrow-left-circle formularioBotones-icono"></i>
+            <span>Volver</span>
+        </a>
+    </div>
+</div>
+    
+
+
+
+{% endblock content %}
+
+{% load static %}
+
+{% block extra_js %}
+<script>
+    const idExpediente = {{ object.id }};
+</script>
+<script src="{% static 'core/scripts/features/expediente.js' %}"></script>
+{% endblock extra_js %}

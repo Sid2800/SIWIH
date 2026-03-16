@@ -1,0 +1,272 @@
+{% extends 'core/base_media.html'%}
+
+{% block title %}Evaluacion RX{% endblock title %}
+{% block content %}
+{% load static %}
+
+<div class="contenedor2 contenedorFormulario"> 
+    <div class="tituloFormulario">
+        <div class="tituloFormulario-texto"> 
+            <i class="bi  bi-radioactive"></i>
+            <h2> {{ titulo }} Evaluacion Imagenologica  </h2>
+        </div>
+        <div class="tituloFormulario-subrallado"></div>
+    </div>
+
+    <form method="post" class="formulario" id="form-evaluacionrx">
+        {% csrf_token %}
+        <fieldset class="frmEvaluacionRxCampos">
+            <legend>Agregando</legend>
+  
+            <fieldset class="evaluacionEvaluacionCampos">
+            <legend>Datos Evaluacion</legend>
+            
+            <div class="formularioCampo">
+                {{ form.fecha.label_tag }}
+                {{ form.fecha }}
+            </div>
+
+            <div class="formularioCampo">
+                {{ form.maquinarx.label_tag }}
+                {{ form.maquinarx }}
+            </div>
+
+            <div class="formularioCampo">
+                {{ form.dependencia.label_tag }}
+                {{ form.dependencia }}
+            </div>
+
+
+            <div class="formularioCampo">
+                {{ form.observaciones.label_tag }}
+                {{ form.observaciones }}
+            </div>
+
+            {% if Pexterno %}
+            <label class="ck-formulario" for="switchPacienteExterno" id="evalucionPacienteExternoCheck">
+                    <span id="evalucionPacienteExternoLabel" class="ck-formulario__label">Paciente Externo</span>
+                    <input type="checkbox" id="switchPacienteExterno" class="ck-formulario__checkbox" hidden>
+                    <div class="ck-formulario__base">
+                    <div class="ck-formulario__bolita"></div>
+                    </div>
+            </label>
+            {% endif %}
+
+
+            
+        </fieldset>
+
+        <fieldset class="evaluacionPacienteCampos evaluacionrxFielsetPacienteInternoExterno_Visible" id="paciente-interno-fieldset" >
+            <legend>Datos Paciente</legend>            
+
+            <div class="formularioCampo">
+                <label>DNI </label>
+                {{ form.dniPaciente }}
+            </div>
+
+            <div class="formularioCampo">
+                <label>Expediente N</label>
+                {{ form.numeroExpediente }}
+            </div>
+
+            <div class="formularioCampo">
+                <label>Nombre</label>
+                {{ form.nombreCompletoPaciente }}
+            </div>
+            
+            <div class="formularioCampo">
+                <label for="fecha_nacimiento">Fecha de Nacimiento:</label>
+                {{ form.fechaNacimientoPaciente }}
+            </div>
+
+            <div class="formularioCampo">
+                <label for="fecha_nacimiento">Edad</label>
+                {{ form.edadPaciente }}
+            </div>
+
+            <div class="formularioCampo">
+                <label>Sexo</label>
+                {{ form.sexoPaciente }}
+            </div>
+            
+            <div class="formularioCampo">
+                <label>Teléfono</label>
+                {{ form.telefonoPaciente }}
+            </div>
+                        
+            <div class="formularioCampo">
+                <label>Domicilio</label>
+                {{ form.direccionPaciente }}
+            </div>
+
+            
+
+            {{ form.idPaciente }}
+
+        </fieldset>
+        
+        {% if Pexterno %}
+        <fieldset class="evalucionRxPacienteECampos evaluacionrxFielsetPacienteInternoExterno_Oculto" id="paciente-externo-fieldset">
+            <legend>Paciente Externo</legend>
+
+            <div class="formularioCampo">
+                <label># Identificación</label>
+                <input type="text" id="paciente_externo_dni" name="pacienteExternoDni" placeholder="Identidad Paciente Externo" class="formularioCampo-text">
+            </div>
+
+            <div class="formularioCampo">
+                <label>1er Nombre</label>
+                <input type="text" id="paciente_externo_nombre1" name="pacienteExternoNombre1" placeholder="Primer Nombre" class="formularioCampo-text">
+            </div>
+            
+            <div class="formularioCampo">
+                <label>2do Nombre</label>
+                <input type="text" id="paciente_externo_nombre2" name="pacienteExternoNombre2" placeholder="Segundo Nombre" class="formularioCampo-text">
+            </div>
+            
+            <div class="formularioCampo">
+                <label>1er Apellido</label>
+                <input type="text" id="paciente_externo_apellido1" name="pacienteExternoApellido1" placeholder="Primer Apellido" class="formularioCampo-text">
+            </div>
+            
+            <div class="formularioCampo">
+                <label>2do Apellido</label>
+                <input type="text" id="paciente_externo_apellido2" name="pacienteExternoApellido2" placeholder="Segundo Apellido" class="formularioCampo-text">
+            </div>
+
+            <div class="formularioCampo">
+                <label>Fecha Nac</label>
+                <input type="date" id="paciente_externo_fecha_nacimiento" name="pacienteExternoFechaNacimiento" class="formularioCampo-date">
+            </div>
+
+            <div class="formularioCampo">
+                <label>Sexo</label>
+                <select id="paciente_externo_sexo" name="pacienteExternoSexo" class="formularioCampo-select">
+                    <option value="M">Mujer</option>
+                    <option value="H">Hombre</option>
+                    <option value="N">No identificado</option>
+                </select>
+            </div>
+                    
+            <input type="hidden" name="pacienteExternoId" id="id_paciente_externo" value="">
+        </fieldset>
+        {% endif %}
+        
+
+
+        </fieldset>
+
+        {% comment "" %}
+        <div class="evaluacionListaEstudios">
+                <table id="tablaEstudio" class="display" style="width:100%">
+                    <thead>
+                        <tr>
+                        <th>Codigo</th>
+                        <th>Estudio</th>
+                        <th>Impreso</th>
+                        <th></th>
+                        </tr>
+                    </thead>
+                <tbody>
+                </tbody>
+                </table>
+        </div>
+        {% endcomment %}
+
+
+        <fieldset class="evaluacion-estudios-grid-contenedor">
+            <legend>Estudios</legend>
+            
+            <div class="evaluacion-estudios-grid" id="evaluacion-estudios-grid-id">
+            
+            </div>
+        </fieldset>
+
+
+
+
+    
+    
+    
+    <!-- Botón para guardar -->
+    <div class="formularioBotones">
+
+        {% if MD == 2 %}
+
+        <button type="button" class="formularioBotones-boton" id="formularioEvalucionRx-botonInactivar">
+            <i class="bi bi-dash-circle-fill formularioBotones-icono"></i>
+            <span>Inactivar</span>
+        </button>
+
+        {% endif %}
+
+
+        <a href="javascript:history.back()" class="formularioBotones-boton">
+            <i class="bi bi-x-octagon-fill formularioBotones-icono"></i>
+            <span>Cancelar</span>
+        </a>
+
+        <button type="submit"  class="formularioBotones-boton" id="formularioEvaluacionRX-botonGuardar">
+            <i class="bi bi-floppy2-fill " class="formularioBotones-icono"></i>
+            <span>Guardar</span>
+        </button>   
+
+    </div>
+    
+    </form>
+    
+    
+    </div>
+
+
+
+
+{% endblock content %}
+
+{% load static %}
+
+{% block media_js %}
+
+<!-- Primero definimos las variables y valores necesarios en el script inline -->
+<script>
+
+    const estudios = {{ estudios|safe }};
+    const MEDIA_SERVER_OFFLINE = {{ media_server_offline|yesno:"true,false" }};
+    
+    // edicion
+    // edicion
+    const modoUso = "{{ MD }}";
+    const Pexterno = "{{ Pexterno }}";
+    {% if MD == 2 %} 
+        {% if dependencia_actual %} 
+            const dependenciaActual = {{ dependencia_actual|safe }};
+        {% endif %}
+        {% if estudios_actuales %}
+            // Convertimos los estudios actuales a un array de objetos 
+            const estudiosActuales = {{ estudios_actuales|safe }};
+        {% endif %}
+        {% if info_externo %} 
+            const pacienteExternoInfo = {{ info_externo|safe }};
+        {% else %}
+            const pacienteExternoInfo = null;
+        {% endif %}
+    {% endif %}
+    
+
+</script>
+
+{% if object.id %}
+    <script>
+        let idEvaluacion = "{{ object.id }}";  // se asigna como string
+    </script>
+{% endif %}
+
+
+
+
+<script src="{% static 'core/scripts/features/evaluacionrx.js' %}"></script>
+
+
+
+
+{% endblock media_js %}

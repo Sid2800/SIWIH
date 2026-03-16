@@ -1,0 +1,65 @@
+{% extends 'core/base.html'%}
+
+
+
+{% block title %}Evaluaciones RX{% endblock title %}
+
+{% block content %}
+    <div class="contenedor2 dataTables_wrapper"> 
+
+        <div class="tituloFormulario" style="margin-bottom: 2rem;">
+            <div class="tituloFormulario-texto"> 
+                <i class="bi  bi-radioactive"></i>
+                <h2 class="sin-margen">Listado General de Evaluaciones Imagenologicas</h2>
+            
+            
+            </div>
+            <div class="tituloFormulario-subrallado"></div>
+        </div>
+    
+        <table id="data_table_evaluacionrx" class="dataTable stripe hover  row-border" >
+            <thead>
+                <tr>
+                    <th>Num</th>
+                    <th>Fecha</th>
+                    <th>Dependencia</th>
+                    <th>Maquina</th>
+                    <th>Estudios</th>
+                    <th>Exp</th>
+                    <th>DNI</th>
+                    <th>Nombre PTE</th>
+                    <th>Actualizado</th>
+
+                </tr>
+            </thead>
+        <tbody>
+        </tbody>
+        <tfoot>
+                <tr>
+                    <th>Num</th>
+                    <th>Fecha</th>
+                    <th>Dependencia</th>
+                    <th>Maquina</th>
+                    <th>Estudios</th>
+                    <th>Exp</th>
+                    <th>DNI</th>
+                    <th>Nombre PTE</th>
+                    <th>Actualizado</th>
+
+                </tr>
+        </tfoot>
+        </table>
+    </div>
+    
+{% endblock content %}
+
+{% load static %}
+
+
+{% block extra_js %}
+
+
+
+<script src="{% static 'core/scripts/tablas/dataTablesEvaluacionrx.js' %}"></script>
+
+{% endblock extra_js %}

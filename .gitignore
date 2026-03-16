@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# variables de entorno
+.env
+
+# Virtual env (está un nivel arriba)
+../entornoV/
+
+# Django
+staticfiles/
+db.sqlite3
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# temporales
+temp_*.png

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html class="acceso-denegado-html">
+<head>
+   <title>Acceso Denegado | SIWI</title>
+   <!--cargamos los archivos estaticos -->
+   {% load static %}
+   <link rel="stylesheet" href="{% static 'core/bootstrap-icons/bootstrap-icons.min.css' %}">
+
+   <link rel="preload" href="{% static 'core/css/style.css' %} "as="style">
+   <link rel="stylesheet" href="{% static 'core/css/style.css' %}">
+
+   <link rel="stylesheet" href="{% static 'core/fonts/css/googlefonts.css' %}">
+</head>
+<body class="acceso-denegado-body">
+   <div class="pagina-acceso-denegado">
+      <div class="contenedor-acceso-denegado">
+         <span class="acceso-denegado-titulo">Acceso Denegado</span>
+         <i class="bi bi-exclamation-triangle"></i>
+         <p>No tienes permisos para acceder a esta página.</p>
+         <div class="login-btn-container acceso-denegado-btn">
+            <a href="javascript:history.back()" class="formularioBotones-boton login-btn">
+               <i class="bi bi-arrow-bar-left"></i>
+               <span>Regresar</span>
+            </a>
+         </div>
+      </div>
+   </div>   
+</body>
+
+<script>
+   let modo = localStorage.getItem('modo');
+   if (modo === 'oscuro') {
+      const body = document.body;
+      body.classList.toggle("darkmode"); 
+   }
+   
+</script>
+
+</html>

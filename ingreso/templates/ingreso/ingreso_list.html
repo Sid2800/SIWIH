@@ -1,0 +1,57 @@
+{% extends 'core/base.html'%}
+
+{% block title %}Ingreso{% endblock title %}
+
+{% block content %}
+    <div class="contenedor2 dataTables_wrapper"> 
+        <div class="tituloFormulario" style="margin-bottom: 2rem;">
+            <div class="tituloFormulario-texto"> 
+                <i class="bi bi-clipboard2-heart"></i>
+                <h2 class="sin-margen">Listado General de Ingresos</h2>
+            </div>
+            <div class="tituloFormulario-subrallado"></div>
+        </div>
+    
+        <table id="data_table_ingreso" class="dataTable stripe hover  row-border" >
+            <thead>
+                <tr>
+                    <th>Num</th>
+                    <th>Ingreso</th>
+                    <th>Egreso</th>
+                    <th>F SDGI</th>
+                    <th>Sala | Servicio</th>
+                    <th>Exp</th>
+                    <th>DNI</th>
+                    <th>Nombre PTE</th>
+
+                </tr>
+            </thead>
+        <tbody>
+        </tbody>
+        <tfoot>
+                <tr>
+                    <th>Num</th>
+                    <th>Ingreso</th>
+                    <th>Egreso</th>
+                    <th>F SDGI</th>
+                    <th>Sala | Servicio</th>
+                    <th>Exp</th>
+                    <th>DNI</th>
+                    <th>Nombre PTE</th>
+                </tr>
+        </tfoot>
+        </table>
+    </div>
+    
+{% endblock content %}
+
+{% load static %}
+
+
+{% block extra_js %}
+
+
+
+<script src="{% static 'core/scripts/tablas/dataTablesIngreso.js' %}"></script>
+
+{% endblock extra_js %}

@@ -1,0 +1,359 @@
+{% extends 'core/base.html'%}
+
+{% block title %}Paciente{% endblock title %}
+{% block content %}
+{% load static %}
+{% load permisos_unidad %}
+<div class="contenedor2 contenedorFormulario"> 
+
+    <div class="tituloFormulario" style="margin-bottom: 3rem;">
+        <div class="tituloFormularioPaciente-texto"> 
+            <div class="tituloFormularioPaciente-icono">
+                <i class="bi bi-person"></i>
+                <h2 class="sin-margen">{{titulo}}</h2>
+            </div>
+            <div class="tituloFormularioPaciente-botones">
+                
+                {% if not readonly_mode %}
+                    <a id="btn-cadaver" class="formularioBotones-boton" style="display: none">
+                        <i class="bi bi-emoji-dizzy-fill"></i>
+                        <span>CADAVER</span>
+                    </a>
+                {% endif %}
+
+                {% if MD == 2  %}
+                    
+                    {% if not readonly_mode  %}
+
+                        <a href="{{ url_ingreso }}" class="formularioBotones-boton">
+                            <i class="bi bi-activity" class="formularioBotones-icono"></i>
+                            <span>INGRESO</span> 
+                        </a>
+                        
+                        <!-- toca hacer que lo llamne desde JS-->
+                        <a id="frmPaciente-boton-agregar_atencion" class="formularioBotones-boton">
+                            <i class="bi-thermometer-half" class="formularioBotones-icono"></i>
+                            <span>ATENCION</span> 
+                        </a>
+
+                    {% endif %}
+
+                    {% if  request.user|tiene_rol:"ADMIN:Admision,digitador:Admision,visitante:Admision,auditor:DIRECTIVOS,ADMIN:Imagenologia,digitador:Imagenologia,visitante:Sala"%}
+
+                        <a href="{{ url_historial }}" class="formularioBotones-boton">
+                            <i class="bi bi-journal-medical" class="formularioBotones-icono"></i>
+                            <span>HISTORIAL</span> 
+                        </a>
+
+                    {% endif %}
+
+                
+                {% endif %}
+            </div>
+        </div>
+
+
+        <div class="tituloFormulario-subrallado"></div>
+    </div>
+
+    <form method="post" class="formulario" id="form-paciente">
+        {% csrf_token %}
+    
+        <fieldset class="frmPacienteCampos">
+            <legend>{{ subtitulo }} <b> {{ object.primer_nombre }} {{ object.primer_apellido }} </b></legend>
+            
+            <fieldset class="identificacionCampos">
+                <legend>Identificacion</legend>
+                
+                <div class="formularioCampo">
+                    <label>Expediente #</label>
+                    <input type="text" id="expediente-numero" name="expediente_numero" placeholder="Número" class="formularioCampo-text" readonly required>
+                </div>
+
+                <div class="formularioCampo">
+                    <label>Tipo</label>
+                    {{ form.tipo }}
+                </div>
+
+                <!-- Nacionalidad -->
+                <div class="formularioCampo">
+                    {{ form.nacionalidad.label_tag }}
+                    {{ form.nacionalidad }}
+                </div>
+
+                <!-- DNI -->
+                <div class="formularioCampo">
+                    <label for="id_dni">Numero</label>
+                    {{ form.dni }}
+                </div>
+            </fieldset>
+
+            <fieldset class="generalesCampos">
+                <legend>Datos Generales</legend>
+
+                <!-- Nombre -->
+                <div class="formularioCampo">
+                    {{ form.primer_nombre.label_tag }}
+                    {{ form.primer_nombre }}
+                </div>
+
+                <div class="formularioCampo">
+                    {{ form.segundo_nombre.label_tag }}
+                    {{ form.segundo_nombre }}
+                </div>
+            
+                <!-- Apellido -->
+                <div class="formularioCampo">
+                    {{ form.primer_apellido.label_tag }}
+                    {{ form.primer_apellido }}
+                </div>
+
+                <div class="formularioCampo">
+                    {{ form.segundo_apellido.label_tag }}
+                    {{ form.segundo_apellido }}
+                </div>
+
+                <!-- Sexo -->
+                <div class="formularioCampo">
+                    {{ form.sexo.label_tag }}
+                    {{ form.sexo }}
+                </div>
+            
+                <!-- Fecha de nacimiento -->
+                <div class="formularioCampo">
+                    {{ form.fecha_nacimiento.label_tag }}
+                    {{ form.fecha_nacimiento }}
+                </div>
+                
+                <!-- Edad -->
+                <div class="formularioCampo">
+                    <label>Edad</label>
+                    <input type="text" id="edad" name="edad" placeholder="Edad" class="formularioCampo-text" tabindex="-1" readonly>
+                </div>
+
+                <!-- ultima Visita -->
+                {% if MD == 2 %}
+                <div class="formularioCampo">
+                    <label>Última Visita</label>
+                    <input type="text" class="formularioCampo-text" tabindex="-1" readonly="" 
+                    value="{% if object.get_ultima_visita %}{{ object.get_ultima_visita }}{% else %}-----{% endif %}">
+                </div>
+                {% endif %}
+            </fieldset>
+
+            <fieldset class="domicilioCampos">
+                <legend>Domicilio</legend>
+
+                <!-- Departamento -->
+                <div class="formularioCampo">
+                    <label>Departamento</label>
+                    {{ form.departamento }}
+                </div>
+
+                <!-- Municipio -->
+                <div class="formularioCampo">
+                    {{ form.municipio.label_tag }}
+                    {{ form.municipio }}
+                </div>
+
+                <div class="formularioCampo pacienteUbicacion">
+                    {{ form.sector.label_tag }}
+                    {{ form.sector }}
+                    <button type="button" class="formularioBotones-boton" id="agregar_ubicacion">
+                        <i class="bi bi-plus-square"></i>
+                    </button>
+                </div>
+            </fieldset>
+
+            <fieldset class="otrosCampos">
+                <legend>Otros Datos</legend>
+
+                <!-- Telefono -->
+                <div class="formularioCampo">
+                    {{ form.telefono.label_tag }}
+                    {{ form.telefono }}
+                </div>
+
+                <!-- Estado Civil -->
+                <div class="formularioCampo">
+                    {{ form.estado_civil.label_tag }}
+                    {{ form.estado_civil }}
+                </div>
+
+                <div class="formularioCampo">
+                    {{ form.ocupacion.label_tag }}
+                    {{ form.ocupacion }}
+                </div>
+
+                <div id="grupo-orden-gemelar" class="formularioCampo" style="display: none;">
+                    <label>Orden Gemelar</label>
+                    {{ form.orden_gemelar }}
+
+    
+                </div>
+
+
+            </fieldset>
+
+            <fieldset class="madreCampos">
+                <legend>Madre</legend>
+
+                <!-- Madre -->
+                <div class="formularioCampo formularioCampoPadres">
+                    <input type="hidden" name="domicilio_madre" id="id_domicilio_madre">
+                    <input type="hidden" name="madreId" id="id_madre">
+                    
+                    <input type="text" id="madre_dni" name="madreDni" placeholder="Identidad Madre" class="formularioCampo-text">
+                    <input type="text" id="madre_nombre1" name="madreNombre1" placeholder="Primer Nombre" class="formularioCampo-text">
+                    <input type="text" id="madre_nombre2" name="madreNombre2" placeholder="Segundo Nombre" class="formularioCampo-text">
+                    <input type="text" id="madre_apellido1" name="madreApellido1" placeholder="Primer Apellido" class="formularioCampo-text">
+                    <input type="text" id="madre_apellido2" name="madreApellido2" placeholder="Segundo Apellido" class="formularioCampo-text">
+                </div>
+            </fieldset>
+
+            <fieldset class="padreCampos">
+                <legend>Padre</legend>
+
+                <div class="formularioCampo formularioCampoPadres">
+                    <input type="hidden" name="domicilio_padre" id="id_domicilio_padre">
+                    <input type="hidden" name="padreId" id="id_padre">
+                    
+                    <input type="text" id="padre_dni" name="padreDni" placeholder="Identidad Padre" class="formularioCampo-text">
+                    <input type="text" id="padre_nombre1" name="padreNombre1" placeholder="Primer Nombre" class="formularioCampo-text">
+                    <input type="text" id="padre_nombre2" name="padreNombre2" placeholder="Segundo Nombre" class="formularioCampo-text">
+                    <input type="text" id="padre_apellido1" name="padreApellido1" placeholder="Primer Apellido" class="formularioCampo-text">
+                    <input type="text" id="padre_apellido2" name="padreApellido2" placeholder="Segundo Apellido" class="formularioCampo-text">
+                </div>
+            </fieldset>
+
+            <fieldset class="observacionCampos">
+
+                <legend>Etnia / Observaciones</legend>
+                <div class="formularioCampo">
+                    {{ form.etnia.label_tag }}
+                    {{ form.etnia }}
+                </div>
+                
+                <div class="formularioCampo">
+                    {{ form.observaciones }}
+                </div>
+            </fieldset>
+
+            <fieldset class="detallesRegistro detallesRegistro__ocultar">
+                <legend>Detalles del Registro</legend>
+                
+                <div class="formularioCampo">
+                    <label>Creado:</label>
+                    <label class="formularioCampo-text">{{ info_registro.fecha_creado }}  por {{ info_registro.creado_por }}</label>
+                </div>
+                
+                <div class="formularioCampo">
+                    <label>Actualizado:</label>
+                    <label class="formularioCampo-text">{{ info_registro.fecha_modificado }} por {{ info_registro.modificado_por }}</label>
+                </div>
+
+                <div class="formularioCampo">
+                    {{ form.estado.label_tag }}
+                    {{ form.estado }}
+                </div>
+                
+                {% if  request.user|tiene_rol:"ADMIN:Admision"  %}
+                    <div class="formularioCampo">
+                        {{ form.clasificacion.label_tag }}
+                        {{ form.clasificacion }}
+                    </div>
+                {% endif %}
+                
+            </fieldset>
+        </fieldset>
+
+        <!-- Botón para guardar -->
+        <div class="formularioBotones">
+
+            <label class="ck-formulario" for="switchSAI">
+                <input type="checkbox" id="switchSAI" name="sai" class="ck-formulario__checkbox" hidden
+                {% if paciente.sai %}checked{% endif %}>
+                <div class="ck-formulario__base">
+                <div class="ck-formulario__bolita"></div>
+                </div>
+                <span class="ck-formulario__label">SAI</span>
+            </label>
+
+            
+            <label class="ck-formulario" for="switchADO">
+                <input type="checkbox" id="switchADO" name="adolescente" class="ck-formulario__checkbox" hidden
+                {% if paciente.adolescente %}checked{% endif %}>
+                <div class="ck-formulario__base">
+                <div class="ck-formulario__bolita"></div>
+                </div>
+                <span class="ck-formulario__label">Adolescente</span>
+            </label>
+
+            {% if MD == 2 %}
+
+                
+                <label class="ck-formulario" for="switchDefuncion">
+                    <input type="checkbox" id="switchDefuncion" class="ck-formulario__checkbox" hidden>
+                    <div class="ck-formulario__base">
+                    <div class="ck-formulario__bolita"></div>
+                    </div>
+                    <span class="ck-formulario__label">Defuncion</span>
+                </label>
+
+            {% endif %}
+
+            <a href="javascript:history.back()" class="formularioBotones-boton">
+                <i class="bi bi-x-octagon-fill"></i>
+                <span>Cancelar</span>
+            </a>
+
+            <button type="submit" class="formularioBotones-boton" id="formularioPaciente-botonGuardar">
+                <i class="bi bi-floppy2-fill"></i>
+                <span>Guardar</span>
+            </button>
+
+        </div>
+    </form>
+
+
+</div>
+
+{% endblock content %}
+{% load static %}
+
+{% block extra_js %}
+<script src="{% static 'core/scripts/features/sector.js' %}"></script>
+
+<script>
+
+    // edicion
+    let MD = "{{ MD }}";
+    var dicContexto = {};
+
+    if (MD == 2) {
+        {% if info_expediente %} 
+            dicContexto["infoExpediente"] = {{ info_expediente|safe }};
+        {% endif %}
+        {% if info_ubicacion %} 
+            dicContexto["infoUbicacion"] = {{ info_ubicacion|safe }};
+        {% endif %}
+        {% if info_madre %} 
+            dicContexto["infoMadre"] = {{ info_madre|safe }};
+        {% endif %}
+        {% if info_padre %} 
+            dicContexto["infoPadre"] = {{ info_padre|safe }}; 
+        {% endif %}
+        {% if defuncion is not None %} 
+            dicContexto["defuncion"] = {{ defuncion|lower }}; 
+        {% endif %}
+    }
+
+    var idPaciente = '{{ object.id }}';
+    var idTipo = '{{ object.tipo_id }}';
+
+    var permiso = {{ readonly_mode }};
+    dicContexto["soloLectura"] = permiso;
+</script>
+
+<script src="{% static 'core/scripts/features/paciente.js' %}"></script>
+{% endblock extra_js %}

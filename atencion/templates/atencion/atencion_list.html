@@ -1,0 +1,60 @@
+{% extends 'core/base.html'%}
+
+
+
+{% block title %}Atenciones{% endblock title %}
+
+{% block content %}
+    <div class="contenedor2 dataTables_wrapper"> 
+        <div class="tituloFormulario" style="margin-bottom: 2rem;">
+            <div class="tituloFormulario-texto"> 
+                <i class="bi-thermometer-half"></i>
+                <h2 class="sin-margen">Listado General de Atenciones</h2>
+            </div>
+            <div class="tituloFormulario-subrallado"></div>
+        </div>
+    
+        <table id="data_table_atencion" class="dataTable stripe hover  row-border" >
+            <thead>
+                <tr>
+                    <th>Num</th>
+                    <th>Atencion</th>
+                    <th>Retorno</th>
+                    <th>Servicio</th>
+                    <th>Exp</th>
+                    <th>DNI</th>
+                    <th>Nombre PTE</th>
+
+                </tr>
+            </thead>
+        <tbody>
+        </tbody>
+        <tfoot>
+                <tr>
+                    <th>Num</th>
+                    <th>Atencion</th>
+                    <th>Retorno</th>
+                    <th>Servicio</th>
+                    <th>Exp</th>
+                    <th>DNI</th>
+                    <th>Nombre PTE</th>
+                </tr>
+        </tfoot>
+        </table>
+    </div>
+    
+{% endblock content %}
+
+{% load static %}
+
+
+{% block extra_js %}
+
+
+
+<script src="{% static 'core/scripts/tablas/dataTablesAtencion.js' %}"></script>
+
+
+
+
+{% endblock extra_js %}

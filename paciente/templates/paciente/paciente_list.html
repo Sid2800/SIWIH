@@ -1,0 +1,84 @@
+{% extends 'core/base.html'%}
+
+
+
+{% block title %}Pacientes{% endblock title %}
+
+{% block content %}
+
+
+
+
+<div class="contenedor2 dataTables_wrapper"> 
+
+
+
+    <div class="tituloFormulario" style="margin-bottom: 3rem;">
+        <div class="tituloFormulario-texto"> 
+            <i class="bi bi-person"></i>
+            <h2 class="sin-margen">Listado General de Pacientes</h2>
+        </div>
+        <div class="tituloFormulario-subrallado"></div>
+    </div>
+
+    <table id="data_table_paciente" class="dataTable stripe hover  row-border" >
+        <thead>
+            <tr>
+                
+                <th>Exp</th>
+                <th># Identificacion</th>
+                <th>Tip</th>
+                <th>Nombre</th>
+                <th>Apellido</th>
+                <th>F Nacimiento</th>
+                <th>Sexo</th>
+                <th>Direccion</th>
+                <th>Clas</th>
+                <th>Actualizado</th>
+                <th>id</th>
+            </tr>
+        </thead>
+    <tbody>
+    </tbody>
+    <tfoot>
+            <tr>
+                
+                <th>Exp</th>
+                <th># Identificacion</th>
+                <th>Tip</th>
+                <th>Nombre</th>
+                <th>Apellido</th>
+                <th>F Nacimiento</th>
+                <th>Sexo</th>
+                <th>Direccion</th>
+                <th>Clas</th>
+                <th>Actualizado</th>
+                <th>id</th>
+            </tr>
+    </tfoot>
+    </table>
+
+
+
+</div>
+{% endblock content %}
+{% load static %}
+
+{% block extra_js %}
+<script>
+var botonesUnidad = {};
+    {% if botones %} 
+        botonesUnidad = {{ botones|safe }};
+    {% endif %}
+</script>
+<script src="{% static 'core/scripts/tablas/dataTablesPaciente.js' %}"></script>
+
+
+
+{% endblock extra_js %}
+
+
+
+
+
+

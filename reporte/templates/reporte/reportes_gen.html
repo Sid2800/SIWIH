@@ -1,0 +1,280 @@
+{% extends 'core/base.html' %}
+{% block title %}Generador de Reportes{% endblock title %}
+{% load permisos_unidad %}
+
+{% block content %}
+<div class="contenedor2"> 
+    <div class="tituloFormulario" style="margin-bottom: 2rem;">
+        <div class="tituloFormulario-texto"> 
+            <i class="bi bi-journal-text "></i>
+            <h2 class="sin-margen">Reportes e Informes</h2>
+        </div>
+        <div class="tituloFormulario-subrallado"></div>
+    </div>
+
+        <div class="reporteTabs">
+                    <button class="reporteTabsBoton active" data-tab="reporteGenerador">
+                        <i class="bi bi-journal-plus reporteTabsBoton__logo"></i>
+                        <span class="reporteTabsBoton__texto">GENERADOR</span>
+                    </button>
+
+                    {% if  request.user|tiene_unidad:"Referencia:DIRECTIVOS:imagenologia" %}
+                    <button class="reporteTabsBoton" data-tab="reporteInformes">
+                        <i class="bi bi-journal-medical reporteTabsBoton__logo"></i>
+                        <span class="reporteTabsBoton__texto">INFORMES</span>
+                    </button>
+                    {% endif %}
+
+                    {% if  request.user|tiene_unidad:"Referencia:DIRECTIVOS" %}
+                    <button class="reporteTabsBoton" data-tab="reporteCatalogos">
+                        <i class="bi bi-table reporteTabsBoton__logo"></i>
+                        <span class="reporteTabsBoton__texto">CATALOGOS</span>
+                    </button>
+                    {% endif %}
+
+                    
+        </div>
+
+
+    <div class="fieldset-falso">    
+
+        <div class="reporte-tab-contenido active" id="reporteGenerador">
+
+            <fieldset class="detallesRegistro">
+                <legend>Rango de fechas para todos los reportes</legend>
+
+                <div class="formularioCampoModal">
+                    <label for="reporte-gen-fecha-inicial">Fecha Inicial</label>
+                    <input type="date" id="reporte-gen-fecha-inicial" name="fecha_inicio" value="{{ fecha_inicio|date:'Y-m-d' }}" class="formularioCampo-date">
+                </div>
+
+                <div class="formularioCampoModal">
+                    <label for="reporte-gen-fecha-final">Fecha Final</label>
+                    <input type="date" id="reporte-gen-fecha-final" name="fecha_fin" value="{{ fecha_fin|date:'Y-m-d' }}" class="formularioCampo-date">
+                </div>
+
+
+            </fieldset>
+
+            <fieldset class="frmGeneradorReportesCampos">
+                <legend>Modelos Reportes</legend>
+
+                <div class="formularioCampoModal">
+                    <label for="reporte-gen-modelo">Modelo</label>
+                    <select id="reporte-gen-modelo" name="modelo" class="formularioCampo-select">
+                        {% for valor, texto in modelos %}
+                        <option value="{{ valor }}">{{ texto }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="formularioCampoModal">
+                    <label for="reporte-gen-interacion">Interacción</label>
+                    <select id="reporte-gen-interacion" class="formularioCampo-select" name="interacion">
+                    </select>
+                </div>
+
+                <div class="formularioCampoModal">
+                    <label for="reporte-gen-agrupacion">Agrupación</label>
+                    <select id="reporte-gen-agrupacion" class="formularioCampo-select" name="agrupacion">
+                    </select>
+                </div>
+                
+
+                <div class="formularioCampoModal">
+                    <label for="reporte-gen-filtro-campo">Campo Filtro</label>
+                    <select id="reporte-gen-filtro-campo" class="formularioCampo-select" name="filtro">
+                    </select>
+                </div>
+
+                <div class="formularioCampoModal">
+                    <label for="reporte-gen-filtro-valor">Valor Filtro</label>
+                    <select id="reporte-gen-filtro-valor" class="formularioCampo-select" name="filtro">
+                    </select>
+                </div>
+
+                <div class="reporte-gen-contenerdor-switch-boton">
+                    <label class="ck-formulario" for="reporte-gen-interruptor-detalle">
+                        <input type="checkbox" id="reporte-gen-interruptor-detalle" class="ck-formulario__checkbox" hidden>
+                        <div class="ck-formulario__base">
+                            <div class="ck-formulario__bolita"></div>
+                        </div>
+                        <span class="ck-formulario__label">Detalles</span>
+                    </label>
+
+                    <a class="formularioBotones-boton" id="reporte-gen-generar-boton">
+                        <i class="bi bi-file-earmark-arrow-down-fill"></i>
+                        <span>Generar</span>
+                    </a>
+                </div>
+            </fieldset>
+
+        </div>
+
+        <div class="reporte-tab-contenido" id="reporteInformes">
+            <fieldset class="reporte-informe">
+                <div class="informe-criterios-generales">
+                
+                    <div class="formularioCampoModal">
+                            <label for="informe-rx-informe-anio">Año</label>
+                            <select id="informe-rx-informe-anio" class="formularioCampo-select">
+                                {% for anio in anios %}
+                                    <option value="{{ anio }}" {% if anio == anios|last %}selected{% endif %}>
+                                        {{ anio }}
+                                    </option>
+                                {% endfor %}
+                            </select>      
+                    </div>
+                    
+                    <div class="formularioCampoModal">
+                        <label for="informe-rx-informe-mes">Mes</label>
+                        <select id="informe-rx-informe-mes" class="formularioCampo-select"> 
+                            <option value="01" {% if mes_actual == "01" %}selected{% endif %}>ENERO</option>
+                            <option value="02" {% if mes_actual == "02" %}selected{% endif %}>FEBRERO</option>
+                            <option value="03" {% if mes_actual == "03" %}selected{% endif %}>MARZO</option>
+                            <option value="04" {% if mes_actual == "04" %}selected{% endif %}>ABRIL</option>
+                            <option value="05" {% if mes_actual == "05" %}selected{% endif %}>MAYO</option>
+                            <option value="06" {% if mes_actual == "06" %}selected{% endif %}>JUNIO</option>
+                            <option value="07" {% if mes_actual == "07" %}selected{% endif %}>JULIO</option>
+                            <option value="08" {% if mes_actual == "08" %}selected{% endif %}>AGOSTO</option>
+                            <option value="09" {% if mes_actual == "09" %}selected{% endif %}>SEPTIEMBRE</option>
+                            <option value="10" {% if mes_actual == "10" %}selected{% endif %}>OCTUBRE</option>
+                            <option value="11" {% if mes_actual == "11" %}selected{% endif %}>NOVIEMBRE</option>
+                            <option value="12" {% if mes_actual == "12" %}selected{% endif %}>DICIEMBRE</option>
+                        </select>      
+                    </div>
+                    
+                    {% comment %} Ocultar para usuarios de Imagenología {% endcomment %}
+                    
+                        <div class="informes-exportacion-op">
+                            <label class="informes-exportacion-texto">Formato</label>
+
+                            <div class="informes-exportacion-cks"> 
+                                <div class="informes-exportacion-grupo">
+
+                                    <label class="radio-personalizado" for="informe-export-pdf">
+                                        <input type="radio" id="informe-export-pdf" name="formato_informe" value="pdf" hidden checked>
+                                        <div class="radio-boton">
+                                            <i class="bi bi-filetype-pdf"></i>
+                                            PDF
+                                        </div>
+                                    </label>
+
+                                    <label class="radio-personalizado" for="informe-export-xlsx">
+                                        <input type="radio" id="informe-export-xlsx" name="formato_informe" value="xlsx" hidden>
+                                        <div class="radio-boton">
+                                            <i class="bi bi-file-earmark-spreadsheet "></i>
+                                            EXCEL
+                                        </div>
+                                    </label>
+
+                                </div>
+                            </div>
+                        </div>
+                    
+                
+                    
+                </div>
+                {% if  request.user|tiene_rol:"ADMIN:imagenologia,digitador:imagenologia,auditor:DIRECTIVOS"%}
+                    <fieldset class="reporteCamposInformes">
+                        <legend>Radiologia</legend>
+                            <div class="formularioCampoModal">
+                                <label for="informe-rx-informe">Informe</label>
+                                <select id="informe-rx-informe" class="formularioCampo-select" name="rx-informe">
+                                    {% for valor, texto in informesRx %}
+                                        <option value="{{ valor }}">{{ texto }}</option>
+                                    {% endfor %}
+                                </select>  
+                                <a class="formularioBotones-boton" id="informe-rx-generar-boton">
+                                    <i class="bi bi-file-earmark-arrow-down-fill"></i>
+                                    <span>Generar</span>
+                                </a>    
+                            </div>
+                    </fieldset>
+                {% endif %}
+                
+                {% if  request.user|tiene_rol:"ADMIN:Referencia,digitador:Referencia,auditor:DIRECTIVOS"%}
+                    <fieldset class="reporteCamposInformes">
+                        <legend>Referencia - Respuesta</legend>
+                            <div class="formularioCampoModal">
+                                <label for="informe-referencia-informe">Informe</label>
+                                <select id="informe-referencia-informe" class="formularioCampo-select" name="referencia-informe">
+                                    {% for valor, texto in informesReferencia %}
+                                        <option value="{{ valor }}">{{ texto }}</option>
+                                    {% endfor %}
+                                </select>  
+                                <a class="formularioBotones-boton" id="informe-referencia-generar-boton">
+                                    <i class="bi bi-file-earmark-arrow-down-fill"></i>
+                                    <span>Generar</span>
+                                </a>    
+                                
+                            </div>
+                    </fieldset>
+                {% endif %}
+            </fieldset>
+        </div>
+
+        <div class="reporte-tab-contenido" id="reporteCatalogos">
+            {% if  request.user|tiene_rol:"ADMIN:Referencia,digitador:Referencia,auditor:DIRECTIVOS"%}
+                <fieldset class="reporte-informe">
+                
+                    <fieldset class="detallesRegistro">
+                        <legend>Rango de fechas</legend>
+
+                        <div class="formularioCampoModal">
+                            <label for="catalogo-fecha-inicial">Fecha Inicial</label>
+                            <input type="date" id="catalogo-fecha-inicial" value="{{ fecha_inicio|date:'Y-m-d' }}" class="formularioCampo-date">
+                        </div>
+
+                        <div class="formularioCampoModal">
+                            <label for="catalogo-fecha-final">Fecha Final</label>
+                            <input type="date" id="catalogo-fecha-final" value="{{ fecha_fin|date:'Y-m-d' }}" class="formularioCampo-date">
+                        </div>
+                    </fieldset>
+
+                    <fieldset class="reporteCamposCatologo">
+                        <legend>Catálogo</legend>
+
+                        <div class="formularioCampoModal">
+                            <label for="catalogo-tipo">Tipo</label>
+                            <select id="catalogo-tipo" class="formularioCampo-select">
+                                {% for valor, texto in informesCatalogo %}
+                                    <option value="{{ valor }}">{{ texto }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        
+                        <a class="formularioBotones-boton" id="catalogo-generar-boton">
+                            <i class="bi bi-download"></i>
+                            <span>Generar</span>
+                        </a>
+                    </fieldset>
+                </fieldset>
+            {% endif %}
+        </div>
+
+
+    </div>
+</div>
+{% endblock content %}
+
+{% load static %}
+{% block extra_js %}
+
+<script> 
+urls['obtenerInteraccionFiltroAgrupacion'] = "{% url 'obtener_interaccion_filtro_agrupacion' %}";
+urls['obtenerOpcionesFiltro'] = "{% url 'obtener_opciones_filtro' %}";
+urls['reporteGenerado'] = "{% url 'reporte_generado' %}";
+urls['informesImagenologia'] = "{% url 'informes_imagenologia' %}";
+urls['informesReferencia'] = "{% url 'informes_referencia' %}";
+urls['informesCatalogo'] = "{% url 'informes_catalogo' %}";
+
+
+
+
+</script>
+
+<script src="{% static 'core/scripts/reports/generador.js' %}"></script>
+
+{% endblock extra_js %}

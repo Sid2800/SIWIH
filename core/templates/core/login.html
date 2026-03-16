@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="es" class="login-html">
+<head>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>Login | SIWIH</title>
+   {% load static %}
+
+   <!-- Favicon -->
+   <link rel="icon" href="{% static 'core/favicon.ico' %}" type="image/x-icon">
+
+   <!-- Estilos -->
+   <link rel="stylesheet" href="{% static 'core/bootstrap-icons/bootstrap-icons.min.css' %}">
+   <link rel="preload" href="{% static 'core/css/style.css' %}" as="style">
+   <link rel="stylesheet" href="{% static 'core/css/style.css' %}">
+   <link rel="stylesheet" href="{% static 'core/fonts/css/googlefonts.css' %}">
+</head>
+
+<body class="login-body">
+   <!-- ENCABEZADO -->
+   <header class="login-header">
+      <div class="login-header-content">
+         <!-- Logo institucional (Hospital) -->
+         <img src="{% static 'core/img/SIWIFINAL.png' %}" alt="Logo SIWIH" class="login-logo-institucion">
+
+         <!-- Nombre del sistema -->
+         <div class="login-nombre-sistema">
+            <h1>SIWIH</h1>
+            <span>Sistema Informático Web Integral Hospitalario</span>
+         </div>
+
+         <!-- Logo fundación u otro -->
+         <div class="login-logos-secundarios">
+            <img src="{% static 'core/img/logo_HEAC.png' %}" alt="Logo Fundación" class="login-logo-secundario">
+            <img src="{% static 'core/img/logo_FUNDAGES2.png' %}" alt="Logo Fundación" class="login-logo-secundario">
+            <img src="{% static 'core/img/logo_sesal.png' %}" alt="Logo Fundación" class="login-logo-secundario">
+         <div>
+         
+      </div>
+   </header>
+
+   <!-- CUERPO PRINCIPAL DE LOGIN -->
+   <div class="login-container">
+      <form class="login-form" method="POST">
+         {% csrf_token %}
+
+         <div class="login-form-title">
+            <span>Bienvenido</span>
+         </div>
+
+         <img src="{% static 'core/img/SIWIFINAL_3.png' %}" alt="Logo Empresa" class="login-logo">
+
+         <!-- Usuario -->
+         <div class="input-container">
+            <i class="bi bi-person-fill input-icon"></i>
+            {{ form.username }}
+         </div>
+
+         <!-- Contraseña -->
+         <div class="input-container">
+            <i class="bi bi-shield-lock-fill input-icon"></i>
+            {{ form.password }}
+         </div>
+
+         <!-- Zona -->
+         <div class="input-container">
+            <i class="bi bi-geo-alt-fill input-icon"></i>
+            {{ form.zona }}  
+         </div>
+
+         <!-- Botón login -->
+         <div class="login-btn-container">
+            <button type="submit" class="formularioBotones-boton login-btn">
+               <i class="bi bi-key-fill"></i>
+               <span>Iniciar sesión</span>
+            </button>
+         </div>
+
+         <!-- Errores del formulario -->
+         {% if form.errors %}
+         <div class="form-errors">
+            <strong>¡Error!</strong> Por favor, revisa los campos:
+            <ul>
+               {% for field, errors in form.errors.items %}
+                  {% if field == '__all__' %}
+                     {% for error in errors %}
+                        <li>{{ error }}</li>
+                     {% endfor %}
+                  {% else %}
+                     <li>{{ field|capfirst }}: {{ errors|join:", " }}</li>
+                  {% endif %}
+               {% endfor %}
+            </ul>
+         </div>
+         {% endif %}
+      </form>
+   </div>
+
+   <!-- PIE DE PÁGINA -->
+   <footer class="login-footer">
+      <p>Sistema desarrollado por &copy; 2025 - Ing. Sady Gonzalez</p>
+      <p>Hospital Enrique Aguilar Cerrato - Fundación Gestora de la Salud </p>
+   </footer>
+
+   <!-- Modo oscuro -->
+   <script>
+      let modo = localStorage.getItem('modo');
+      if (modo === 'oscuro') {
+         document.body.classList.toggle("darkmode"); 
+      }
+   </script>
+</body>
+</html>

@@ -1,0 +1,631 @@
+{% extends 'core/base.html'%}
+
+{% block title %}Referencia{% endblock title %}
+{% block content %}
+
+
+<div class="contenedor2 contenedorFormulario"> 
+
+    <div class="tituloFormulario" style="margin-bottom: 3rem;">
+        <div class="tituloFormularioReferencia-texto"> 
+            <div class="tituloFormularioReferencia-icono">
+                <i class="bi bi-link-45deg"></i>
+                <h2 class="sin-margen">{{titulo}} Referencia y Respuesta </h2>
+            </div>
+            <div class="tituloFormularioReferencia-botones">
+
+                <!--
+                <a class="formularioBotones-boton oculto" id="formularioReferenciaBotonRegistrarRespuesta">
+                    <i class="bi bi-activity" class="formularioBotones-icono"></i>
+                    <span>REGISTRAR RESPUESTA</span> 
+                </a>
+                -->
+
+            </div>
+        </div>
+
+
+        <div class="tituloFormulario-subrallado"></div>
+    </div>
+
+
+
+    
+    {% csrf_token %}
+        <div class="frmReferenciaCampos">
+            <span class="form-subtitulo-fieldset-falso"> {{ subtitulo }}</span> <!-- quitar al final-->
+            <fieldset class="referenciaPacienteCampos">
+            <legend>Datos Paciente</legend>  
+
+
+                <div class="formularioCampo">
+                    <label>DNI </label>
+                    {{ form.dniPaciente }}
+                </div>
+
+                <div class="formularioCampo">
+                    <label>Expediente N</label>
+                    {{ form.numeroExpediente }}
+                </div>
+
+                <div class="formularioCampo">
+                    <label>Nombre</label>
+                    {{ form.nombreCompletoPaciente }}
+                </div>
+                
+                <div class="formularioCampo">
+                    <label for="fecha_nacimiento">Fecha de Nacimiento:</label>
+                    {{ form.fechaNacimientoPaciente }}
+                </div>
+
+                <div class="formularioCampo">
+                    <label for="fecha_nacimiento">Edad</label>
+                    {{ form.edadPaciente }}
+                </div>
+
+                <div class="formularioCampo">
+                    <label>Sexo</label>
+                    {{ form.sexoPaciente }}
+                </div>
+                
+                <div class="formularioCampo">
+                    <label>Teléfono</label>
+                    {{ form.telefonoPaciente }}
+                </div>
+                            
+                <div class="formularioCampo">
+                    <label>Domicilio</label>
+                    {{ form.direccionPaciente }}
+                </div>
+                
+                
+
+                {{ form.idPaciente }}
+            </fieldset>
+
+            <div class="referenciaTabs">
+                <a href="#" class="referenciaTabsBoton active" data-tab="camposReferencia">
+                    <i class="bi bi-link-45deg reporteTabsBoton__logo"></i>
+                    <span class="referenciaTabsBoton__texto">REFERENCIA</span>
+                </a>
+                
+                {% if MD == 2 %}
+
+                    {% if form.tipo.value == 0  %}
+                    <a id="referenciaTabRespuesta" class="referenciaTabsBoton" data-tab="camposRespuesta">
+                        <i class="bi bi-reply-all-fill reporteTabsBoton__logo"></i>
+                        <span class="referenciaTabsBoton__texto">RESPUESTA</span>
+                    </a>
+                    {% else %}
+                    <a id="referenciaTabRespuestaEnv" class="referenciaTabsBoton" data-tab="camposRespuestaEnv">
+                        <i class="bi bi-reply-all-fill reporteTabsBoton__logo"></i>
+                        <span class="referenciaTabsBoton__texto">RESPUESTA</span>
+                    </a>
+
+                    {% endif %}
+                {% endif %}
+            </div>
+
+            <form method="post" class="formulario" id="form-referencia">
+                <div class="referencia-tab-contenido active" id="camposReferencia">
+                    <div class="referenciaReferenciaCampos" >
+
+                        {{ form.idReferencia }}
+
+                        <fieldset class="referencia-referencia-tipo">
+                            <legend>Tipo Referencia</legend>
+                            <div class="referencia-referencia-tipo-contenedor">
+                                <label class="radio-personalizado" for="referencia-tipo-enviada">
+                                <input type="radio" id="referencia-tipo-enviada" name="tipo" value="1" hidden 
+                                        {% if object.tipo == 1 %}checked{% endif %}>
+                                <span class="radio-boton">Enviada</span>
+                                </label>
+
+                                <label class="radio-personalizado" for="referencia-tipo-recibida">
+                                <input type="radio" id="referencia-tipo-recibida" name="tipo" value="0" hidden 
+                                        {% if object.tipo == 0 %}checked{% endif %}>
+                                <span class="radio-boton">Recibida</span>
+                                </label>
+                            </div>
+                        </fieldset>
+
+                        <fieldset class="referenciaReferenciaCamposFechas">
+                            <legend>Fechas</legend>
+                            <div class="formularioCampoReferenciaFecha">
+                                <label>Elaboracion</label>
+                                {{ form.fecha_elaboracion }}                 
+                            </div>
+
+                            <div class="formularioCampoReferenciaFecha">
+                                <label>Recibida</label>
+                                {{ form.fecha_recepcion }}                 
+                            </div>
+                        </fieldset >
+
+                        <fieldset class="referenciaReferenciaCamposInstituciones">
+                            <legend>Instituciones</legend>
+
+                            <div class="formularioCampo">
+                                <label>Origen</label>
+                                {{ form.institucion_origen }}                 
+                            </div>
+                            
+                            <div class="formularioCampo">
+                                <label>Destino</label>
+                                {{ form.institucion_destino }}                 
+                            </div>        
+                        </fieldset >
+
+                        <fieldset class="referenciaReferenciaCamposMotivo">
+                            <legend>Motivo de envio</legend>
+                            <div class="formularioCampo">
+                                {{ form.motivo.label_tag }}
+                                {{ form.motivo }}   
+                            </div>  
+                            <div class="formularioCampo">
+                                <label>Detalle</label>
+                                {{ form.motivo_detalle }}   
+                            </div>  
+
+                        </fieldset >
+                        
+                        <fieldset class="referenciaReferenciaCamposOtros">
+                            <legend>Elaboracion</legend>
+                            <div class="formularioCampo">
+                                <label>Elaborado por</label>
+                                {{ form.elaborada_por }}   
+                            </div>  
+                            <div class="formularioCampo">
+                                <label>Aten. requerida</label>
+                                {{ form.atencion_requerida }}   
+                            </div>   
+                        </fieldset >
+
+                        <div class="referenciaReferenciaCamposDiagnostico" >
+                            <label class= "form-subtitulo-fieldset-falso">DIAGNOSTICO</label>
+                            <table id="referencia-tabla-referencia-diagnosticos"  class="display" style="width:100%">
+                                <thead>
+                                    <tr>
+                                        <th>Diagnostico</th>
+                                        <th>Detalle</th>
+                                        <th>Confirmado</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                </tbody>
+                            </table>
+                        </div >
+
+                        <fieldset class="referenciaReferenciaObservaciones">
+                        <legend>Observaciones</legend>
+                            {{ form.observaciones }}  
+                        </fieldset >
+                    
+                        <div class="referenciaReferenciaEvaluacion" id="contenedor-evaluacion">
+                            <fieldset class="radio-fielset referenciaOportuna">
+                                <legend>Oportuna</legend>
+                                <div class="referencia-contenedor-radios-options">
+                                    <label class="radio-personalizado">
+                                        <input type="radio" name="oportuna" value="1" hidden 
+                                            {% if object.oportuna == 1 %}checked{% endif %}>
+                                        <span class="radio-boton">SI</span>
+                                    </label>
+
+                                    <label class="radio-personalizado">
+                                        <input type="radio" name="oportuna" value="2" hidden 
+                                            {% if object.oportuna == 2 %}checked{% endif %}>
+                                        <span class="radio-boton">NO</span>
+                                    </label>
+
+                                    <label class="radio-personalizado">
+                                        <input type="radio" name="oportuna" value="3" hidden 
+                                            {% if object.oportuna == 3 or MD == 1 %}checked{% endif %}>
+                                        <span class="radio-boton">NC</span>
+                                    </label>
+                                <div>
+                            </fieldset >
+
+                            <fieldset class="radio-fielset referenciaJustificada">
+                                <legend>Justificada</legend>
+                                    
+                                    <div class="referencia-contenedor-radios-options">
+                                        <label class="radio-personalizado">
+                                            <input type="radio" name="justificada" value="1" hidden 
+                                                {% if object.justificada == 1 %}checked{% endif %}>
+                                            <span class="radio-boton">SI</span>
+                                        </label>
+
+                                        <label class="radio-personalizado">
+                                            <input type="radio" name="justificada" value="2" hidden 
+                                                {% if object.justificada == 2 %}checked{% endif %}>
+                                            <span class="radio-boton">NO</span>
+                                        </label>
+
+                                        <label class="radio-personalizado">
+                                            <input type="radio" name="justificada" value="3" hidden 
+                                                {% if object.justificada == 3 or MD == 1 %}checked{% endif %}>
+                                            <span class="radio-boton">NC</span>
+                                        </label>
+                                    </div>
+                            </fieldset>
+                        </div>
+
+                        <fieldset class="referenciaReferenciaCamposInteractivo" id="contenedor-interactivo">
+                            <legend>Destino de la Referencia</legend>
+
+                            <div class="formularioCampo">
+                                <label>Area Refiere</label>
+                                {{ form.area_refiere }}
+                            </div>
+
+                            <div class="formularioCampo">
+                                <label>Especialidad Destino</label>
+                                {{ form.especialidad_destino }}
+                            </div>
+
+                                                
+                        </fieldset >
+
+
+                    </div>
+                </div>
+            </form>
+            
+            {% if form.tipo.value == 0 %}
+            <form method="post" class="formulario" id="form-respuesta" action="{% url 'respuesta_agregar' %}">
+                <div class="referencia-tab-contenido" id="camposRespuesta">
+                    <div class="referenciaRespuestaCampos">
+
+                        {{ form_respuesta.idRespuesta }}
+
+                        <div class="referenciaRespuestaPanel referenciaRespuestaPanelIzquierdo">
+                        <!-- Fieldsets del lado izquierdo -->
+                            <fieldset class="referenciaRespuestaCamposFechas">
+                                <legend>Fechas</legend>
+                                <div class="formularioCampoReferenciaFecha">
+                                    <label>Elaboración</label>
+                                    {{ form_respuesta.fecha_elaboracion }}
+                                </div>
+                                <div class="formularioCampoReferenciaFecha">
+                                    <label>Atención</label>
+                                    {{ form_respuesta.fecha_atencion }}
+                                </div>
+                            </fieldset>
+
+                            <fieldset class="referenciaRespuestaGestionRespuesta">
+                                <legend>Gestión de respuesta</legend>
+
+                                <div class="formularioCampo">
+                                    <label>Institución</label>
+                                    {{ form_respuesta.institucion_responde }}
+                                </div>
+
+                                <div class="formularioCampo">
+                                    <label>Área capta</label>
+                                    {{ form_respuesta.area_capta }}
+                                </div>
+
+                                <div class="formularioCampo">
+                                    <label>Área respuesta</label>
+                                    {{ form_respuesta.area_responde }}
+                                </div>
+                            </fieldset>
+                            
+                            <div class="referenciaRespuestaCamposDiagnostico" >
+                                <label class= "form-subtitulo-fieldset-falso">DIAGNOSTICO</label>
+                                {% if form.tipo.value == 0  %}
+                                    <table id="referencia-tabla-respuesta-diagnosticos"  class="display" style="width:100%">
+                                        <thead>
+                                            <tr>
+                                                <th>Diagnostico</th>
+                                                <th>Detalle</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                        </tbody>
+                                    </table>
+                                {% endif %}
+                            </div>
+
+
+
+                        </div>
+                        
+
+                        <div class="referenciaRespuestaPanel referenciaRespuestaPanelDerecho">
+                            <fieldset class="referenciaRespuestaCamposMotivo">
+                                <legend>Motivo de envio</legend>
+                                <div class="formularioCampo">
+                                    {{ form_respuesta.motivo.label_tag }}
+                                    {{ form_respuesta.motivo }}   
+                                </div>  
+                                <div class="formularioCampo">
+                                    <label>Detalle</label>
+                                    {{ form_respuesta.motivo_detalle }}   
+                                </div>  
+
+                            </fieldset >
+
+                            <fieldset class="referenciaRespuestaCamposOtros">
+                                <legend>Elaboracion</legend>
+                                <div class="formularioCampo">
+                                    <label>Elaborado por</label>
+                                    {{ form_respuesta.elaborada_por }}   
+                                </div>  
+                                <div class="formularioCampo">
+                                    <label>Aten. requerida</label>
+                                    {{ form_respuesta.atencion_requerida }}   
+                                </div>   
+                            </fieldset >
+
+
+                            <fieldset class="referenciaRespuestaSeguimiento">
+                                <legend>Seguimiento Paciente</legend>
+                                
+                                {% if MD == 2  and seguimiento == 2 %}
+                                <a href="{{ referencia_enviada_seguimiento_url }}"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="formularioBotones-boton formularioBotones-boton_flotante-derecha"
+                                id="ir_referencia_enviada_seguimiento"
+                                title="Ir a Referencia">
+                                    <i class="bi bi-link-45deg"></i>
+                                </a>
+                                {% endif %}
+
+
+                                <div class="referencia-respuesta-seguimiento-seguimiento-op">
+                                    <label class="referencia-respuesta-seguimiento-texto">Manejo</label>
+                                    <div class="referencia-respuesta-seguimiento-cks"> 
+                                        <div class="referencia-respuesta-seguimiento">
+                                            <label class="radio-personalizado" for="referencia-respuesta-seguimiento-institucional">
+                                                <input type="radio" id="referencia-respuesta-seguimiento-institucional" name="seguimiento" value="1" hidden>
+                                                <span class="radio-boton">Institucional</span>
+                                            </label>
+
+                                            <label class="radio-personalizado" for="referencia-respuesta-seguimiento-primer-nivel">
+                                                <input type="radio" id="referencia-respuesta-seguimiento-primer-nivel" name="seguimiento" value="0" hidden>
+                                                <span class="radio-boton">Primer Nivel</span>
+                                            </label>
+
+                                            <label class="radio-personalizado" for="referencia-respuesta-seguimiento-referencia">
+                                                <input type="radio" id="referencia-respuesta-seguimiento-referencia" name="seguimiento" value="2" hidden>
+                                                <span class="radio-boton">Referencia</span>
+                                            </label>
+
+                                        </div>
+                                    </div>
+                                </div>
+
+
+                                <div class="formularioCampo" id="seguimiento-campo-institucional-1">
+                                    <label>Especialidad</label>
+                                    {{ form_respuesta.area_seguimiento_especialidad }}
+                                </div>
+
+                                <div class="formularioCampo" id="seguimiento-campo-institucional-2">
+                                    <label>Fecha Cita</label>
+                                    {{ form_respuesta.fecha_cita }}
+                                </div>
+                                
+                                <div class="formularioCampo oculto" id="seguimiento-campo-primer-nivel">
+                                    <label>Institución</label>
+                                    {{ form_respuesta.institucion_destino }}
+                                </div>
+
+                                <div class="formularioCampo oculto" id="seguimiento-campo-referencia-1">
+                                    <label>Institución</label>
+                                    {{ form_respuesta.seguimiento_referencia_institucion_destino }}
+                                </div>
+
+                                <div class="formularioCampo oculto" id="seguimiento-campo-referencia-2">
+                                    <label>Especialidad</label>
+                                    {{ form_respuesta.seguimiento_referencia_especialidad_destino }}
+                                </div>
+                                
+
+                            </fieldset>
+
+                            <fieldset class="referenciaRespuestaObservaciones">
+                                <legend>Observaciones</legend>
+                                {{ form_respuesta.observaciones }}  
+                            </fieldset >
+                        </div>
+
+                    </div>
+                </div>
+            </form>
+            {% endif %}
+
+            <form method="post" class="formulario" id="form-respuesta-env" action="{% url 'respuesta_agregar' %}">
+
+                {{ form_respuesta.idRespuesta }}
+
+                <div class="referencia-tab-contenido" id="camposRespuestaEnv">
+                    <div class="referenciaRespuestaEnvCampos">
+                        <div class="referenciaRespuestaPanel referenciaRespuestaPanelIzquierdo">
+                            <fieldset class="referenciaRespuestaCamposFechas">
+                                <legend>Fechas</legend>
+                                <div class="formularioCampoReferenciaFecha">
+                                    <label>Atencion</label>
+                                    {{ form_respuesta.fecha_atencion }}
+                                </div>
+                                <div class="formularioCampoReferenciaFecha">
+                                    <label>Recepcion</label>
+                                    {{ form_respuesta.fecha_recepcion }}
+                                </div>
+                            </fieldset>
+
+                            <fieldset class="referenciaRespuestaGestionRespuesta">
+                                <legend>Responde</legend>
+                                <div class="formularioCampo">
+                                    <label>Institución</label>
+                                    {{ form_respuesta.institucion_responde }}
+                                </div>
+                            </fieldset>
+
+                            <div class="referenciaRespuestaCamposDiagnostico" >
+                                <label class= "form-subtitulo-fieldset-falso">DIAGNOSTICO</label>
+                                {% if form.tipo.value == 1  %}
+                                    <table id="referencia-tabla-respuesta-diagnosticos"  class="display" style="width:100%">
+                                        <thead>
+                                            <tr>
+                                                <th>Diagnostico</th>
+                                                <th>Detalle</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                        </tbody>
+                                    </table>
+                                {% endif %}
+                            </div>
+
+                        </div>
+
+                        <div class="referenciaRespuestaPanel referenciaRespuestaPanelDerecho">
+                            <fieldset class="referenciaRespuestaCamposMotivo">
+                                <legend>Motivo de envio</legend>
+                                <div class="formularioCampo">
+                                    {{ form_respuesta.motivo.label_tag }}
+                                    {{ form_respuesta.motivo }}   
+                                </div>  
+                                <div class="formularioCampo">
+                                    <label>Detalle</label>
+                                    {{ form_respuesta.motivo_detalle }}   
+                                </div>  
+                            </fieldset >
+
+                            <fieldset class="referenciaRespuestaCamposOtros">
+                            <legend>Elaboracion</legend>
+                                    <div class="formularioCampo">
+                                        <label>Elaborado por</label>
+                                        {{ form_respuesta.elaborada_por }}   
+                                    </div>  
+                                    <div class="formularioCampo">
+                                        <label>Aten. requerida</label>
+                                        {{ form_respuesta.atencion_requerida }}   
+                                    </div>   
+                            </fieldset >
+
+                            <fieldset class="referenciaRespuestaGestionRespuesta">
+                                <legend>Seguimiento Paciente</legend>
+
+                                <div class="formularioCampo">
+                                        <label>Institución</label>
+                                        {{ form_respuesta.institucion_destino }}
+                                </div>
+                            </fieldset>
+
+                            <fieldset class="referenciaRespuestaObservaciones">
+                                <legend>Observaciones</legend>
+                                {{ form_respuesta.observaciones }}  
+                            </fieldset >
+
+                        </div>
+                    </div>
+                </div>
+            </form>
+
+
+        </div>
+
+        <!-- Botón para guardar -->
+        <div class="formularioBotones">
+
+            {% if MD == 2 and form.tipo.value == 1 %}
+                <label class="ck-formulario" for="switchSeguimiento">
+                    <input type="checkbox" id="switchSeguimiento" name="seguimiento" class="ck-formulario__checkbox" hidden
+                    {% if form.idSeguimiento.value >= 1 %}checked{% endif %}>
+                    <div class="ck-formulario__base">
+                    <div class="ck-formulario__bolita"></div>
+                    </div>
+                    <span class="ck-formulario__label">Seguimiento TIC</span>
+                </label>
+                {{ form.idSeguimiento }}
+            {% endif %}
+
+
+            {% if MD == 2 and form.tipo.value == 0 %}
+                <label class="ck-formulario" for="switchNoAtencion">
+                    <input
+                        type="checkbox"
+                        id="switchNoAtencion"
+                        name="no_atencion"
+                        class="ck-formulario__checkbox"
+                        hidden
+                        {% if form.motivo_no_atencion.value >= 1 %}checked{% endif %}
+                    >
+                    <div class="ck-formulario__base">
+                        <div class="ck-formulario__bolita"></div>
+                    </div>
+                    <span class="ck-formulario__label">No atención</span>
+                </label>
+
+                <input type="hidden" id="{{ form.motivo_no_atencion.id_for_label }}" name="{{ form.motivo_no_atencion.name }}" value="{{ form.motivo_no_atencion.value|default:'0' }}">
+            {% endif %}
+                        
+
+
+            {% if MD == 2 %}
+                <a class="formularioBotones-boton" id="formularioReferencia-botonImprimir">
+                    <i class="bi bi-printer-fill" class="formularioBotones-icono"></i>
+                    <span>Imprimir</span>
+                </a>
+            {% endif %}
+
+            <a href="javascript:history.back()" class="formularioBotones-boton">
+                <i class="bi bi-x-octagon-fill formularioBotones-icono"></i>
+                <span>Cancelar</span>
+            </a>
+
+            
+            <button type="submit"  class="formularioBotones-boton" id="formularioReferencia-botonGuardar">
+                <i class="bi bi-floppy2-fill " class="formularioBotones-icono"></i>
+                {% if MD == 1 %}
+                <span>Registrar Referencia</span>
+                {% else %}
+                <span>Actualizar Referencia</span>
+
+                {% endif %}
+            </button>   
+
+        </div>
+
+    
+</div>
+
+
+
+
+
+{% endblock content %}
+
+{% load static %}
+
+{% block extra_js %}
+
+<script>
+const tipo = {{ form.tipo.value }};
+
+//const modoUso = parseInt("{{ MD }}", 10);
+
+const modoUso = Number("{{ MD }}");
+const seguimiento = Number({{ seguimiento }});
+const idReferencia = Number({{ form_respuesta.idRespuesta.value }}); // ojo es el id de la referencia de seguimiento a una respuesta no la general
+
+{% if MD == 2 %} 
+        {% if diagnosticos_referencia_actuales %} 
+            const diagnosticosReferenciaActuales = {{ diagnosticos_referencia_actuales|safe }};
+        {% endif %}
+
+        {% if diagnosticos_respuesta_actuales %} 
+            const diagnosticosRespuestaActuales = {{ diagnosticos_respuesta_actuales|safe }};
+        {% endif %}
+
+{% endif %}
+
+</script>
+
+<script src="{% static 'core/scripts/features/referencia.js' %}"></script>
+
+{% endblock extra_js %}

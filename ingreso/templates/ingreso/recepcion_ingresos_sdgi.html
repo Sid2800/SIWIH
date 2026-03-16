@@ -1,0 +1,149 @@
+{% extends 'core/base.html'%}
+
+{% block title %}Recepcion de egresos{% endblock title %}
+{% block content %}
+
+
+<div class="contenedor2 contenedorListaRecepcion"> 
+    <div class="tituloFormulario">
+        <div class="tituloFormulario-texto"> 
+            <i class="bi bi-archive"></i>
+            <h2 class="sin-margen">Recepción de egresos (SDGI)</h2>
+        </div>
+        <div class="tituloFormulario-subrallado"></div>
+    </div>
+    
+    
+
+
+        <fieldset class="recepcionIngresoCampos">
+            <legend>Datos Recepcion</legend>
+
+                    
+                    <div class="formularioCampo">
+                        <label for="fecha">Fecha</label>
+                        <input type="text" id="fecha" name="fecha" placeholder="Fecha" value="{{ fecha_actual }}" class="formularioCampo-text" disabled >
+                    </div>
+
+                    <div class="formularioCampo">
+                        <label>Responsable</label>
+                        <input type="text" id="responsable" name="responsable" placeholder="Responsable" value="{{ responsable }}" class="formularioCampo-text">
+                    </div> 
+
+                    <div class="formularioCampo" id="recepcionIngresoObservaciones">
+                        <label>Observaciones</label>
+                    <textarea name="observaciones" cols="40" rows="10" class="formularioCampo-text" placeholder="Observaciones" id="observaciones"></textarea>
+                </div> 
+                
+            
+        </fieldset>
+
+
+
+        <div class="listasRecepcion">
+                <!-- Lista Izquierda -->
+            <div class="contendorLista">
+                <h3 class="sin-margen">Pendientes</h3>
+                <input type="text" class="formularioCampo-text"  id="busquedaPendientes" placeholder="Buscar en Pendientes">
+                <ul id="listaRecepcionIzquierda" class="listbox sin-margen">
+
+
+                </ul>
+                <label>Total <span id="totalPendiente"> ###</span> --- Filtrado <span id="SubtotalPendiente"> ###</span></label>
+            </div>
+
+                <!-- Botones -->
+            <div class="listasRecepcionBotones">
+
+                <!-- Mover uno a la derecha -->
+                <button type="button" id="BtnMoverDerecha" class="formularioBotones-boton" title="Mover seleccionado a la derecha">
+                    <i class="bi bi-arrow-right-circle"></i>
+                </button>
+                
+                <!-- Mover uno a la izquierda -->
+                <button type="button" id="BtnMoverIzquierda" class="formularioBotones-boton" title="Mover seleccionado a la izquierda">
+                    <i class="bi bi-arrow-left-circle"></i>
+                </button>
+                
+                <!-- Mover todos a la derecha -->
+                <button type="button" id="BtnMoverTodoDerecha" class="formularioBotones-boton" title="Mover todos a la derecha">
+                    <i class="bi bi-skip-forward-circle"></i>
+                </button>
+                
+                <!-- Mover todos a la izquierda -->
+                <button type="button" id="BtnMoverTodoIzquierda" class="formularioBotones-boton" title="Mover todos a la izquierda">
+                    <i class="bi bi-skip-backward-circle"></i>
+                </button>
+
+            </div>
+
+
+            <div class="contendorLista">
+                <h3 class="sin-margen">Por Recibir</h3>
+                <input type="text" class="formularioCampo-text sin-margen"  id="busquedaPorRecibir" placeholder="Buscar en Pendientes">
+                <ul id="listaRecepcionDerecha" class="listbox"></ul>
+                <label>Total <span id="totalPorRecibir"> ###</span> --- Filtrado <span id="SubtotalPorRecibir"> ###</span></label>
+            </div>
+
+
+           
+
+        </div>
+
+
+
+        <div class="recepcionIngresoBotones">
+
+            <label class="ck-formulario" for="switchImprimirComprobante">
+                <input type="checkbox" id="switchImprimirComprobante" class="ck-formulario__checkbox" hidden>
+                <div class="ck-formulario__base">
+                <div class="ck-formulario__bolita"></div>
+                </div>
+                <span class="ck-formulario__label">Imprimir</span>
+            </label>
+
+            <a href="{% url 'listar_ingresos' %}" class="formularioBotones-boton">
+                <i class="bi bi-arrow-left-circle formularioBotones-icono"></i>
+                <span>Volver</span>
+            </a>
+
+            <button class="formularioBotones-boton" id="recepcionIngresoBoton">
+                <i class="bi bi-check-square-fill"></i>
+                <span>Confirmar recepcion</span>
+            </button>
+        </div>
+    
+
+        
+
+    
+    
+    
+</div>
+
+
+{% endblock content %}
+
+{% load static %}
+
+{% block extra_js %}
+
+
+<script>
+
+    
+    var ingresosActivos = null;
+    {% if ingresos %} 
+        ingresosActivos = JSON.parse('{{ ingresos|escapejs }}');
+    {% endif %}
+
+   
+
+    
+</script>
+
+
+
+<script src="{% static 'core/scripts/features/recepcionIngresosSDGI.js' %}"></script>
+{% endblock extra_js %}
+

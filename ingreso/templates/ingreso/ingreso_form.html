@@ -1,0 +1,301 @@
+{% extends 'core/base.html'%}
+
+{% block title %}Ingreso{% endblock title %}
+{% block content %}
+
+
+<div class="contenedor2 contenedorFormulario"> 
+    <div class="tituloFormulario">
+        <div class="tituloFormulario-texto"> 
+            <i class="bi bi-activity"></i>
+            <h2 class="sin-margen">{{ titulo }} a Hospitalizacion</h2>
+        </div>
+        <div class="tituloFormulario-subrallado"></div>
+    </div>
+
+    <form method="post" class="formulario" id="form-ingreso">
+        {% csrf_token %}
+        
+        <fieldset class="frmIngresoCampos">
+        <legend>
+            <b> 
+                {% if object.estado == 2%}
+                Ingreso Desactivado
+                {% else %}
+                {{ subtitulo }}
+                {% endif %}
+            </b>
+        </legend>
+            
+        <fieldset class="ingresoIngresoCampos">
+            <legend>Datos Ingreso</legend>
+            
+            <div class="formularioCampo">
+                {{ form.cama.label_tag }}
+                {{ form.cama }}
+            </div>
+
+            <div class="formularioCampo">
+                {{ form.sala.label_tag }}
+                {{ form.sala }}
+            </div>
+
+            <div class="formularioCampo">
+                {{ form.zona.label_tag }}
+                {{ form.zona }}
+            </div>
+
+            <div class="formularioCampo">
+                {{ form.observaciones.label_tag }}
+                {{ form.observaciones }}
+            </div>
+
+
+            {% if MD == 2 %}
+                <div class="formularioCampo">
+                    <label>Fechas:</label>
+                    <input type="text"  class="formularioCampo-text"  value="{{ fechas_egreso_sdgi }}" readonly>
+                </div>
+                {% else %}
+                <div class="formularioCampo">
+                    <label for="fecha_ingreso">Fecha Ingreso:</label>
+                    <input type="text" id="fecha_ingreso" class="formularioCampo-text"  value="{{ fecha_hoy }}" readonly>
+                </div>
+            {% endif %}
+        
+
+
+        </fieldset>
+
+        <fieldset class="ingresoPacienteCampos">
+            <legend>Datos Paciente</legend>            
+
+            <div class="formularioCampo">
+                <label>DNI </label>
+                {{ form.dniPaciente }}
+            </div>
+
+            <div class="formularioCampo">
+                <label>Expediente N</label>
+                {{ form.numeroExpediente }}
+            </div>
+
+            <div class="formularioCampo">
+                <label>Nombre</label>
+                {{ form.nombreCompletoPaciente }}
+            </div>
+            
+            <div class="formularioCampo">
+                <label for="fecha_nacimiento">Fecha de Nacimiento:</label>
+                {{ form.fechaNacimientoPaciente }}
+            </div>
+
+            <div class="formularioCampo">
+                <label for="fecha_nacimiento">Edad</label>
+                {{ form.edadPaciente }}
+            </div>
+            
+            <div class="formularioCampo">
+                <label>Sexo</label>
+                {{ form.sexoPaciente }}
+            </div>
+
+            <div class="formularioCampo">
+                <label>Teléfono</label>
+                {{ form.telefonoPaciente }}
+            </div>
+            
+            
+            <div class="formularioCampo">
+                <label>Domicilio</label>
+                {{ form.direccionPaciente }}
+            </div>
+
+            {{ form.idPaciente }}
+
+        </fieldset>
+
+        
+        <fieldset class="ingresoAcompanianteCampos">
+            <legend>Datos Acompañante</legend>
+
+                    
+                    <div class="formularioCampo">
+                        <label># identificacion</label>
+                        <input type="text" id="acompaniante_dni" name="acompanianteDni" placeholder="Identidad Acompañante" class="formularioCampo-text">
+                    </div>
+
+                    <div class="formularioCampo">
+                        <label>Telefono</label>
+                        <input type="text" id="telefono" name="telefono" placeholder="Telefono" class="formularioCampo-text">
+                    </div>   
+
+                    <div class="formularioCampo">
+                        <label>1er Nombre</label>
+                        <input type="text" id="acompaniante_nombre1" name="acompanianteNombre1" placeholder="Primer Nombre" class="formularioCampo-text">
+                    </div>
+                    
+                    <div class="formularioCampo">
+                        <label>2do Nombre</label>
+                        <input type="text" id="acompaniante_nombre2" name="acompanianteNombre2" placeholder="Segundo Nombre" class="formularioCampo-text">
+                    </div>
+                    
+                    <div class="formularioCampo">
+                        <label>1er Apellido</label>
+                        <input type="text" id="acompaniante_apellido1" name="acompanianteApellido1" placeholder="Primer Apellido" class="formularioCampo-text">
+                    </div>
+                    
+                    <div class="formularioCampo">
+                        <label>2do Apellido</label>
+                        <input type="text" id="acompaniante_apellido2" name="acompanianteApellido2" placeholder="Segundo Apellido" class="formularioCampo-text">
+                    </div>
+                                            
+                    <!-- Departamento -->
+                    <div class="formularioCampo">
+                        <label>Departamento</label>
+                        {{ form.departamento }}
+                    </div>
+
+                    <!-- municipio    -->
+                    <div class="formularioCampo">
+                        {{ form.municipio.label_tag }}
+                        {{ form.municipio }}
+                    </div>
+
+                    <div class="formularioCampo ingresoUbicacion">
+                        <label>Sector</label> 
+                        <select id="id_sector" class="formularioCampo-select" name="sector" ></select>
+                        <button type="button" class="formularioBotones-boton" id="agregar_ubicacion">
+                            <i class="bi bi-plus-square"></i>
+                        </button>
+                    </div>
+            
+                    <input type="hidden" name="acompanianteId" id="id_acompaniante" value="{{ acompaniante.id}}">
+            
+ 
+            
+        </fieldset>
+    
+    <fieldset class="detallesRegistro detallesRegistro__ocultar">
+        <legend>Detalles del Registro</legend>
+        
+        <div class="formularioCampo">
+            <label>Creado:</label>
+            <label class="formularioCampo-text">{{ info_registro.fecha_creado }}  por {{ info_registro.creado_por  }}</label>
+            
+        </div>
+        
+        <div class="formularioCampo">
+            <label>Actualizado:</label>
+            <label class="formularioCampo-text">{{ info_registro.fecha_modificado }} por {{ info_registro.modificado_por   }}</label>
+        </div>
+
+        <div class="formularioCampo">
+            {{ form.estado.label_tag }}
+            {{ form.estado }}
+        </div>
+        
+        {% if request.user.is_staff %}
+        <div class="formularioCampo">
+            {{ form.clasificacion.label_tag }}
+            {{ form.clasificacion }}
+            
+        </div>
+        
+        {% endif %}
+
+    </fieldset>
+    
+    
+    </fieldset>
+    
+    
+    
+    <!-- Botón para guardar -->
+    <div class="formularioBotones">
+
+
+        {% if MD == 2 %}
+
+        <a class="formularioBotones-boton" id="formularioIngreso-botonImprimir">
+            <i class="bi bi-printer-fill" class="formularioBotones-icono"></i>
+            <span>Imprimir</span>
+        </a>
+
+        <button type="button" class="formularioBotones-boton" id="formularioIngreso-botonInactivar">
+            <i class="bi bi-dash-circle-fill formularioBotones-icono"></i>
+            <span>Inactivar</span>
+        </button>
+
+
+
+        {% endif %}
+
+
+
+        <a href="javascript:history.back()" class="formularioBotones-boton">
+            <i class="bi bi-x-octagon-fill formularioBotones-icono"></i>
+            <span>Cancelar</span>
+        </a>
+
+        <button type="submit"  class="formularioBotones-boton" id="formularioIngreso-botonGuardar">
+            <i class="bi bi-floppy2-fill " class="formularioBotones-icono"></i>
+            <span>Guardar</span>
+        </button>   
+
+       
+
+    </div>
+    
+    </form>
+    
+    
+    
+    </div>
+
+
+
+
+{% endblock content %}
+
+{% load static %}
+
+{% block extra_js %}
+
+<!-- Primero definimos las variables y valores necesarios en el script inline -->
+<script>
+    urls['autoCompleteCama'] = "{% url 'camaAutocomplete' %}";
+
+    let MD = parseInt("{{ MD }}");
+
+    var dicContexto = {};
+
+    {% if acompaniante %}
+        const acompanianteData = {{ acompaniante|safe }};
+    {% endif %}
+
+    let extranjero = {{ extranjero|yesno:"true,false" }};
+    let lectura = {{ solo_lectura|yesno:"true,false" }};
+    
+
+    if (MD == 2) {
+        {% if acompaniante %}
+            dicContexto["acompaniante"] = acompanianteData;
+        {% endif %}
+        
+    }
+
+
+
+</script>
+
+{% if object.id %}
+    <script>
+        let idIngreso = "{{ object.id }}";  // se asigna como string
+    </script>
+{% endif %}
+
+<!-- Ahora cargamos el archivo externo que hace uso de las variables definidas arriba -->
+<script src="{% static 'core/scripts/features/ingreso.js' %}"></script>
+
+{% endblock extra_js %}

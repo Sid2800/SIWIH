@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <!--cargamos los archivos estaticos -->
+   {% load static %}
+   <!-- permisos para ver los botones-->
+   {% load permisos_unidad %}
+
+
+   
+   <link rel="icon" href="{% static 'core/favicon.ico' %}" type="image/x-icon">
+   <!-- Fuentes locales (Google Fonts descargadas) -->
+   <link rel="stylesheet" href="{% static 'core/fonts/css/googlefonts.css' %}">
+
+   <!-- NORMALIZE -->
+   <link rel="preload" href="{% static 'core/css/normalice.css' %}" as="style">
+   <link rel="stylesheet" href="{% static 'core/css/normalice.css' %}">
+
+   <!-- ICONOS -->
+   <link rel="stylesheet" href="{% static 'core/bootstrap-icons/bootstrap-icons.min.css' %}">
+
+   <!-- ALERTAS -->
+   <!-- Toastr -->
+   <link rel="stylesheet" href="{% static 'core/toastr/css/toastr.min.css' %}">
+   <!-- SweetAlert2 tema oscuro -->
+   <link rel="stylesheet" href="{% static 'core/sweetalert2/css/dark.css' %}">
+
+   <link rel="stylesheet" href="{% static 'core/tom-select/css/tom-select.css' %}">
+   <link rel="stylesheet" href="{% static 'core/select2/css/select2.min.css' %}">
+   <!-- DataTables -->
+   <link rel="stylesheet" href="{% static 'core/datatables/css/dataTables.dataTables.css' %}">
+   <link rel="stylesheet" href="{% static 'core/datatables/css/responsive.dataTables.css' %}">
+   <!-- Preload y estilos generales -->
+   <link rel="preload" href="{% static 'core/css/media/controlGaleria.css' %}" as="style">
+   <link rel="stylesheet" href="{% static 'core/css/media/controlGaleria.css' %}">
+
+
+
+   <link rel="preload" href="{% static 'core/css/style.css' %}" as="style">
+   <link rel="stylesheet" href="{% static 'core/css/style.css' %}">
+
+
+   {% block extra_css %}
+   {% endblock extra_css %}
+
+   <title>{% block title %}{% endblock title %} | SIWI</title>
+</head>
+<body class="cuerpo">
+
+   <button class="ocultar-mostrar-barra-navegacion">
+      <i class="bi bi-menu-button-wide-fill ocultar-mostrar-barra-navegacion__mostrar"></i>
+      <i class="bi bi-x-circle ocultar-mostrar-barra-navegacion__ocultar"></i>
+
+   </button>
+
+   <aside class="barra-navegacion">
+      <div>
+
+         <div class="bn__titulo">
+            <img src="{% static 'core/img/SIWIFINAL_3.png' %}" alt="Logo SIWIH" class="bn-titulo__logo" id="logo">
+            <span class="bn-titulo__nombre">SIWIH</span>
+         </div>
+
+         <a href="{% url 'home' %}" class="bp__boton-agregar">
+            <i class="bi bi-house-heart bp-boton-agregar__icono"></i>
+            <span>Inicio</span>
+         </a>
+      </div>
+
+
+      <nav class="bn__navegacion">
+         <ul>
+            <li>
+               <a href="{% url 'listar_pacientes' %}" class="bn-navegacion__enlace" title="Paciente">
+                  <i class="bi bi-person bn-navegacion-enlace__logo"></i>
+                  <span class="bn-navegacion-enlace__texto">Paciente</span>
+               </a>
+            </li> 
+
+         
+            {% if request.user|tiene_unidad:"Admision:DIRECTIVOS:Sala" %}
+
+               {% if request.user|tiene_unidad:"Admision:DIRECTIVOS" %}
+               <li>
+                  <a href="{% url 'listar_expedientes' %}" class="bn-navegacion__enlace" title="Expediente">
+                     <i class="bi bi-clipboard2-heart bn-navegacion-enlace__logo"></i>
+                     <span class="bn-navegacion-enlace__texto ocultar">Expediente</span>
+                  </a>
+               </li>
+               {% endif %}
+
+               <li>
+                  <a href="{% url 'listar_ingresos' %}" class="bn-navegacion__enlace">
+                     <i class="bi bi-activity bn-navegacion-enlace__logo"></i>
+                     <span class="bn-navegacion-enlace__texto">Ingreso</span>
+                  </a>
+               </li>
+
+         
+               <li>  
+                  <a href="{% url 'listar_atenciones' %}" class="bn-navegacion__enlace">
+                     <i class="bi-thermometer-half bn-navegacion-enlace__logo"></i>
+                     <span class="bn-navegacion-enlace__texto">Atencion</span>
+                  </a>
+               </li>
+            {% endif %}
+            <!--
+            <li>
+               <a href="{% url 'home' %}" class="bn-navegacion__enlace">
+                  <i class="bi bi-archive bn-navegacion-enlace__logo"></i>
+                  <span class="bn-navegacion-enlace__texto">Atencion</span>
+               </a>
+            </li>
+            -->
+            
+
+            
+            {% if  request.user|tiene_unidad:"Imagenologia:DIRECTIVOS:Sala" %}
+               <li>  
+                  <a href="{% url 'listar_evalucionesrx' %}" class="bn-navegacion__enlace">
+                     <i class="bi  bi-radioactive bn-navegacion-enlace__logo"></i>
+                     <span class="bn-navegacion-enlace__texto">Evaluacion RX</span>
+                  </a>
+               </li>
+            {% endif %}
+
+
+            {% if  request.user|tiene_unidad:"Referencia:DIRECTIVOS" %}
+               <li>  
+                  <a href="{% url 'listar_referencias' %}" class="bn-navegacion__enlace">
+                     <i class="bi bi-link-45deg bn-navegacion-enlace__logo"></i>
+                     <span class="bn-navegacion-enlace__texto">Referencia</span>
+                  </a>
+               </li>
+            {% endif %}
+
+
+            <li>  
+               <a href="{% url 'generador_reporte' %}" class="bn-navegacion__enlace">
+                  <i class="bi bi-journal-text bn-navegacion-enlace__logo"></i>
+                  <span class="bn-navegacion-enlace__texto">Reporte</span>
+               </a>
+            </li>
+         
+            {% if  request.user|tiene_rol:"ADMIN:Admision"  %}
+
+            <li>
+               <a href="{% url 'mantenimiento' %}" class="bn-navegacion__enlace">
+                  <i class="bi bi-wrench-adjustable-circle-fill bn-navegacion-enlace__logo"></i>
+                  <span class="bn-navegacion-enlace__texto">
+                     Mantenimiento
+                  </span>
+               </a>
+            </li>
+            {% endif %}
+
+            {% if request.user.is_staff %}
+            <li>
+               <a href="/admin/" class="bn-navegacion__enlace">
+                  <i class="bi bi-person-workspace bn-navegacion-enlace__logo"></i>
+                  <span class="bn-navegacion-enlace__texto">
+                     Admin Panel
+                  </span>
+               </a>
+            </li>
+            {% endif %}
+            
+         </ul>
+
+      </nav>
+
+
+      <div>
+         <div class="bn_separador">
+         </div>
+
+         <div class="bp-modo-oscuro">
+            <div class="bp-modo-oscuro__info">
+               <i class="bi bi-moon-stars bp-modo-oscuro__ico"></i>
+               <span class="bp-modo-oscuro__texto">Modo Oscuro</span>   
+            </div>
+
+            <div class="bp-modo-oscuro__switch" id="switch">
+               <div class="bp-modo-oscuro-switch__base">
+                  <div class="bp-modo-oscuro-switch__bolita" id="bolita"></div>
+               </div>
+               
+            </div>
+         </div>
+
+         <div class="bp-inf-usuario">
+            
+            <img src="{% static 'core/img/avatar.jpg' %}" alt="imagen de perfil" class="bp-inf-usuario__imagen">
+            
+            <div class="bp-inf-usuario__texto">
+               {% if request.user.is_authenticated %}
+                  <span class="bp-inf-usuario-texto__usuario">
+                     {{ request.user.username }}
+                  </span>
+                  <span class="bp-inf-usuario-texto__grupo">
+                     {% if request.user.is_superuser %}
+                        Superusuario
+                     {% else %}
+                        {% with request.user.perfilunidad_set.first as perfil %}
+                           {{ perfil.rol|upper }} - {{ perfil.unidad.nombre_unidad|upper|slice:":6" }}
+                        {% endwith %}
+                     {% endif %}
+                  </span>
+                  <span class="bp-inf-usuario-texto__grupo" id="bp-base-zona">
+                     {{ request.session.zona_nombre_zona|default:"No seleccionada" }}
+                  </span>
+                  
+                  
+               {% else %}
+                  <span class="bp-inf-usuario-texto__usuario">Usuario no autenticado</span>
+               {% endif %}
+            </div>
+
+            <form action="{% url 'logout' %}" method="POST" id="bp-cerrar-usuario__boton" title="Cerrar Sesion">
+               {% csrf_token %}
+               <button type="button" id="cerrar-sesion-btn"  class="formularioBotones-boton bp-cerrar-usuario__botonAccion">
+                  <i class="bi bi-lock-fill"></i>
+               </button>
+            </form>
+
+         </div>
+
+
+      </div>
+
+   </aside>
+
+   <main>
+      
+      <section class="contenedor">
+         {% block content %}
+      
+         {% endblock content %}
+      </section>
+
+
+      
+      {% if messages %}
+      {% for message in messages %}
+         <input type="hidden" class="toast-message" data-type="{{ message.tags }}" value="{{ message }}" />
+      {% endfor %}
+      {% endif %}
+
+      
+   </main>
+
+<!-- CONFIGURACIÓN GLOBAL FRONTEND -->
+<script>
+
+   /* Zona del usuario */
+   let zona = "{{ request.session.zona_codigo|default:"0"|escapejs }}";
+
+   /* Token CSRF accesible desde JS */
+   window.CSRF_TOKEN = "{{ csrf_token }}";
+
+   /* Configuración general del sistema */
+   window.APP_CONFIG = {
+      estudioDefaultImg: "{% static 'core/img/estudio_default.png' %}"
+   };
+
+
+   /* URLs DEL SISTEMA (API / VIEWS) */
+
+   window.urls = {
+
+      /* ---------------- PACIENTES ---------------- */
+
+      obtenerPacienteCenso: "{% url 'obtener-paciente-censo' %}",
+      listadoPacientes: "{% url 'listar_pacientes_API' %}",
+      agregarPaciente: "{% url 'paciente_agregar' %}",
+      editarPaciente: "{% url 'paciente_editar' pk=0 slug='slug' %}",
+      busquedaPaciente: "{% url 'busqueda-paciente' %}",
+      obtenerPacienteIngresoExpediente: "{% url 'obtener_paciente_ingreso_expediente' %}",
+      obtenerPacienteIngresoDNI: "{% url 'obtener_paciente_ingreso_dni' %}",
+      verificarPacienteSimilar: "{% url 'verificar_paciente_similar'%}",
+
+      obtenerPacienteRegistroDNI: "{% url 'obtener_paciente_registro_dni' %}",
+      obtenerPacienteRegistroExpediente: "{% url 'obtener_paciente_registro_expediente' %}",
+
+      obtenerPadre: "{% url 'obtener-padre' %}",
+      detallesDomicilio: "{% url 'obtenerDetallesDomicilio' %}",
+      listadoDispensacionPaciente: "{% url 'dispensaciones_paciente' %}",
+
+
+      /* ---------------- EVALUACION RX ---------------- */
+
+      obtenerPacienteExternoDni: "{% url 'obtener_paciente_externo_dni' %}",
+      listarEvalucionesrxAPI: "{% url 'listar_evalucionesrx_API' %}",
+      listadoEvaluacionesPaciente: "{% url 'listar_evalucionesrx_paciente_API' %}",
+      listarEvalucionesrx: "{% url 'listar_evalucionesrx' %}",
+      agregarEvaluacionrx: "{% url 'evaluacionrx_agregar' pk=0 slug='slug' %}",
+      editarEvaluacionrx: "{% url 'evaluacionrx_editar' pk=0 slug='slug' %}",
+      inactivarEvaluacionrx: "{% url 'inactivar_evalucion_rx' %}",
+      verificarPacienteInactivo: "{% url 'verificar_paciente_inactivo' %}",
+
+
+      /* ---------------- INGRESOS ---------------- */
+
+      listadoIngresos: "{% url 'listar_ingresos_API' %}",
+      listarIngresos: "{% url 'listar_ingresos' %}",
+      listadoIngresosPaciente: "{% url 'listar-ingresos-paciente-API' %}",
+      agregarIngreso: "{% url 'ingreso_agregar' pk=0 slug='slug' %}",
+      editarIngreso: "{% url 'ingreso_editar' pk=0 slug='slug' %}",
+      inactivarIngreso: "{% url 'inactivar_ingreso' %}",
+      validarIngresoActivo: "{% url 'validar-ingreso-activo' %}",
+      registrarRecepcionIngresos: "{% url 'registrar-recepcion-ingresos-sala' %}",
+      registrarRecepcionIngresosSDGI: "{% url 'registrar-recepcion-ingresos-sdgi' %}",
+
+
+      /* ---------------- REPORTES ---------------- */
+
+      ReporteHojaHospitalizacion: "{% url 'reporte_hospitalizacion_26' ingreso_id=0 %}",
+      ReporteFormatoReferencia: "{% url 'formato_referencia_SINAR' referencia_id=0 %}",
+      ReporteFormatoRespuesta: "{% url 'formato_respuesta_SINAR' respuesta_id=0 %}",
+
+
+      /* ---------------- RECEPCIÓN INGRESOS ---------------- */
+
+      recibirIngresosSala: "{% url 'recibir-ingresos-sala' %}",
+      recibirIngresosSDGI: "{% url 'recibir-ingresos-sdgi' %}",
+
+
+      /* ---------------- EXPEDIENTES ---------------- */
+
+      listadoExpedientes: "{% url 'listar_expedientes_API' %}",
+      expedienteVer: "{% url 'expediente_ver' pk=0 %}",
+      listarExpedientesPropietariosAPI: "{% url 'listar_expedientes_propietarios_API' %}",
+      expedienteLibre: "{% url 'expediente-libre' %}",
+
+
+      /* ---------------- BÚSQUEDAS ---------------- */
+
+      busquedaCenso: "{% url 'busqueda-censo' %}",
+      busquedaAvanzada: "{% url 'busqueda_avanzada' %}",
+      busquedaAcompaniante: "{% url 'obtener-acompaniante' %}",
+
+
+      /* ---------------- AUTOCOMPLETADOS ---------------- */
+
+      sectorAutocomplete: "{% url 'sectorAutocomplete' %}",
+      aldeaAutocomplete: "{% url 'aldeaAutocomplete' %}",
+
+
+      /* ---------------- UBICACIÓN ---------------- */
+
+      municipioXdepto: "{% url 'municipioXdepartamento' %}",
+      listarZona: "{% url 'listarZona' %}",
+      listarSala: "{% url 'listarSala' %}",
+      listarDiagnostico: "{% url 'listar_diagnostico' %}",
+      listarEspecialidad: "{% url 'listarEspecialidad' %}",
+      cambiarZona: "{% url 'cambiarZona' %}",
+      agregarSector: "{% url 'agregarSector' %}",
+
+
+      /* ---------------- DEFUNCIÓN ---------------- */
+
+      obtenerDefuncion: "{% url 'obtener_defuncion' %}",
+      guardarDefuncion: "{% url 'paciente_guardar_defuncion' %}",
+      verificarDefuncion: "{% url 'verificar_defuncion' %}",
+      procesarCadaver: "{% url 'registrar_entrega_cadaver' %}",
+
+
+      /* ---------------- ATENCIÓN ---------------- */
+
+      obtenerAtencion: "{% url 'obtener_atencion' %}",
+      guardarAtencion: "{% url 'atencion_guardar' %}",
+      listadoAtencion: "{% url 'listar_atenciones_API' %}",
+      recibirAtencion: "{% url 'recibir-atenciones' %}",
+      listadoAtencionesPaciente: "{% url 'listar-atenciones-paciente-API' %}",
+      verificarAtencionReciente: "{% url 'verificar_atencion_reciente' %}",
+      registrarRecepcionAtenciones: "{% url 'registrar-recepcion-atenciones' %}",
+
+
+      /* ---------------- REFERENCIAS ---------------- */
+
+      agregarReferencia: "{% url 'referencia_agregar' pk=0 slug='slug' %}",
+      editarReferencia: "{% url 'referencia_editar' pk=0 slug='slug' %}",
+      listarCondiciones: "{% url 'listar_condiciones' %}",
+      seguimientoAgregarEditar: "{% url 'seguimiento_agregar_editar' %}",
+      seguimientoTicObtener: "{% url 'seguimiento_tic_obtener' %}",
+      listarReferenciasAPI: "{% url 'listar_referencias_API' %}",
+
+
+      /* ---------------- DISPENSACIÓN ---------------- */
+      obtenerImagenesEvaluacion: "{% url 'dispensaciones_paciente' %}",
+
+      /* ---------------- MEDIA ---------------- */
+      obtenerImagenesEvaluacion: "{% url 'obtener_imagenes_evaluacion'%}"
+
+   };
+
+
+</script>
+
+<!-- LIBRERÍAS JS -->
+
+   <script src="{% static 'core/jquery/jquery-3.7.1.min.js' %}"></script>
+
+   <!-- DataTables -->
+   <script src="{% static 'core/datatables/js/dataTables.js' %}"></script>
+   <script src="{% static 'core/datatables/js/dataTables.responsive.js' %}"></script>
+
+   <!-- Botones -->
+   <script src="{% static 'core/datatables/js/buttons.min.js' %}"></script>
+   <script src="{% static 'core/datatables/js/buttons.html5.min.js' %}"></script>
+   <script src="{% static 'core/datatables/js/buttons.print.min.js' %}"></script>
+
+   <!-- Excel export -->
+   <script src="{% static 'core/datatables/jszip/jszip.min.js' %}"></script>
+
+   <script src="{% static 'core/select2/js/select2.min.js' %}"></script>
+    
+   <script src="{% static 'core/inputmask/inputmask.js' %}"></script>
+
+   <script src="{% static 'core/tom-select/js/tom-select.complete.min.js' %}"></script>
+
+   <!-- ALERTAS -->
+
+   <!-- SweetAlert2 -->
+   <script src="{% static 'core/sweetalert2/js/sweetalert2.min.js' %}"></script>
+   <!-- Toastr -->
+   <script src="{% static 'core/toastr/js/toastr.min.js' %}"></script>
+
+
+
+
+   <!-- SCRIPTS PROPIOS -->
+   <script src="{% static 'core/scripts/helpers/fechaUtilidades.js' %}"></script>
+
+   <script src="{% static 'core/scripts/helpers/helpers.js' %}"></script>
+
+   <script src="{% static 'core/scripts/core/main.js' %}"></script>
+
+   <script src="{% static 'core\scripts\media\controlGaleria.js' %}"></script>
+
+
+
+   {% block extra_js %}
+   {% endblock extra_js %}
+
+
+
+</body>
+</html>
+
+

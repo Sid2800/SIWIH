@@ -1,0 +1,64 @@
+{% extends 'core/base.html'%}
+
+
+
+{% block title %}Referencias{% endblock title %}
+
+{% block content %}
+    <div class="contenedor2 dataTables_wrapper"> 
+
+        <div class="tituloFormulario" style="margin-bottom: 2rem;">
+            <div class="tituloFormulario-texto"> 
+                <i class="bi bi-link-45deg"></i>
+                <h2 class="sin-margen">Listado General de Referencias</h2>
+            
+            
+            </div>
+            <div class="tituloFormulario-subrallado"></div>
+        </div>
+    
+        <table id="data_table_referencias" class="dataTable stripe hover  row-border" >
+            <thead>
+                <tr>
+                    <th>Num</th>
+                    <th>Tipo</th>
+                    <th>Fecha</th>
+                    <th>Institucion</th>
+                    <th>Diagnostico</th>
+                    <th>Exp</th>
+                    <th>DNI</th>
+                    <th>Nombre PTE</th>
+                    <th>Indicadores</th>
+                </tr>
+            </thead>
+        <tbody>
+        </tbody>
+        <tfoot>
+                <tr>
+                    <th>Num</th>
+                    <th>Tipo</th>
+                    <th>Fecha</th>
+                    <th>Institucion</th>
+                    <th>Diagnostico</th>
+                    <th>Exp</th>
+                    <th>DNI</th>
+                    <th>Nombre PTE</th>
+                    <th>Indicadores</th>
+
+                </tr>
+        </tfoot>
+        </table>
+    </div>
+    
+{% endblock content %}
+
+{% load static %}
+
+
+{% block extra_js %}
+
+<script src="{% static 'core/scripts/tablas/dataTablesReferencia.js' %}"></script>
+
+
+
+{% endblock extra_js %}

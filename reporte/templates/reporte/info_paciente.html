@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Información del Paciente</title>
+    <style>
+        body { font-family: Arial, sans-serif; font-size: 12px; margin: 20px; }
+        h1 { text-align: center; }
+        .seccion { margin-top: 20px; }
+        .campo { font-weight: bold; width: 150px; display: inline-block; }
+        .linea { margin-bottom: 5px; }
+    </style>
+</head>
+<body>
+
+<h1>Información General del Paciente</h1>
+
+<div class="seccion">
+    <div class="linea"><span class="campo">Nombres:</span> {{ paciente.nombres }}</div>
+    <div class="linea"><span class="campo">Apellidos:</span> {{ paciente.apellidos }}</div>
+    <div class="linea"><span class="campo">DNI:</span> {{ paciente.dni }}</div>
+    <div class="linea"><span class="campo">Fecha Nac.:</span> {{ paciente.fecha_nacimiento }}</div>
+    <div class="linea"><span class="campo">Edad:</span> {{ paciente.edad }}</div>
+    <div class="linea"><span class="campo">Sexo:</span> {% if paciente.sexo == "1" %}Masculino{% else %}Femenino{% endif %}</div>
+    <div class="linea"><span class="campo">Estado civil:</span> {{ paciente.estado_civil }}</div>
+    <div class="linea"><span class="campo">Ocupación:</span> {{ paciente.ocupacion }}</div>
+    <div class="linea"><span class="campo">Teléfono:</span> {{ paciente.telefono }}</div>
+</div>
+
+<div class="seccion">
+    <h3>Ubicación</h3>
+    <div class="linea"><span class="campo">Departamento:</span> {{ paciente.departamento }}</div>
+    <div class="linea"><span class="campo">Municipio:</span> {{ paciente.municipio }}</div>
+    <div class="linea"><span class="campo">Sector:</span> {{ paciente.sector }}</div>
+</div>
+
+<div class="seccion">
+    <h3>Padres</h3>
+    <div class="linea"><span class="campo">Nombre del padre:</span> {{ paciente.nombre_padre }}</div>
+    <div class="linea"><span class="campo">DNI del padre:</span> {{ paciente.dni_padre }}</div>
+    <div class="linea"><span class="campo">Nombre de la madre:</span> {{ paciente.nombre_madre }}</div>
+    <div class="linea"><span class="campo">DNI de la madre:</span> {{ paciente.dni_madre }}</div>
+</div>
+
+</body>
+</html>
