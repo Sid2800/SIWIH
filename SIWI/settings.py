@@ -159,7 +159,14 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
 
 STATIC_URL = '/static/'
-STATIC_ROOT = '/home/sid280/SIWI/staticfiles'
+
+
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+
+if ENVIRONMENT == "development":
+    STATICFILES_DIRS = [os.path.join(BASE_DIR, "core", "static")]
+else:
+    STATIC_ROOT = '/home/sid280/SIWI/staticfiles'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
