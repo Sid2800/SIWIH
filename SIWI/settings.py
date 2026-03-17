@@ -31,9 +31,9 @@ IMAGE_SERVER_PASSWORD = os.getenv("IMAGE_SERVER_PASSWORD")
 SECRET_KEY = os.getenv("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv("DEBUG", "False").lower() == "true"
+DEBUG = True if os.getenv("DEBUG", "0") == "1" else False
 
-ALLOWED_HOSTS = ['SIWIH','127.0.0.1','192.168.88.28','192.168.1.12']
+ALLOWED_HOSTS = ['SIWIH','127.0.0.1','192.168.88.28','192.168.88.173']
 
 # Application definition
 
@@ -159,7 +159,14 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
 
 STATIC_URL = '/static/'
-STATIC_ROOT = '/home/sid280/SIWI/staticfiles'
+
+
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+
+if ENVIRONMENT == "development":
+    STATICFILES_DIRS = [os.path.join(BASE_DIR, "core", "static")]
+else:
+    STATIC_ROOT = '/home/sid280/SIWI/staticfiles'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
