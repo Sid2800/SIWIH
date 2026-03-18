@@ -13,3 +13,15 @@ class UnidadID:
 class AccionEstudio(str, Enum):
     KEEP = "KEEP"
     DELETE = "DELETE"
+
+class LogApp:
+    GENERAL = "general"
+    PACIENTES = "pacientes"
+    INGRESOS = "ingresos"
+    RX = "rx"
+    REFERENCIAS = "referencias"
+    REPORTES = "reportes"
+    AUTH = "auth"
+    TOKEN = "token"
+    MEDIA = "media"
+

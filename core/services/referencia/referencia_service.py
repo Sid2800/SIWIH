@@ -5,6 +5,9 @@ from django.db.models.functions import ExtractMonth, Concat, Trim, ExtractYear, 
 from core.utils.utilidades_calculos import calcular_porcentaje
 from servicio.models import Institucion_salud
 from core.services.referencia.referencia_diagnostico_service import RefDiagnosticoService
+from core.constants.domain_constants import HEAC_INSTITUCION_ID
+from core.constants.domain_constants import LogApp
+from core.utils.utilidades_logging import *
 from django.db import transaction
 from datetime import date,datetime
 from django.utils import timezone
@@ -17,115 +20,146 @@ class ReferenciaService:
     
 
     @staticmethod
-    def crear_referencia_enviada_segun_repuesta(data: dict, diagnosticos,  user=None):
+    def crear_referencia_enviada_segun_repuesta(data: dict, diagnosticos, user=None):
 
-        campos = {
-            "fecha_elaboracion": data.get("fecha_elaboracion"),
-            "tipo": data.get("tipo"),
-            "paciente": data.get("paciente"),
-            "institucion_origen": Institucion_salud.objects.get(id=65),# siempre sera el enrique osea nosotros 
-            "institucion_destino": data.get("institucion_destino"),
-            "motivo": data.get("motivo"),
-            "motivo_detalle": data.get("motivo_detalle"),
-            "atencion_requerida": data.get("atencion_requerida"),
-            "elaborada_por": data.get("elaborada_por"), 
-            "area_refiere_sala": data.get("area_refiere_sala"),
-            "area_refiere_especialidad": data.get("area_refiere_especialidad"),
-            "area_refiere_servicio_auxiliar": data.get("area_refiere_servicio_auxiliar"),
-            "especialidad_destino": data.get("especialidad_destino"),
-            "observaciones": data.get("observaciones"),
-            "estado": True    
-        }
+        try:
+            with transaction.atomic():
 
-        if user:
-            campos["creado_por"] = user
-            campos["modificado_por"] = user
+                campos = {
+                    "fecha_elaboracion": data.get("fecha_elaboracion"),
+                    "tipo": data.get("tipo"),
+                    "paciente": data.get("paciente"),
+                    "institucion_origen": Institucion_salud.objects.get(id=HEAC_INSTITUCION_ID),
+                    "institucion_destino": data.get("institucion_destino"),
+                    "motivo": data.get("motivo"),
+                    "motivo_detalle": data.get("motivo_detalle"),
+                    "atencion_requerida": data.get("atencion_requerida"),
+                    "elaborada_por": data.get("elaborada_por"),
+                    "area_refiere_sala": data.get("area_refiere_sala"),
+                    "area_refiere_especialidad": data.get("area_refiere_especialidad"),
+                    "area_refiere_servicio_auxiliar": data.get("area_refiere_servicio_auxiliar"),
+                    "especialidad_destino": data.get("especialidad_destino"),
+                    "observaciones": data.get("observaciones"),
+                    "estado": True
+                }
 
-        referencia = Referencia.objects.create(**campos)
+                if user:
+                    campos["creado_por"] = user
+                    campos["modificado_por"] = user
 
-        
-        for diag in diagnosticos:
-            diag['confirmado'] = True
+                referencia = Referencia.objects.create(**campos)
 
-        result_diagnostico = RefDiagnosticoService.procesar_diagnosticos_referencia(
+                # Forzar confirmados
+                for diag in diagnosticos:
+                    diag['confirmado'] = True
+
+                # Procesar diagnósticos (ya usa raise internamente)
+                RefDiagnosticoService.procesar_diagnosticos_referencia(
                     referencia_id=referencia.id,
                     diagnosticos=diagnosticos
                 )
+                return referencia
 
+        except Exception:
+            log_error(
+                f"Error creando referencia de seguimiento paciente {data.get('paciente')} destino {data.get('institucion_destino')}",
+                app=LogApp.REFERENCIAS
+            )
+            raise
 
-        return referencia
-    
 
     @staticmethod
     def crear_actualizar_seguimiento(seguimiento, user):
-        if seguimiento.idSeguimiento == '0':
-            try:
-                SeguimientoTic.objects.get(referencia_id=seguimiento.idReferencia)
-                return False, 0, "Esta referencia ya tiene un seguimiento registrado"
-            except SeguimientoTic.DoesNotExist:
-                pass
+        try:
+            with transaction.atomic():
+                # creacioa
+                if seguimiento.idSeguimiento == '0':
+                    # Bloqueo para evitar duplicados concurrentes
+                    existe = (
+                        SeguimientoTic.objects
+                        .select_for_update()
+                        .filter(referencia_id=seguimiento.idReferencia)
+                        .exists()
+                    )
 
-            try:
-                nuevo = SeguimientoTic.objects.create(
-                    referencia_id = seguimiento.idReferencia,
-                    metodo_comunicacion = seguimiento.metodo,
-                    establece_comunicacion = seguimiento.establece_comunicacion,
-                    asistio_referencia = seguimiento.asistio_referencia,
-                    fuente_info = seguimiento.fuente_info,
-                    condicion_paciente_id = seguimiento.condicion_paciente,
-                    observaciones = seguimiento.observaciones,
-                    creado_por = user
-                )
+                    if existe:
+                        log_warning(
+                            f"Intento duplicado seguimiento referencia {seguimiento.idReferencia}",
+                            app=LogApp.REFERENCIAS
+                        )
+                        raise ValueError("Esta referencia ya tiene un seguimiento registrado")
 
-                return True, nuevo.id, "Seguimiento creado correctamente"
+                    nuevo = SeguimientoTic.objects.create(
+                        referencia_id=seguimiento.idReferencia,
+                        metodo_comunicacion=seguimiento.metodo,
+                        establece_comunicacion=seguimiento.establece_comunicacion,
+                        asistio_referencia=seguimiento.asistio_referencia,
+                        fuente_info=seguimiento.fuente_info,
+                        condicion_paciente_id=seguimiento.condicion_paciente,
+                        observaciones=seguimiento.observaciones,
+                        creado_por=user
+                    )
+                    return nuevo.id  
 
-            except Exception as e:
-                return False, 0, "No se pudo crear el seguimiento, intente nuevamente"
 
-        #ACTUALIZACIÓN
-        else:
-            try:
-                seg = SeguimientoTic.objects.get(pk=seguimiento.idSeguimiento)
-            except SeguimientoTic.DoesNotExist:
-                return False, 0, "No existe el seguimiento a actualizar"
+                # actualizacion
+                else:
 
-            cambio = False
+                    try:
+                        seg = (
+                            SeguimientoTic.objects
+                            .select_for_update()
+                            .get(pk=seguimiento.idSeguimiento)
+                        )
+                    except SeguimientoTic.DoesNotExist:
+                        log_warning(
+                            f"Seguimiento {seguimiento.idSeguimiento} no existe para actualizar",
+                            app=LogApp.REFERENCIAS
+                        )
+                        raise ValueError("No existe el seguimiento a actualizar")
 
-            # Comparar campo por campo
-            if seg.metodo_comunicacion != seguimiento.metodo:
-                seg.metodo_comunicacion = seguimiento.metodo
-                cambio = True
+                    cambio = False
 
-            if seg.establece_comunicacion != seguimiento.establece_comunicacion:
-                seg.establece_comunicacion = seguimiento.establece_comunicacion
-                cambio = True
+                    if seg.metodo_comunicacion != seguimiento.metodo:
+                        seg.metodo_comunicacion = seguimiento.metodo
+                        cambio = True
 
-            if seg.asistio_referencia != seguimiento.asistio_referencia:
-                seg.asistio_referencia = seguimiento.asistio_referencia
-                cambio = True
+                    if seg.establece_comunicacion != seguimiento.establece_comunicacion:
+                        seg.establece_comunicacion = seguimiento.establece_comunicacion
+                        cambio = True
 
-            if seg.fuente_info != seguimiento.fuente_info:
-                seg.fuente_info = seguimiento.fuente_info
-                cambio = True
+                    if seg.asistio_referencia != seguimiento.asistio_referencia:
+                        seg.asistio_referencia = seguimiento.asistio_referencia
+                        cambio = True
 
-            if seg.condicion_paciente_id != seguimiento.condicion_paciente:
-                seg.condicion_paciente_id = seguimiento.condicion_paciente
-                cambio = True
+                    if seg.fuente_info != seguimiento.fuente_info:
+                        seg.fuente_info = seguimiento.fuente_info
+                        cambio = True
 
-            if seg.observaciones != seguimiento.observaciones:
-                seg.observaciones = seguimiento.observaciones
-                cambio = True
+                    if seg.condicion_paciente_id != seguimiento.condicion_paciente:
+                        seg.condicion_paciente_id = seguimiento.condicion_paciente
+                        cambio = True
 
-            # Ningún campo cambió
-            if not cambio:
-                return True, seg.id, "No hubo cambios en el seguimiento"
+                    if seg.observaciones != seguimiento.observaciones:
+                        seg.observaciones = seguimiento.observaciones
+                        cambio = True
 
-            #  algo cambió  guardar
-            try:
-                seg.save()
-                return True, seg.id, "Seguimiento actualizado correctamente"
-            except Exception as e:  
-                return False, 0, "No se pudo actualizar el seguimiento"
+                    if not cambio:
+                        # No es error → solo devolver id
+                        return seg.id
+
+                    seg.save()
+                    return seg.id
+
+        except ValueError:
+            raise
+
+        except Exception:
+            log_error(
+                f"Error en crear/actualizar seguimiento referencia {seguimiento.idReferencia}",
+                app=LogApp.REFERENCIAS
+            )
+            raise
 
 
     @staticmethod

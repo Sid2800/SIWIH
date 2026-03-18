@@ -8,7 +8,8 @@ from core.services.paciente_service import PacienteService
 from django.db.models import Func, F, Q, OuterRef, Subquery, DateField, Value, Count
 from django.db.models.functions import Concat
 from django.db import transaction
-from django.utils import timezone
+from core.utils.utilidades_logging import *
+from core.constants.domain_constants import LogApp
 
 class IngresoService:
 
@@ -83,79 +84,85 @@ class IngresoService:
 
     @staticmethod
     def procesar_acompaniante(id, dni, nombre1, nombre2, apellido1, apellido2, sector, telefono):
-        
-        dni = dni or None
+        try:
+            dni = dni or None
+            def actualizar_datos_acompaniante(acompaniante):
+                cambios = False
 
+                if acompaniante.dni != dni:
+                    acompaniante.dni = dni
+                    cambios = True
 
-        def actualizar_datos_acompaniante(acompaniante):
-            cambios = False
+                if acompaniante.primer_nombre != nombre1:
+                    acompaniante.primer_nombre = nombre1
+                    cambios = True
+                
+                if acompaniante.segundo_nombre != nombre2:
+                    acompaniante.segundo_nombre = nombre2
+                    cambios = True
+                
+                if acompaniante.primer_apellido != apellido1:
+                    acompaniante.primer_apellido = apellido1
+                    cambios = True
 
-            if acompaniante.dni != dni:
+                if acompaniante.segundo_apellido != apellido2:
+                    acompaniante.segundo_apellido = apellido2
+                    cambios = True
 
-                acompaniante.dni = dni
-                cambios = True
+                if acompaniante.sector_id != sector:
+                    acompaniante.sector_id = sector
+                    cambios = True
 
-            if acompaniante.primer_nombre != nombre1:
-                acompaniante.primer_nombre = nombre1
-                cambios = True
-            
-            if acompaniante.segundo_nombre != nombre2:
-                acompaniante.segundo_nombre = nombre2
-                cambios = True
-            
-            if acompaniante.primer_apellido != apellido1:
-                acompaniante.primer_apellido = apellido1
-                cambios = True
+                if acompaniante.telefono != telefono:
+                    acompaniante.telefono = telefono
+                    cambios = True
+                
+                if cambios:
+                    acompaniante.save()
 
-            if acompaniante.segundo_apellido != apellido2:
-                acompaniante.segundo_apellido = apellido2
-                cambios = True
-
-            if acompaniante.sector_id != sector:
-                acompaniante.sector_id = sector
-                cambios = True
-
-            if acompaniante.telefono != telefono:
-                acompaniante.telefono = telefono
-                cambios = True
-            
-            if cambios:
-                acompaniante.save()
-
-            return acompaniante
-
-        # Intentamos encontrar el acompañante por ID
-        if id:
-            try:
-                acompaniante = Acompanante.objects.get(id=id)
-                return actualizar_datos_acompaniante(acompaniante)
-            except Acompanante.DoesNotExist:
-                pass  # Si no existe, continuamos buscando por DNI
-
-        # Intentamos encontrar el acompañante por DNI
-        if dni:
-            try:
-                acompaniante = Acompanante.objects.get(dni=dni)
-                return actualizar_datos_acompaniante(acompaniante)
-            except Acompanante.DoesNotExist:
-                pass  # Si no existe, intentamos crearlo
-
-        # Si no encontramos por ID o DNI, creamos un nuevo acompañante
-        if nombre1 and apellido1:
-            with transaction.atomic():  # Para evitar problemas de concurrencia
-                acompaniante = Acompanante.objects.create(
-                    primer_nombre=nombre1,
-                    segundo_nombre=nombre2,
-                    primer_apellido=apellido1,
-                    segundo_apellido=apellido2,
-                    dni=dni if dni else None,
-                    telefono=telefono,
-                    sector_id=sector
-                )
                 return acompaniante
 
-        return None
-                
+            # Intentamos encontrar el acompañante por ID
+            if id:
+                try:
+                    acompaniante = Acompanante.objects.get(id=id)
+                    return actualizar_datos_acompaniante(acompaniante)
+                except Acompanante.DoesNotExist:
+                    pass  # Si no existe, continuamos buscando por DNI
+
+            # Intentamos encontrar el acompañante por DNI
+            if dni:
+                try:
+                    acompaniante = Acompanante.objects.get(dni=dni)
+                    return actualizar_datos_acompaniante(acompaniante)
+                except Acompanante.DoesNotExist:
+                    pass  # Si no existe, intentamos crearlo
+
+            # Si no encontramos por ID o DNI, creamos un nuevo acompañante
+            if nombre1 and apellido1:
+                with transaction.atomic():  # Para evitar problemas de concurrencia
+                    acompaniante = Acompanante.objects.create(
+                        primer_nombre=nombre1,
+                        segundo_nombre=nombre2,
+                        primer_apellido=apellido1,
+                        segundo_apellido=apellido2,
+                        dni=dni if dni else None,
+                        telefono=telefono,
+                        sector_id=sector
+                    )
+                    return acompaniante
+            log_warning(
+                f"No se pudo crear acompañante, datos insuficientes",
+                app=LogApp.PACIENTES
+            )
+
+            return None
+        except Exception:
+            log_error(
+                f"Error procesando acompañante DNI {dni}",
+                app=LogApp.PACIENTES
+            )
+            raise
             
     @staticmethod
     def tiene_ingreso_activo(id_paciente):
@@ -404,21 +411,19 @@ class IngresoService:
                 }
 
         except Exception as e:
-            print(f"Error al generar data de ingreso: {e}")
+            log_error(
+                    f"Error al generar data de ingreso: {e}",
+                    app=LogApp.INGRESOS
+                )
             return None
         
 
     @staticmethod
     def inactivar_ingreso(ingresoId):
-        ingreso = Ingreso.objects.filter(
+        updated = Ingreso.objects.filter(
             id=ingresoId,
             fecha_recepcion_sdgi__isnull=True,
             estado=1
-        ).first()
+        ).update(estado=2)
 
-        if ingreso :
-            ingreso.estado = 2
-            ingreso.save()
-            return True
-
-        return False
+        return updated > 0

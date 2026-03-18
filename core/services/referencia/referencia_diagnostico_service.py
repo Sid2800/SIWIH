@@ -1,5 +1,7 @@
 from referencia.models import Referencia_diagnostico, Respuesta_diagnostico
 from django.db import transaction
+from core.constants.domain_constants import LogApp
+from core.utils.utilidades_logging import *
 
 class RefDiagnosticoService:
 
@@ -24,38 +26,70 @@ class RefDiagnosticoService:
 
     @staticmethod
     def procesar_diagnosticos_referencia(referencia_id, diagnosticos):
-        """
-        
-        """
+
         if not diagnosticos:
-            return {'error': True, 'mensaje':" No se enviaron diagnosticos."}
+            log_warning(
+                f"No se enviaron diagnósticos en referencia {referencia_id}",
+                app=LogApp.REFERENCIAS
+            )
+            raise ValueError("No se enviaron diagnosticos.")
 
-        with transaction.atomic():
-            #Desactivamos todos los diagnosticos antes de procesarlos
-            Referencia_diagnostico.objects.filter(referencia_id=referencia_id).update(estado=False)
+        try:
+            with transaction.atomic():
 
-            for diagnostico in diagnosticos:
-                diag_id = diagnostico.get('id')
-                diag_ref = diagnostico.get('idDiagDB', 0) #0 = nuevo 
-                detalle = diagnostico.get('detalle')
-                confirmado = diagnostico.get('confirmado', False)
+                # Desactivamos todos los diagnósticos
+                Referencia_diagnostico.objects.filter(
+                    referencia_id=referencia_id
+                ).update(estado=False)
 
-                if diag_ref and diag_ref > 0:
-                    try:
-                        referencia_diagnostico = Referencia_diagnostico.objects.get(id=diag_ref, referencia_id=referencia_id)
-                        referencia_diagnostico.estado = True
-                        referencia_diagnostico.detalle = detalle.strip() if detalle else None
-                        referencia_diagnostico.confirmada = confirmado
-                        referencia_diagnostico.save()
-                    except Referencia_diagnostico.DoesNotExist:
-                        return {'error': True, 'mensaje': f"El diagnostico con id {diag_ref} no existe."}
-                else:  # estudio nuevo → crear
-                    resultado = RefDiagnosticoService.crear_referencia_diagnostico(referencia_id, diag_id, detalle, confirmado)
-                    if resultado['error']:
-                        return {'error': True, 'mensaje': resultado['mensaje']}
-    
-        return {'error': False, 'mensaje': "Diagnosticos procesados correctamente"}
-    
+                for diagnostico in diagnosticos:
+                    diag_id = diagnostico.get('id')
+                    diag_ref = diagnostico.get('idDiagDB', 0)
+                    detalle = diagnostico.get('detalle')
+                    confirmado = diagnostico.get('confirmado', False)
+
+                    if diag_ref and diag_ref > 0:
+                        try:
+                            referencia_diagnostico = Referencia_diagnostico.objects.get(
+                                id=diag_ref,
+                                referencia_id=referencia_id
+                            )
+
+                            referencia_diagnostico.estado = True
+                            referencia_diagnostico.detalle = detalle.strip() if detalle else None
+                            referencia_diagnostico.confirmada = confirmado
+                            referencia_diagnostico.save()
+
+                        except Referencia_diagnostico.DoesNotExist:
+                            log_warning(
+                                f"Diagnóstico referencia {diag_ref} no existe en referencia {referencia_id}",
+                                app=LogApp.REFERENCIAS
+                            )
+                            raise ValueError(f"El diagnostico con id {diag_ref} no existe.")
+
+                    else:
+                        RefDiagnosticoService.crear_referencia_diagnostico(
+                            referencia_id,
+                            diag_id,
+                            detalle,
+                            confirmado
+                        )
+
+            # éxito (no logueamos porque así lo definiste)
+            return {
+                'mensaje': "Diagnosticos procesados correctamente"
+            }
+
+        except ValueError:
+            raise
+
+        except Exception:
+            log_error(
+                f"Error procesando diagnósticos referencia {referencia_id}",
+                app=LogApp.REFERENCIAS
+            )
+            raise
+
 
     @staticmethod
     def crear_referencia_diagnostico(id_referencia, id_diagnostico, detalle, confirmado=False):
@@ -69,12 +103,13 @@ class RefDiagnosticoService:
                 detalle=detalle.upper().strip() if detalle else None,
                 confirmada=confirmado
             )
-            return {'error': False, 'mensaje': "Diagnostico procesado correctamente"}
-        except Exception as e:
-            return {
-                'error': True,
-                'mensaje': f"Error al crear el detalle: {str(e)}"
-            }
+
+        except Exception:
+            log_error(
+                f"Error creando diagnóstico referencia {id_referencia} diagnostico {id_diagnostico}",
+                app=LogApp.REFERENCIAS
+            )
+            raise
         
 
     @staticmethod
@@ -97,59 +132,84 @@ class RefDiagnosticoService:
 
     @staticmethod
     def procesar_diagnosticos_respuesta(respuesta_id, diagnosticos):
-        """
-        Crea o actualiza los diagnósticos asociados a una respuesta.
-        """
+
         if not diagnosticos:
-            return {'error': True, 'mensaje': "No se enviaron diagnósticos."}
+            log_warning(
+                f"No se enviaron diagnósticos en respuesta {respuesta_id}",
+                app=LogApp.REFERENCIAS
+            )
+            raise ValueError("No se enviaron diagnósticos.")
 
-        with transaction.atomic():
-            # Desactivar todos los diagnósticos antes de procesarlos
-            Respuesta_diagnostico.objects.filter(respuesta_id=respuesta_id).update(estado=False)
+        try:
+            with transaction.atomic():
 
-            for diagnostico in diagnosticos:
-                diag_id = diagnostico.get('id')
-                diag_res = diagnostico.get('idDiagDB', 0)  # 0 = nuevo
-                detalle = diagnostico.get('detalle')
+                # Desactivar todos
+                Respuesta_diagnostico.objects.filter(
+                    respuesta_id=respuesta_id
+                ).update(estado=False)
 
-                if diag_res and diag_res > 0:
-                    try:
-                        respuesta_diagnostico = Respuesta_diagnostico.objects.get(
-                            id=diag_res, respuesta_id=respuesta_id
+                for diagnostico in diagnosticos:
+                    diag_id = diagnostico.get('id')
+                    diag_res = diagnostico.get('idDiagDB', 0)
+                    detalle = diagnostico.get('detalle')
+
+                    if diag_res and diag_res > 0:
+                        try:
+                            respuesta_diagnostico = Respuesta_diagnostico.objects.get(
+                                id=diag_res,
+                                respuesta_id=respuesta_id
+                            )
+
+                            respuesta_diagnostico.estado = True
+                            respuesta_diagnostico.detalle = detalle.strip() if detalle else None
+                            respuesta_diagnostico.save()
+
+                        except Respuesta_diagnostico.DoesNotExist:
+                            log_warning(
+                                f"Diagnóstico respuesta {diag_res} no existe en respuesta {respuesta_id}",
+                                app=LogApp.REFERENCIAS
+                            )
+                            raise ValueError(f"El diagnóstico con id {diag_res} no existe.")
+
+                    else:
+                        # nuevo → solo llamar, sin validar resultado
+                        RefDiagnosticoService.crear_respuesta_diagnostico(
+                            respuesta_id,
+                            diag_id,
+                            detalle
                         )
-                        respuesta_diagnostico.estado = True
-                        respuesta_diagnostico.detalle = detalle.strip() if detalle else None
-                        respuesta_diagnostico.save()
-                    except Respuesta_diagnostico.DoesNotExist:
-                        return {'error': True, 'mensaje': f"El diagnóstico con id {diag_res} no existe."}
-                else:
-                    # Diagnóstico nuevo → crear
-                    resultado = RefDiagnosticoService.crear_respuesta_diagnostico(
-                        respuesta_id, diag_id, detalle
-                    )
-                    if resultado['error']:
-                        return {'error': True, 'mensaje': resultado['mensaje']}
 
-        return {'error': False, 'mensaje': "Diagnósticos procesados correctamente"}
+            return {
+                'mensaje': "Diagnósticos procesados correctamente"
+            }
+
+        except ValueError:
+            raise
+
+        except Exception:
+            log_error(
+                f"Error procesando diagnósticos respuesta {respuesta_id}",
+                app=LogApp.REFERENCIAS
+            )
+            raise
     
 
     #Respuesta 
     @staticmethod
     def crear_respuesta_diagnostico(id_respuesta, id_diagnostico, detalle):
-        """
-        Crea un objeto RespuestaDiagnostico.
-        """
+
         try:
             Respuesta_diagnostico.objects.create(
                 respuesta_id=id_respuesta,
                 diagnostico_id=id_diagnostico,
                 detalle=detalle.upper().strip() if detalle else None
             )
-            return {'error': False, 'mensaje': "Diagnóstico procesado correctamente"}
-        except Exception as e:
-            return {
-                'error': True,
-                'mensaje': f"Error al crear el detalle del diagnóstico: {str(e)}"
-            }
 
-    
+        except Exception:
+            log_error(
+                f"Error creando diagnóstico respuesta {id_respuesta} diagnostico {id_diagnostico}",
+                app=LogApp.REFERENCIAS
+            )
+            raise
+
+        

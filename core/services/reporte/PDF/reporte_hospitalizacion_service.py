@@ -14,6 +14,8 @@ from core.utils.utilidades_textos import formatear_dni, formatear_expediente
 from core.utils.utilidades_fechas import formatear_fecha, mes_nombre
 from core.services.reporte.PDF.reporte_referencia_service import ReporteReferenciaService
 from django.conf import settings
+from core.constants.domain_constants import LogApp
+from core.utils.utilidades_logging import *
 
 
 class ReporteHospitalizacionService:
@@ -34,13 +36,19 @@ class ReporteHospitalizacionService:
         alt_margen = 2.6
 
         # Logos
-        logo1 = os.path.join(settings.BASE_DIR, 'core/static/core/img/escudo_nacional.png')
-        pdf.drawImage(logo1, x=12, y=alto-62, width=62, height=42,
-                    preserveAspectRatio=True, mask='auto')
+        try:
+            logo1 = os.path.join(settings.BASE_DIR, 'core/static/core/img/escudo_nacional.png')
+            pdf.drawImage(logo1, x=12, y=alto-62, width=62, height=42,
+                        preserveAspectRatio=True, mask='auto')
 
-        logo2 = os.path.join(settings.BASE_DIR, 'core/static/core/img/logo_HEAC.png')
-        pdf.drawImage(logo2, x=ancho-78, y=alto-62, width=62, height=42,
-                    preserveAspectRatio=True, mask='auto')
+            logo2 = os.path.join(settings.BASE_DIR, 'core/static/core/img/logo_HEAC.png')
+            pdf.drawImage(logo2, x=ancho-78, y=alto-62, width=62, height=42,
+                        preserveAspectRatio=True, mask='auto')
+        except Exception:
+            log_warning(
+                "No se logro cargar los logotipos de la empresa",
+                app=LogApp.REPORTES
+            )
 
         # Tabla
         datos = [[""] * columnas for _ in range(filas)]
@@ -1279,67 +1287,74 @@ class ReporteHospitalizacionService:
 
     @staticmethod
     def GenerarFormatoHojaHospitalizacion2026(data, usuario):
-
-        # 1. NORMALIZAR DATA
-        paciente = SimpleNamespace(**data["paciente"])
-        padres = SimpleNamespace(**data["padres"])
-        acompaniante = SimpleNamespace(**data["acompaniante"])
-        ingreso = SimpleNamespace(**data["ingreso"])
-        usuario_creacion =  SimpleNamespace(**data["usuario"])
-        institucion =  SimpleNamespace(**data["institucion"])
-
-
-        # 2. CONFIGURACIÓN DOCUMENTO
-        nombre_paciente = f"{paciente.nombres} {paciente.apellido1}".strip().replace(" ", "_") 
-        fecha_str = ingreso.fecha_ingreso.strftime("%Y%m%d_%H%M")
-        nombre_archivo = f"reporte_ingreso_{nombre_paciente}_{fecha_str}.pdf"
-        response = HttpResponse(content_type='application/pdf')
-        response['Content-Disposition'] = f'inline; filename="{nombre_archivo}"'
-
-        pdf = canvas.Canvas(response, pagesize=letter)
-        pdf.setTitle(f"Hoja de Hospitalizacion- {nombre_paciente}")
-        ancho, alto = letter
+        try:
+            if not data:
+                log_warning(
+                    f"Intento de generar hoja hospitalización sin data ",
+                    app=LogApp.REPORTES
+                )
+                raise ValueError("No hay datos para generar hoja hospitalización")
+            # 1. NORMALIZAR DATA
+            paciente = SimpleNamespace(**data["paciente"])
+            padres = SimpleNamespace(**data["padres"])
+            acompaniante = SimpleNamespace(**data["acompaniante"])
+            ingreso = SimpleNamespace(**data["ingreso"])
+            usuario_creacion =  SimpleNamespace(**data["usuario"])
+            institucion =  SimpleNamespace(**data["institucion"])
 
 
-        # 3. DIBUJO DOCUMENTO
-        #pagina 1 
-        ReporteHospitalizacionService.__dibujarEstructuraHojaHospitalizacion2026(pdf,ancho,alto)
-        ReporteHospitalizacionService.__dibujarEtiquetasEstaticasHojaHospitalizacion2026(pdf,ancho,alto)
-        altura_bloque3 = ReporteHospitalizacionService.__dibujarDatosPacienteHojaHospitalizacion2026(pdf,ancho,alto,paciente)
-        
-        ReporteHospitalizacionService.__dibujarDatosIngresoHojaHospitalizacion2026(pdf,ancho,alto,altura_bloque3,acompaniante,padres,ingreso,usuario_creacion)
-        ReporteHospitalizacionService.__dibujarPiePaginaFormatoHojaHospitalizacion2026(pdf, ancho, alto, usuario)
-        #PAGINA2
-        ReporteHospitalizacionService.__dibujarAutorizacionFormatoHojaHospitalizacion2026(pdf, ancho, alto, ingreso, paciente, padres, acompaniante)
-        ReporteHospitalizacionService.__dibujarPiePaginaFormatoHojaHospitalizacion2026(pdf, ancho, alto, usuario)
-        #pagina 3
-        ReporteHospitalizacionService.__dibujarEpicrisisFormatoHojaHospitalizacion2026(pdf, ancho, alto, paciente, ingreso)
-        ReporteHospitalizacionService.__dibujarPiePaginaFormatoHojaHospitalizacion2026(pdf, ancho, alto, usuario)
+            # 2. CONFIGURACIÓN DOCUMENTO
+            nombre_paciente = f"{paciente.nombres} {paciente.apellido1}".strip().replace(" ", "_") 
+            fecha_str = ingreso.fecha_ingreso.strftime("%Y%m%d_%H%M")
+            nombre_archivo = f"reporte_ingreso_{nombre_paciente}_{fecha_str}.pdf"
+            response = HttpResponse(content_type='application/pdf')
+            response['Content-Disposition'] = f'inline; filename="{nombre_archivo}"'
 
-        #pagina 4 referencia
-        pdf.showPage()
-        ReportePdfBaseService.dibujar_borde_pagina(pdf, ancho, alto, None)
-
-        ReporteReferenciaService._dibujarEstructuraFormatoReferenciaRespuesta(pdf,ancho,alto)
-        ReporteReferenciaService._dibujarEtiquetasEstaticasFormatoRefenciaRespuesta(pdf,ancho,alto)
-        ReporteReferenciaService._dibujarDatosHospitalizacion(pdf,ancho,alto, paciente, institucion)
-        ReporteReferenciaService._dibujarPiePaginaFormatoReferenciaRespuesta(pdf, ancho, alto, usuario)
-        #pagina 5
-        pdf.showPage()
-        ReportePdfBaseService.dibujar_borde_pagina(pdf, ancho, alto, 2)
-        ReporteReferenciaService._dibujarEstructuraPagina2FormatoReferenciaRespuesta(pdf,ancho,alto)
-        ReporteReferenciaService._dibujarPiePaginaFormatoReferenciaRespuesta(pdf, ancho, alto, usuario)
-        ReporteReferenciaService._dibujarDatosPagina2FormatoReferencia(pdf, ancho, alto, institucion, True)
+            pdf = canvas.Canvas(response, pagesize=letter)
+            pdf.setTitle(f"Hoja de Hospitalizacion- {nombre_paciente}")
+            ancho, alto = letter
 
 
+            # 3. DIBUJO DOCUMENTO
+            #pagina 1 
+            ReporteHospitalizacionService.__dibujarEstructuraHojaHospitalizacion2026(pdf,ancho,alto)
+            ReporteHospitalizacionService.__dibujarEtiquetasEstaticasHojaHospitalizacion2026(pdf,ancho,alto)
+            altura_bloque3 = ReporteHospitalizacionService.__dibujarDatosPacienteHojaHospitalizacion2026(pdf,ancho,alto,paciente)
+            
+            ReporteHospitalizacionService.__dibujarDatosIngresoHojaHospitalizacion2026(pdf,ancho,alto,altura_bloque3,acompaniante,padres,ingreso,usuario_creacion)
+            ReporteHospitalizacionService.__dibujarPiePaginaFormatoHojaHospitalizacion2026(pdf, ancho, alto, usuario)
+            #PAGINA2
+            ReporteHospitalizacionService.__dibujarAutorizacionFormatoHojaHospitalizacion2026(pdf, ancho, alto, ingreso, paciente, padres, acompaniante)
+            ReporteHospitalizacionService.__dibujarPiePaginaFormatoHojaHospitalizacion2026(pdf, ancho, alto, usuario)
+            #pagina 3
+            ReporteHospitalizacionService.__dibujarEpicrisisFormatoHojaHospitalizacion2026(pdf, ancho, alto, paciente, ingreso)
+            ReporteHospitalizacionService.__dibujarPiePaginaFormatoHojaHospitalizacion2026(pdf, ancho, alto, usuario)
 
+            #pagina 4 referencia
+            pdf.showPage()
+            ReportePdfBaseService.dibujar_borde_pagina(pdf, ancho, alto, None)
 
+            ReporteReferenciaService._dibujarEstructuraFormatoReferenciaRespuesta(pdf,ancho,alto)
+            ReporteReferenciaService._dibujarEtiquetasEstaticasFormatoRefenciaRespuesta(pdf,ancho,alto)
+            ReporteReferenciaService._dibujarDatosHospitalizacion(pdf,ancho,alto, paciente, institucion)
+            ReporteReferenciaService._dibujarPiePaginaFormatoReferenciaRespuesta(pdf, ancho, alto, usuario)
+            #pagina 5
+            pdf.showPage()
+            ReportePdfBaseService.dibujar_borde_pagina(pdf, ancho, alto, 2)
+            ReporteReferenciaService._dibujarEstructuraPagina2FormatoReferenciaRespuesta(pdf,ancho,alto)
+            ReporteReferenciaService._dibujarPiePaginaFormatoReferenciaRespuesta(pdf, ancho, alto, usuario)
+            ReporteReferenciaService._dibujarDatosPagina2FormatoReferencia(pdf, ancho, alto, institucion, True)
 
+            # Finalizar el PDF
+            pdf.save()
+            return response
+        except ValueError:
+            raise
 
-
-        
-        # Finalizar el PDF
-        pdf.save()
-        return response
-    
+        except Exception:
+            log_error(
+                f"Error generando hoja hospitalización",
+                app=LogApp.REPORTES
+            )
+            raise
     
