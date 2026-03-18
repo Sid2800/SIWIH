@@ -5,6 +5,8 @@ from django.conf import settings
 import json
 from types import SimpleNamespace
 import requests
+from core.constants.domain_constants import LogApp
+from core.utils.utilidades_logging import *
 
 class RequestService:
 
@@ -40,7 +42,6 @@ class RequestService:
 
             url = f"{settings.IMAGE_SERVER_URL}{BUSCAR_ARCHIVOS}"
             token = traer_server_token()
-   
             payload = {
                 "app": peticion.app,
                 "origen_tipo": peticion.origen_tipo,
@@ -71,10 +72,11 @@ class RequestService:
             }
         
         except ImageServerAuthError as e:
-            return {
-                "ok": False,
-                "error": str(e)
-            }
+            log_error(
+                "Error autenticación media server",
+                app=LogApp.MEDIA
+            )
+            return {"ok": False, "error": str(e)}
 
         except ValueError as ve:
             return {
@@ -83,12 +85,20 @@ class RequestService:
             }
 
         except requests.exceptions.HTTPError as e:
+            log_warning(
+                f"HTTP error media server status={e.response.status_code}",
+                app=LogApp.MEDIA
+            )
             return {
                 "ok": False,
                 "error": e.response.text[:500]
             }
 
         except requests.exceptions.RequestException as e:
+            log_error(
+                "Error conexión media server LIST",
+                app=LogApp.MEDIA
+            )
             return {
                 "ok": False,
                 "error": str(e)
@@ -146,9 +156,12 @@ class RequestService:
                     "error": response.text[:500]
                 }
 
-            print(f"error:{ response.text[:500]}")
 
             if response.status_code >= 400:
+                log_warning(
+                    f"Error subida imagen status={response.status_code}",
+                    app=LogApp.MEDIA
+                )
                 return {
                     "ok": False,
                     "error": response_json
@@ -166,6 +179,10 @@ class RequestService:
             }
 
         except requests.exceptions.RequestException as e:
+            log_error(
+                "Error conexión subir imagen",
+                app=LogApp.MEDIA
+            )
             return {
                 "ok": False,
                 "error": f"Error de conexión con servidor de imágenes: {str(e)}"
@@ -214,10 +231,10 @@ class RequestService:
                 }
 
             if response.status_code >= 400:
-                return {
-                    "ok": False,
-                    "error": response_json
-                }
+                log_warning(
+                    f"Error desactivar imagen status={response.status_code}",
+                    app=LogApp.MEDIA
+                )
 
             return {
                 "ok": True,
@@ -232,6 +249,10 @@ class RequestService:
             }
 
         except requests.exceptions.RequestException as e:
+            log_error(
+                "Error conexión desactivar imagen",
+                app=LogApp.MEDIA
+            )
             return {
                 "ok": False,
                 "error": f"Error de conexión con servidor de imágenes: {str(e)}"

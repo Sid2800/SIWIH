@@ -1472,6 +1472,7 @@ ZONA INFORMES ESTADÍSTICOS
         pdf.drawString(ancho-130, alto_bloque36-28, ReporteReferenciaService._texto_seguro(f"# {respuesta.ref_id}", 10))
 
 
+
     @staticmethod
     def _dibujarPiePaginaFormatoReferenciaRespuesta(pdf, ancho, alto, usuario):
         #Dibuja el pie de página en una posición fija desde el borde inferior.
@@ -1709,8 +1710,8 @@ ZONA INFORMES ESTADÍSTICOS
 
 
         #Crecion del documento
-        nombre_paciente = f"{paciente.paciente_nombre1} {paciente.paciente_nombre2}".strip().replace(" ", "_") 
-        nombre_archivo = f"reporte_respuesta_{nombre_paciente}.pdf"
+        nombre_paciente = f"{paciente.nombres}".strip().replace(" ", "_") 
+        nombre_archivo = f"reporte_respuesta_{paciente.nombres}.pdf"
 
 
         response = HttpResponse(content_type='application/pdf')
