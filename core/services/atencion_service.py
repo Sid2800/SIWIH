@@ -7,6 +7,8 @@ from django.db import transaction
 from django.db.models import Func, F, Q, OuterRef, Subquery, DateField, Value, Count
 from django.db.models.functions import Concat
 from django.utils import timezone as django_timezone
+from core.constants.domain_constants import LogApp
+from core.utils.utilidades_logging import *
 import pytz
 from django.utils import timezone
 from datetime import timedelta
@@ -14,6 +16,7 @@ class AtencionService:
 
       @staticmethod
       def procesar_atencion(atencion):
+
             def actualizar_datos_si_necesario(atencionRegistro):
                   cambios = False
                   if atencionRegistro.fecha_atencion != atencion.fecha:
@@ -41,6 +44,10 @@ class AtencionService:
                         atencionRegistro = Atencion.objects.get(id=atencion.id)
                         return actualizar_datos_si_necesario(atencionRegistro)
                   except Atencion.DoesNotExist:
+                        log_warning(
+                              f"Atención no encontrada id={atencion.id}",
+                              app=LogApp.ATENCION
+                        )
                         return False
 
             elif atencion.fecha and atencion.paciente_id and atencion.especialidad_id:
@@ -70,11 +77,13 @@ class AtencionService:
                                     ubicacion,
                                     atencion.usuario_id
                               )
-
                         return True
 
-                  except Exception as e:
-                        print(f"Error al procesar atención: {e}")
+                  except Exception:
+                        log_error(
+                              f"Error actualizando atención id={atencion.id}",
+                              app=LogApp.ATENCION
+                              )
                         return False
 
             return False
@@ -186,6 +195,7 @@ class AtencionService:
                   Q(paciente_id=id_paciente) & (Q(fecha_recepcion__isnull=True))
             ).exists()
 
+
       @staticmethod
       def verificar_atencion_hora(id_paciente, horas=1):
             limite_central = timezone.now() - timedelta(hours=horas)
@@ -219,156 +229,152 @@ class AtencionService:
             """
             Filtra y procesa datos de atenciones según criterios.
             Puede retornar datos detallados o un resumen agrupado.
-
-            Args:
-                  reporte_criterios (dict): Criterios de filtrado y agrupación
-                  modo (str): 'detallado' o 'resumido'
-
-            Returns:
-                  dict: Data procesada lista para reportes
             """
-            #try:
-            qs = Atencion.objects.all()
-            #qs = qs.filter(estado=1)  # Solo atenciones activas
-            # --- Bloque de Filtros ---
-            if 'campoFiltro' in reporte_criterios and 'valorFiltro' in reporte_criterios:
-                  if reporte_criterios['campoFiltro'] != 'ninguno':
-                        campo = reporte_criterios['campoFiltro']
-                        valor = reporte_criterios['valorFiltro']
-                        qs = qs.filter(**{campo: valor})
+            try:
+                  qs = Atencion.objects.all()
+                  #qs = qs.filter(estado=1)  # Solo atenciones activas
+                  # --- Bloque de Filtros ---
+                  if 'campoFiltro' in reporte_criterios and 'valorFiltro' in reporte_criterios:
+                        if reporte_criterios['campoFiltro'] != 'ninguno':
+                              campo = reporte_criterios['campoFiltro']
+                              valor = reporte_criterios['valorFiltro']
+                              qs = qs.filter(**{campo: valor})
 
-            if 'fechaIni' in reporte_criterios and reporte_criterios['fechaIni']:
-                  campo_fecha = reporte_criterios.get('interaccion', 'fecha_creado')
-                  qs = qs.filter(**{f"{campo_fecha}__gte": reporte_criterios['fechaIni']})
+                  if 'fechaIni' in reporte_criterios and reporte_criterios['fechaIni']:
+                        campo_fecha = reporte_criterios.get('interaccion', 'fecha_creado')
+                        qs = qs.filter(**{f"{campo_fecha}__gte": reporte_criterios['fechaIni']})
 
-            if 'fechaFin' in reporte_criterios and reporte_criterios['fechaFin']:
-                  campo_fecha = reporte_criterios.get('interaccion', 'fecha_creado')
-                  qs = qs.filter(**{f"{campo_fecha}__lte": reporte_criterios['fechaFin']})
+                  if 'fechaFin' in reporte_criterios and reporte_criterios['fechaFin']:
+                        campo_fecha = reporte_criterios.get('interaccion', 'fecha_creado')
+                        qs = qs.filter(**{f"{campo_fecha}__lte": reporte_criterios['fechaFin']})
 
-      
+            
 
-            # --- Diccionario de agrupaciones para Atencion ---
-            agrupacion_campos = {
-                  'creado_por_id': ('creado_por__username', 'usuario creador'),
-                  'modificado_por_id': ('modificado_por__username', 'usuario editor'),
-                  'paciente__sector__aldea__municipio__departamento_id': (
-                  'paciente__sector__aldea__municipio__departamento__nombre_departamento', 'Departamento'
-                  ),
-                  'paciente__sector__aldea__municipio_id': (
-                  'paciente__sector__aldea__municipio__nombre_municipio', 'Municipio'
-                  ),
-                  'especialidad__servicio_id': ('especialidad__servicio__nombre_servicio', 'servicio'),
-                  'especialidad_id': ('especialidad__nombre_especialidad', 'Especialidad'),
-            }
+                  # --- Diccionario de agrupaciones para Atencion ---
+                  agrupacion_campos = {
+                        'creado_por_id': ('creado_por__username', 'usuario creador'),
+                        'modificado_por_id': ('modificado_por__username', 'usuario editor'),
+                        'paciente__sector__aldea__municipio__departamento_id': (
+                        'paciente__sector__aldea__municipio__departamento__nombre_departamento', 'Departamento'
+                        ),
+                        'paciente__sector__aldea__municipio_id': (
+                        'paciente__sector__aldea__municipio__nombre_municipio', 'Municipio'
+                        ),
+                        'especialidad__servicio_id': ('especialidad__servicio__nombre_servicio', 'servicio'),
+                        'especialidad_id': ('especialidad__nombre_especialidad', 'Especialidad'),
+                  }
 
-            agrupacion_key = reporte_criterios.get('agrupacion', 'id')
-            campo_agrupado, nombre_amigable = agrupacion_campos.get(
-                  agrupacion_key,
-                  (agrupacion_key, agrupacion_key)
-            )
-
-            # --- Lógica de Modo Detallado vs. Modo Resumido ---
-            if modo == 'detallado':
-                  limite = 5000  # Límite de registros para evitar sobrecarga
-
-                  # Precargamos relaciones para evitar N+1
-                  qs = qs.select_related(
-                  'paciente', 
-                  'especialidad', 
-                  'especialidad__servicio', 
-                  'creado_por', 
-                  'modificado_por'
-                  ).prefetch_related(
-                        'recepcion_detalles_atencion__recepcion__recibido_por'
+                  agrupacion_key = reporte_criterios.get('agrupacion', 'id')
+                  campo_agrupado, nombre_amigable = agrupacion_campos.get(
+                        agrupacion_key,
+                        (agrupacion_key, agrupacion_key)
                   )
-                  # Si tienes relaciones similares a las recepciones, agrégalas aquí:
-                  # .prefetch_related(
-                  #     'relacion_similar__campo__usuario'
-                  # )
 
-                  qs_ordenado = qs.order_by(campo_agrupado, 'fecha_atencion')[:limite]
+                  # --- Lógica de Modo Detallado vs. Modo Resumido ---
+                  if modo == 'detallado':
+                        limite = 5000  # Límite de registros para evitar sobrecarga
 
-
-                  # Transformamos a lista de diccionarios (ajustar campos según tu modelo Atencion)
-                  lista_dicts = list(qs_ordenado.values(
-                  'id',
-                  'paciente__dni',
-                  'paciente__expediente_numero',
-                  'paciente__primer_nombre',
-                  'paciente__segundo_nombre',
-                  'paciente__primer_apellido',
-                  'paciente__segundo_apellido',
-                  'paciente__sector__aldea__municipio__departamento__nombre_departamento',
-                  'paciente__sector__aldea__municipio__nombre_municipio',
-
-                  'especialidad__nombre_especialidad',
-                  'especialidad__servicio__nombre_servicio',
-                  'especialidad__servicio__nombre_corto',
-
-                  # Agregar otros campos específicos de Atencion:
-                  'fecha_creado',
-                  'fecha_atencion', 
-                  'fecha_recepcion', 
-                  'creado_por__username',
-                  'creado_por__first_name',
-                  'creado_por__last_name',
-                  'modificado_por__username',
-                  'modificado_por__first_name',
-                  'modificado_por__last_name',
-                  'recepcion_detalles_atencion__recepcion__recibido_por__username'
-                  # Si tienes campos similares a las recepciones, agrégalos:
-                  # 'campo_usuario_relacionado__username',
-                  ))
-
-                  return {
-                  'campo_agrupado': campo_agrupado,
-                  'etiqueta': nombre_amigable,
-                  'data': lista_dicts
-                  }
-
-            elif modo == 'resumido':
-                  # Lógica de agrupación y resumen
-                  if agrupacion_key == 'especialidad_id':
-                        # Agrupación especial combinando especialidad y servicio
-                        qs_con_combinacion = qs.annotate(
-                              nombre_combinado_especialidad_servicio=Concat(
-                                    'especialidad__nombre_especialidad',
-                                    Value(' | '),
-                                    'especialidad__servicio__nombre_servicio'
-                              )
+                        # Precargamos relaciones para evitar N+1
+                        qs = qs.select_related(
+                        'paciente', 
+                        'especialidad', 
+                        'especialidad__servicio', 
+                        'creado_por', 
+                        'modificado_por'
+                        ).prefetch_related(
+                              'recepcion_detalles_atencion__recepcion__recibido_por'
                         )
+                        # Si tienes relaciones similares a las recepciones, agrégalas aquí:
+                        # .prefetch_related(
+                        #     'relacion_similar__campo__usuario'
+                        # )
 
-                        resumen_raw = qs_con_combinacion.values('nombre_combinado_especialidad_servicio').annotate(
-                              total=Count('id')
-                        ).order_by('-total')
+                        qs_ordenado = qs.order_by(campo_agrupado, 'fecha_atencion')[:limite]
 
-                        nombre_amigable = "Especialidad y Servicio"
-                        campo_agrupado = 'nombre_combinado_especialidad_servicio'
-                  else:
-                        # Agrupación estándar
-                        resumen_raw = qs.values(campo_agrupado).annotate(
-                              total=Count('id')
-                        ).order_by('-total')
 
-                  # Calcular totales y porcentajes
-                  total = qs.count()
-                  resumen = []
+                        # Transformamos a lista de diccionarios (ajustar campos según tu modelo Atencion)
+                        lista_dicts = list(qs_ordenado.values(
+                        'id',
+                        'paciente__dni',
+                        'paciente__expediente_numero',
+                        'paciente__primer_nombre',
+                        'paciente__segundo_nombre',
+                        'paciente__primer_apellido',
+                        'paciente__segundo_apellido',
+                        'paciente__sector__aldea__municipio__departamento__nombre_departamento',
+                        'paciente__sector__aldea__municipio__nombre_municipio',
 
-                  for item in resumen_raw:
-                        porcentaje = (item['total'] / total) * 100 if total > 0 else 0
-                        resumen.append({
-                              campo_agrupado: item[campo_agrupado],
-                              'total': item['total'],
-                              'porcentaje': round(porcentaje, 2)
-                        })
+                        'especialidad__nombre_especialidad',
+                        'especialidad__servicio__nombre_servicio',
+                        'especialidad__servicio__nombre_corto',
 
-                  return {
-                  'campo_agrupado': campo_agrupado,
-                  'etiqueta': nombre_amigable,
-                  'total': total,
-                  'resumen': resumen
-                  }
-            """
+                        # Agregar otros campos específicos de Atencion:
+                        'fecha_creado',
+                        'fecha_atencion', 
+                        'fecha_recepcion', 
+                        'creado_por__username',
+                        'creado_por__first_name',
+                        'creado_por__last_name',
+                        'modificado_por__username',
+                        'modificado_por__first_name',
+                        'modificado_por__last_name',
+                        'recepcion_detalles_atencion__recepcion__recibido_por__username'
+                        # Si tienes campos similares a las recepciones, agrégalos:
+                        # 'campo_usuario_relacionado__username',
+                        ))
+
+                        return {
+                        'campo_agrupado': campo_agrupado,
+                        'etiqueta': nombre_amigable,
+                        'data': lista_dicts
+                        }
+
+                  elif modo == 'resumido':
+                        # Lógica de agrupación y resumen
+                        if agrupacion_key == 'especialidad_id':
+                              # Agrupación especial combinando especialidad y servicio
+                              qs_con_combinacion = qs.annotate(
+                                    nombre_combinado_especialidad_servicio=Concat(
+                                          'especialidad__nombre_especialidad',
+                                          Value(' | '),
+                                          'especialidad__servicio__nombre_servicio'
+                                    )
+                              )
+
+                              resumen_raw = qs_con_combinacion.values('nombre_combinado_especialidad_servicio').annotate(
+                                    total=Count('id')
+                              ).order_by('-total')
+
+                              nombre_amigable = "Especialidad y Servicio"
+                              campo_agrupado = 'nombre_combinado_especialidad_servicio'
+                        else:
+                              # Agrupación estándar
+                              resumen_raw = qs.values(campo_agrupado).annotate(
+                                    total=Count('id')
+                              ).order_by('-total')
+
+                        # Calcular totales y porcentajes
+                        total = qs.count()
+                        resumen = []
+
+                        for item in resumen_raw:
+                              porcentaje = (item['total'] / total) * 100 if total > 0 else 0
+                              resumen.append({
+                                    campo_agrupado: item[campo_agrupado],
+                                    'total': item['total'],
+                                    'porcentaje': round(porcentaje, 2)
+                              })
+
+                        return {
+                        'campo_agrupado': campo_agrupado,
+                        'etiqueta': nombre_amigable,
+                        'total': total,
+                        'resumen': resumen
+                        }
+            
             except Exception as e:
-                  print(f"Error al generar data de atencion: {e}")
-                  return None"""
+                  log_error(
+                        f"Error generando reporte de atención modo={modo}",
+                        app=LogApp.REPORTE
+                  )
+                  return None

@@ -153,14 +153,14 @@ class IngresoService:
                     return acompaniante
             log_warning(
                 f"No se pudo crear acompañante, datos insuficientes",
-                app=LogApp.PACIENTES
+                app=LogApp.PACIENTE
             )
 
             return None
         except Exception:
             log_error(
                 f"Error procesando acompañante DNI {dni}",
-                app=LogApp.PACIENTES
+                app=LogApp.PACIENTE
             )
             raise
             

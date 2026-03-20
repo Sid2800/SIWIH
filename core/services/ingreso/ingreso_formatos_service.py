@@ -31,7 +31,7 @@ class IngresoFormatosService:
             except Ingreso.DoesNotExist:
                 log_warning(
                         f"Ingreso {ingreso_id} no encontrado al construir hoja hospitalización",
-                        app=LogApp.REPORTES,
+                        app=LogApp.REPORTE,
                     )
                 raise Exception("Ingreso no encontrado")
 
@@ -258,7 +258,7 @@ class IngresoFormatosService:
         except Exception:
             log_error(
                 "Error construyendo data hoja hospitalización",
-                app=LogApp.REPORTES,
+                app=LogApp.REPORTE,
                 ingreso_id=ingreso_id
             )
             raise Exception("Error construyendo data hoja hospitalización")

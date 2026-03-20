@@ -33,7 +33,7 @@ class ReportePdfBaseService:
         except Exception:
             log_warning(
                 "No se pudo cargar logo en encabezado PDF",
-                app=LogApp.REPORTES
+                app=LogApp.REPORTE
             )
 
     @staticmethod
@@ -98,7 +98,7 @@ class ReportePdfBaseService:
         except Exception as e:
             log_warning(
                 "Error dibujando marca de agua en PDF",
-                app=LogApp.REPORTES
+                app=LogApp.REPORTE
             )
 
 

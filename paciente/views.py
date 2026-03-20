@@ -20,6 +20,7 @@ from core.services.server_image.media_service import MediaService
 from usuario.permisos import verificar_permisos_usuario, verificar_permisos_dispensacion
 from core.utils.utilidades_fechas import formatear_fecha, formatear_fecha_simple, calcular_edad_texto
 from core.utils.utilidades_textos import generar_slug,formatear_nombre_completo, formatear_ubicacion_completo, formatear_expediente, formatear_dni
+from core.validators.fecha_validator import validar_fecha
 # permisos
 from core.constants.permisos import (
     PACIENTE_EDITOR_ROLES,
@@ -29,7 +30,8 @@ from core.constants.permisos import (
     PACIENTE_DISPENSACION_ROLES,
     PACIENTE_DISPENSACION_UNIDADES,
 )
-
+from core.constants.domain_constants import LogApp
+from core.utils.utilidades_logging import *
 
 
 from usuario.models import PerfilUnidad
@@ -1084,41 +1086,49 @@ def busquedaAvanzada(request):
 
 
 def guardarDefuncion(request):
+
     if not verificar_permisos_usuario(request.user, PACIENTE_EDITOR_ROLES, PACIENTE_EDITOR_UNIDADES):
         return JsonResponse({'error': 'No tienes permisos para realizar esta accion'}, status=403)
 
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Metodo no permitido'}, status=405)
 
-    if request.method == 'POST':
+    try:
+        data = json.loads(request.body)
+
+        fecha_str = data.get('fecha')
+        
         try:
-            data = json.loads(request.body)
+            fecha = datetime.strptime(fecha_str, '%Y-%m-%d').date()
+            validar_fecha(fecha)
+        except (ValueError, TypeError):
+            return JsonResponse({'error': 'Formato de fecha no valido. Se espera YYYY-MM-DD'}, status=400)
 
-            fecha_str = data.get('fecha')
-            try:
-                fecha = datetime.strptime(fecha_str, '%Y-%m-%d').date()
-                if fecha > datetime.now().date():
-                    return JsonResponse({'error': 'La fecha no puede ser futura'}, status=400)
-            except ValueError:
-                return JsonResponse({'error': 'Formato de fecha no valido. Se espera YYYY-MM-DD'}, status=400)
+        defuncion_obj = {
+            "fecha": fecha,
+            "sala_id": data.get('sala'),
+            "motivo": data.get('motivo'),
+            "paciente_id": data.get('idPaciente'),
+            "id": data.get('idDefuncion'),
+            "usuario_id": request.user.id
+        }
 
-            defuncion_obj = {
-                "fecha": fecha,
-                "sala_id": data.get('sala'),
-                "motivo": data.get('motivo'),
-                "paciente_id": data.get('idPaciente'),
-                "id": data.get('idDefuncion'),
-                "usuario_id": request.user.id
-            }
+        defuncion = SimpleNamespace(**defuncion_obj)
 
-            defuncion = SimpleNamespace(**defuncion_obj)
+        try:
             resultado = PacienteService.procesar_defuncion(defuncion)
-
             return JsonResponse({'guardo': resultado}, status=200)
+        except Exception as e:
+            return JsonResponse({'error': 'No se pudo procesar la defunción'}, status=500)
 
-        except json.JSONDecodeError:
-            return JsonResponse({'error': 'Error al procesar los datos JSON'}, status=400)
-
-    return JsonResponse({'error': 'Metodo no permitido'}, status=405)
     
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Error al procesar los datos JSON'}, status=400)
+
+    except Exception as e:
+        return JsonResponse({'error': 'Error interno del servidor'}, status=500)
+    
+
 
 def obtener_defuncion_paciente(request):
     idPaciente = request.GET.get('id')
@@ -1149,27 +1159,47 @@ def registrarEntregaCadaver(request):
     if not verificar_permisos_usuario(request.user, PACIENTE_EDITOR_ROLES, PACIENTE_EDITOR_UNIDADES):
         return JsonResponse({'error': 'No tienes permisos para realizar esta accion'}, status=403)
 
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método no permitido'}, status=405)
 
-    if request.method == 'POST':
+
+
+    try:
+        data = json.loads(request.body)
+
+        defuncion_obj = {
+            "reponsable_dni": data.get('dniR'),
+            "reponsable_nombre": data.get('nombreR'),
+            "paciente_id": data.get('idPaciente'),
+            "id": data.get('idDefuncion'),
+        }
+
+        defuncion = SimpleNamespace(**defuncion_obj)
+
         try:
-            data = json.loads(request.body)
-
-            defuncion_obj = {
-                "reponsable_dni": data.get('dniR'),
-                "reponsable_nombre": data.get('nombreR'),
-                "paciente_id": data.get('idPaciente'),
-                "id": data.get('idDefuncion'),
-            }
-
-            defuncion = SimpleNamespace(**defuncion_obj)
             resultado, idDefuncion = PacienteService.procesar_entrega_cadaver(defuncion)
-            pdf_url = reverse("entrega-cadaver", kwargs={"defuncion_id": idDefuncion})
-            return JsonResponse({'guardo': resultado, 'pdf_url': pdf_url}, status=200)
+        except Exception:
+            return JsonResponse(
+                {'error': 'No se pudo registrar la entrega de cadáver'},
+                status=500
+            )
+        
+        if not resultado:
+            return JsonResponse(
+                {'error': 'No se encontró registro de defunción'},
+                status=404
+            )
 
-        except json.JSONDecodeError:
-            return JsonResponse({'error': 'Error al procesar los datos JSON'}, status=400)
+        pdf_url = reverse("entrega-cadaver", kwargs={"defuncion_id": idDefuncion})
 
-    return JsonResponse({'error': 'MÃ©todo no permitido'}, status=405)
+        return JsonResponse({
+            'guardo': True,
+            'pdf_url': pdf_url
+        }, status=200)
+
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Error al procesar los datos JSON'}, status=400)
+
 
 
 def verificar_defuncion(request):
@@ -1331,8 +1361,15 @@ def dispensacion_view(request):
     paciente = Paciente.objects.filter(id=id).values('dni', 'expediente_numero').first()
     
     if paciente:
-        resultado = obtener_dispensacion_mysql(paciente['expediente_numero'], paciente['dni'])
+        try:
+            resultado = obtener_dispensacion_mysql(paciente['expediente_numero'], paciente['dni'])
+        except Exception as e:
+            log_error(
+                f"[FALLO_DISPENSACION] paciente_id={id} detalle={str(e)}",
+                app=LogApp.REPLICACION
+            )
+            return JsonResponse({'error': 'Error obteniendo dispensaciones'}, status=500)
     else:
         return JsonResponse({'error': 'El di paciente recibido no existe'}, status=400)
- 
+
     return JsonResponse({'data': resultado})

@@ -3,6 +3,7 @@ from django.conf import settings
 from django.db import connections
 from core.constants.stored_procedures import SP_OBTENER_DISPENSACIONES_PACIENTE, SP_SIWI_PACIENTE_INSERTAR_ACTUALIZAR, SP_PACIENTE_SQLSERVER_SYNC
 
+
 def sync_paciente_sqlserver(paciente_dict):
     """
     Llama al procedimiento almacenado PC_SIWI_PACIENTE_AGREGAR_ACTUALIZAR
@@ -67,13 +68,18 @@ def sync_paciente_sqlserver(paciente_dict):
         cursor.close()
         conn.close()
 
-        if resultado:
-            return f"Sync SQL Server → {resultado.resultado}"
-        else:
-            return "Sync SQL Server ejecutado, sin retorno"
+        if not resultado:
+            raise RuntimeError(
+                f"SQL Server no devolvió resultado expediente={paciente_dict.get('EXPEDIENTE')}"
+            )
+        
+        return resultado.resultado
 
     except Exception as e:
-        return f"Error al sincronizar con SQL Server: {e}"
+        raise RuntimeError(
+            f"SQLSERVER_SYNC expediente={paciente_dict.get('EXPEDIENTE')} error={str(e)}"
+        )
+
     
 
 def sync_paciente_mysql(paciente_dict):
@@ -100,12 +106,17 @@ def sync_paciente_mysql(paciente_dict):
 
             # Si el SP retorna algo, lo leemos
             resultado = cursor.fetchone()
-            if resultado:
-                return str(resultado[0])  # por ejemplo: 'insertado' o 'actualizado'
-            return "sin respuesta"
+            if not resultado:
+                raise RuntimeError(
+                    f"MySQL no devolvió resultado expediente={paciente_dict.get('EXPEDIENTE')}"
+                )
+            
+            return str(resultado[0])       
+    
     except Exception as e:
-        print(f"❌ Error al llamar SP MySQL: {e}")
-        return "error"
+        raise RuntimeError(
+            f"Error al sincronizar MySQL expediente={paciente_dict.get('EXPEDIENTE')} detalle={str(e)}"
+        )
 
 
 def obtener_dispensacion_mysql(expediente, dni=0):
@@ -115,12 +126,14 @@ def obtener_dispensacion_mysql(expediente, dni=0):
                 dni,
                 expediente
             ])
-            resultado = cursor.fetchall()  # <-- cambio aquí
-            if resultado:
-                return resultado
-            return []  # Por si no hay datos
+
+            resultado = cursor.fetchall()
+
+            return resultado or []
+
     except Exception as e:
-        print(f"Error en obtener_dispensacion_mysql: {e}")
-        return []
+        raise RuntimeError(
+            f"Error al obtener dispensaciones expediente={expediente} dni={dni} detalle={str(e)}"
+        )
     
 

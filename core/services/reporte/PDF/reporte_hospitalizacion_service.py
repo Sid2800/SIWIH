@@ -47,7 +47,7 @@ class ReporteHospitalizacionService:
         except Exception:
             log_warning(
                 "No se logro cargar los logotipos de la empresa",
-                app=LogApp.REPORTES
+                app=LogApp.REPORTE
             )
 
         # Tabla
@@ -810,7 +810,7 @@ class ReporteHospitalizacionService:
     def __dibujarDatosIngresoHojaHospitalizacion2026(pdf, ancho, alto,altura_bloque3, acompaniante, padres, ingreso, usuario_creacion):
         altura_bloque4 = altura_bloque3 - 40
         primer_elemento_izquierda = ReporteHospitalizacionService.MARGEN_IZQUIERDO
-        pdf.setFont("Helvetica-Bold", 12)
+        pdf.setFont("Helvetica-Bold", 11.5)
 
         if ingreso.cama:
             pdf.rect(primer_elemento_izquierda+428, alto-43, 68, 14, stroke=1, fill=0)
@@ -818,8 +818,8 @@ class ReporteHospitalizacionService:
 
         
 
-        pdf.drawCentredString(primer_elemento_izquierda + 123 , altura_bloque4, ReportePdfBaseService.texto_seguro(acompaniante.nombre, 32))
-        pdf.drawCentredString(primer_elemento_izquierda + 365 , altura_bloque4, ReportePdfBaseService.texto_seguro(acompaniante.direccion, 28))
+        pdf.drawCentredString(primer_elemento_izquierda + 123 , altura_bloque4, ReportePdfBaseService.texto_seguro(acompaniante.nombre, 34))
+        pdf.drawCentredString(primer_elemento_izquierda + 365 , altura_bloque4, ReportePdfBaseService.texto_seguro(acompaniante.direccion, 32))
         pdf.setFont("Helvetica-Bold", 13)
         pdf.drawCentredString(primer_elemento_izquierda + 528 , altura_bloque4, ReportePdfBaseService.texto_seguro(acompaniante.telefono, 9))
 
@@ -1291,7 +1291,7 @@ class ReporteHospitalizacionService:
             if not data:
                 log_warning(
                     f"Intento de generar hoja hospitalización sin data ",
-                    app=LogApp.REPORTES
+                    app=LogApp.REPORTE
                 )
                 raise ValueError("No hay datos para generar hoja hospitalización")
             # 1. NORMALIZAR DATA
@@ -1354,7 +1354,7 @@ class ReporteHospitalizacionService:
         except Exception:
             log_error(
                 f"Error generando hoja hospitalización",
-                app=LogApp.REPORTES
+                app=LogApp.REPORTE
             )
             raise
     

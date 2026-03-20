@@ -216,7 +216,7 @@ class ReporteGeneradorService:
             log_error(
                 f"Error generando PDF resumido modelo {reporte_criterios.get('modelo')} "
                 f"mes {reporte_criterios.get('fechaIni')} - {reporte_criterios.get('fechaFin')}",
-                app=LogApp.REPORTES
+                app=LogApp.REPORTE
             )
             raise
 
@@ -227,7 +227,7 @@ class ReporteGeneradorService:
             if not data:
                 log_warning(
                     f"Reporte detallado sin datos modelo {reporte_criterios.get('modelo')}",
-                    app=LogApp.REPORTES
+                    app=LogApp.REPORTE
                 )
                 raise ValueError("No hay datos para generar el reporte detallado")
 
@@ -716,7 +716,7 @@ class ReporteGeneradorService:
                 log_error(
                     f"Desajuste páginas vs estilos en reporte detallado "
                     f"modelo {reporte_criterios.get('modelo')}",
-                    app=LogApp.REPORTES
+                    app=LogApp.REPORTE
                 )
                 raise ValueError("Error interno generando páginas del reporte")
 
@@ -783,6 +783,6 @@ class ReporteGeneradorService:
             log_error(
                 f"Error generando PDF detallado modelo {reporte_criterios.get('modelo')} "
                 f"agrupado por {reporte_criterios.get('agrupacion')}",
-                app=LogApp.REPORTES
+                app=LogApp.REPORTE
             )
             raise

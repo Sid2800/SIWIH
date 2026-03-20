@@ -16,12 +16,43 @@ class AccionEstudio(str, Enum):
 
 class LogApp:
     GENERAL = "general"
-    PACIENTES = "pacientes"
+    PACIENTE = "paciente"
     INGRESOS = "ingresos"
     RX = "rx"
     REFERENCIAS = "referencias"
-    REPORTES = "reportes"
+    REPORTE = "reportes"
     AUTH = "auth"
     TOKEN = "token"
     MEDIA = "media"
+    REPLICACION = "replicacion"
+    EXPEDIENTE = "expediente"
+    ATENCION = "atencion"
+
+
+# Salas excluidas para reportes / lógica clínica
+SALAS_EXCLUIDAS = [
+    714,  # aislado covid
+    200,  # aislado covid
+    512,  # aislado gine (se consigna como Gine)
+    114,  # aislado medicina
+    206,
+    308,
+    310,  # cirugía pediátrica
+    201,  # medicina hombres/mujeres juntos
+    711,  # puerperio adolescente normal
+    708,  # puerperio normal
+    713,  # puerperio quirúrgico
+    706,  # puerperio quirúrgico patológico
+    709,  # puerperio vaginal patológico
+    712,  # séptico aislado
+    707,  # amenaza de aborto
+    705,  # embarazo patológico
+]
+
+# Servicios auxiliares externos
+SERVICIOS_AUX_EXTERNOS = [
+    3,  # CESAMO
+    4   # otros hospitales
+]
+
 

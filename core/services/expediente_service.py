@@ -4,7 +4,8 @@ from datetime import datetime
 from django.db.models import Min, Max
 from django.db.utils import IntegrityError
 from django.core.exceptions import ValidationError
-
+from core.constants.domain_constants import LogApp
+from core.utils.utilidades_logging import *
 
 class ExpedienteService:
 
@@ -18,6 +19,11 @@ class ExpedienteService:
             ).exclude(
                 expedienteAsignados__estado="1"
             ).first()
+            if not expediente:
+                log_warning(
+                        f"No disponible expediente={expediente_numero} usuario={usuario_id}",
+                        app=LogApp.EXPEDIENTE
+                )
             return expediente
     
     @staticmethod
@@ -26,6 +32,10 @@ class ExpedienteService:
             expediente = ExpedienteService.comprobar_libre(expediente_numero, usuario_id)
 
             if not expediente:
+                log_warning(
+                    f"[OCUPADO] expediente={expediente_numero} paciente={paciente_id}",
+                    app=LogApp.EXPEDIENTE
+                )
                 expediente = ExpedienteService.asignar_expediente_paciente(None, paciente_id, usuario_id)
             else:
                 expediente = ExpedienteService.asignar_expediente_paciente(expediente, paciente_id, usuario_id)
@@ -40,22 +50,42 @@ class ExpedienteService:
 
         with transaction.atomic():
 
-            asignado = PacienteAsignacion.objects.filter(expediente=expediente,estado="1").exists()
-            if asignado:                                           
+            asignado = PacienteAsignacion.objects.filter(
+                expediente=expediente,
+                estado="1"
+            ).exists()
+
+            if asignado:
+                log_warning(
+                    f"[OCUPADO] expediente={expediente.numero} paciente={paciente_id} reasignando",
+                    app=LogApp.EXPEDIENTE
+                )
                 expediente = ExpedienteService.obtener_expediente_libre(usuario_id)
+
             PacienteAsignacion.objects.create(
                 estado=1,
                 fecha_asignacion=datetime.now(),
                 paciente_id=paciente_id,
-                expediente_id=expediente.id            
+                expediente_id=expediente.id
             )
+
             expediente.estado = 1
             expediente.save()
-            if PacienteAsignacion.objects.filter(expediente=expediente, estado="1").count() > 1:
+
+            duplicados = list(
+                PacienteAsignacion.objects.filter(
+                    expediente=expediente,
+                    estado="1"
+                ).values_list("id", flat=True)[:2]
+            )
+
+            if len(duplicados) > 1:
+                log_error(
+                    f"[DUPLICADO] expediente={expediente.numero} paciente={paciente_id}",
+                    app=LogApp.EXPEDIENTE
+                )
                 raise ValidationError("No se logró asignar el expediente: duplicado detectado.")
         return expediente
-
-
 
     """ Busca un expediente libre o crea uno nuevo si no hay disponibles. """
     @staticmethod
@@ -80,8 +110,10 @@ class ExpedienteService:
 
             # Si no hay expedientes disponibles, generar uno nuevo
             if not expediente:
-
-
+                log_warning(
+                    f"[CREACION] sin disponibles usuario={usuario_id}",
+                    app=LogApp.EXPEDIENTE
+                )
                 numero_disponible = 1
                 queryset = Expediente.objects.order_by('numero').values_list('numero', flat=True)
 
@@ -99,16 +131,15 @@ class ExpedienteService:
                         fecha_modificado=datetime.now()
                     )
                 except IntegrityError as e:
-                    print(e)
+                    log_error(
+                        f"[ERROR_DB] Creacion {str(e)} usuario={usuario_id}",
+                        app=LogApp.EXPEDIENTE
+                    )
                     transaction.set_rollback(True)
                     return None  # Indicar que hubo un error al crear el expediente
 
         return expediente
-    
-
-
         """ Asigna un expediente a un paciente. """
-    
     
     @staticmethod
     def obtener_expediente_activo_paciente(pacienteId):
@@ -138,16 +169,24 @@ class ExpedienteService:
             # Obtener el expediente por número
             expediente = Expediente.objects.get(numero=numero_expediente)
         except Expediente.DoesNotExist:
+            log_warning(
+                f"[NO_EXISTE] expediente={numero_expediente}",
+                app=LogApp.EXPEDIENTE
+            )
             # Si no se encuentra el expediente, retornar False
             return False
         
         try:
             # Buscar la asignación activa entre el paciente y el expediente
-            asignacion = PacienteAsignacion.objects.get(expediente_id=expediente.id, paciente_id=id_paciente, estado=1)
+            _ = PacienteAsignacion.objects.get(expediente_id=expediente.id, paciente_id=id_paciente, estado=1)
             # Si la asignación existe, retornar True indicando que el paciente es el propietario
             return True
         except PacienteAsignacion.DoesNotExist:
             # Si no existe la asignación activa, retornar False
+            log_warning(
+                f"[NO_PROPIETARIO] expediente={numero_expediente} paciente={id_paciente}",
+                app=LogApp.EXPEDIENTE
+            )
             return False
         
     
@@ -164,5 +203,9 @@ class ExpedienteService:
             expediente.modificado_por_id = usuarioId
             expediente.save()
             return True
+        log_warning(
+            f"[SIN_ASIGNACION] paciente={pacienteId}",
+            app=LogApp.EXPEDIENTE
+        )
 
         return False

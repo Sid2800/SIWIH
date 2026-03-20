@@ -22,7 +22,7 @@ class RefInformeService:
         except Exception as e:
             log_error(
                 f"Error generando rango de fechas mes {mes} año {anio}",
-                app=LogApp.REPORTES
+                app=LogApp.REPORTE
             )
             return {"error": "Error generando rango de fecha"}
 
@@ -55,7 +55,7 @@ class RefInformeService:
         except Exception as e:
             log_error(
                 f"Error consultando referencias mes {mes} año {anio}",
-                app=LogApp.REPORTES
+                app=LogApp.REPORTE
             )
             return {"error": "Error consultando datos"}
 
@@ -193,10 +193,10 @@ class RefInformeService:
 
         else:
             log_warning(
-            f"Índice inválido {indice} en informe referencia",
-            app=LogApp.REPORTES
-        )
-        return {'error': 'Índice no válido'}
+                f"Índice inválido {indice} en informe referencia",
+                app=LogApp.REPORTE
+            )
+            return {'error': 'Índice no válido'}
 
         # ---------------------------------------------------------------------
         # Construcción de tabla general para índices 1, 2, 3 y 5
@@ -231,7 +231,7 @@ class RefInformeService:
         except Exception as e:
             log_error(
                 f"Error generando rango fechas TIC mes {mes} año {anio}",
-                app=LogApp.REPORTES
+                app=LogApp.REPORTE
             )
             return {"error": "Error generando rango de fechas"}
 
@@ -250,7 +250,7 @@ class RefInformeService:
         except Exception as e:
             log_error(
                 f"Error consultando referencias TIC mes {mes} año {anio}",
-                app=LogApp.REPORTES
+                app=LogApp.REPORTE
             )
             return {"error": "Error consultando referencias TIC"}
 
@@ -300,7 +300,7 @@ class RefInformeService:
         except Exception as e:
             log_error(
                 f"Error generando rango fechas gestor mes {mes} año {anio}",
-                app=LogApp.REPORTES
+                app=LogApp.REPORTE
             )
             return {"error": "Error generando rango de fechas"}
 
@@ -332,7 +332,7 @@ class RefInformeService:
         except Exception as e:
             log_error(
                 f"Error consultando referencias gestor mes {mes} año {anio}",
-                app=LogApp.REPORTES
+                app=LogApp.REPORTE
             )
             return {"error": "Error consultando datos de referencias"}
 
@@ -419,7 +419,7 @@ class RefInformeService:
         else:
             log_warning(
                 f"Índice inválido {indice} en informe gestor",
-                app=LogApp.REPORTES
+                app=LogApp.REPORTE
             )
             return {"error": "Índice no válido"}
 
@@ -898,7 +898,7 @@ class RefInformeService:
             else:
                 log_warning(
                     f"Índice inválido {indice} en informe respuesta",
-                    app=LogApp.REPORTES
+                    app=LogApp.REPORTE
                 )
                 return {'error': 'Índice no válido'}
             
@@ -925,7 +925,7 @@ class RefInformeService:
         except Exception as e:
                 log_error(
                         f"Error al generar data del informe referencias",
-                        app=LogApp.REPORTES
+                        app=LogApp.REPORTE
                     )
                 return None
         
@@ -937,7 +937,7 @@ class RefInformeService:
         except Exception as e:
             log_error(
                 f"Error generando rango fechas detalle especialidad mes {mes} año {anio}",
-                app=LogApp.REPORTES
+                app=LogApp.REPORTE
             )
             return {"error": "Error generando rango de fechas"}
 
@@ -975,7 +975,7 @@ class RefInformeService:
         except Exception as e:
             log_error(
                 f"Error consultando referencias Top3 especialidad mes {mes} año {anio}",
-                app=LogApp.REPORTES
+                app=LogApp.REPORTE
             )
             return {"error": "Error consultando referencias del Top 3"}
 
@@ -1028,7 +1028,7 @@ class RefInformeService:
         except Exception as e:
             log_error(
                 f"Error obteniendo diagnósticos Top3 especialidad mes {mes} año {anio}",
-                app=LogApp.REPORTES
+                app=LogApp.REPORTE
             )
             return {"error": "Error obteniendo diagnósticos del Top 3"}
 
