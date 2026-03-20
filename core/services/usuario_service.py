@@ -13,10 +13,13 @@ class UsuarioService:
         usuarios = User.objects.filter(is_active=True).values('id', 'username')
         return list(usuarios)
     
+
     @staticmethod
     def pertenece_unidad(usuario, unidad_id):
         perfiles = PerfilUnidad.objects.filter(usuario=usuario).values_list('unidad_id', flat=True)
         return int(unidad_id) in perfiles
+    
+
     
     @staticmethod
     def obtener_tabs_usuario(usuario):

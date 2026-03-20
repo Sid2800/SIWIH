@@ -12,7 +12,10 @@ from django.utils import timezone
 import calendar
 from collections import defaultdict
 from core.utils.utilidades_mensajes import mostrar_resultado_media
-
+from core.constants.domain_constants import LogApp
+from core.utils.utilidades_logging import *
+from core.validators.main_validator import validar_entero_positivo
+from django.core.exceptions import ObjectDoesNotExist
 
 
 class EvaluacionService:
@@ -49,85 +52,122 @@ class EvaluacionService:
     @staticmethod
     def crear_evaluacionrx_estudio_detalle(id_evaluacionrx, id_estudio, impreso=False):
 
-        if not id_estudio:
-            raise EvaluacionDominioError("ID de estudio inválido")
+        id_estudio = validar_entero_positivo(id_estudio, "estudio_id")
+        id_evaluacionrx = validar_entero_positivo(id_evaluacionrx, "evaluacion_id")
 
-        detalle = EvaluacionRxDetalle.objects.create(
-            evaluacionRx_id=id_evaluacionrx,
-            estudio_id=id_estudio,
-            impreso=impreso
-        )
+        try:
+            detalle = EvaluacionRxDetalle.objects.create(
+                evaluacionRx_id=id_evaluacionrx,
+                estudio_id=id_estudio,
+                impreso=impreso
+            )
 
-        return detalle.id
+            return detalle.id
+
+        except Exception as e:
+            raise RuntimeError(
+                f"No se pudo crear detalle evaluacion={id_evaluacionrx} estudio={id_estudio} detalle={str(e)}"
+            )
+
 
 
     @staticmethod
     def procesar_estudios_evaluacion(evaluacion_id, estudios):
 
         if not estudios:
+            log_warning(
+                f"[SIN_ESTUDIOS] evaluacion={evaluacion_id}",
+                app=LogApp.RX
+            )
             raise EvaluacionDominioError("No se enviaron estudios.")
 
         id_map = {}
+        try:
+            with transaction.atomic():
 
-        with transaction.atomic():
+                for estudio in estudios:
 
-            for estudio in estudios:
+                    frontend_id = estudio.get('frontendId')
+                    estudio_id = estudio.get('id')
+                    detalle_id = estudio.get('idDetalle', 0)
+                    impreso = estudio.get('impreso', False)
+                    accion = estudio.get('accionEstudio')
 
-                frontend_id = estudio.get('frontendId')
-                estudio_id = estudio.get('id')
-                detalle_id = estudio.get('idDetalle', 0)
-                impreso = estudio.get('impreso', False)
-                accion = estudio.get('accionEstudio')
+                    try:
+                        _ = AccionEstudio(accion)
+                    except ValueError:
+                        log_warning(
+                            f"[ACCION_INVALIDA] evaluacion={evaluacion_id} accion={accion}",
+                            app=LogApp.RX
+                        )
+                        raise EvaluacionDominioError("Acción de estudio inválida")
 
-                try:
-                    _ = AccionEstudio(accion)
-                except ValueError:
-                    raise EvaluacionDominioError("Acción de estudio inválida")
+                    if not estudio_id:
+                        log_warning(
+                                f"[ID_INVALIDO] evaluacion={evaluacion_id} frontend_id={frontend_id}",
+                                app=LogApp.RX
+                            )
+                        raise EvaluacionDominioError("ID de estudio inválido")
 
-                if not estudio_id:
-                    raise EvaluacionDominioError("ID de estudio inválido")
+                    if detalle_id != 0:
 
-                if detalle_id != 0:
+                        try:
+                            estudioDetalle = (
+                                EvaluacionRxDetalle.objects
+                                .select_for_update()
+                                .get(id=detalle_id, evaluacionRx_id=evaluacion_id)
+                            )
+                        except ObjectDoesNotExist:
+                            log_error(
+                                f"[DETALLE_NO_EXISTE] evaluacion={evaluacion_id} detalle_id={detalle_id}",
+                                app=LogApp.RX
+                            )
+                            raise
 
-                    estudioDetalle = (
-                        EvaluacionRxDetalle.objects
-                        .select_for_update()
-                        .get(id=detalle_id, evaluacionRx_id=evaluacion_id)
-                    )
+                        if accion == AccionEstudio.DELETE:
+                            if estudioDetalle.activo:  # evitar update innecesario
+                                estudioDetalle.activo = False
+                                estudioDetalle.save(update_fields=["activo"])
+                            else:
+                                log_warning(
+                                    f"[YA_INACTIVO] evaluacion={evaluacion_id} detalle_id={detalle_id}",
+                                    app=LogApp.RX
+                                )
+                            continue
 
-                    if accion == AccionEstudio.DELETE:
-                        if estudioDetalle.activo:  # evitar update innecesario
-                            estudioDetalle.activo = False
-                            estudioDetalle.save(update_fields=["activo"])
-                        continue
+                        fields_to_update = []
 
-                    fields_to_update = []
+                        if estudioDetalle.impreso != impreso:
+                            estudioDetalle.impreso = impreso
+                            fields_to_update.append("impreso")
 
-                    if estudioDetalle.impreso != impreso:
-                        estudioDetalle.impreso = impreso
-                        fields_to_update.append("impreso")
+                        if estudioDetalle.estudio_id != estudio_id:
+                            estudioDetalle.estudio_id = estudio_id
+                            fields_to_update.append("estudio_id")
 
-                    if estudioDetalle.estudio_id != estudio_id:
-                        estudioDetalle.estudio_id = estudio_id
-                        fields_to_update.append("estudio_id")
+                        if fields_to_update:
+                            estudioDetalle.save(update_fields=fields_to_update)
 
-                    if fields_to_update:
-                        estudioDetalle.save(update_fields=fields_to_update)
+                    else:
 
-                else:
+                        if accion == AccionEstudio.DELETE:
+                            continue
 
-                    if accion == AccionEstudio.DELETE:
-                        continue
+                        nuevo_id = EvaluacionService.crear_evaluacionrx_estudio_detalle(
+                            evaluacion_id,
+                            estudio_id,
+                            impreso
+                        )
 
-                    nuevo_id = EvaluacionService.crear_evaluacionrx_estudio_detalle(
-                        evaluacion_id,
-                        estudio_id,
-                        impreso
-                    )
+                        id_map[frontend_id] = nuevo_id
 
-                    id_map[frontend_id] = nuevo_id
-
-        return id_map
+            return id_map
+        except Exception as e:
+            log_error(
+                f"[FALLO_PROCESO] evaluacion={evaluacion_id} detalle={str(e)}",
+                app=LogApp.RX
+            ) 
+            raise
 
 
     @staticmethod
@@ -164,163 +204,231 @@ class EvaluacionService:
 
     @staticmethod
     def cambiar_referencia_evaluacion_externo_interno(idPaciente, idExterno):
-        """
-        Pasa todas las evaluaciones de un paciente externo a un paciente interno.
-        """
-        with transaction.atomic():
 
-            evaluaciones = EvaluacionRx.objects.filter(
-                paciente_externo_id=idExterno
+        if not idPaciente or not idExterno:
+            log_warning(
+                f"[ID_INVALIDO] paciente={idPaciente} externo={idExterno}",
+                app=LogApp.RX
             )
+            raise EvaluacionDominioError("IDs inválidos para cambio de referencia.")
 
-            actualizadas = evaluaciones.update(
-                paciente_id=idPaciente,
-                paciente_externo_id=None
+        try:
+            with transaction.atomic():
+
+                evaluaciones = EvaluacionRx.objects.filter(
+                    paciente_externo_id=idExterno
+                )
+
+                actualizadas = evaluaciones.update(
+                    paciente_id=idPaciente,
+                    paciente_externo_id=None
+                )
+
+                if actualizadas == 0:
+                    log_warning(
+                        f"[SIN_EVALUACIONES] externo={idExterno}",
+                        app=LogApp.RX
+                    )
+
+            return actualizadas
+
+        except Exception as e:
+            log_error(
+                f"[FALLO_CAMBIO_REFERENCIA] paciente={idPaciente} externo={idExterno} detalle={str(e)}",
+                app=LogApp.RX
             )
-
-        return actualizadas
+            raise
 
 
     @staticmethod
     def procesar_paciente_externo(externo, usuario):
         """Asigna un padre/madre a un paciente, creando o actualizando registros."""
+        try:
+            # Extraer valores de 'externo' de forma segura
+            ext_id = externo.get('id')
+            ext_dni = externo.get('dni')
+            ext_nombre1 = externo.get('nombre1')
+            ext_nombre2 = externo.get('nombre2')
+            ext_apellido1 = externo.get('apellido1')
+            ext_apellido2 = externo.get('apellido2')
+            ext_fecha_nac = externo.get('fechaNacimiento')
+            ext_sexo = externo.get('sexo')
 
-        # Extraer valores de 'externo' de forma segura
-        ext_id = externo.get('id')
-        ext_dni = externo.get('dni')
-        ext_nombre1 = externo.get('nombre1')
-        ext_nombre2 = externo.get('nombre2')
-        ext_apellido1 = externo.get('apellido1')
-        ext_apellido2 = externo.get('apellido2')
-        ext_fecha_nac = externo.get('fechaNacimiento')
-        ext_sexo = externo.get('sexo')
 
+            def actualizar_datos_externo(paciente_externo):
+                """Actualiza los datos del padre/madre solo si han cambiado."""
+                cambios = False
+                if paciente_externo.dni != ext_dni:
+                    paciente_externo.dni = ext_dni
+                    cambios = True
+                if paciente_externo.primer_nombre != ext_nombre1:
+                    paciente_externo.primer_nombre = ext_nombre1
+                    cambios = True
+                if paciente_externo.segundo_nombre != ext_nombre2:
+                    paciente_externo.segundo_nombre = ext_nombre2
+                    cambios = True
+                if paciente_externo.primer_apellido != ext_apellido1:
+                    paciente_externo.primer_apellido = ext_apellido1
+                    cambios = True
+                if paciente_externo.segundo_apellido != ext_apellido2:
+                    paciente_externo.segundo_apellido = ext_apellido2
+                    cambios = True
+                if paciente_externo.fecha_nacimiento != ext_fecha_nac:
+                    paciente_externo.fecha_nacimiento = ext_fecha_nac
+                    cambios = True
+                if paciente_externo.sexo != ext_sexo:
+                    paciente_externo.sexo = ext_sexo
+                    cambios = True
 
-        def actualizar_datos_externo(paciente_externo):
-            """Actualiza los datos del padre/madre solo si han cambiado."""
-            cambios = False
-            if paciente_externo.dni != ext_dni:
-                paciente_externo.dni = ext_dni
-                cambios = True
-            if paciente_externo.primer_nombre != ext_nombre1:
-                paciente_externo.primer_nombre = ext_nombre1
-                cambios = True
-            if paciente_externo.segundo_nombre != ext_nombre2:
-                paciente_externo.segundo_nombre = ext_nombre2
-                cambios = True
-            if paciente_externo.primer_apellido != ext_apellido1:
-                paciente_externo.primer_apellido = ext_apellido1
-                cambios = True
-            if paciente_externo.segundo_apellido != ext_apellido2:
-                paciente_externo.segundo_apellido = ext_apellido2
-                cambios = True
-            if paciente_externo.fecha_nacimiento != ext_fecha_nac:
-                paciente_externo.fecha_nacimiento = ext_fecha_nac
-                cambios = True
-            if paciente_externo.sexo != ext_sexo:
-                paciente_externo.sexo = ext_sexo
-                cambios = True
+                if cambios:
+                    paciente_externo.modificado_por = usuario
+                    paciente_externo.save()
 
-            if cambios:
-                paciente_externo.modificado_por = usuario
-                paciente_externo.save()
+                return paciente_externo
 
-            return paciente_externo
+            def crear():
+                """Crea un paciente externo si no existe."""
+                if not ext_nombre1 or not ext_apellido1:
+                    log_warning(
+                        f"[DATOS_INSUFICIENTES] intento crear externo sin nombre/apellido dni={ext_dni}",
+                        app=LogApp.RX
+                    )
+                    raise ValidationError("No se puede crear paciente externo sin nombre1 y apellido1.")
+                paciente_nuevo = PacienteExterno.objects.create(
+                    dni=ext_dni if ext_dni else None,
+                    primer_nombre=ext_nombre1.upper() if ext_nombre1 else None,
+                    segundo_nombre=ext_nombre2 if ext_nombre2 else None,
+                    primer_apellido=ext_apellido1.upper() if ext_apellido1 else None,
+                    segundo_apellido=ext_apellido2 if ext_apellido2 else None,
+                    fecha_nacimiento=ext_fecha_nac,
+                    sexo=ext_sexo,
+                    creado_por=usuario,
+                    modificado_por=usuario
+                )
+                return paciente_nuevo
 
-        def crear():
-            """Crea un paciente externo si no existe."""
-            if not ext_nombre1 or not ext_apellido1:
-                raise ValidationError("No se puede crear paciente externo sin nombre1 y apellido1.")
-            paciente_nuevo = PacienteExterno.objects.create(
-                dni=ext_dni if ext_dni else None,
-                primer_nombre=ext_nombre1.upper() if ext_nombre1 else None,
-                segundo_nombre=ext_nombre2 if ext_nombre2 else None,
-                primer_apellido=ext_apellido1.upper() if ext_apellido1 else None,
-                segundo_apellido=ext_apellido2 if ext_apellido2 else None,
-                fecha_nacimiento=ext_fecha_nac,
-                sexo=ext_sexo,
-                creado_por=usuario,
-                modificado_por=usuario
-            )
-            return paciente_nuevo
+            # 1. Buscar por ID
+            if ext_id:
+                try:
+                    paciente_externo = PacienteExterno.objects.get(id=ext_id)
+                    return actualizar_datos_externo(paciente_externo)
+                except PacienteExterno.DoesNotExist:
+                    log_warning(
+                        f"[NO_EXISTE] externo_id={ext_id}",
+                        app=LogApp.RX
+                    )
+                    raise ValidationError(f"No existe paciente externo con id {ext_id}")
 
-        # 1. Buscar por ID
-        if ext_id:
-            try:
-                paciente_externo = PacienteExterno.objects.get(id=ext_id)
-                return actualizar_datos_externo(paciente_externo)
-            except PacienteExterno.DoesNotExist:
-                raise ValidationError(f"No existe paciente externo con id {ext_id}")
+            # 2. Buscar por DNI
+            if ext_dni:
+                try:
+                    paciente_externo = PacienteExterno.objects.get(dni=ext_dni)
+                    return actualizar_datos_externo(paciente_externo)
+                except PacienteExterno.DoesNotExist:
+                    return crear()
 
-        # 2. Buscar por DNI
-        if ext_dni:
-            try:
-                paciente_externo = PacienteExterno.objects.get(dni=ext_dni)
-                return actualizar_datos_externo(paciente_externo)
-            except PacienteExterno.DoesNotExist:
+            # 3. Crear si hay nombres y apellidos
+            if ext_nombre1 and ext_apellido1:
                 return crear()
 
-        # 3. Crear si hay nombres y apellidos
-        if ext_nombre1 and ext_apellido1:
-            return crear()
-
-        # 4. Sin datos clave, error
-        raise ValidationError("Datos insuficientes para crear o actualizar paciente externo.")       
+            # 4. Sin datos clave, error
+            log_warning(
+                f"[SIN_DATOS] no se pudo identificar externo id={ext_id} dni={ext_dni}",
+                app=LogApp.RX
+            )
+            raise ValidationError("Datos insuficientes para crear o actualizar paciente externo.") 
+        
+        except Exception as e:
+            log_error(
+                f"[FALLO_PROCESO] externo_id={ext_id} dni={ext_dni} detalle={str(e)}",
+                app=LogApp.RX
+            )
+            raise      
     
+
+
     @staticmethod
     def inactivar_paciente_externo(id):
 
-        paciente_e = PacienteExterno.objects.get(id=id, activo=True)
-        paciente_e.activo = False
-        paciente_e.save(update_fields=["activo"])
+        try:
+            paciente_e = PacienteExterno.objects.get(id=id, activo=True)
+            paciente_e.activo = False
+            paciente_e.save(update_fields=["activo"])
+
+        except PacienteExterno.DoesNotExist:
+            log_warning(
+                f"[NO_EXISTE_O_INACTIVO] externo_id={id}",
+                app=LogApp.RX
+            )
+            return False
+
+        except Exception as e:
+            log_error(
+                f"[FALLO_INACTIVAR] externo_id={id} detalle={str(e)}",
+                app=LogApp.RX
+            )
+            raise
+
+        return True
 
 
     @staticmethod
     def inactivar_evaluacion_rx(evaluacionId, usuario):
         detalles_ids = []
-        with transaction.atomic():
-            evaluacion = EvaluacionRx.objects.filter(
-                id=evaluacionId,
-                estado=1
-            ).first()
+        try:
+            with transaction.atomic():
+                evaluacion = EvaluacionRx.objects.filter(
+                    id=evaluacionId,
+                    estado=1
+                ).first()
 
-            if not evaluacion:
-                return False
-            
-            evaluacion.estado = 2
-            evaluacion.save(update_fields=["estado"])
+                if not evaluacion:
+                    log_warning(
+                        f"[NO_EXISTE_O_INACTIVA] evaluacion={evaluacionId}",
+                        app=LogApp.RX
+                    )
+                    return False
+                
+                evaluacion.estado = 2
+                evaluacion.save(update_fields=["estado"])
 
-            # Obtener ids antes de actualizar
-            detalles_ids = list(
+                # Obtener ids antes de actualizar
+                detalles_ids = list(
+                    EvaluacionRxDetalle.objects.filter(
+                        evaluacionRx=evaluacionId,
+                        activo=1
+                    ).values_list("id", flat=True)
+                )
+
                 EvaluacionRxDetalle.objects.filter(
-                    evaluacionRx=evaluacionId,
-                    activo=1
-                ).values_list("id", flat=True)
-            )
+                    id__in=detalles_ids
+                ).update(activo=0)
 
-            EvaluacionRxDetalle.objects.filter(
-                id__in=detalles_ids
-            ).update(activo=0)
+            if detalles_ids:
+                try:
+                    paciente_tipo, paciente_id = evaluacion.obtener_tipo_y_paciente_id()
 
-        if detalles_ids:
-            paciente_tipo, paciente_id = evaluacion.obtener_tipo_y_paciente_id()
-            media_result = MediaService.desactivar_imagenes_evaluacion(
+                    media_result = MediaService.desactivar_imagenes_evaluacion(
                         detalles_ids=detalles_ids,
                         paciente_tipo=paciente_tipo,
                         paciente_id=paciente_id,
                         usuario=usuario
                     )
-            
 
-        return True , media_result
+                except Exception as e:
+                    log_error(
+                        f"[FALLO_MEDIA] evaluacion={evaluacionId} detalle={str(e)}",
+                        app=LogApp.MEDIA
+                    )
+                
 
-        
-    @staticmethod
-    def inactivar_evaluacion_rx_detalles(evaluacionId):
-        actualizados = EvaluacionRxDetalle.objects.filter(
-            evaluacionRx=evaluacionId
-        ).update(activo=0)
-        return actualizados > 0 
+            return True , media_result
+        except Exception as e:
+            log_error(
+                f"[FALLO_INACTIVAR] evaluacion={evaluacionId} detalle={str(e)}",
+                app=LogApp.RX
+            )
+            raise
 
 
     @staticmethod
@@ -357,21 +465,6 @@ class EvaluacionService:
                 "modificado_por__username",
                 "fecha_modificado"
             ))
-
-            # Convertir fechas a hora local legible
-            """
-            for e in evaluaciones:
-                for campo in ["fecha", "fecha_modificado"]:
-                    valor = e.get(campo)
-                    print(valor)
-                    if isinstance(valor, datetime):
-                        e[campo] = timezone.localtime(valor).strftime("%d/%m/%Y %H:%M")
-                        print(e[campo])
-                    elif isinstance(valor, date):
-                        e[campo] = valor.strftime("%d/%m/%Y")
-                        print(e[campo])
-            """
-
 
             return evaluaciones
 
@@ -481,7 +574,10 @@ class EvaluacionService:
         
 
         except Exception as e:
-            print(f"Error al generar data de ingreso resumido: {e}")
+            log_error(
+                f"[FALLO_REPORTE_RX] criterios={reporte_criterios} detalle={str(e)}",
+                app=LogApp.RX
+            )
             return None
         
 
@@ -616,6 +712,10 @@ class EvaluacionService:
         
 
         except Exception as e:
+            log_error(
+                f"[FALLO_REPORTE_ESTUDIO_RX] criterios={reporte_criterios} detalle={str(e)}",
+                app=LogApp.RX
+            )
             return None
         
 
@@ -725,7 +825,10 @@ class EvaluacionService:
                 }
             
         except Exception as e:
-            print(f"Error al generar data del informe gasto pelicula: {e}")
+            log_error(
+                f"[FALLO_REPORTE_GASTO_PELICULA] mes={mes} anio={anio} indice={indice} detalle={str(e)}",
+                app=LogApp.RX
+            )
             return None
 
 
@@ -828,9 +931,12 @@ class EvaluacionService:
                 }
             
         except Exception as e:
-            print(f"Error al generar data del informe gasto pelicula: {e}")
+            log_error(
+                f"[FALLO_REPORTE_PACIENTE_SALA] mes={mes} anio={anio} detalle={str(e)}",
+                app=LogApp.RX
+            )
             return None
-        
+                
 
     @staticmethod
     def generarDataInformeEstudioDependecia(mes, anio):
@@ -944,5 +1050,9 @@ class EvaluacionService:
                 }
 
         except Exception as e:
-            print(f"Error al generar data del informe estudios por dependencia: {e}")
+            log_error(
+                f"[FALLO_REPORTE_ESTUDIO_DEPENDENCIA] mes={mes} anio={anio} detalle={str(e)}",
+                app=LogApp.RX
+            )
             return None
+                    

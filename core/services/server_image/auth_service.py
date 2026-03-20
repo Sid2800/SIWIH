@@ -29,19 +29,11 @@ def _request_new_token():
             timeout=5,
         )
     except requests.RequestException as exc:
-        log_error(
-            f"Error conexión servidor imágenes: {exc}",
-            app=LogApp.TOKEN
-        )
         raise ImageServerAuthError(
             f"No se pudo conectar al servidor de imágenes: {exc}"
         )
 
     if response.status_code != 200:
-        log_error(
-            f"Error token imágenes status={response.status_code}",
-            app=LogApp.TOKEN
-        )
         raise ImageServerAuthError(
             f"Error al solicitar token de imágenes "
             f"(status {response.status_code}): {response.text}"
@@ -50,19 +42,12 @@ def _request_new_token():
     try:
         data = response.json()
     except ValueError:
-        log_error(
-            "Respuesta inválida (no JSON) servidor imágenes",
-            app=LogApp.TOKEN
-        )
         raise ImageServerAuthError(
             "Respuesta inválida del servidor de imágenes (no es JSON)"
         )
 
     if "access" not in data:
-        log_error(
-            "Respuesta sin access token servidor imágenes",
-            app=LogApp.TOKEN
-        )
+
         raise ImageServerAuthError(
             "Respuesta inválida del servidor de imágenes (no viene access token)"
         )

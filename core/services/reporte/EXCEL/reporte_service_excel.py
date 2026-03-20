@@ -271,7 +271,7 @@ class ServiceExcel:
             if not data:
                 log_warning(
                     f"Excel referencia sin datos informe {informe}",
-                    app=LogApp.REPORTES
+                    app=LogApp.REPORTE
                 )
                 raise ValueError("No hay datos para generar el reporte")
             
@@ -402,7 +402,7 @@ class ServiceExcel:
         except Exception:
             log_error(
                 f"Error generando Excel referencia informe {reporte.get('informe')} mes {reporte.get('mes')} año {reporte.get('anio')}",
-                app=LogApp.REPORTES
+                app=LogApp.REPORTE
             )
             raise
         
@@ -413,7 +413,7 @@ class ServiceExcel:
             if not data:
                 log_warning(
                     f"Excel catálogo sin datos: {titulo}",
-                    app=LogApp.REPORTES
+                    app=LogApp.REPORTE
                 )
                 raise ValueError("No hay datos para generar el catálogo")
             
@@ -507,7 +507,7 @@ class ServiceExcel:
         except Exception:
             log_error(
                 f"Error al generar el catalogo {titulo or "referencias"}",
-                app=LogApp.REPORTES
+                app=LogApp.REPORTE
             )
             raise
 

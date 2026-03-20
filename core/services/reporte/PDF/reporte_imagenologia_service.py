@@ -30,7 +30,7 @@ class ReporteImagenologiaService:
             if not reporte_criterios:
                 log_warning(
                     "Intento de generar informe sin criterios (gasto/costo película)",
-                    app=LogApp.REPORTES
+                    app=LogApp.REPORTE
                 )
                 raise ValueError("Criterios requeridos")
                 
@@ -226,7 +226,7 @@ class ReporteImagenologiaService:
         except Exception:
             log_error(
                 f"Error generando informe imagenología tipo={indice} mes={mes} anio={anio}",
-                app=LogApp.REPORTES
+                app=LogApp.REPORTE
             )
             raise
 
@@ -237,7 +237,7 @@ class ReporteImagenologiaService:
             if not reporte_criterios:
                 log_warning(
                     "Intento de generar informe estudio dependencia sin criterios",
-                    app=LogApp.REPORTES
+                    app=LogApp.REPORTE
                 )
                 raise ValueError("Criterios requeridos")
             
@@ -442,6 +442,6 @@ class ReporteImagenologiaService:
         except Exception:
             log_error(
                 f"Error generando informe estudios dependencia mes={mes} anio={anio}",
-                app=LogApp.REPORTES
+                app=LogApp.REPORTE
             )
             raise

@@ -6,7 +6,8 @@ from django.db import transaction
 from core.services.expediente_service import ExpedienteService
 from ingreso.models import Ingreso
 from django.utils import timezone
-from django.utils import timezone
+from core.constants.domain_constants import LogApp
+from core.utils.utilidades_logging import *
 
 class RecepcionIngresoServiceSala:
     def __init__(self, RecepcionIngresoSala=None):
@@ -18,7 +19,7 @@ class RecepcionIngresoServiceSala:
         try:
             return (
                 RecepcionIngresoSala.objects
-                .select_related("recibido_por", "modificado_por")  # agregá aquí las relaciones que querés precargar
+                .select_related("recibido_por", "modificado_por")  
                 .get(id=idRecepcion)
             )
         except RecepcionIngresoSala.DoesNotExist:
@@ -72,17 +73,23 @@ class RecepcionIngresoServiceSala:
                     id_ingreso = ingreso.get('id')
                     id_sala = ingreso.get('idSala')
                     id_paciente = ingreso.get('idPaciente')
-                    resultado = RecepcionIngresoServiceSala.procesar_recepcion_ingreso_detalle_sala(
+                    
+                    RecepcionIngresoServiceSala.procesar_recepcion_ingreso_detalle_sala(
                         id_ingreso, id_sala, id_paciente, recepcion, usuario
                     )
 
-                    if resultado.get('error'):
-                        raise Exception(resultado['mensaje'])
+            return {
+                'mensaje': "El proceso se realizó correctamente",
+                'idRecepcion': recepcion.id
+            }
 
         except Exception as e:
-            return {'error': True, 'mensaje': f"Error al generar los registros: {str(e)}"}
+            log_error(
+                f"[FALLO_RECEPCION_INGRESO_SALA] usuario={usuario.id} total_ingresos={len(ingresos)} detalle={str(e)}",
+                app=LogApp.ATENCION
+            )
+            raise
 
-        return {'error': False, 'mensaje': "El proceso se realizó correctamente", 'idRecepcion': recepcion.id}
 
     @staticmethod
     def procesar_recepcion_ingreso_detalle_sala(idIngreso, idSala, idPaciente, recepcion, usuario):
@@ -106,20 +113,9 @@ class RecepcionIngresoServiceSala:
             if not cambio:
                 raise Exception("No se logro cambiar la ubicacion del expedediente")
 
-
         except Ingreso.DoesNotExist:
-            return {
-                'error': True,
-                'mensaje': "El ingreso indicado no existe"
-            }
+            raise Exception("El ingreso indicado no existe")
 
-        except Exception as e:
-            return {
-                'error': True,
-                'mensaje': f"Error al crear el detalle: {str(e)}"
-            }
-
-        return {'error': False, 'mensaje': "Detalle procesado correctamente"}
 
 
 class RecepcionIngresoServiceSDGI:
@@ -151,17 +147,23 @@ class RecepcionIngresoServiceSDGI:
                 for ingreso in ingresos:
                     id_ingreso = ingreso.get('id')
                     id_paciente = ingreso.get('idPaciente')
-                    resultado = RecepcionIngresoServiceSDGI.procesar_recepcion_ingreso_detalle_sdgi(
+
+                    RecepcionIngresoServiceSDGI.procesar_recepcion_ingreso_detalle_sdgi(
                         id_ingreso, id_paciente, recepcion, usuario
                     )
 
-                    if resultado.get('error'):
-                        raise Exception(resultado['mensaje'])
+            return {
+                'mensaje': "El proceso se realizó correctamente",
+                'idRecepcion': recepcion.id
+            }
 
         except Exception as e:
-            return {'error': True, 'mensaje': f"Error al generar los registros: {str(e)}"}
+            log_error(
+                f"[FALLO_RECEPCION_INGRESO_SDGI] usuario={usuario.id} total_ingresos={len(ingresos)} detalle={str(e)}",
+                app=LogApp.ATENCION
+            )
+            raise
 
-        return {'error': False, 'mensaje': "El proceso se realizó correctamente", 'idRecepcion': recepcion.id}
 
     @staticmethod
     def procesar_recepcion_ingreso_detalle_sdgi(idIngreso, idPaciente, recepcion, usuario):
@@ -186,20 +188,7 @@ class RecepcionIngresoServiceSDGI:
 
 
         except Ingreso.DoesNotExist:
-            return {
-                'error': True,
-                'mensaje': "El ingreso indicado no existe"
-            }
-
-        except Exception as e:
-            return {
-                'error': True,
-                'mensaje': f"Error al crear el detalle: {str(e)}"
-            }
-
-        return {'error': False, 'mensaje': "Detalle procesado correctamente"}
-
-
+            raise Exception("El ingreso indicado no existe")
 
 
     def obtener_detalles_sdgi(self): # lo usa reporte

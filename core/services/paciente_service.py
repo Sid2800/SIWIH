@@ -14,7 +14,8 @@ from django.db import transaction
 from datetime import datetime, date
 from django.db import connection, models
 from django.utils import timezone
-
+from core.constants.domain_constants import LogApp
+from core.utils.utilidades_logging import *
 
 class PacienteService:
 
@@ -78,7 +79,12 @@ class PacienteService:
                 return {"data": datos}
 
         except OperationalError as e:
-            return {"error": f"Error de conexión a la base de datos: {str(e)}"}
+            log_error(
+                f"[FALLO_CENSO] dni={dni} detalle={str(e)}",
+                app=LogApp.INTEGRACION
+            )
+            return {"error": "No se pudo consultar el censo"}
+
 
     @staticmethod
     def obtener_pacientes(query=None):
@@ -95,7 +101,8 @@ class PacienteService:
             qs = qs.filter(nombre_completo__icontains=query)
 
         return qs.values("id", "nombre_completo", "dni", "fecha_nacimiento", "sexo")
-            
+
+
     @staticmethod
     def obtener_paciente_propietario(DNI):
         try:
@@ -104,6 +111,7 @@ class PacienteService:
         except PacienteAsignacion.DoesNotExist:
             return None
             
+
     @staticmethod
     def listar_personas_censo(params, start, length, order_column, order_direction):
         where_clauses = []
@@ -179,7 +187,12 @@ class PacienteService:
             return datos, total_filtered  # Devuelve los datos y la cantidad total filtrada
 
         except Exception as e:
-            return {'error': str(e)}, 0
+            log_error(
+                f"[FALLO_LISTAR_CENSO] params={params} start={start} length={length} detalle={str(e)}",
+                app=LogApp.INTEGRACION
+            )
+            return {'error': 'Error al consultar el censo'}, 0
+        
     
     @staticmethod
     def listar_personas_censo_avanzada(params, start, length, order_column, order_direction):
@@ -207,6 +220,9 @@ class PacienteService:
             where_clauses.append("censo.SEGUNDO_APELLIDO LIKE %s")
             query_params.append(params["search_apellido2"].strip() + '%')
 
+        if not isinstance(order_column, int) or order_column >= len(columns):
+            order_column = 0
+
         # Si no hay criterios, devolver una lista vacía
         if len(query_params) < 3:
             return [], 0  # Retorna lista vacía y 0 registros filtrados
@@ -223,7 +239,7 @@ class PacienteService:
             "NOMBRE_DEPARTAMENTO"
         ]
         order_by_column = columns[order_column]
-        order_by_direction = order_direction.upper()
+        order_by_direction = "ASC" if order_direction.upper() != "DESC" else "DESC"
 
         try:
             with connections['censo2025'].cursor() as cursor:
@@ -265,7 +281,11 @@ class PacienteService:
             return datos, total_filtered  # Devuelve los datos y la cantidad total filtrada
 
         except Exception as e:
-            return {'error': str(e)}, 0
+            log_error(
+                f"[FALLO_LISTAR_CENSO_AVANZADO] filtros={list(params.keys())} start={start} length={length} detalle={str(e)}",
+                app=LogApp.INTEGRACION
+            )
+            return {'error': 'Error al consultar el censo'}, 0
         
 
     @staticmethod
@@ -316,8 +336,11 @@ class PacienteService:
                     defuncionRegistro.save()
                     return True
             except Exception as e:
-                print(f"Error al modificar defunción: {e}")
-                return False
+                log_error(
+                    f"[FALLO_ACTUALIZAR_DEFUNCION] id={defuncionRegistro.id} detalle={str(e)}",
+                    app=LogApp.PACIENTE
+                )
+                raise
 
     
         
@@ -328,6 +351,8 @@ class PacienteService:
                 return actualizar_datos_defuncion(defuncionRegistro)
             except Defuncion.DoesNotExist:
                 return False
+            except Exception:
+                raise
 
                 
         # si tiene id se lo vamos a marcalro como defuncion
@@ -347,12 +372,20 @@ class PacienteService:
                         raise Exception("No se pudo cambiar el estado del paciente a pasivo")
 
                 return True  # Todo salió bien
+            
             except Exception as e:
-                print(f"Error al procesar defunción: {e}")
-                return False
+                log_error(
+                f"[FALLO_CREAR_DEFUNCION] paciente={defuncion.paciente_id} detalle={str(e)}",
+                app=LogApp.PACIENTE
+            )
+            raise
         else:   
-            print("No hay datos")
+            log_warning(
+                f"[DATOS_INCOMPLETOS_DEFUNCION] paciente={defuncion.paciente_id}",
+                app=LogApp.PACIENTE
+            )
             return False
+
 
     @staticmethod
     def procesar_entrega_cadaver(defuncion):
@@ -364,8 +397,6 @@ class PacienteService:
             except Defuncion.DoesNotExist:
                 return False, 0
         else: 
-            print(f"id defuncion vacio")
-
             try:
                 defuncionRegistro = Defuncion.objects.get(id=defuncion.id)
             except Defuncion.DoesNotExist:
@@ -379,8 +410,11 @@ class PacienteService:
                 defuncionRegistro.save()
                 return True,  defuncionRegistro.id
         except Exception as e:
-            print(e)
-            return False, 0
+            log_error(
+                f"[FALLO_ENTREGA_CADAVER] paciente={defuncion.paciente_id} id_defuncion={defuncion.id} detalle={str(e)}",
+                app=LogApp.PACIENTE
+            )
+            raise
 
 
     @staticmethod
@@ -401,14 +435,17 @@ class PacienteService:
         paciente.save()
         return True
 
+
     @staticmethod
     def paciente_a_activo(idPaciente):
         updated = Paciente.objects.filter(id=idPaciente).update(estado="A")
         return updated > 0
 
+
     @staticmethod
     def comprobar_defuncion(paciente):
         return hasattr(paciente, 'defuncion') and paciente.defuncion is not None
+
 
     @staticmethod
     def comprobar_inactivo(idPaciente):
@@ -420,19 +457,37 @@ class PacienteService:
 
     @staticmethod
     def reclasificar_rn_a_hijo(ejecutar=False):
-        """
-        Llama al procedimiento almacenado reclasificar_rn_a_hijo.
-        
-        """
-        with connection.cursor() as cursor:
-            cursor.callproc("reclasificar_rn_a_hijo", [1 if ejecutar else 0])
-            result = cursor.fetchall()
-            
-            if result and len(result[0]) > 0:
-                return result[0][0]  # cantidad_reclasificados
-            return 0
+
+        try:
+            with connection.cursor() as cursor:
+                cursor.callproc("reclasificar_rn_a_hijo", [1 if ejecutar else 0])
+                result = cursor.fetchall()
+
+                if not result or len(result[0]) == 0:
+                    log_warning(
+                        f"[SIN_RESPUESTA_SP] reclasificar_rn_a_hijo ejecutar={ejecutar}",
+                        app=LogApp.PACIENTE
+                    )
+                    return 0
+
+                cantidad = result[0][0]
+
+                log_info(
+                    f"[RECLASIFICACION_RN] ejecutar={ejecutar} total={cantidad}",
+                    app=LogApp.PACIENTE
+                )
+
+                return cantidad
+
+        except Exception as e:
+            log_error(
+                f"[FALLO_SP_RECLASIFICAR] ejecutar={ejecutar} detalle={str(e)}",
+                app=LogApp.PACIENTE
+            )
+            raise
 
 
+    #OJO  SIN USO PERO POTENCIALMENTE NECESARIA
     @staticmethod
     def comprobar_reclasificar_pacientes_pasivos_ultima_visita(ejecutar=True):
         hoy = date.today()
@@ -451,9 +506,6 @@ class PacienteService:
 
             if isinstance(ultima_visita, datetime):
                 ultima_visita = ultima_visita.date()
-
-            
-            print(f"def{defu}   ---   visita{ultima_visita}  --- dni{paciente.dni}")
 
             if ultima_visita >= inicio_anio:
                 pacientes_a_corregir.append(paciente)
@@ -644,6 +696,13 @@ class PacienteService:
                 ).order_by('-total')
 
                 total = qs.count()
+
+                if total == 0:
+                    log_warning(
+                        f"[REPORTE_VACIO] modo={modo} criterios={reporte_criterios}",
+                        app=LogApp.REPORTE
+                    )
+                    
                 resumen = []
                 for item in resumen_raw:
                     porcentaje = (item['total'] / total) * 100 if total > 0 else 0
@@ -661,9 +720,13 @@ class PacienteService:
                 }
 
         except Exception as e:
-            print(f"Error al generar data del paciente: {e}")
+            log_error(
+                    f"[FALLO_REPORTE_PACIENTE] modo={modo} criterios={str(reporte_criterios)} detalle={str(e)}",
+                    app=LogApp.REPORTE
+                )
             return None
             
+
     @staticmethod
     def llenarDatosCamposPaciente(form, paciente, numero_expediente=None):
         form.fields['dniPaciente'].initial = paciente.dni

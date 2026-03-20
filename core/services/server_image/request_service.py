@@ -42,10 +42,11 @@ class RequestService:
 
             url = f"{settings.IMAGE_SERVER_URL}{BUSCAR_ARCHIVOS}"
             token = traer_server_token()
+
             payload = {
                 "app": peticion.app,
                 "origen_tipo": peticion.origen_tipo,
-                "origen_ids": peticion.origen_ids,  # ← importante
+                "origen_ids": peticion.origen_ids,
                 "paciente_tipo": peticion.paciente_tipo,
                 "paciente_id": peticion.paciente_id
             }
@@ -62,47 +63,28 @@ class RequestService:
                 timeout=10
             )
 
-            print(response)
-
             response.raise_for_status()
 
             return {
                 "ok": True,
                 "data": response.json()
             }
-        
-        except ImageServerAuthError as e:
-            log_error(
-                "Error autenticación media server",
-                app=LogApp.MEDIA
-            )
-            return {"ok": False, "error": str(e)}
 
-        except ValueError as ve:
-            return {
-                "ok": False,
-                "error": str(ve)
-            }
+        except ImageServerAuthError:
+            raise  
+
+        except ValueError:
+            raise  
 
         except requests.exceptions.HTTPError as e:
-            log_warning(
-                f"HTTP error media server status={e.response.status_code}",
-                app=LogApp.MEDIA
+            raise RuntimeError(
+                f"HTTP error media server status={e.response.status_code} detalle={e.response.text[:200]}"
             )
-            return {
-                "ok": False,
-                "error": e.response.text[:500]
-            }
 
         except requests.exceptions.RequestException as e:
-            log_error(
-                "Error conexión media server LIST",
-                app=LogApp.MEDIA
+            raise RuntimeError(
+                f"Error conexión media server LIST: {str(e)}"
             )
-            return {
-                "ok": False,
-                "error": str(e)
-            }
 
     @staticmethod
     def subir_imagen(peticion_dict):
@@ -148,7 +130,6 @@ class RequestService:
                 timeout=20
             )
 
-            
             try:
                 response_json = response.json()
             except ValueError:
@@ -156,37 +137,26 @@ class RequestService:
                     "error": response.text[:500]
                 }
 
-
             if response.status_code >= 400:
-                log_warning(
-                    f"Error subida imagen status={response.status_code}",
-                    app=LogApp.MEDIA
+                raise RuntimeError(
+                    f"Error subida imagen status={response.status_code} detalle={response_json}"
                 )
-                return {
-                    "ok": False,
-                    "error": response_json
-                }
 
             return {
                 "ok": True,
                 "data": response_json
             }
 
-        except ValueError as ve:
-            return {
-                "ok": False,
-                "error": str(ve)
-            }
+        except ValueError:
+            raise  # validación
 
         except requests.exceptions.RequestException as e:
-            log_error(
-                "Error conexión subir imagen",
-                app=LogApp.MEDIA
+            raise RuntimeError(
+                f"Error conexión subir imagen: {str(e)}"
             )
-            return {
-                "ok": False,
-                "error": f"Error de conexión con servidor de imágenes: {str(e)}"
-            }
+
+        except Exception:
+            raise
         
 
     @staticmethod
@@ -195,10 +165,11 @@ class RequestService:
 
         try:
             RequestService._validar_argumentos_peticion(peticion)
+
             url = f"{settings.IMAGE_SERVER_URL}{DESACTIVAR_IMAGEN}"
             token = traer_server_token()
 
-            headers ={
+            headers = {
                 "Authorization": f"Bearer {token}",
                 "Content-Type": "application/json"
             }
@@ -210,11 +181,11 @@ class RequestService:
                 "paciente_tipo": peticion.paciente_tipo,
                 "paciente_id": peticion.paciente_id,
                 "usuario_snapshot": json.dumps({
-                        "id": peticion.usuario_id,
-                        "nombre": peticion.usuario_nombre,
-                        "sistema": "SIWI-HOSPITAL"
-                    })
-                }
+                    "id": peticion.usuario_id,
+                    "nombre": peticion.usuario_nombre,
+                    "sistema": "SIWI-HOSPITAL"
+                })
+            }
 
             response = requests.post(
                 url,
@@ -231,40 +202,34 @@ class RequestService:
                 }
 
             if response.status_code >= 400:
-                log_warning(
-                    f"Error desactivar imagen status={response.status_code}",
-                    app=LogApp.MEDIA
+                raise RuntimeError(
+                    f"Error desactivar imagen status={response.status_code} detalle={response_json}"
                 )
 
             return {
                 "ok": True,
                 "data": response_json
             }
-            
 
-        except ValueError as ve:
-            return {
-                "ok": False,
-                "error": str(ve)
-            }
+        except ValueError:
+            raise  # validación
 
         except requests.exceptions.RequestException as e:
-            log_error(
-                "Error conexión desactivar imagen",
-                app=LogApp.MEDIA
+            raise RuntimeError(
+                f"Error conexión desactivar imagen: {str(e)}"
             )
-            return {
-                "ok": False,
-                "error": f"Error de conexión con servidor de imágenes: {str(e)}"
-            }
+
+        except Exception:
+            raise
         
 
     @staticmethod
     def desactivar_imagenes_batch(peticion_dict):
 
         peticion = SimpleNamespace(**peticion_dict)
+
         try:
-            # Validación mínima específica para batch
+            # Validación mínima
             if not isinstance(peticion.origen_ids, list) or not peticion.origen_ids:
                 raise ValueError("origen_ids debe ser una lista no vacía")
 
@@ -283,12 +248,11 @@ class RequestService:
                 "paciente_id": peticion.paciente_id,
                 "origen_ids": peticion.origen_ids,
                 "usuario_snapshot": json.dumps({
-                        "id": peticion.usuario_id,
-                        "nombre": peticion.usuario_nombre,
-                        "sistema": "SIWI-HOSPITAL"
-                    })
-                }
-            
+                    "id": peticion.usuario_id,
+                    "nombre": peticion.usuario_nombre,
+                    "sistema": "SIWI-HOSPITAL"
+                })
+            }
 
             response = requests.post(
                 url,
@@ -303,27 +267,25 @@ class RequestService:
                 response_json = {"error": response.text[:500]}
 
             if response.status_code >= 400:
-                return {
-                    "ok": False,
-                    "error": response_json
-                }
+                raise RuntimeError(
+                    f"Error batch desactivar imágenes status={response.status_code} detalle={response_json}"
+                )
 
             return {
                 "ok": True,
                 "desactivadas": response_json.get("desactivadas", 0)
             }
 
-        except ValueError as ve:
-            return {
-                "ok": False,
-                "error": str(ve)
-            }
+        except ValueError:
+            raise
 
         except requests.exceptions.RequestException as e:
-            return {
-                "ok": False,
-                "error": f"Error de conexión con servidor de imágenes: {str(e)}"
-            }
+            raise RuntimeError(
+                f"Error conexión batch desactivar imágenes: {str(e)}"
+            )
+
+        except Exception:
+            raise
         
 
     @staticmethod
@@ -336,7 +298,6 @@ class RequestService:
                 raise ValueError("faltan parametros para ejectutar esta peticion")
             
             url = f"{settings.IMAGE_SERVER_URL}{MIGRAR_IMAGENES_EXTERNO_INTERNO}"
-            print(url)
             token = traer_server_token()
 
             headers = {
@@ -363,24 +324,22 @@ class RequestService:
                 response_json = {"error": response.text[:500]}
 
             if response.status_code >= 400:
-                return {
-                    "ok": False,
-                    "error": response_json
-                }
+                raise RuntimeError(
+                    f"Error migrar imágenes externo→interno status={response.status_code} detalle={response_json}"
+                )
 
             return {
                 "ok": True,
                 "convertidas": response_json.get("convertidas", 0)
             }
 
-        except ValueError as ve:
-            return {
-                "ok": False,
-                "error": str(ve)
-            }
+        except ValueError:
+            raise
 
         except requests.exceptions.RequestException as e:
-            return {
-                "ok": False,
-                "error": f"Error de conexión con servidor de imágenes: {str(e)}"
-            }
+            raise RuntimeError(
+                f"Error conexión migrar imágenes externo→interno: {str(e)}"
+            )
+        
+        except Exception:
+            raise

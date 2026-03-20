@@ -1,6 +1,7 @@
 from servicio import models as modelosServicio
 from servicio.models import Institucion_salud
 from core.constants.domain_constants import HEAC_INSTITUCION_ID
+from core.constants.domain_constants import SALAS_EXCLUIDAS, SERVICIOS_AUX_EXTERNOS
 from django.db import transaction
 from django.db.models import Value, F, CharField
 from django.db.models.functions import Concat
@@ -48,7 +49,6 @@ class ServicioService:
     @staticmethod
     def obtener_camas_activas():
         qs = modelosServicio.Cama.objects.filter(estado=1)  # Filtramos las camas activas (estado=1)
-        
         return qs
     
 
@@ -102,7 +102,6 @@ class ServicioService:
         return list(salas)
 
 
-
     @staticmethod
     def obtener_sala_id(idSala):
         try:
@@ -110,7 +109,8 @@ class ServicioService:
             return sala
         except modelosServicio.Sala.DoesNotExist:
             return None
-        
+    
+
     @staticmethod
     def obtener_especialidad_id(idEspecialidad):
         try:
@@ -134,7 +134,6 @@ class ServicioService:
                 # Actualizar la sesión del usuario
                 request.session['zona_codigo'] = nueva_zona.codigo
                 request.session['zona_nombre_zona'] = nueva_zona.nombre_zona
-
                 return nueva_zona
 
         except modelosServicio.Zona.DoesNotExist:
@@ -148,29 +147,9 @@ class ServicioService:
     """
     @staticmethod    
     def obtener_dependencias(incluir_externo=True):
-        salas_excluidas = [
-            714,  # aislado covid 
-            200,  # asilado covid
-            512,  # aislado gine se debe consignar únicamente como Gine
-            114,  # aislado medicina
-            206,
-            308,
-            310,  # cirugia pediatrica
-            201,  # medicina hombres y mujeres juntos; existen separados, es mejor
-            711,  #	PUERPERIO ADOLECENTE NORMAL	
-            708,  #	PUERPERIO NORMA
-            713,  #	PUERPERIO QUIRURGICO
-            706,  #	PUERPERIO QUIRURGICO PATOLOGICO
-            709,  #	PUERPERIO VAGINAL PATOLOGICO
-            712,  #	SEPTICO AISLADO
-            707,  #	AMENAZA DE ABORTO
-            705,  #	EMBARAZO PATOLOGICO	
-        ]
+        salas_excluidas = SALAS_EXCLUIDAS
 
-        serv_auxiliares_externos = [] if incluir_externo else [
-            3,  #cesamo
-            4   #otros hospitales
-        ]
+        serv_auxiliares_externos = [] if incluir_externo else SERVICIOS_AUX_EXTERNOS
 
         # Salas hospitalarias activas (excluyendo las no seleccionables)
         salas = (
@@ -228,6 +207,7 @@ class ServicioService:
 
         return dependencias
     
+
 
     @staticmethod
     def obtener_dependencia_y_campo(clave):
