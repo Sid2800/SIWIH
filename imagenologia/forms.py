@@ -122,6 +122,7 @@ class EvaluacionRXCreateForm(forms.ModelForm):
         p_externo = self.data.get('paciente_externo_data')
         p_ligado = self.data.get('paciente_ligado_id')
 
+        #valirdad imagenes 
         for nombre, imagen in self.files.items():
             if not nombre.startswith("archivo__"):
                 continue

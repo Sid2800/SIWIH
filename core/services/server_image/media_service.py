@@ -73,7 +73,7 @@ class MediaService:
         """
         Procesa imágenes en modo AGREGAR.
         """
-
+        print(archivos)
         warnings = []
         success = []
 

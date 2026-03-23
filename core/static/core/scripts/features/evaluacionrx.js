@@ -845,6 +845,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 estudio["paciente"]= nombreCompleto.value?.trim() || "";
                 let registro = await agregarEditarEstudioDetalle(estudio, estudios);
+                console.log(registro);
                 if (registro) {
                     actualizarEstudio(registro);
                 }
