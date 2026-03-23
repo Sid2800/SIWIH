@@ -1,6 +1,6 @@
 const AdjuntarImagenHelper = ( function () {
     const TIPOS_PERMITIDOS  = ["image/jpeg", "image/png", "image/webp"];
-    const MAXIMO_MB = 10;
+    const MAXIMO_MB = 15;
 
     function MDaBytes(mb){
         return mb * 1024 * 1024

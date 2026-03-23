@@ -2,12 +2,10 @@ from enum import Enum, IntEnum
 
 
 TIPOS_IMAGEN_PERMITIDOS = [
-    "image/jpeg",
-    "image/png",
     "image/webp"
 ]
 
-MAX_TAMANO_IMAGEN_MB = 10
+MAX_TAMANO_IMAGEN_MB = 15
 
 
 class AccionImagen(str, Enum):

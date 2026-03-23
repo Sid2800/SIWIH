@@ -157,32 +157,30 @@ const ImageEditor = (() => {
     }
 
 
-
-
-
-
-
     function confirm(){
 
         const canvas = cropper.getCroppedCanvas({
-            imageSmoothingEnabled:true,
-            imageSmoothingQuality:"high"
+            maxWidth: 1200,
+            maxHeight: 1200,
+            imageSmoothingEnabled: true,
+            imageSmoothingQuality: "high"
         });
 
         canvas.toBlob(blob => {
 
-            const file = new File([blob],"imagen_editada.jpg",{type:"image/jpeg"});
+            const file = new File(
+                [blob],
+                "imagen_editada.webp",
+                { type: "image/webp" }
+            );
 
             resolver(file);
-
             close();
-
-        });
+        }, "image/webp", 0.85); 
 
     }
 
     function cancel(){
-        console.log("HIII");
         resolver(null);
 
         close();
