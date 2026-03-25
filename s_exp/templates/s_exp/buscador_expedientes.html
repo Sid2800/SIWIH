@@ -1,0 +1,413 @@
+{% extends 'core/base.html' %}
+{% load static %}
+{% load permisos_unidad %}
+
+{% block title %}Solicitar Expedientes{% endblock title %}
+
+{% block extra_css %}
+<style>
+    /* ======= s_exp Buscador — Compatible con light/dark mode ======= */
+
+    .sexp-buscador-layout {
+        display: grid;
+        grid-template-columns: 1fr 370px;
+        gap: 1.5rem;
+    }
+
+    @media (max-width:900px) {
+        .sexp-buscador-layout {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    /* Nav sub-módulos */
+    .sexp-nav-modulos {
+        display: flex;
+        gap: 0.8rem;
+        margin-bottom: 1.5rem;
+        flex-wrap: wrap;
+    }
+
+    .sexp-nav-link {
+        padding: 0.6rem 1.2rem;
+        border-radius: 1rem;
+        background-color: var(--blanco);
+        border: 1px solid var(--colorLinea);
+        text-decoration: none;
+        color: var(--colorTablacelda);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.9rem;
+        font-family: var(--fuenteCuerpo);
+        transition: background-color .2s, transform .2s, border-color .2s;
+    }
+
+    .sexp-nav-link:hover {
+        background-color: var(--colorMenuHover);
+        color: var(--colorMenuTextoHover);
+        border-color: var(--colorMenuTextoHover);
+        transform: translateY(-1px);
+    }
+
+    .sexp-nav-link--active {
+        background-color: var(--colorBoton);
+        color: var(--colorTextoBoton);
+        border-color: var(--colorBoton);
+    }
+
+    /* Barra de búsqueda */
+    .sexp-search-box {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1.5rem;
+        flex-wrap: wrap;
+    }
+
+    .sexp-search-input {
+        flex: 1;
+        min-width: 200px;
+        padding: 0.6rem 1rem;
+        border-radius: 1rem;
+        border: 1px solid var(--colorLinea);
+        background-color: var(--blanco);
+        color: var(--colorTablacelda);
+        font-size: 0.9rem;
+        font-family: var(--fuenteCuerpo);
+    }
+
+    .sexp-search-select {
+        padding: 0.6rem;
+        border-radius: 1rem;
+        border: 1px solid var(--colorLinea);
+        background-color: var(--blanco);
+        color: var(--colorTablacelda);
+        font-size: 0.9rem;
+        font-family: var(--fuenteCuerpo);
+    }
+
+    .sexp-search-btn {
+        padding: 0.6rem 1.2rem;
+        border-radius: 1rem;
+        border: none;
+        background-color: var(--colorBoton);
+        color: var(--colorTextoBoton);
+        cursor: pointer;
+        font-weight: 600;
+        font-family: var(--fuenteCuerpo);
+        transition: background-color .2s;
+    }
+
+    .sexp-search-btn:hover {
+        opacity: 0.85;
+    }
+
+    /* Resultados */
+    .sexp-resultado {
+        background-color: var(--blanco);
+        border-radius: 1rem;
+        padding: 0.8rem 1rem;
+        margin-bottom: 0.5rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: all .2s;
+        border: 1px solid var(--colorLinea);
+        color: var(--colorTablacelda);
+    }
+
+    .sexp-resultado:hover {
+        border-color: var(--colorBoton);
+    }
+
+    .sexp-resultado__info h4 {
+        margin: 0 0 0.2rem;
+        font-size: 0.95rem;
+        font-weight: 600;
+    }
+
+    .sexp-resultado__info p {
+        margin: 0;
+        font-size: 0.8rem;
+        opacity: 0.7;
+    }
+
+    .sexp-add-btn {
+        padding: 0.4rem 0.8rem;
+        border-radius: 0.6rem;
+        border: none;
+        background-color: var(--colorRadioBotonActivo);
+        color: #fff;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 0.8rem;
+        transition: all .2s;
+        white-space: nowrap;
+    }
+
+    .sexp-add-btn:hover {
+        opacity: 0.85;
+    }
+
+    .sexp-add-btn:disabled {
+        background-color: var(--colorControlDeshabilitadoFondo);
+        cursor: not-allowed;
+        opacity: 0.6;
+    }
+
+    /* Badges de disponibilidad */
+    .sexp-badge {
+        display: inline-block;
+        padding: 0.2rem 0.6rem;
+        border-radius: 2rem;
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    .sexp-badge--disponible {
+        background: rgba(34, 197, 94, 0.15);
+        color: #22c55e;
+        border: 1px solid rgba(34, 197, 94, 0.3);
+    }
+
+    .sexp-badge--prestado {
+        background: rgba(220, 53, 69, 0.15);
+        color: var(--colorEliminarRojo);
+        border: 1px solid rgba(220, 53, 69, 0.3);
+    }
+
+    .sexp-badge--en-carrito {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        padding: 0.3rem 0.6rem;
+        border-radius: 0.6rem;
+        background: rgba(99, 102, 241, 0.15);
+        color: #6366f1;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    /* Carrito */
+    .sexp-carrito {
+        background-color: var(--blanco);
+        border-radius: 1.5rem;
+        padding: 1.2rem;
+        position: sticky;
+        top: 1rem;
+        border: 1px solid var(--colorLinea);
+        transition: background-color 0.3s ease;
+    }
+
+    .sexp-carrito h3 {
+        margin: 0 0 1rem;
+        font-size: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: var(--colorTablacelda);
+    }
+
+    .sexp-carrito-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.6rem 0.5rem;
+        border-bottom: 1px solid var(--colorLinea);
+        font-size: 0.85rem;
+        color: var(--colorTablacelda);
+    }
+
+    .sexp-carrito-item:last-child {
+        border-bottom: none;
+    }
+
+    .sexp-remove-btn {
+        background: none;
+        border: none;
+        color: var(--colorEliminarRojo);
+        cursor: pointer;
+        font-size: 1rem;
+        padding: 0.2rem;
+        transition: opacity .2s;
+    }
+
+    .sexp-remove-btn:hover {
+        opacity: 0.7;
+    }
+
+    .sexp-carrito-empty {
+        text-align: center;
+        opacity: 0.5;
+        padding: 1.5rem;
+        font-size: 0.85rem;
+        color: var(--colorTablacelda);
+    }
+
+    .sexp-carrito-form {
+        margin-top: 1rem;
+        border-top: 1px solid var(--colorLinea);
+        padding-top: 1rem;
+    }
+
+    .sexp-carrito-form label {
+        display: block;
+        margin-bottom: 0.3rem;
+        font-weight: 600;
+        font-size: 0.8rem;
+        color: var(--colorTablacelda);
+    }
+
+    .sexp-carrito-form textarea,
+    .sexp-carrito-form input,
+    .sexp-carrito-form select {
+        width: 100%;
+        padding: 0.5rem;
+        border-radius: 0.6rem;
+        border: 1px solid var(--colorLinea);
+        background-color: var(--blanco);
+        color: var(--colorTablacelda);
+        font-size: 0.85rem;
+        margin-bottom: 0.8rem;
+        font-family: var(--fuenteCuerpo);
+    }
+
+    .sexp-submit-btn {
+        width: 100%;
+        padding: 0.7rem;
+        border-radius: 1rem;
+        border: none;
+        background-color: var(--colorBoton);
+        color: var(--colorTextoBoton);
+        cursor: pointer;
+        font-weight: 700;
+        font-size: 0.95rem;
+        transition: all .2s;
+        font-family: var(--fuenteCuerpo);
+    }
+
+    .sexp-submit-btn:hover {
+        opacity: 0.85;
+    }
+
+    .sexp-submit-btn:disabled {
+        background-color: var(--colorControlDeshabilitadoFondo);
+        cursor: not-allowed;
+    }
+
+    .sexp-carrito-count {
+        background-color: var(--colorBoton);
+        color: var(--colorTextoBoton);
+        border-radius: 50%;
+        width: 22px;
+        height: 22px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.75rem;
+        font-weight: 700;
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<div class="contenedor2">
+    <div class="tituloFormulario" style="margin-bottom: 1.5rem;">
+        <div class="tituloFormulario-texto">
+            <i class="bi bi-folder2-open"></i>
+            <h2 class="sin-margen">Solicitar Préstamo de Expedientes</h2>
+        </div>
+        <div class="tituloFormulario-subrallado"></div>
+    </div>
+
+    <!-- Navegación sub-módulos -->
+    <div class="sexp-nav-modulos">
+        <a href="{% url 's_exp_buscador' %}" class="sexp-nav-link sexp-nav-link--active">
+            <i class="bi bi-search"></i> Solicitar Expedientes
+        </a>
+        <a href="{% url 's_exp_seguimiento' %}" class="sexp-nav-link">
+            <i class="bi bi-clock-history"></i> Mis Solicitudes
+        </a>
+        {% if request.user|en_grupo:"administradores" %}
+        <a href="{% url 's_exp_dashboard' %}" class="sexp-nav-link">
+            <i class="bi bi-speedometer2"></i> Panel Admin
+        </a>
+        <a href="{% url 's_exp_solicitudes' %}" class="sexp-nav-link">
+            <i class="bi bi-list-check"></i> Gestión Solicitudes
+        </a>
+        <a href="{% url 's_exp_monitoreo' %}" class="sexp-nav-link">
+            <i class="bi bi-binoculars"></i> Monitoreo
+        </a>
+        <a href="{% url 's_exp_devoluciones' %}" class="sexp-nav-link">
+            <i class="bi bi-arrow-return-left"></i> Devoluciones
+        </a>
+        <a href="{% url 's_exp_reportes' %}" class="sexp-nav-link">
+            <i class="bi bi-bar-chart-line"></i> Reportes
+        </a>
+        {% endif %}
+    </div>
+
+    <div class="sexp-buscador-layout">
+        <!-- Panel izquierdo: Búsqueda -->
+        <div>
+            <div class="sexp-search-box">
+                <select id="tipo-busqueda" class="sexp-search-select">
+                    <option value="expediente">N° Expediente</option>
+                    <option value="identidad">Identidad</option>
+                    <option value="nombre">Nombre</option>
+                </select>
+                <input type="text" id="busqueda-input" class="sexp-search-input" placeholder="Buscar expediente...">
+                <button id="btn-buscar" class="sexp-search-btn">
+                    <i class="bi bi-search"></i> Buscar
+                </button>
+            </div>
+
+            <div id="resultados-busqueda">
+                <p style="opacity:0.5; text-align:center;">Ingrese un criterio de búsqueda para encontrar expedientes
+                    disponibles.</p>
+            </div>
+        </div>
+
+        <!-- Panel derecho: Carrito -->
+        <div>
+            <div class="sexp-carrito">
+                <h3><i class="bi bi-cart3"></i> Carrito <span class="sexp-carrito-count" id="carrito-count">0</span>
+                </h3>
+                <div id="carrito-items">
+                    <div class="sexp-carrito-empty"><i class="bi bi-cart-x" style="font-size:1.4rem;"></i><br>No hay
+                        expedientes seleccionados</div>
+                </div>
+
+                <div class="sexp-carrito-form" id="carrito-form" style="display:none;">
+                    <label>Motivo *</label>
+                    <select id="solicitud-motivo">
+                        <option value="">Seleccione...</option>
+                        <option value="Consulta Médica">Consulta Médica</option>
+                        <option value="Auditoría">Auditoría</option>
+                        <option value="Trámite Legal">Trámite Legal</option>
+                        <option value="Revisión Administrativa">Revisión Administrativa</option>
+                        <option value="Investigación">Investigación</option>
+                        <option value="Otro">Otro</option>
+                    </select>
+
+                    <label>Área de Destino</label>
+                    <input type="text" id="solicitud-area" placeholder="Ej: Consulta Externa">
+
+                    <label>Observaciones</label>
+                    <textarea id="solicitud-observaciones" rows="2" placeholder="Detalles adicionales..."></textarea>
+
+                    <button class="sexp-submit-btn" id="btn-enviar-solicitud" disabled>
+                        <i class="bi bi-send"></i> Enviar Solicitud
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script src="{% static 'core/scripts/s_exp/buscador_carrito.js' %}"></script>
+{% endblock extra_js %}

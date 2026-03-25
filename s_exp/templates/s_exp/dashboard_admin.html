@@ -1,0 +1,138 @@
+{% extends 'core/base.html' %}
+{% load static %}
+{% load permisos_unidad %}
+
+{% block title %}Dashboard Expedientes{% endblock title %}
+
+{% block extra_css %}
+<style>
+    .sexp-dashboard { display:flex; flex-direction:column; gap:1.5rem; }
+
+    .sexp-kpi-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(200px,1fr)); gap:1rem; }
+    .sexp-kpi-card {
+        background-color: var(--blanco);
+        border-radius: 1rem; padding: 1.2rem;
+        display: flex; flex-direction: column; gap: 0.5rem;
+        border-left: 4px solid var(--kpi-color, #6366f1);
+        transition: transform .2s; color: var(--colorTablacelda);
+    }
+    .sexp-kpi-card:hover { transform: translateY(-2px); }
+    .sexp-kpi-card__valor { font-size: 2rem; font-weight: 700; color: var(--kpi-color, #6366f1); }
+    .sexp-kpi-card__titulo { font-size: 0.85rem; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.05em; }
+    .sexp-kpi-card--disponible { --kpi-color: #22c55e; }
+    .sexp-kpi-card--prestado { --kpi-color: #f59e0b; }
+    .sexp-kpi-card--pendiente { --kpi-color: #6366f1; }
+    .sexp-kpi-card--vencido { --kpi-color: #ef4444; }
+    .sexp-kpi-card--parcial { --kpi-color: #f97316; }
+    .sexp-kpi-card--proximo { --kpi-color: #eab308; }
+    .sexp-kpi-card--total { --kpi-color: #8b5cf6; }
+    .sexp-kpi-card--baja { --kpi-color: #64748b; }
+
+    /* Nav sub-módulos */
+    .sexp-nav-modulos { display:flex; gap:0.8rem; flex-wrap:wrap; margin-bottom:1rem; }
+    .sexp-nav-link {
+        padding: 0.6rem 1.2rem; border-radius: 1rem;
+        background-color: var(--blanco); border: 1px solid var(--colorLinea);
+        text-decoration: none; color: var(--colorTablacelda);
+        display: flex; align-items: center; gap: 0.5rem;
+        font-size: 0.9rem; font-family: var(--fuenteCuerpo);
+        transition: background-color .2s, transform .2s;
+    }
+    .sexp-nav-link:hover {
+        background-color: var(--colorMenuHover); color: var(--colorMenuTextoHover);
+        transform: translateY(-1px);
+    }
+    .sexp-nav-link--active {
+        background-color: var(--colorBoton); color: var(--colorTextoBoton);
+        border-color: var(--colorBoton);
+    }
+
+    .sexp-section-title {
+        font-size: 1.1rem; font-weight: 600; margin-bottom: 0.8rem;
+        display: flex; align-items: center; gap: 0.5rem;
+        color: var(--colorTablacelda);
+    }
+
+    .sexp-alerta-tabla { width:100%; border-collapse:collapse; font-size:0.85rem; color: var(--colorTablacelda); }
+    .sexp-alerta-tabla th { text-align:left; padding:0.6rem; opacity:0.7; border-bottom:1px solid var(--colorLinea); }
+    .sexp-alerta-tabla td { padding:0.6rem; border-bottom:1px solid var(--colorLinea); }
+
+    .sexp-badge { padding: 0.25rem 0.6rem; border-radius: 2rem; font-size: 0.75rem; font-weight: 600; }
+    .sexp-badge--vencido { background: rgba(239,68,68,0.15); color: #ef4444; }
+    .sexp-badge--proximo { background: rgba(234,179,8,0.15); color: #eab308; }
+    .sexp-badge--parcial { background: rgba(249,115,22,0.15); color: #f97316; }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<div class="contenedor2">
+    <div class="tituloFormulario" style="margin-bottom: 1.5rem;">
+        <div class="tituloFormulario-texto">
+            <i class="bi bi-folder2-open"></i>
+            <h2 class="sin-margen">Dashboard — Préstamo de Expedientes</h2>
+        </div>
+        <div class="tituloFormulario-subrallado"></div>
+    </div>
+
+    <div class="sexp-nav-modulos">
+        <a href="{% url 's_exp_buscador' %}" class="sexp-nav-link">
+            <i class="bi bi-search"></i> Solicitar Expedientes
+        </a>
+        <a href="{% url 's_exp_seguimiento' %}" class="sexp-nav-link">
+            <i class="bi bi-clock-history"></i> Mis Solicitudes
+        </a>
+        <a href="{% url 's_exp_dashboard' %}" class="sexp-nav-link sexp-nav-link--active">
+            <i class="bi bi-speedometer2"></i> Panel Admin
+        </a>
+        <a href="{% url 's_exp_solicitudes' %}" class="sexp-nav-link">
+            <i class="bi bi-list-check"></i> Gestión Solicitudes
+        </a>
+        <a href="{% url 's_exp_monitoreo' %}" class="sexp-nav-link">
+            <i class="bi bi-binoculars"></i> Monitoreo
+        </a>
+        <a href="{% url 's_exp_devoluciones' %}" class="sexp-nav-link">
+            <i class="bi bi-arrow-return-left"></i> Devoluciones
+        </a>
+        <a href="{% url 's_exp_reportes' %}" class="sexp-nav-link">
+            <i class="bi bi-bar-chart-line"></i> Reportes
+        </a>
+    </div>
+
+    <div class="sexp-dashboard">
+        <div class="sexp-kpi-grid">
+            <div class="sexp-kpi-card sexp-kpi-card--total">
+                <span class="sexp-kpi-card__valor" id="kpi-total">-</span>
+                <span class="sexp-kpi-card__titulo">Total Expedientes</span>
+            </div>
+            <div class="sexp-kpi-card sexp-kpi-card--disponible">
+                <span class="sexp-kpi-card__valor" id="kpi-disponibles">-</span>
+                <span class="sexp-kpi-card__titulo">Disponibles</span>
+            </div>
+            <div class="sexp-kpi-card sexp-kpi-card--prestado">
+                <span class="sexp-kpi-card__valor" id="kpi-prestados">-</span>
+                <span class="sexp-kpi-card__titulo">En Préstamo</span>
+            </div>
+            <div class="sexp-kpi-card sexp-kpi-card--pendiente">
+                <span class="sexp-kpi-card__valor" id="kpi-pendientes">-</span>
+                <span class="sexp-kpi-card__titulo">Solicitudes Pendientes</span>
+            </div>
+            <div class="sexp-kpi-card sexp-kpi-card--vencido">
+                <span class="sexp-kpi-card__valor" id="kpi-vencidos">-</span>
+                <span class="sexp-kpi-card__titulo">Préstamos Vencidos</span>
+            </div>
+            <div class="sexp-kpi-card sexp-kpi-card--proximo">
+                <span class="sexp-kpi-card__valor" id="kpi-proximos">-</span>
+                <span class="sexp-kpi-card__titulo">Próximos a Vencer</span>
+            </div>
+            <div class="sexp-kpi-card sexp-kpi-card--parcial">
+                <span class="sexp-kpi-card__valor" id="kpi-parciales">-</span>
+                <span class="sexp-kpi-card__titulo">Devoluciones Parciales</span>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script src="{% static 'core/scripts/s_exp/dashboard.js' %}"></script>
+{% endblock extra_js %}

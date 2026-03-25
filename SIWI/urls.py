@@ -29,5 +29,6 @@ urlpatterns = [
     path('imagenologia/',include('imagenologia.urls')),
     path('referencia/',include('referencia.urls')),
     path('clinico/',include('clinico.urls')),
+    path('s_exp/',include('s_exp.urls')),
     path('admin/', admin.site.urls),
 ]

@@ -66,3 +66,22 @@ def tiene_unidad(user, unidades_str):
             return True
 
     return False
+
+
+@register.filter
+def en_grupo(user, grupos_str):
+    """
+    Verifica si el usuario pertenece a alguno de los grupos indicados.
+    Uso:
+        user|en_grupo:"Solicitantes"
+        user|en_grupo:"Solicitantes:Exp_Administradores"
+    Superusuarios y staff siempre retornan True.
+    """
+    if not user.is_authenticated:
+        return False
+
+    if user.is_superuser or user.is_staff:
+        return True
+
+    grupos = [g.strip() for g in grupos_str.split(':') if g.strip()]
+    return user.groups.filter(name__in=grupos).exists()

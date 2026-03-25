@@ -1,0 +1,246 @@
+{% extends 'core/base.html' %}
+{% load static %}
+{% load permisos_unidad %}
+
+{% block title %}Control de Devoluciones{% endblock title %}
+
+{% block extra_css %}
+<style>
+    .sexp-dev-card {
+        background-color: var(--blanco);
+        border-radius: 1rem; padding: 1.2rem; margin-bottom: 1rem;
+        border-left: 4px solid #6366f1;
+        color: var(--colorTablacelda);
+    }
+    .sexp-dev-card--vencido { border-left-color: #ef4444; }
+    .sexp-dev-card--parcial { border-left-color: #f97316; }
+
+    .sexp-dev-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:0.8rem; }
+    .sexp-dev-header h3 { margin:0; font-size:1rem; }
+
+    .sexp-dev-info {
+        display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+        gap:0.5rem; margin-bottom:0.8rem; font-size:0.85rem;
+    }
+    .sexp-dev-info span { opacity:0.7; }
+
+    .sexp-dev-actions { display:flex; gap:0.5rem; flex-wrap:wrap; }
+    .sexp-dev-btn {
+        padding: 0.5rem 1rem; border-radius: 1rem; border: none;
+        cursor: pointer; font-size: 0.85rem; font-weight: 600;
+        display: flex; align-items: center; gap: 0.3rem; transition: all .2s;
+        font-family: var(--fuenteCuerpo);
+    }
+    .sexp-dev-btn--completa { background: #22c55e; color: #fff; }
+    .sexp-dev-btn--completa:hover { opacity: 0.85; }
+    .sexp-dev-btn--parcial { background: #f59e0b; color: #000; }
+    .sexp-dev-btn--parcial:hover { opacity: 0.85; }
+
+    .sexp-exp-tag {
+        background: rgba(99,102,241,0.15); color: #6366f1;
+        padding: 0.2rem 0.5rem; border-radius: 0.4rem;
+        font-size: 0.75rem; font-weight: 600; display: inline-block;
+    }
+    .sexp-badge {
+        padding: 0.25rem 0.6rem; border-radius: 2rem;
+        font-size: 0.75rem; font-weight: 600;
+    }
+    .sexp-badge--vencido { background: rgba(239,68,68,0.15); color: #ef4444; }
+    .sexp-badge--normal { background: rgba(99,102,241,0.15); color: #6366f1; }
+
+    /* Nav sub-módulos */
+    .sexp-nav-modulos { display:flex; gap:0.8rem; flex-wrap:wrap; margin-bottom:1rem; }
+    .sexp-nav-link {
+        padding: 0.6rem 1.2rem; border-radius: 1rem;
+        background-color: var(--blanco); border: 1px solid var(--colorLinea);
+        text-decoration: none; color: var(--colorTablacelda);
+        display: flex; align-items: center; gap: 0.5rem;
+        font-size: 0.9rem; font-family: var(--fuenteCuerpo);
+        transition: background-color .2s, transform .2s;
+    }
+    .sexp-nav-link:hover {
+        background-color: var(--colorMenuHover); color: var(--colorMenuTextoHover);
+        transform: translateY(-1px);
+    }
+    .sexp-nav-link--active {
+        background-color: var(--colorBoton); color: var(--colorTextoBoton);
+        border-color: var(--colorBoton);
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<div class="contenedor2">
+    <div class="tituloFormulario" style="margin-bottom: 1.5rem;">
+        <div class="tituloFormulario-texto">
+            <i class="bi bi-arrow-return-left"></i>
+            <h2 class="sin-margen">Control de Devoluciones</h2>
+        </div>
+        <div class="tituloFormulario-subrallado"></div>
+    </div>
+
+    <div class="sexp-nav-modulos">
+        <a href="{% url 's_exp_buscador' %}" class="sexp-nav-link">
+            <i class="bi bi-search"></i> Solicitar Expedientes
+        </a>
+        <a href="{% url 's_exp_seguimiento' %}" class="sexp-nav-link">
+            <i class="bi bi-clock-history"></i> Mis Solicitudes
+        </a>
+        <a href="{% url 's_exp_dashboard' %}" class="sexp-nav-link">
+            <i class="bi bi-speedometer2"></i> Panel Admin
+        </a>
+        <a href="{% url 's_exp_solicitudes' %}" class="sexp-nav-link">
+            <i class="bi bi-list-check"></i> Gestión Solicitudes
+        </a>
+        <a href="{% url 's_exp_monitoreo' %}" class="sexp-nav-link">
+            <i class="bi bi-binoculars"></i> Monitoreo
+        </a>
+        <a href="{% url 's_exp_devoluciones' %}" class="sexp-nav-link sexp-nav-link--active">
+            <i class="bi bi-arrow-return-left"></i> Devoluciones
+        </a>
+        <a href="{% url 's_exp_reportes' %}" class="sexp-nav-link">
+            <i class="bi bi-bar-chart-line"></i> Reportes
+        </a>
+    </div>
+
+    <div id="lista-devoluciones">
+        <p style="opacity:0.5; text-align:center;">Cargando préstamos pendientes de devolución...</p>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    cargarDevoluciones();
+});
+
+function cargarDevoluciones() {
+    $.ajax({
+        url: window.urls.s_exp_prestamos_devolucion_api,
+        method: 'GET',
+        success: function(resp) {
+            renderDevoluciones(resp.data);
+        },
+        error: function() {
+            toastr.error("Error al cargar las devoluciones");
+        }
+    });
+}
+
+function renderDevoluciones(data) {
+    const container = $('#lista-devoluciones');
+    if (!data.length) {
+        container.html('<p style="opacity:0.5; text-align:center;">No hay préstamos pendientes de devolución.</p>');
+        return;
+    }
+
+    let html = '';
+    data.forEach(function(p) {
+        const claseExtra = p.esta_vencido ? 'sexp-dev-card--vencido' : (p.estado === 'DevolucionParcial' ? 'sexp-dev-card--parcial' : '');
+        const exps = p.expedientes.map(n => `<span class="sexp-exp-tag">#${n}</span>`).join(' ');
+        const badgeClass = p.esta_vencido ? 'sexp-badge--vencido' : 'sexp-badge--normal';
+
+        html += `
+        <div class="sexp-dev-card ${claseExtra}">
+            <div class="sexp-dev-header">
+                <h3><i class="bi bi-box-seam"></i> Préstamo #${p.id}</h3>
+                <span class="sexp-badge ${badgeClass}">${p.estado}</span>
+            </div>
+            <div class="sexp-dev-info">
+                <div><span>Usuario:</span> ${p.usuario_nombre}</div>
+                <div><span>Expedientes:</span> ${p.cant_expedientes}</div>
+                <div><span>Devueltos:</span> ${p.cant_devueltos}</div>
+                <div><span>Pendientes:</span> ${p.cant_pendientes}</div>
+            </div>
+            <div style="margin-bottom:0.8rem;">${exps}</div>
+            <div class="sexp-dev-actions">
+                <button class="sexp-dev-btn sexp-dev-btn--completa" onclick="procesarDevolucion(${p.id}, ${p.cant_pendientes}, true)">
+                    <i class="bi bi-check-circle"></i> Devolución Completa (${p.cant_pendientes})
+                </button>
+                <button class="sexp-dev-btn sexp-dev-btn--parcial" onclick="procesarDevolucion(${p.id}, ${p.cant_pendientes}, false)">
+                    <i class="bi bi-exclamation-triangle"></i> Devolución Parcial
+                </button>
+            </div>
+        </div>`;
+    });
+    container.html(html);
+}
+
+function procesarDevolucion(prestamoId, maxPendientes, esCompleta) {
+    if (esCompleta) {
+        Swal.fire({
+            title: 'Confirmar Devolución Completa',
+            html: `<p>¿Confirma que se recibieron los <b>${maxPendientes}</b> expediente(s) pendientes?</p>
+                   <div style="margin-top:1rem;">
+                       <label style="display:block;margin-bottom:0.3rem;font-weight:600;">Notas (opcional)</label>
+                       <textarea id="swal-notas" rows="2" style="width:100%;padding:0.5rem;border-radius:6px;border:1px solid #ccc;"></textarea>
+                   </div>`,
+            showCancelButton: true,
+            confirmButtonText: 'Confirmar',
+            cancelButtonText: 'Cancelar',
+            confirmButtonColor: '#22c55e',
+            preConfirm: () => ({ notas: document.getElementById('swal-notas').value })
+        }).then((result) => {
+            if (result.isConfirmed) {
+                enviarDevolucion(prestamoId, maxPendientes, result.value.notas);
+            }
+        });
+    } else {
+        Swal.fire({
+            title: 'Devolución Parcial',
+            html: `<div style="margin-bottom:1rem;">
+                       <label style="display:block;margin-bottom:0.3rem;font-weight:600;">Cantidad recibida (máx ${maxPendientes})</label>
+                       <input type="number" id="swal-cantidad" min="1" max="${maxPendientes}" value="1" style="width:100%;padding:0.5rem;border-radius:6px;border:1px solid #ccc;">
+                   </div>
+                   <div>
+                       <label style="display:block;margin-bottom:0.3rem;font-weight:600;">Notas (obligatorio)</label>
+                       <textarea id="swal-notas" rows="3" placeholder="Detalle los expedientes faltantes..." style="width:100%;padding:0.5rem;border-radius:6px;border:1px solid #ccc;"></textarea>
+                   </div>`,
+            showCancelButton: true,
+            confirmButtonText: 'Registrar',
+            cancelButtonText: 'Cancelar',
+            confirmButtonColor: '#f59e0b',
+            preConfirm: () => {
+                const cant = parseInt(document.getElementById('swal-cantidad').value);
+                const notas = document.getElementById('swal-notas').value.trim();
+                if (!notas) { Swal.showValidationMessage('Las notas son obligatorias para devoluciones parciales'); return false; }
+                if (cant < 1 || cant > maxPendientes) { Swal.showValidationMessage(`Cantidad debe ser entre 1 y ${maxPendientes}`); return false; }
+                return { cantidad: cant, notas: notas };
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                enviarDevolucion(prestamoId, result.value.cantidad, result.value.notas);
+            }
+        });
+    }
+}
+
+function enviarDevolucion(prestamoId, cantidad, notas) {
+    $.ajax({
+        url: window.urls.s_exp_procesar_devolucion_api,
+        method: 'POST',
+        headers: { 'X-CSRFToken': window.CSRF_TOKEN },
+        contentType: 'application/json',
+        data: JSON.stringify({
+            prestamo_id: prestamoId,
+            cantidad_recibida: cantidad,
+            notas: notas || ''
+        }),
+        success: function(resp) {
+            if (resp.success) {
+                const msg = resp.estado === 'Completa'
+                    ? 'Devolución completa registrada exitosamente.'
+                    : `Devolución parcial registrada. Faltan ${resp.pendientes} expediente(s).`;
+                toastr.success(msg);
+                cargarDevoluciones();
+            }
+        },
+        error: function(xhr) {
+            const err = xhr.responseJSON ? xhr.responseJSON.error : 'Error desconocido';
+            toastr.error(err);
+        }
+    });
+}
+</script>
+{% endblock extra_js %}

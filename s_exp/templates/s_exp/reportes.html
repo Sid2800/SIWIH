@@ -1,0 +1,211 @@
+{% extends 'core/base.html' %}
+{% load static %}
+{% load permisos_unidad %}
+
+{% block title %}Reportes S_EXP{% endblock title %}
+
+{% block extra_css %}
+<style>
+    .sexp-reportes-filtros {
+        background-color: var(--blanco);
+        border-radius: 1rem; padding: 1.2rem; margin-bottom: 1.5rem;
+        display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end;
+        border: 1px solid var(--colorLinea);
+        color: var(--colorTablacelda);
+    }
+    .sexp-filtro-grupo { display:flex; flex-direction:column; gap:0.3rem; }
+    .sexp-filtro-grupo label { font-size:0.8rem; font-weight:600; opacity:0.7; }
+    .sexp-filtro-grupo input, .sexp-filtro-grupo select {
+        padding: 0.5rem; border-radius: 0.6rem;
+        border: 1px solid var(--colorLinea);
+        background-color: var(--blanco); color: var(--colorTablacelda);
+        font-size: 0.85rem; font-family: var(--fuenteCuerpo);
+    }
+    .sexp-filtro-btn {
+        padding: 0.5rem 1.2rem; border-radius: 1rem; border: none;
+        background-color: var(--colorBoton); color: var(--colorTextoBoton);
+        cursor: pointer; font-weight: 600; font-size: 0.85rem;
+        transition: all .2s; font-family: var(--fuenteCuerpo);
+    }
+    .sexp-filtro-btn:hover { opacity: 0.85; }
+    .sexp-filtro-btn--export { background: #22c55e; color: #fff; }
+    .sexp-filtro-btn--export:hover { opacity: 0.85; }
+
+    .sexp-reportes-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(350px,1fr)); gap:1.5rem; }
+    .sexp-reporte-card {
+        background-color: var(--blanco);
+        border-radius: 1rem; padding: 1.2rem;
+        border: 1px solid var(--colorLinea);
+        color: var(--colorTablacelda);
+    }
+    .sexp-reporte-card h3 { margin:0 0 1rem; font-size:1rem; display:flex; align-items:center; gap:0.5rem; }
+    .sexp-reporte-tabla { width:100%; border-collapse:collapse; font-size:0.85rem; color: var(--colorTablacelda); }
+    .sexp-reporte-tabla th { text-align:left; padding:0.5rem; opacity:0.7; border-bottom:1px solid var(--colorLinea); }
+    .sexp-reporte-tabla td { padding:0.5rem; border-bottom:1px solid var(--colorLinea); }
+
+    .sexp-tabs { display:flex; gap:0; margin-bottom:1.5rem; }
+    .sexp-tab {
+        padding: 0.6rem 1.2rem; border: none; cursor: pointer;
+        background: transparent; color: var(--colorTablacelda);
+        font-size: 0.9rem; font-family: var(--fuenteCuerpo);
+        border-bottom: 2px solid transparent; transition: all .2s;
+    }
+    .sexp-tab:hover { border-bottom-color: var(--colorLinea); }
+    .sexp-tab.active { border-bottom-color: var(--colorBoton); font-weight: 600; }
+    .sexp-tab-content { display:none; }
+    .sexp-tab-content.active { display:block; }
+
+    /* Nav sub-módulos */
+    .sexp-nav-modulos { display:flex; gap:0.8rem; flex-wrap:wrap; margin-bottom:1rem; }
+    .sexp-nav-link {
+        padding: 0.6rem 1.2rem; border-radius: 1rem;
+        background-color: var(--blanco); border: 1px solid var(--colorLinea);
+        text-decoration: none; color: var(--colorTablacelda);
+        display: flex; align-items: center; gap: 0.5rem;
+        font-size: 0.9rem; font-family: var(--fuenteCuerpo);
+        transition: background-color .2s, transform .2s;
+    }
+    .sexp-nav-link:hover {
+        background-color: var(--colorMenuHover); color: var(--colorMenuTextoHover);
+        transform: translateY(-1px);
+    }
+    .sexp-nav-link--active {
+        background-color: var(--colorBoton); color: var(--colorTextoBoton);
+        border-color: var(--colorBoton);
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<div class="contenedor2">
+    <div class="tituloFormulario" style="margin-bottom: 1.5rem;">
+        <div class="tituloFormulario-texto">
+            <i class="bi bi-bar-chart-line"></i>
+            <h2 class="sin-margen">Reportes — Préstamo de Expedientes</h2>
+        </div>
+        <div class="tituloFormulario-subrallado"></div>
+    </div>
+
+    <div class="sexp-nav-modulos">
+        <a href="{% url 's_exp_buscador' %}" class="sexp-nav-link">
+            <i class="bi bi-search"></i> Solicitar Expedientes
+        </a>
+        <a href="{% url 's_exp_seguimiento' %}" class="sexp-nav-link">
+            <i class="bi bi-clock-history"></i> Mis Solicitudes
+        </a>
+        <a href="{% url 's_exp_dashboard' %}" class="sexp-nav-link">
+            <i class="bi bi-speedometer2"></i> Panel Admin
+        </a>
+        <a href="{% url 's_exp_solicitudes' %}" class="sexp-nav-link">
+            <i class="bi bi-list-check"></i> Gestión Solicitudes
+        </a>
+        <a href="{% url 's_exp_monitoreo' %}" class="sexp-nav-link">
+            <i class="bi bi-binoculars"></i> Monitoreo
+        </a>
+        <a href="{% url 's_exp_devoluciones' %}" class="sexp-nav-link">
+            <i class="bi bi-arrow-return-left"></i> Devoluciones
+        </a>
+        <a href="{% url 's_exp_reportes' %}" class="sexp-nav-link sexp-nav-link--active">
+            <i class="bi bi-bar-chart-line"></i> Reportes
+        </a>
+    </div>
+
+    <!-- Filtros -->
+    <div class="sexp-reportes-filtros">
+        <div class="sexp-filtro-grupo">
+            <label>Fecha Inicio</label>
+            <input type="date" id="filtro-fecha-inicio">
+        </div>
+        <div class="sexp-filtro-grupo">
+            <label>Fecha Fin</label>
+            <input type="date" id="filtro-fecha-fin">
+        </div>
+        <div class="sexp-filtro-grupo">
+            <label>Rango Rápido</label>
+            <select id="filtro-rango">
+                <option value="">Personalizado</option>
+                <option value="diario">Hoy</option>
+                <option value="semanal">Esta Semana</option>
+                <option value="mensual" selected>Este Mes</option>
+                <option value="trimestral">Este Trimestre</option>
+                <option value="semestral">Este Semestre</option>
+                <option value="anual">Este Año</option>
+            </select>
+        </div>
+        <button class="sexp-filtro-btn" id="btn-generar-reporte">
+            <i class="bi bi-funnel"></i> Generar
+        </button>
+    </div>
+
+    <!-- Tabs -->
+    <div class="sexp-tabs">
+        <button class="sexp-tab active" data-tab="movimiento">
+            <i class="bi bi-graph-up"></i> Movimiento
+        </button>
+        <button class="sexp-tab" data-tab="incidencias">
+            <i class="bi bi-exclamation-triangle"></i> Incidencias y Auditoría
+        </button>
+    </div>
+
+    <!-- Tab: Movimiento -->
+    <div class="sexp-tab-content active" id="tab-movimiento">
+        <div class="sexp-reportes-grid">
+            <div class="sexp-reporte-card">
+                <h3><i class="bi bi-bar-chart"></i> Volumen de Préstamos</h3>
+                <div id="reporte-volumen" style="text-align:center; padding:1rem; opacity:0.5;">
+                    Presione "Generar" para cargar datos.
+                </div>
+            </div>
+            <div class="sexp-reporte-card">
+                <h3><i class="bi bi-building"></i> Demanda por Área</h3>
+                <div id="reporte-areas">
+                    <table class="sexp-reporte-tabla">
+                        <thead><tr><th>Área</th><th>Solicitudes</th></tr></thead>
+                        <tbody id="tbody-areas"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="sexp-reporte-card">
+                <h3><i class="bi bi-pie-chart"></i> Motivos de Uso</h3>
+                <div id="reporte-motivos">
+                    <table class="sexp-reporte-tabla">
+                        <thead><tr><th>Motivo</th><th>Cantidad</th></tr></thead>
+                        <tbody id="tbody-motivos"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab: Incidencias -->
+    <div class="sexp-tab-content" id="tab-incidencias">
+        <div class="sexp-reportes-grid">
+            <div class="sexp-reporte-card">
+                <h3><i class="bi bi-alarm" style="color:#ef4444;"></i> Morosidad</h3>
+                <table class="sexp-reporte-tabla">
+                    <thead><tr><th>Préstamo</th><th>Usuario</th><th>Área</th><th>Días Vencido</th></tr></thead>
+                    <tbody id="tbody-morosidad"></tbody>
+                </table>
+            </div>
+            <div class="sexp-reporte-card">
+                <h3><i class="bi bi-exclamation-circle" style="color:#f97316;"></i> Inconsistencias</h3>
+                <table class="sexp-reporte-tabla">
+                    <thead><tr><th>Préstamo</th><th>Usuario</th><th>Total</th><th>Devueltos</th><th>Faltantes</th></tr></thead>
+                    <tbody id="tbody-inconsistencias"></tbody>
+                </table>
+            </div>
+            <div class="sexp-reporte-card">
+                <h3><i class="bi bi-x-circle" style="color:#ef4444;"></i> Trazabilidad de Rechazos</h3>
+                <table class="sexp-reporte-tabla">
+                    <thead><tr><th>Solicitud</th><th>Usuario</th><th>Fecha</th><th>Motivo</th></tr></thead>
+                    <tbody id="tbody-rechazos"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script src="{% static 'core/scripts/s_exp/reportes.js' %}"></script>
+{% endblock extra_js %}

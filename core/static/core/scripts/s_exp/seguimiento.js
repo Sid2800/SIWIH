@@ -1,0 +1,136 @@
+/**
+ * Seguimiento de Solicitudes - s_exp
+ * Muestra las solicitudes del usuario con timeline visual.
+ */
+$(document).ready(function () {
+    cargarMisSolicitudes();
+    // Refresco cada 30 segundos
+    setInterval(cargarMisSolicitudes, 30000);
+});
+
+function cargarMisSolicitudes() {
+    $.ajax({
+        url: window.urls.s_exp_mis_solicitudes_api,
+        method: 'GET',
+        success: function (resp) {
+            renderSolicitudes(resp.data);
+        },
+        error: function () {
+            toastr.error("Error al cargar solicitudes");
+        }
+    });
+}
+
+function renderSolicitudes(data) {
+    const container = $('#timeline-solicitudes');
+
+    if (!data.length) {
+        container.html('<p style="opacity:0.5; text-align:center;">No tiene solicitudes registradas. <a href="' + window.urls.s_exp_buscador + '" style="color:#6366f1;">Crear una nueva</a></p>');
+        return;
+    }
+
+    let html = '';
+    data.forEach(function (s) {
+        const claseEstado = s.estado_flujo.toLowerCase().replace(/\s/g, '');
+        const badgeEstilos = {
+            'pendiente': 'background:rgba(99,102,241,0.2);color:#a5b4fc;',
+            'aprobado': 'background:rgba(34,197,94,0.2);color:#22c55e;',
+            'rechazado': 'background:rgba(239,68,68,0.2);color:#ef4444;',
+            'enprestamo': 'background:rgba(245,158,11,0.2);color:#f59e0b;',
+            'devuelto': 'background:rgba(100,116,139,0.2);color:#94a3b8;',
+            'devolucionparcial': 'background:rgba(249,115,22,0.2);color:#f97316;'
+        };
+        const borderColors = {
+            'pendiente': '#6366f1',
+            'aprobado': '#22c55e',
+            'rechazado': '#ef4444',
+            'enprestamo': '#f59e0b',
+            'devuelto': '#64748b',
+            'devolucionparcial': '#f97316'
+        };
+
+        const exps = s.expedientes.map(n => `<span class="sexp-exp-tag">#${n}</span>`).join(' ');
+        const badgeEstilo = badgeEstilos[claseEstado] || '';
+        const borderColor = borderColors[claseEstado] || '#6366f1';
+
+        html += `
+        <div class="sexp-sol-card" style="border-left-color:${borderColor};">
+            <div class="sexp-sol-header">
+                <h3><i class="bi bi-file-text"></i> Solicitud #${s.id}</h3>
+                <span class="sexp-sol-badge" style="${badgeEstilo}padding:0.25rem 0.8rem;border-radius:20px;font-size:0.75rem;font-weight:700;">${s.estado_flujo}</span>
+            </div>
+            <div class="sexp-sol-info">
+                <div><label>Fecha</label>${s.fecha_creacion}</div>
+                <div><label>Motivo</label>${s.motivo}</div>
+                <div><label>Área</label>${s.area_destino || '-'}</div>
+                <div><label>Expedientes</label>${s.cant_expedientes}</div>
+            </div>
+            <div class="sexp-sol-exps">${exps}</div>`;
+
+        // Info del préstamo si existe
+        if (s.prestamo) {
+            const p = s.prestamo;
+            if (p.motivo_rechazo) {
+                html += `<div class="sexp-sol-rechazo"><i class="bi bi-x-circle" style="color:#ef4444;"></i> <strong>Motivo de rechazo:</strong> ${p.motivo_rechazo}</div>`;
+            }
+            if (p.estado === 'Entregado' || p.estado === 'Vencido' || p.estado === 'DevolucionParcial') {
+                // Timer
+                if (p.tiempo_restante_segundos !== null) {
+                    const timerClass = p.esta_vencido ? 'color:#ef4444;' : (p.porcentaje_tiempo_usado >= 90 ? 'color:#eab308;' : 'color:#22c55e;');
+                    let timerText = '';
+                    if (p.esta_vencido) {
+                        timerText = 'VENCIDO';
+                    } else {
+                        const h = Math.floor(p.tiempo_restante_segundos / 3600);
+                        const m = Math.floor((p.tiempo_restante_segundos % 3600) / 60);
+                        timerText = `${h}h ${m}m restantes`;
+                    }
+                    html += `<div class="sexp-sol-timer" style="${timerClass}"><i class="bi bi-clock"></i> ${timerText}</div>`;
+                }
+
+                // Botón devolver
+                html += `<button class="sexp-devolver-btn" onclick="solicitarDevolucion(${p.id})">
+                    <i class="bi bi-arrow-return-left"></i> Solicitar Devolución
+                </button>`;
+            }
+            if (p.comentarios) {
+                html += `<div style="margin-top:0.5rem;font-size:0.8rem;opacity:0.7;"><i class="bi bi-chat-text"></i> ${p.comentarios}</div>`;
+            }
+        }
+
+        html += `</div>`;
+    });
+
+    container.html(html);
+}
+
+function solicitarDevolucion(prestamoId) {
+    Swal.fire({
+        title: 'Solicitar Devolución',
+        text: '¿Desea iniciar el proceso de devolución de los expedientes? Presente los expedientes al administrador.',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, Devolver',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#f59e0b'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.ajax({
+                url: window.urls.s_exp_solicitar_devolucion_api,
+                method: 'POST',
+                headers: { 'X-CSRFToken': window.CSRF_TOKEN },
+                contentType: 'application/json',
+                data: JSON.stringify({ prestamo_id: prestamoId }),
+                success: function (resp) {
+                    if (resp.success) {
+                        toastr.success(resp.mensaje);
+                    }
+                },
+                error: function (xhr) {
+                    const err = xhr.responseJSON ? xhr.responseJSON.error : 'Error desconocido';
+                    toastr.error(err);
+                }
+            });
+        }
+    });
+}

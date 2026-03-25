@@ -84,3 +84,16 @@ REFERENCIA_EDITOR_UNIDADES = ['Referencia']
 # Acceso de solo visualización / edición parcial (Edit, Listar)
 REFERENCIA_VISUALIZACION_ROLES = ["admin", "digitador", "auditor"]
 REFERENCIA_VISUALIZACION_UNIDADES = ["Referencia", "DIRECTIVOS"]
+
+
+# -----------------------------
+# PERMISOS APP S_EXP
+# -----------------------------
+
+# Acceso de administración (aprobar, rechazar, monitorear, devoluciones, reportes)
+S_EXP_ADMIN_ROLES = ['exp_admin', 'admin']
+S_EXP_ADMIN_UNIDADES = ['Admision', 'DIRECTIVOS']
+
+# Acceso de usuario solicitante (buscar, solicitar, seguimiento)
+S_EXP_USUARIO_ROLES = ['exp_admin', 'exp_solicitante', 'admin']
+S_EXP_USUARIO_UNIDADES = ['Admision', 'DIRECTIVOS', 'Sala', 'Imagenologia', 'Referencia']

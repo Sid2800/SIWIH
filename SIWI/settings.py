@@ -59,7 +59,8 @@ INSTALLED_APPS = [
     'imagenologia',
     'referencia',
     'clinico',
-    'usuario'
+    'usuario',
+    's_exp'
 
 
 ]
@@ -224,12 +225,26 @@ LOGGING = {
             "formatter": "standard",
             "level": "INFO",
         },
+
+        "s_exp_file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": LOG_DIR / "s_exp.log",
+            "maxBytes": 1024 * 1024 * 10,  # 10MB
+            "backupCount": 5,
+            "formatter": "standard",
+            "level": "DEBUG",
+        },
     },
 
     "loggers": {
         "siwi": {
             "handlers": ["console", "siwi_file"],
             "level": "INFO",
+            "propagate": False,
+        },
+        "s_exp": {
+            "handlers": ["console", "s_exp_file"],
+            "level": "DEBUG",
             "propagate": False,
         },
     },
