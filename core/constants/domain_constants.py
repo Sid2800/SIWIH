@@ -14,6 +14,11 @@ class AccionEstudio(str, Enum):
     KEEP = "KEEP"
     DELETE = "DELETE"
 
+class UsoDependencia(str, Enum):
+    GENERAL = "general"
+    DEFUNCION = "defuncion"
+    OBITO = "obito"
+
 class LogApp:
     GENERAL = "general"
     PACIENTE = "paciente"
@@ -27,6 +32,7 @@ class LogApp:
     REPLICACION = "replicacion"
     EXPEDIENTE = "expediente"
     ATENCION = "atencion"
+
 
 
 # Salas excluidas para reportes / lógica clínica
@@ -55,4 +61,15 @@ SERVICIOS_AUX_EXTERNOS = [
     4   # otros hospitales
 ]
 
+
+# Indicadores de edad
+INDICADOR_DIAS = "2"
+INDICADOR_MESES = "3"
+INDICADOR_ANIOS = "4"
+
+# Rango edad fértil
+EDAD_FERTIL_MIN = 10
+EDAD_FERTIL_MAX = 49
+
+GENERO_FEMENINO = "M"
 

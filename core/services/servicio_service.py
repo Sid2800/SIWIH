@@ -146,10 +146,25 @@ class ServicioService:
     ojo a la variable que excluye ciertas salas
     """
     @staticmethod    
-    def obtener_dependencias(incluir_externo=True):
+    def obtener_dependencias(incluir_externo=True, solo_emergencia=False):
+
+
         salas_excluidas = SALAS_EXCLUIDAS
 
         serv_auxiliares_externos = [] if incluir_externo else SERVICIOS_AUX_EXTERNOS
+
+        def _especialidades_por_servicio(servicio_id, tipo):
+            return (
+                modelosServicio.Especialidad.objects
+                .filter(estado=1, servicio_id=servicio_id)
+                .annotate(
+                    tipo=Value(tipo, output_field=CharField()),
+                    nombre=F('nombre_especialidad'),
+                    origen=Value('ESPECIALIDAD', output_field=CharField()),
+                    clave=Concat(Value('E-'), F('id'), output_field=CharField())
+                )
+                .values('clave', 'nombre', 'tipo', 'origen')
+            )
 
         # Salas hospitalarias activas (excluyendo las no seleccionables)
         salas = (
@@ -165,29 +180,17 @@ class ServicioService:
             .values('clave', 'nombre', 'tipo', 'origen')
         )
 
-        # Especialidades servicio 50 consulta externa
-        especialidades = modelosServicio.Especialidad.objects.filter(estado=1, servicio_id=50).annotate(
-            tipo=Value('CEXT', output_field=CharField()),
-            nombre=F('nombre_especialidad'),
-            origen=Value('ESPECIALIDAD', output_field=CharField()),
-            clave=Concat(Value('E-'), F('id'), output_field=CharField())
-        ).values('clave', 'nombre', 'tipo', 'origen')
+        especialidades = []
 
         # Especialidades emergencia servicio 1000 emercia
-        especialidadesE = modelosServicio.Especialidad.objects.filter(estado=1, servicio_id=1000).annotate(
-            tipo=Value('EMERG', output_field=CharField()),
-            nombre=F('nombre_especialidad'),
-            origen=Value('ESPECIALIDAD', output_field=CharField()),
-            clave=Concat(Value('E-'), F('id'), output_field=CharField())
-        ).values('clave', 'nombre', 'tipo', 'origen')
+        especialidades.append(_especialidades_por_servicio(1000, 'EMERG'))
 
-        # Especialidades emergencia servicio 700 obstetricia
-        especialidadesO = modelosServicio.Especialidad.objects.filter(estado=1, servicio_id=700).annotate(
-            tipo=Value('OBS', output_field=CharField()),
-            nombre=F('nombre_especialidad'),
-            origen=Value('ESPECIALIDAD', output_field=CharField()),
-            clave=Concat(Value('E-'), F('id'), output_field=CharField())
-        ).values('clave', 'nombre', 'tipo', 'origen')
+        if not solo_emergencia:
+            # Especialidades servicio 50 consulta externa
+            especialidades.append(_especialidades_por_servicio(50, 'CEXT'))
+
+            # Especialidades emergencia servicio 700 obstetricia
+            especialidades.append(_especialidades_por_servicio(700, 'OBS'))
 
         # Servicios auxiliares todos los activos 
         servicios = (modelosServicio.ServiciosAux.objects
@@ -203,11 +206,11 @@ class ServicioService:
         )
 
         # Unir todas las listas
-        dependencias = list(chain(salas, especialidadesE, especialidades, especialidadesO, servicios))
+        especialidades = list(chain(*especialidades))
+        dependencias = list(chain(salas, especialidades, servicios))
 
         return dependencias
     
-
 
     @staticmethod
     def obtener_dependencia_y_campo(clave):
@@ -241,3 +244,38 @@ class ServicioService:
 
         else:
             raise ValidationError("Prefijo no reconocido.")
+        
+
+    @staticmethod
+    def encontrar_dependencia_en_instance(instance, prefijo=""):
+        """
+        prefijo = "" → sala
+        prefijo = "area_refiere_" → area_refiere_sala
+        """
+
+        sala = getattr(instance, f"{prefijo}sala", None)
+        especialidad = getattr(instance, f"{prefijo}especialidad", None)
+        servicio_aux = getattr(instance, f"{prefijo}servicio_auxiliar", None)
+
+        if sala:
+            return {
+                "clave": f"S-{sala.id}",
+                "nombre": sala.nombre_sala,
+                "tipo": "HOSP"
+            }
+
+        elif especialidad:
+            return {
+                "clave": f"E-{especialidad.id}",
+                "nombre": especialidad.nombre_especialidad,
+                "tipo": "CEXT"  # lo dejamos así por ahora ✔️
+            }
+
+        elif servicio_aux:
+            return {
+                "clave": f"A-{servicio_aux.id}",
+                "nombre": servicio_aux.nombre_servicio_a,
+                "tipo": "SAUX"
+            }
+
+        return None

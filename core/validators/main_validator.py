@@ -1,6 +1,8 @@
 
 from django.core.exceptions import ValidationError
 
+
+
 def validar_entero_positivo(valor, nombre_campo="campo"):
     """
     Validador genérico para asegurar que un valor sea un entero >= 1.
@@ -22,3 +24,5 @@ def validar_entero_positivo(valor, nombre_campo="campo"):
         raise ValidationError({nombre_campo: "El valor debe ser mayor o igual a 1."})
 
     return valor
+
+

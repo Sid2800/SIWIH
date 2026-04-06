@@ -84,12 +84,35 @@ async function confirmarAccion(titulo, mensaje, botonAfirmativo = "Aceptar", bot
 }
 
 
+function renderDatosPaciente(containerId, datos = {}) {
+   const header = document.getElementById(containerId);
+
+   if (!header) return;
+   header.innerHTML = "";
+
+   Object.entries(datos).forEach(([label, value]) => {
+
+      const fila = document.createElement("div");
+      fila.className = "modal-dato";
+
+      fila.innerHTML = `
+         <span class="modal-dato-label">${label}</span>
+         <span class="modal-dato-valor">${value || ''}</span>
+      `;
+
+      header.appendChild(fila);
+   });
+}
+
 const API_URLS = {
    obtenerPacienteCenso: urls["obtenerPacienteCenso"],
    busquedaCenso: urls["busquedaCenso"],
    busquedaPaciente: urls["busquedaPaciente"],
    busquedaAvanzada: urls["busquedaAvanzada"],
    obtenerDefuncion: urls["obtenerDefuncion"],
+   guardarDefuncion: urls["guardarDefuncion"],
+   obtenerObito: urls["obtenerObito"],
+   guardarObito: urls["guardarObito"],
    obtenerAtencion:  urls["obtenerAtencion"],
    obtenerPacienteExternoDni: urls["obtenerPacienteExternoDni"],
    validarIngresoActivo: urls["validarIngresoActivo"],
@@ -104,7 +127,9 @@ const API_URLS = {
    obtenerPacienteRegistroDNI: urls["obtenerPacienteRegistroDNI"],
    agregar_ingreso: urls["agregarIngreso"],
    listarEvalucionesrx: urls["listarEvalucionesrx"],
-   obtenerSeguimientoTIC: urls["seguimientoTicObtener"]
+   obtenerSeguimientoTIC: urls["seguimientoTicObtener"],
+   listarObitosPaciente: urls["listarObitosPaciente"],
+   listarDependencias: urls["listarDependencias"],
 };
 
 /**
@@ -945,7 +970,7 @@ async function AgregarSectorModal(id_municipio) {
       title: "Agregar Nuevo Sector",
       html: `
          <form method="post" class="formulario" id="formulario-model-sector">
-            <fieldset class="sectorCamposModal">
+               <fieldset class="sectorCamposModal">
                <legend>Registre los datos de nuevo Sector</legend>
 
                <div class="formularioCampoModalCheck">
@@ -962,7 +987,7 @@ async function AgregarSectorModal(id_municipio) {
                   <label for="SectorDescripcion">Sector</label>
                   <input type="text" id="modal_agregar_sector-descripcion" name="SectorDescripcion" placeholder="SECTOR" class="formularioCampo-text">
                </div>
-            </fieldset>
+               </fieldset>
          </form>
       `,
       showCancelButton: true,
@@ -981,13 +1006,13 @@ async function AgregarSectorModal(id_municipio) {
          const descripcion = document.querySelector('#modal_agregar_sector-descripcion');
 
          if (!aldea.value) {
-            Swal.showValidationMessage('Debe seleccionar una aldea para un sector');
-            return false;
+               Swal.showValidationMessage('Debe seleccionar una aldea para un sector');
+               return false;
          }
 
          if (!descripcion.value.trim()) {
-            Swal.showValidationMessage('La descripción no puede estar en blanco');
-            return false;
+               Swal.showValidationMessage('La descripción no puede estar en blanco');
+               return false;
          }
 
          return true;
@@ -998,7 +1023,7 @@ async function AgregarSectorModal(id_municipio) {
          const selectAldea = $('#modal_agregar_sector-aldea');
 
          if (!selectAldea.hasClass("select2-hidden-accessible")) {
-            selectAldea.select2({
+               selectAldea.select2({
                ajax: {
                   url: urls["aldeaAutocomplete"],
                   dataType: "json",
@@ -1020,7 +1045,7 @@ async function AgregarSectorModal(id_municipio) {
                   searching: () => "Buscando...",
                   noResults: () => "No se encontraron resultados.",
                },
-            });
+               });
          }
 
          // Ajustar botones dentro del modal
@@ -1037,27 +1062,27 @@ async function AgregarSectorModal(id_municipio) {
       try {
          const csrfToken = window.CSRF_TOKEN;
          const response = await fetch(urls["agregarSector"], {
-            method: "POST",
-            headers: {
+               method: "POST",
+               headers: {
                "Content-Type": "application/json",
                "X-CSRFToken": csrfToken
-            },
-            body: JSON.stringify({
+               },
+               body: JSON.stringify({
                zona: zona,
                aldea_id: aldea,
                descripcion_sector: sectorDescripcion.toUpperCase()
-            })
+               })
          });
 
          if (!response.ok) throw new Error(`Error HTTP: ${response.status}`);
 
          const data = await response.json();
          if (data.sector_id) {
-            toastr.success("Sector registrado correctamente.");
-            resultado = data;
-            Swal.close(); // Cerrar la modal manualmente solo en caso de éxito
+               toastr.success("Sector registrado correctamente.");
+               resultado = data;
+               Swal.close(); // Cerrar la modal manualmente solo en caso de éxito
          } else {
-            toastr.error("Existe un problema al registrar el sector.");
+               toastr.error("Existe un problema al registrar el sector.");
          }
       } catch (error) {
          toastr.error("Error al registrar el sector: " + error.message);
@@ -1067,203 +1092,6 @@ async function AgregarSectorModal(id_municipio) {
    return resultado;
 }
 
-/*Agrega una defunción y marca el paciente como difunto*/
-async function AgregarDefuncionModal(paciente, lectura) {
-   let resultado = null;
-
-   const modal = await Swal.fire({
-      title: `Definir como defunción `,
-      html: `
-         <form method="post" class="formulario" id="formulario-model-defuncion">
-            <fieldset class="modalDefuncionCampos">
-               <legend>Paciente: <b>${paciente.nombre} </b></legend>
-
-               <div class="formularioCampoModal">
-                  <label for="fecha_defuncion">Fecha</label>
-                  <input type="date" id="modal-defuncion-fecha" name="fecha_defuncion" class="formularioCampo-date" required
-                  )}>
-               </div>
-               
-               <div class="formularioCampoModal">
-                  <label for="sala">Sala</label>
-                  <select id="modal-defuncion-sala" class="formularioCampo-select" name="sala">
-                     <option value="" disabled selected>Seleccione una sala</option>
-                  </select>
-               </div>
-
-               <div class="formularioCampoModal" id="modal-defuncion-motivo-campo">
-                  <label for="motivo">Motivo</label>
-                  <textarea id="modal-defuncion-motivo" class="formularioCampo-select" name="motivo" rows=2></textarea>
-               </div>
-
-               <input type="hidden" id="modal-defuncion-id" name="idDefuncion">
-            </fieldset>
-
-            <fieldset class="modalDefuncionCampos" id="modal-campos-defuncion-registros" style="display: none;">
-               <legend>Detalles del registro</legend>
-               <div class="formularioCampoModal">
-                  <label for="Fregistro">Registrado</label>
-                  <input type="text" id="modal-defuncion-detalles-registro" class="formularioCampo-text" disabled>
-               </div>
-            </fieldset>
-         </form>
-      `,
-      showCancelButton: true,
-      showCloseButton: true,
-      confirmButtonText: '<i class="bi bi-floppy-fill"></i> Guardar',
-      cancelButtonText: '<i class="bi bi-x-circle-fill"></i> Cancelar',
-      customClass: {
-         popup: 'contener-modal-defuncion',
-         title: 'contener-modal-titulo',
-         confirmButton: 'contener-modal-boton-confirmar',
-         cancelButton: 'contener-modal-boton-cancelar'
-      },
-      preConfirm: () => {
-         
-         const sala = document.getElementById("modal-defuncion-sala").value;
-         const fecha = document.getElementById("modal-defuncion-fecha").value;
-
-         if (!sala) {
-            Swal.showValidationMessage('Debe seleccionar una sala');
-            return false;
-         }
-
-         if (!fecha) {
-            Swal.showValidationMessage('Debe seleccionar una fecha');
-            return false;
-         }
-
-         return true;
-      },
-      didOpen: async function () {
-         const confirmBtn = Swal.getConfirmButton();
-         const titleElement = Swal.getTitle(); 
-         const sala = document.getElementById("modal-defuncion-sala");
-         const fecha = document.getElementById("modal-defuncion-fecha");
-         const motivo = document.getElementById("modal-defuncion-motivo");
-         const idDefuncion = document.getElementById("modal-defuncion-id");
-         const detallesRegistro = document.getElementById("modal-defuncion-detalles-registro");
-         const fieldsetRegistro = document.getElementById("modal-campos-defuncion-registros");
-
-         // Cargar salas desde el backend
-         try {
-            const data = await fetchData(urls["listarSala"]);
-            if (Array.isArray(data) && data.length > 0) {
-               data.forEach(item => {
-                  const option = new Option(
-                     concatenarLimpio(item.nombre_sala, ' | ', item.servicio__nombre_corto),
-                     item.id
-                  );
-                  sala.appendChild(option);
-               });
-            } else {
-               console.warn("No se encontraron salas.");
-            }
-         } catch (error) {
-            console.error("Error al cargar salas:", error);
-         }
-
-         // Inicializar TomSelect
-         const salaSelect = new TomSelect("#modal-defuncion-sala", {
-            placeholder: 'Seleccione una sala',
-            allowEmptyOption: true
-         });
-
-         // Verificar si el paciente ya tiene defunción
-         
-         try {
-            let data = null;
-            if (paciente){
-               data = await fetchData(API_URLS.obtenerDefuncion, { id: paciente.id });
-            }
-
-            if (data && "mensaje" in data) {
-               // No tiene defunción, establecer valores por defecto
-               const hoy = new Date();
-               const hace100Anios = new Date();
-               hace100Anios.setFullYear(hoy.getFullYear() - 100);
-               fecha.min = hace100Anios.toISOString().split('T')[0];
-               fecha.max = hoy.toISOString().split('T')[0];
-               fecha.value = hoy.toISOString().split('T')[0];
-               salaSelect.clear(true);
-            } else if (data) {
-               llenarDefuncion(data);
-            }
-         } catch (error) {
-            console.error(error);
-         }
-
-         function llenarDefuncion(defuncion) {
-            titleElement.textContent ="Actualizar defunción"
-            motivo.value = defuncion.motivo || "";
-            fecha.value = defuncion.fecha || "";
-            idDefuncion.value = defuncion.id || "";
-            detallesRegistro.value = concatenarLimpio(defuncion.registrado, formatFecha(defuncion.fechaAdicion)) || "";
-            fieldsetRegistro.style.display = 'block';
-            if (salaSelect){
-               const nuevaOpcion = { id: defuncion.idSala, text: defuncion.salaNombre };
-               salaSelect.addOption(nuevaOpcion);
-               salaSelect.addItem(defuncion.idSala);
-               
-            }
-
-         }
-
-         // comporobar el modo de uso ose solo lectura
-         if(lectura == true)
-         {
-            motivo.disabled = true;
-            fecha.disabled = true;
-            confirmBtn.style.pointerEvents = "none";
-            salaSelect.disable();
-         }
-
-      }
-   });
-
-   if (modal.isConfirmed) {
-        // Guardamos las referencias a los elementos
-         const sala = document.getElementById("modal-defuncion-sala");
-         const fecha = document.getElementById("modal-defuncion-fecha");
-         const motivo = document.getElementById("modal-defuncion-motivo");
-         const idDefuncion = document.getElementById("modal-defuncion-id");
-
-         try {
-            const csrfToken = window.CSRF_TOKEN;
-            const response = await fetch(urls["guardarDefuncion"], {
-               method: "POST",
-               headers: {
-                  "Content-Type": "application/json",
-                  "X-CSRFToken": csrfToken 
-               },
-               body: JSON.stringify({
-                  sala: sala.value,
-                  fecha: fecha.value,
-                  motivo: motivo.value.toUpperCase(),
-                  idDefuncion: idDefuncion.value,
-                  idPaciente: paciente.id
-               })
-            });
-      
-            if (!response.ok) throw new Error(`Error HTTP: ${response.status}`);
-      
-            const data = await response.json();
-
-            if (data.guardo) {
-               resultado = data;
-               Swal.close();
-            } else {
-               toastr.success("NO se guardaron cambios");
-            }
-      
-         } catch (error) {
-            toastr.error("Error al guardar la defuncion " + error.message);
-         }
-         
-      
-   }
-   return resultado;
-}
 
 /*Agrega una atencion */
 async function AgregarAtencionModal(paciente=null, zona=null, atencionId=null) {
@@ -1718,166 +1546,7 @@ async function obtenerDatosPacienteCenso(identidad){
 }
 
 
-/*Agrega una defunción y marca el paciente como difunto*/
-async function entregaEntregaCadaver(paciente) {
-   let resultado = null;
 
-   const modal = await Swal.fire({
-      title: `Entrega de Cadaver`,
-      html: `
-         <form method="post" class="formulario" id="formulario-modal-cadaver">
-            <fieldset class="modalCadaverCampos">
-               <legend>Paciente: <b>${paciente.nombre} - ${paciente.dni}</b></legend>
-               
-               <fieldset class="modalDefuncionResponsableCampos">
-               <legend>Datos responsable</legend>
-
-                  <div class="formularioCampoModal">
-                     <label for="modal-cadaver-dni-responsable">DNI</label>
-                     <input type="text" id="modal-cadaver-dni-responsable" name="dni_responsable" class="formularioCampo-text" required>
-                  </div>
-                  
-                  <div class="formularioCampoModal">
-                     <label for="nombre_responsable">Nombre</label>
-                     <input type="text" id="modal-cadaver-nombre-responsable" name="nombre_responsable" class="formularioCampo-text" placeholder="NOMBRE COMPLETO" required>
-                  </div>
-               </fieldset>
-               <input type="hidden" id="modal-defuncion-id" name="idDefuncion">
-            </fieldset>
-         </form>
-      `,
-      showCancelButton: true,
-      showCloseButton: true,
-      confirmButtonText: '<i class="bi bi-floppy-fill"></i> Guardar',
-      cancelButtonText: '<i class="bi bi-x-circle-fill"></i> Cancelar',
-      customClass: {
-         popup: 'contener-modal-defuncion',
-         title: 'contener-modal-titulo',
-         confirmButton: 'contener-modal-boton-confirmar',
-         cancelButton: 'contener-modal-boton-cancelar'
-      },
-      preConfirm: () => {
-         
-         const dni = document.getElementById("modal-cadaver-dni-responsable").value;
-         const nombre = document.getElementById("modal-cadaver-nombre-responsable").value;
-
-
-         if (!dni) {
-            Swal.showValidationMessage('Debe indicar un DNI valido');
-            return false;
-         }
-
-         if (!nombre) {
-            Swal.showValidationMessage('Debe indicar el nombre del responsable ');
-            return false;
-         }
-      
-         return true;
-      },
-      didOpen: async function () {
-
-         const dni = document.getElementById("modal-cadaver-dni-responsable");
-         const nombre = document.getElementById("modal-cadaver-nombre-responsable");
-         const idDefuncion = document.getElementById("modal-defuncion-id");
-         const titleElement = Swal.getTitle(); 
-
-         Inputmask({
-            regex: regexIdentidad,
-            placeholder: formatoIdentidad,
-            oncomplete: async function () {
-               const resultado = await obtenerDatosPacienteCenso(dni.value);
-               if (resultado){
-                  nombre.value= concatenarLimpio(resultado.NOMBRE1,resultado.NOMBRE2,resultado.APELLIDO1,resultado.APELLIDO2);
-
-               } else if (resultado === 0){
-                  toastr.info("No se encontraron datos para el dni descrito.");
-               } else {
-                  toastr.warning("Error al obtener los datos de la persona:", error);
-               }
-            }
-         }).mask(dni);
-
-         Inputmask({
-            regex: regexNombreApellido,
-            placeholder: 'NOMBRE COMPLETO'
-         }).mask(nombre);
-
-
-
-         // Verificar si el paciente ya tiene defunción
-         
-         try {
-            let data = null;
-            if (paciente){
-               data = await fetchData(API_URLS.obtenerDefuncion, { id: paciente.id });
-            }
-
-            if (data && "mensaje" in data) {
-               // no tiene defuncion no hacer nada
-            } else if (data) {
-               llenar(data);
-            }
-         } catch (error) {
-            console.error(error);
-         }
-
-         function llenar(defuncion) {
-            
-            idDefuncion.value = defuncion.id || "";
-            if (defuncion.reponsable_nombre && defuncion.reponsable_dni) {
-               titleElement.textContent ="Actualizar Entrega de Cadaver"
-               dni.value = defuncion.reponsable_dni;
-               nombre.value = defuncion.reponsable_nombre;
-            }
-
-         }
-         
-
-      }
-   });
-
-   if (modal.isConfirmed) {
-        // Guardamos las referencias a los elementos
-         const dni = document.getElementById("modal-cadaver-dni-responsable");
-         const nombre = document.getElementById("modal-cadaver-nombre-responsable");
-         const defuncion = document.getElementById("modal-defuncion-id");
-
-
-         try {
-            const csrfToken = window.CSRF_TOKEN;
-            const response = await fetch(urls["procesarCadaver"], {
-               method: "POST",
-               headers: {
-                  "Content-Type": "application/json",
-                  "X-CSRFToken": csrfToken 
-               },
-               body: JSON.stringify({
-                  dniR: dni.value,
-                  nombreR: nombre.value.toUpperCase(),
-                  idPaciente: paciente.id,
-                  idDefuncion: defuncion.value
-               })
-            });
-      
-            if (!response.ok) throw new Error(`Error HTTP: ${response.status}`);
-      
-            const data = await response.json();
-      
-            if (data.guardo) {
-               resultado = data;
-               Swal.close();
-            } else {
-               toastr.success("NO se guardaron cambios");
-            }
-      
-         } catch (error) {
-            toastr.error("Error al guardar la defuncion " + error.message);
-         }
-         
-      
-   }
-   return resultado;
-}
 //#endregion
 
 

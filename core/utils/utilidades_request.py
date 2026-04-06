@@ -14,3 +14,10 @@ def cargar_json(request):
             status=400
         )
         return None, error
+    
+    
+def parse_json_request(request):
+    try:
+        return json.loads(request.body or '{}')
+    except json.JSONDecodeError:
+        raise ValueError('JSON inválido')

@@ -4,7 +4,7 @@ from django.views.generic.edit import UpdateView, CreateView
 from django.views.generic import DetailView
 from django.views.decorators.http import require_GET
 from core.services.externals import obtener_dispensacion_mysql
-
+from django.core.exceptions import ValidationError
 from .models import Paciente, Padre
 from ingreso.models import Acompanante
 from .forms import PacienteCreateForm, PacienteEditForm
@@ -15,11 +15,14 @@ from core.services.expediente_service import ExpedienteService
 from core.services.ubicacion_service import UbicacionService
 from core.services.ingreso.ingreso_service import IngresoService
 from core.services.imagenologia_service import EvaluacionService 
+from core.services.servicio_service import ServicioService
 from core.services.usuario_service import UsuarioService
 from core.services.server_image.media_service import MediaService
 from usuario.permisos import verificar_permisos_usuario, verificar_permisos_dispensacion
 from core.utils.utilidades_fechas import formatear_fecha, formatear_fecha_simple, calcular_edad_texto
 from core.utils.utilidades_textos import generar_slug,formatear_nombre_completo, formatear_ubicacion_completo, formatear_expediente, formatear_dni
+from core.utils.utilidades_request import parse_json_request
+from core.validators.main_validator import validar_entero_positivo
 from core.validators.fecha_validator import validar_fecha
 # permisos
 from core.constants.permisos import (
@@ -374,10 +377,8 @@ class PacienteEditView(UpdateView):
         context['info_padre'] = json.dumps(obtener_info_padre(paciente.padre_id))      
 
         #defuncion
-        context['defuncion'] = json.dumps(PacienteService.comprobar_defuncion(paciente))
-
-
-
+        context['defuncion'] = PacienteService.comprobar_defuncion(paciente)
+        context['apto_obito'] = PacienteService.esMujerEdadFertil(paciente)
         #permisos 
 
         
@@ -1086,47 +1087,148 @@ def busquedaAvanzada(request):
 
 
 def guardarDefuncion(request):
-
-    if not verificar_permisos_usuario(request.user, PACIENTE_EDITOR_ROLES, PACIENTE_EDITOR_UNIDADES):
-        return JsonResponse({'error': 'No tienes permisos para realizar esta accion'}, status=403)
-
-    if request.method != 'POST':
-        return JsonResponse({'error': 'Metodo no permitido'}, status=405)
+    try:
+        data = parse_json_request(request)
+    except ValueError as e:
+        return JsonResponse({'error': str(e)}, status=400)
 
     try:
-        data = json.loads(request.body)
-
-        fecha_str = data.get('fecha')
-        
-        try:
-            fecha = datetime.strptime(fecha_str, '%Y-%m-%d').date()
-            validar_fecha(fecha)
-        except (ValueError, TypeError):
-            return JsonResponse({'error': 'Formato de fecha no valido. Se espera YYYY-MM-DD'}, status=400)
-
-        defuncion_obj = {
-            "fecha": fecha,
-            "sala_id": data.get('sala'),
-            "motivo": data.get('motivo'),
-            "paciente_id": data.get('idPaciente'),
-            "id": data.get('idDefuncion'),
-            "usuario_id": request.user.id
-        }
-
-        defuncion = SimpleNamespace(**defuncion_obj)
-
-        try:
-            resultado = PacienteService.procesar_defuncion(defuncion)
-            return JsonResponse({'guardo': resultado}, status=200)
-        except Exception as e:
-            return JsonResponse({'error': 'No se pudo procesar la defunción'}, status=500)
-
+        id_paciente = validar_entero_positivo(data.get('idPaciente'), "idPaciente")
+        id_defuncion = validar_entero_positivo(data.get('idDefuncion'), "idDefuncion") if data.get('idDefuncion') else None
+        tipo = validar_entero_positivo(data.get('tipo'), "tipo")
+    except ValidationError as e:
+        return JsonResponse({'error': e.message_dict}, status=400)
     
-    except json.JSONDecodeError:
-        return JsonResponse({'error': 'Error al procesar los datos JSON'}, status=400)
+    fecha = data.get('fecha')
+    motivo = data.get('motivo')
+
+    dependencia_raw = data.get('dependencia')
+
+    dependencia = None
+    tipo_dependencia = None
+
+    if dependencia_raw:
+        try:
+            dependencia, tipo_dependencia = ServicioService.obtener_dependencia_y_campo(dependencia_raw)
+        except ValidationError:
+            return JsonResponse({'error': 'La dependencia no es válida'}, status=400)
+    
+
+    if not fecha or not id_paciente or not tipo:
+        return JsonResponse({'error': 'Datos incompletos'}, status=400)
+    
+
+    try:
+        fecha = datetime.strptime(fecha, "%Y-%m-%d")
+        validar_fecha(fecha,False)
+    except ValueError:
+        return JsonResponse({'error': 'Formato de fecha inválido'}, status=400)
+    except ValidationError as e:
+        return JsonResponse({'error': 'La fecha enviada no es aceptable '}, status=400)
+
+
+    defuncion = SimpleNamespace(
+        fecha=fecha,
+        tipo_dependencia=tipo_dependencia,
+        dependencia=dependencia,
+        motivo=motivo,
+        paciente_id=int(id_paciente),
+        id=int(id_defuncion) if id_defuncion else None,
+        tipo=int(tipo),
+        usuario_id=request.user.id
+    )
+
+
+    try:
+        resultado = PacienteService.procesar_defuncion(defuncion)
+
+        if resultado:
+            return JsonResponse({'guardo': True}, status=200)
+        else:
+            return JsonResponse({'error': 'No se realizaron cambios'}, status=400)
+
+    except ValueError as e:
+        return JsonResponse({'error': str(e)}, status=400)
 
     except Exception as e:
-        return JsonResponse({'error': 'Error interno del servidor'}, status=500)
+        return JsonResponse({'error': 'No se pudo procesar la defunción'}, status=500)
+
+
+def guardarObito(request):
+    try:
+        data = parse_json_request(request)
+    except ValueError as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+    try:
+        id_paciente = validar_entero_positivo(data.get('idPaciente'), "idPaciente")
+        id_obito = validar_entero_positivo(data.get('idObito'), "idObito") if data.get('idObito') else None
+        tipo = validar_entero_positivo(data.get('tipo'), "tipo")
+    except ValidationError as e:
+        return JsonResponse({'error': e.message_dict}, status=400)
+
+    
+    fecha = data.get('fecha')
+    dni_responsable = data.get('dniResponsable')
+    nombre_responsable = data.get('nombreResponsable')
+
+    dependencia_raw = data.get('dependencia')
+
+    dependencia = None
+    tipo_dependencia = None
+
+    if dependencia_raw:
+        try:
+            dependencia, tipo_dependencia = ServicioService.obtener_dependencia_y_campo(dependencia_raw)
+        except ValidationError:
+            return JsonResponse({'error': 'La dependencia no es válida'}, status=400)
+
+
+    # Validación básica
+    if not fecha or not id_paciente or not tipo:
+        return JsonResponse({'error': 'Datos incompletos'}, status=400)
+
+    try:
+        fecha = datetime.strptime(fecha, "%Y-%m-%d")
+        validar_fecha(fecha, False)
+    except ValueError:
+        return JsonResponse({'error': 'Formato de fecha inválido'}, status=400)
+    except ValidationError:
+        return JsonResponse({'error': 'La fecha enviada no es aceptable'}, status=400)
+
+
+    obito = SimpleNamespace(
+        fecha=fecha,
+        tipo_dependencia=tipo_dependencia,
+        dependencia=dependencia,
+        paciente_id= int(id_paciente),  # madre
+        id=int(id_obito) if id_obito else None,
+        tipo=int(tipo),
+        dni_responsable=dni_responsable,
+        nombre_responsable=nombre_responsable.upper() if nombre_responsable else None,
+        usuario_id=request.user.id
+    )
+
+    try:
+        resultado, id_obito= PacienteService.procesar_obito(obito)
+
+        if resultado and id_obito:
+            pdf_url = reverse("entrega_cadaver_obito", kwargs={"obito_id": id_obito})
+
+            return JsonResponse({
+                'guardo': True,
+                'pdf_url': pdf_url
+            }, status=200)
+        
+        else:
+            return JsonResponse({'error': 'No se realizaron cambios'}, status=400)
+
+    except ValueError as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+    except Exception as e:
+        print(e)
+        return JsonResponse({'error': 'No se pudo procesar el óbito'}, status=500)
     
 
 
@@ -1140,19 +1242,69 @@ def obtener_defuncion_paciente(request):
 
     if not defuncion:
         return JsonResponse({"mensaje": "no defuncion"}, status=200)
+    
+    if defuncion.sala or defuncion.servicio_auxiliar or defuncion.especialidad:
+        info = ServicioService.encontrar_dependencia_en_instance(defuncion)
+        if info:
+            dependencia_codigo = info["clave"]
+            dependencia_label = f"{info['nombre']} ({info['tipo']})"
+    else:
+        dependencia_codigo = None
+        dependencia_label = ""
+
 
     # Construir la respuesta con los datos del paciente
     return JsonResponse({
-    "id": defuncion.id,
-    "idSala": defuncion.sala.id if defuncion.sala else None,
-    "salaNombre": defuncion.sala.nombre_sala if defuncion.sala else "",
-    "fecha": defuncion.fecha_defuncion,
-    "motivo": defuncion.motivo,
-    "fechaAdicion": defuncion.fecha_registro,
-    "registrado": defuncion.registrado_por.username,
-    "reponsable_nombre": defuncion.reponsable_nombre if defuncion.reponsable_nombre else "",
-    "reponsable_dni": defuncion.reponsable_dni if defuncion.reponsable_dni else ""
-})
+        "id": defuncion.id,
+        "dependencia_codigo": dependencia_codigo,
+        "dependencia_label": dependencia_label,
+        "fecha_defuncion": defuncion.fecha_defuncion.strftime("%Y-%m-%d"),
+        "motivo": defuncion.motivo,
+        "fechaAdicion": defuncion.fecha_registro,
+        "registrado": defuncion.registrado_por.username,
+        "fecha_entrega": defuncion.fecha_entrega.strftime("%Y-%m-%d") if defuncion.fecha_entrega else None,
+        "reponsable_nombre": defuncion.reponsable_nombre if defuncion.reponsable_nombre else "",
+        "reponsable_dni": defuncion.reponsable_dni if defuncion.reponsable_dni else "",
+        "tipo_defuncion": defuncion.tipo_defuncion,
+        "tipo_defuncion_display": defuncion.get_tipo_defuncion_display()
+    })
+
+def obtener_obito_paciente(request):
+    idObito = request.GET.get('id')
+
+    if not idObito:
+        return JsonResponse({"error": "El parametro 'idObito' es requerido."}, status=400)
+
+    obito = PacienteService.obtener_obito_id(idObito)
+
+    if not obito:
+        return JsonResponse({"mensaje": "no obito"}, status=200)
+
+    # Resolver dependencia
+    if obito.sala or obito.servicio_auxiliar or obito.especialidad:
+        info = ServicioService.encontrar_dependencia_en_instance(obito)
+        if info:
+            dependencia_codigo = info["clave"]
+            dependencia_label = f"{info['nombre']} ({info['tipo']})"
+        else:
+            dependencia_codigo = None
+            dependencia_label = ""
+    else:
+        dependencia_codigo = None
+        dependencia_label = ""
+
+    return JsonResponse({
+        "id": obito.id,
+        "dependencia_codigo": dependencia_codigo,
+        "dependencia_label": dependencia_label,
+        "fecha_obito": obito.fecha_obito.strftime("%Y-%m-%d"),
+        "reponsable_nombre": obito.responsable_nombre if obito.responsable_nombre else "",
+        "reponsable_dni": obito.responsable_dni if obito.responsable_dni else "",
+        "tipo_defuncion": obito.tipo_defuncion,
+        "tipo_defuncion_display": obito.get_tipo_defuncion_display(),
+        "registrado": obito.registrado_por.username,
+        "fechaAdicion": obito.fecha_registro,
+    })
 
 
 def registrarEntregaCadaver(request):
@@ -1160,30 +1312,45 @@ def registrarEntregaCadaver(request):
         return JsonResponse({'error': 'No tienes permisos para realizar esta accion'}, status=403)
 
     if request.method != 'POST':
-        return JsonResponse({'error': 'Método no permitido'}, status=405)
-
-
+        return JsonResponse({'error': 'Metodo no permitido'}, status=405)
 
     try:
         data = json.loads(request.body)
+        dni = data.get('dniR')
+        nombre = data.get('nombreR')
+        fecha_entrega = data.get('fechaEntrega')
+        id_paciente = data.get('idPaciente')
+        id_defuncion = data.get('idDefuncion')
+
+        if not dni or not nombre or not fecha_entrega:
+            return JsonResponse({'error': 'Datos incompletos'}, status=400)
+
+        try:
+            datetime.strptime(fecha_entrega, "%Y-%m-%d")
+        except ValueError:
+            return JsonResponse({'error': 'Formato de fecha inválido'}, status=400)
 
         defuncion_obj = {
-            "reponsable_dni": data.get('dniR'),
-            "reponsable_nombre": data.get('nombreR'),
-            "paciente_id": data.get('idPaciente'),
-            "id": data.get('idDefuncion'),
+            "reponsable_dni": dni,
+            "reponsable_nombre": nombre,
+            "paciente_id": id_paciente,
+            "id": id_defuncion,
+            "fecha_entrega": fecha_entrega
         }
 
         defuncion = SimpleNamespace(**defuncion_obj)
 
         try:
             resultado, idDefuncion = PacienteService.procesar_entrega_cadaver(defuncion)
-        except Exception:
+        except ValidationError as e:
+            # errores de negocio controlados
+            return JsonResponse({'error': str(e)}, status=400)
+        except Exception as e:
             return JsonResponse(
                 {'error': 'No se pudo registrar la entrega de cadáver'},
                 status=500
             )
-        
+
         if not resultado:
             return JsonResponse(
                 {'error': 'No se encontró registro de defunción'},
@@ -1373,3 +1540,18 @@ def dispensacion_view(request):
         return JsonResponse({'error': 'El di paciente recibido no existe'}, status=400)
 
     return JsonResponse({'data': resultado})
+
+
+@require_GET
+def obtener_obitos_paciente(request):
+    id = request.GET.get('id')
+    if not id:
+        return JsonResponse({'error': 'El parametro id_paciente es requerido'}, status=400)
+
+    try:
+        data = PacienteService.obtener_obitos_por_paciente(id)
+        return JsonResponse(data, safe=False)
+
+    except Exception as e:
+        return JsonResponse({"mensaje": str(e)}, status=500)
+

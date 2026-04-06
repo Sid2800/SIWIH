@@ -1669,6 +1669,148 @@ font-size: 1.6rem;
 }
 
 
+/*tablas estuilos  generales */
+.modal-procesos-tabla {
+   width: 100%;
+   border-collapse: collapse;
+   font-size: 1.2rem;
+   background-color: rgba(0, 0, 0, 0.03);
+   border-radius: 1rem;
+   padding: .5rem
+}
+
+.modal-procesos-tabla thead th {
+   text-align: left;
+   padding: .3rem 0;
+   border-bottom: .3rem solid #ccc;
+   font-weight: 700;
+   font-size: 1.5rem;
+   font-family: var(--fuenteTablaTitulo);
+   color: var(--negro);
+}
+.modal-procesos-tabla thead th:last-child {
+   text-align: right;
+}
+
+.modal-procesos-tabla tbody {
+   border-bottom: .3rem solid #ccc;
+}
+
+.modal-procesos-tabla tbody td {
+   font-family: var(--fuenteTablaCuerpo);
+   padding: .6rem .4rem;
+   border-bottom: .15rem solid #ccc;
+   text-transform: uppercase;
+}
+
+
+
+.modal-procesos-tabla tbody tr:last-child td {
+   border-bottom: none;
+}
+
+.modal-procesos-tabla tbody td span{
+   display: flex;
+   align-items: center;
+   justify-content: flex-start;
+   column-gap: .5rem;
+   white-space: nowrap;
+}
+
+.modal-procesos-tabla tbody td span i{
+   font-weight: 700;
+   color: var(--colorControlDeshabilitadoFondo);
+   font-size: 2rem;
+}
+
+.modal-procesos-tabla tbody td i.registrado{
+   color: #146c43;
+}
+
+.modal-procesos-tabla tbody tr {
+   transition: background-color 0.1s ease;
+}
+
+.modal-procesos-tabla tbody tr:hover {
+   background-color: var(--colorTablaceldaBorde);
+}
+
+
+
+
+/*BOTONDE OTROS PROCESSOS DE PACIENTE*/
+.modal-procesos-btn{
+   font-size: 1.2rem;
+   font-weight: 500;
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   gap: .7rem;
+   text-transform: uppercase;
+   background-color: var(--colorBoton);
+   color: var(--colorTextoBoton);
+   transition: background-color 0.3s ease;
+   border: none;
+   border-radius: 1rem;
+   padding: .4rem .8rem;
+   width: 11rem;
+   cursor: pointer;
+   transition: background-color 0.15s ease, transform 0.1s ease;
+}
+
+.modal-procesos-btn i{
+   font-size: 2rem;
+}
+
+
+.modal-procesos-btn:hover {
+   background-color: var(--blanco);
+   color: var(--negro) !important;
+}
+
+
+.modal-procesos-accion {
+   text-align: right; 
+}
+
+.modal-procesos-accion button {
+   display: inline-flex;
+}
+
+#contenedor-info-defuncion{
+   border-top: .15rem solid #ccc;
+   padding-top: 1rem;
+   display: flex;
+   flex-direction: column;
+   row-gap: 1rem;
+}
+
+@media (min-width: 36rem) {
+   
+   .modalCadaverCampos label{
+      width: 12rem;
+   }
+   
+   .modal-procesos-tabla{
+      font-size: 1.4rem;
+   }
+
+   .modal-procesos-tabla tbody td span{
+      column-gap: 1rem;
+   }
+
+   .modal-procesos-btn{
+      width: 13rem;
+      padding: .6rem 1rem;
+      font-size: 1.3rem;
+      gap: 1rem;
+      font-weight: bold;
+   }
+
+}
+
+
+
 
 /*mi check perzonalizado para menus*/
 .ck-menu {
@@ -1908,7 +2050,13 @@ font-size: 1.5rem;
    font-family: var(--fuenteTablaTitulo);
    font-weight: bold;
    text-transform: uppercase;
+   transition: opacity 0.5s ease;
    
+}
+
+.formularioBotones-boton.oculto{
+   opacity: 0;
+   pointer-events: none;
 }
 
 
@@ -1933,7 +2081,14 @@ font-size: 1.5rem;
 .formularioBotones-boton i {
    padding-top: .4rem;
    font-size: 2.5rem;
+ 
 }
+
+.material-symbols-outlined {
+   font-weight: 250; 
+   font-size: 3.2rem;
+}
+
 
 .formularioBotones-boton_flotante-derecha{
    position: absolute;
@@ -1967,6 +2122,8 @@ font-size: 1.5rem;
    .tituloFormularioReferencia-botones{
       display: flex;
       column-gap: 1rem;
+      flex-wrap: wrap;
+      padding-bottom: 1rem;
    }
 
 /*
@@ -2116,7 +2273,6 @@ font-size: 1.5rem;
    .tituloFormularioPaciente-botones,
    .tituloFormularioReferencia-botones{
       place-items: center;
-      padding: 0;
    }
 
    /* fielset referencia pcainte*/
@@ -2360,6 +2516,9 @@ font-size: 1.5rem;
    color: var(--colorMenuTextoHover);
    margin-bottom: 2rem;
    font-size: 2.2rem;
+   display: flex !important;
+   align-items: center;
+   justify-content: center;
 }
 
 /* Contenedor de controles de búsqueda: layout, padding, borde */
@@ -2422,6 +2581,9 @@ no logro establecer una clase perzonalizada */
    width: 15rem;
    height: 4rem;
 }
+
+
+
 
 /* Hover de botones: cambio de color */
 .contener-modal-boton-confirmar:hover,
@@ -2868,7 +3030,8 @@ input[readonly], textarea[readonly] {
 
 .generalesCampos input[readonly],
 .identificacionCampos input[readonly],
-.generalesCampos select[readonly]{
+.generalesCampos select[readonly],
+.modalCadaverDefuncionPacienteCampos input[disabled]{
    background-color: var(--colorTextBLoqueadoFondo);
    color: var(--colorTextoBloqueado);
 }
@@ -2897,8 +3060,10 @@ select[disabled] {
 
 /*fielset*/
 .modalDefuncionCampos,
+.modalObitoCampos,
 .modalAtencionCampos,
 .sectorCamposModal,
+.modalCadaverDefuncionPacienteCampos,
 .modalDefuncionResponsableCampos,
 .modalReferenciaDiagnosticoCampos,
 .modalCadaverCampos,
@@ -2913,12 +3078,24 @@ select[disabled] {
    flex-direction: column;
    row-gap: 2rem;
    font-size: 1.5rem;
-   margin-bottom: 2rem;
+   margin-bottom: 1rem;
    font-family: var(--fuenteTablaTitulo);
+}
+.modalObitoCampos,
+.modalDefuncionCampos{
+   padding: 1.5rem;
+   row-gap: 1rem;
 }
 
 .modalReferenciaDiagnosticoCampos{
    font-family: var(--fuenteTablaTitulo);
+}
+
+.modalCadaverDefuncionPacienteCampos,
+.modalDefuncionResponsableCampos{
+   row-gap: 1rem;
+   padding: 1.5rem;
+   margin-bottom: .5rem;
 }
 
 #modal-referencia-diagnostico-check{
@@ -2927,11 +3104,7 @@ select[disabled] {
 
 .modalCadaverCampos{
    padding: 2.5rem .5rem 1.5rem .5rem;
-
 }
-
-
-
 
 
 .formularioCampoModalCheck{
@@ -2962,7 +3135,7 @@ select[disabled] {
    }
 
    .formularioCampoModal label{
-      width: 8rem;
+      width: 12rem;
    }
 
 
@@ -2970,9 +3143,6 @@ select[disabled] {
       width: 60rem;
       display: flex !important;
    }
-
- 
-
 
    
    .formularioCampoModal{
@@ -3215,9 +3385,7 @@ select[disabled] {
    }
 
    .listasRecepcionBotones{
-
       width: 8rem;
-
    }
 
 
@@ -4721,9 +4889,11 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
    }
 }
 
-/* ---   MODAL       --- */
+/* ---   MODAL    GALERIA   --- */
 
-.contenedor-modal-galeria{
+.contenedor-modal-galeria,
+.contenedor-modal-obito,
+.contenedor-modal-procesos{
    background-color: var(--colorContendor);
    width: 98% !important;
 }
@@ -4740,7 +4910,9 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
 }
 
 
-.contenedor-modal-galeria .tituloFormulario-subrallado{
+.contenedor-modal-galeria .tituloFormulario-subrallado,
+.contenedor-modal-obito .tituloFormulario-subrallado,
+.contenedor-modal-procesos .tituloFormulario-subrallado{
    margin-bottom: 1.2rem;
    height: .3rem;
 }
@@ -4753,13 +4925,14 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
    width: 100%;
 }
 
-.modal-galeria-contendor-data{
+.modal-contendor-data{
    display: flex;
    flex-direction: column;
    row-gap: 2rem;
 }
 
-.modal-galeria-contendor-data-encabezado{
+.modal-contendor-data-encabezado{
+   background-color: rgba(0, 0, 0, 0.03);
    font-family: var(--fuenteCuerpo);
    font-size: 1.4rem;
    padding: .5rem 1rem 1rem;
@@ -4770,11 +4943,14 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
    row-gap: 1rem;
    border: .15rem solid  #ccc;
    border-radius: 0 0 1rem 1rem;
-
-
 }
 
-.modalGaleriaDato{
+#modalDefuncionHeader,
+#modalObitoHeader{
+   margin-bottom: 1rem;
+}
+
+.modal-dato{
    display: flex;
    flex-wrap: wrap;
    column-gap: .5rem;
@@ -4783,14 +4959,14 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
 }
 
 
-.modalGaleriaLabel{
+.modal-dato-label{
    font-weight: 400;
    color: var(--colorTextoBloqueado);
    opacity: .8;
    min-width: 8rem;
 }
 
-.modalGaleriaValor{
+.modal-dato-valor{
    font-weight: 700;
    color: var(--negro);
    text-transform: uppercase;
@@ -4799,11 +4975,13 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
 
 @media (min-width: 36rem) {
    /*modal*/
-   .contenedor-modal-galeria{
+   .contenedor-modal-galeria,
+   .contenedor-modal-obito,
+   .contenedor-modal-procesos{
       width: 54rem !important
    }
 
-   .modal-galeria-contendor-data-encabezado{
+   .modal-contendor-data-encabezado{
       padding: 2rem 2rem;
       row-gap: 1.5rem;
       font-size: 1.5rem;

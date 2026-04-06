@@ -2,6 +2,7 @@ from django.shortcuts import render
 from dal import autocomplete
 from django.http import JsonResponse
 from core.services.servicio_service import ServicioService
+from core.constants.domain_constants import UsoDependencia
 from django.db.models import Q
 from django.views.decorators.csrf import csrf_exempt
 from django.views import View
@@ -38,37 +39,7 @@ class CamaAutocomplete(autocomplete.Select2QuerySetView):
         ]
         
         return JsonResponse({'results': results})
-"""
-class SalaAutocomplete(autocomplete.Select2QuerySetView):
-    
-    def get_queryset(self):
-        return ServicioService.obtener_salas_activas()
-    
-    def get_result_label(self, result):
-        return f"{result.nombre_sala} {result.servicio}"
 
-    def get(self, request, *args, **kwargs):
-        query = request.GET.get('q', '')
-        salas = self.get_queryset()
-        
-        # Filtramos las camas según el término de búsqueda
-        if query:
-            salas = salas.filter(
-                Q(nombre_sala__icontains=query) |
-                Q(servicio__nombre_servicio__icontains=query)
-            )
-                    
-        # Creamos la respuesta en formato JSON
-        results = [
-            {
-                'id': sala.id,
-                'text': f"{sala.nombre_sala} {sala.servicio.nombre_servicio}",
-            }
-            for sala in salas
-        ]
-        
-        return JsonResponse({'results': results})
-"""
 
 class ListarSala(View):
     def get(self, request):
@@ -96,6 +67,32 @@ class ListarEspecialidadServicio(View):
         especialidades = ServicioService.obtener_especialidades_activas_servicio(id_servicio)
 
         return JsonResponse(especialidades, safe=False)
+    
+
+
+class ListarDependencias(View):
+
+    def get(self, request):
+        uso_param = request.GET.get("uso")
+        try:
+            uso = UsoDependencia(uso_param) if uso_param else UsoDependencia.GENERAL
+        except ValueError:
+            uso = UsoDependencia.GENERAL  
+
+        incluir_externo = True
+        solo_emergencia = False
+
+        if uso == UsoDependencia.DEFUNCION or UsoDependencia.OBITO:
+            incluir_externo = False
+            solo_emergencia = True
+
+
+        dependencias = ServicioService.obtener_dependencias(
+            incluir_externo=incluir_externo,
+            solo_emergencia= solo_emergencia
+        )
+        return JsonResponse(dependencias, safe=False)
+
 
 
 class ListarZona(View):
