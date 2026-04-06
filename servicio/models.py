@@ -94,6 +94,36 @@ class Sala(models.Model):
         return f"{self.nombre_sala} | {self.servicio.nombre_corto}"
 
 
+class Cubiculo(models.Model):
+    numero = models.PositiveIntegerField(verbose_name="Numero de Cubiculo")
+
+    nombre_cubiculo = models.CharField(
+        max_length=100,
+        verbose_name="Nombre Cubiculo"
+    )
+
+    sala = models.ForeignKey(
+        Sala,
+        on_delete=models.PROTECT,
+        related_name="cubiculos"
+    )
+
+    estado = models.SmallIntegerField(
+        verbose_name="Estado",
+        choices=[(1, "Activo"), (2, "Inactivo")],
+        default=1
+    )
+
+    class Meta:
+        verbose_name = "Cubiculo"
+        verbose_name_plural = "Cubiculos"
+        ordering = ["sala", "numero"]
+        unique_together = ("sala", "numero")
+
+    def __str__(self):
+        return f"{self.numero}# {self.nombre_cubiculo}"
+
+
 class Cama(models.Model):
     numero_cama = models.IntegerField(verbose_name="Número de Cama", primary_key=True)
     
@@ -118,6 +148,7 @@ class Cama(models.Model):
     creado_por = models.ForeignKey(User, on_delete=models.PROTECT, related_name='camas_creadas')  # Corregido related_name
     fecha_modificado = models.DateTimeField(verbose_name="Fecha Editado", auto_now=True)
     modificado_por = models.ForeignKey(User, on_delete=models.PROTECT, related_name='camas_modificadas')  # Corregido related_name
+    cubiculo = models.ForeignKey(Cubiculo, on_delete=models.PROTECT, related_name="camas", null=True, blank=True)
 
     class Meta:
         verbose_name = "Cama"
@@ -165,6 +196,7 @@ class ServiciosAux(models.Model):
         verbose_name_plural = "Servicios Auxiliares"
         ordering = ['nombre_servicio_a']
 
+
 # REFERENCIA
 class Proveedor_salud(models.Model):
     nombre_proveedor_salud = models.CharField(
@@ -187,6 +219,7 @@ class Proveedor_salud(models.Model):
         verbose_name = "Proveedor de salud"
         verbose_name_plural = "Proveedores de salud"
         ordering = ['nombre_proveedor_salud']
+
 
 class Nivel_complejidad_institucional(models.Model):
     nivel_complejidad = models.SmallIntegerField(
@@ -221,6 +254,7 @@ class Nivel_complejidad_institucional(models.Model):
         verbose_name_plural = "Niveles de complejidad institucional"
         ordering = ['nivel_complejidad']
 
+
 class Region_salud(models.Model):
     codigo = models.PositiveSmallIntegerField(unique=True)
     nombre_region_salud = models.CharField(
@@ -243,6 +277,7 @@ class Region_salud(models.Model):
         verbose_name = "Region Sanitaria salud"
         verbose_name_plural = "Region Sanitaria salud"
         ordering = ['nombre_region_salud']
+
 
 class Gestor(models.Model):
     nombre_gestor = models.CharField(
@@ -272,6 +307,7 @@ class Gestor(models.Model):
         verbose_name = "Gestor"
         verbose_name_plural = "Gestores"
         ordering = ['nombre_gestor']
+
 
 class Institucion_salud(models.Model):
     codigo_sesal = models.IntegerField(

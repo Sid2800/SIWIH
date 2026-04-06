@@ -20,6 +20,7 @@
 
    <!-- ICONOS -->
    <link rel="stylesheet" href="{% static 'core/bootstrap-icons/bootstrap-icons.min.css' %}">
+   <link rel="stylesheet" href="{% static 'core/material-icons/material-icons.css' %}">
 
    <!-- ALERTAS -->
    <!-- Toastr -->
@@ -288,6 +289,8 @@
       detallesDomicilio: "{% url 'obtenerDetallesDomicilio' %}",
       listadoDispensacionPaciente: "{% url 'dispensaciones_paciente' %}",
 
+      listarObitosPaciente: "{% url 'listar_obitos_paciente' %}",
+
 
       /* ---------------- EVALUACION RX ---------------- */
 
@@ -355,14 +358,23 @@
       listarSala: "{% url 'listarSala' %}",
       listarDiagnostico: "{% url 'listar_diagnostico' %}",
       listarEspecialidad: "{% url 'listarEspecialidad' %}",
+      listarDependencias: "{% url 'listar_dependencias' %}",
+
       cambiarZona: "{% url 'cambiarZona' %}",
       agregarSector: "{% url 'agregarSector' %}",
+
+      
 
 
       /* ---------------- DEFUNCIÓN ---------------- */
 
       obtenerDefuncion: "{% url 'obtener_defuncion' %}",
+      obtenerObito: "{% url 'obtener_obito' %}",
+
       guardarDefuncion: "{% url 'paciente_guardar_defuncion' %}",
+      guardarObito: "{% url 'paciente_guardar_obito' %}",
+
+      
       verificarDefuncion: "{% url 'verificar_defuncion' %}",
       procesarCadaver: "{% url 'registrar_entrega_cadaver' %}",
 
@@ -433,8 +445,10 @@
 
    <!-- SCRIPTS PROPIOS -->
    <script src="{% static 'core/scripts/helpers/fechaUtilidades.js' %}"></script>
-
+   <script src="{% static 'core/scripts/helpers/servicio_helpers.js' %}"></script>
    <script src="{% static 'core/scripts/helpers/helpers.js' %}"></script>
+
+
 
    <script src="{% static 'core/scripts/core/main.js' %}"></script>
 

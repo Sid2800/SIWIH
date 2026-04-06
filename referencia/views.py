@@ -436,6 +436,7 @@ class RespuestaCreateUpdateView(View):
         else:
             return self.form_invalid(form)
         
+        
 
 class SeguimientoCreateUpdateView(View):
     

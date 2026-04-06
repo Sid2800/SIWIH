@@ -18,10 +18,65 @@ class SalaAdmin(admin.ModelAdmin):
     list_filter = ('estado', 'sexo_esperado', 'servicio')
     readonly_fields = ('fecha_creado', 'fecha_modificado')
 
+
+from django.contrib import admin
+from .models import Cubiculo, Cama
+
+
+class CamaInline(admin.TabularInline):
+    model = Cama
+    extra = 0
+    fields = ('numero_cama', 'estado', 'sala')
+    readonly_fields = ('numero_cama',)
+    show_change_link = True
+
+
+@admin.register(Cubiculo)
+class CubiculoAdmin(admin.ModelAdmin):
+    list_display = (
+        'numero',
+        'nombre_cubiculo',
+        'sala',
+        'estado',
+        'total_camas'
+    )
+
+    search_fields = (
+        'numero',
+        'nombre_cubiculo',
+        'sala__nombre_sala'
+    )
+
+    list_filter = (
+        'estado',
+        'sala'
+    )
+
+    ordering = ('sala', 'numero')
+
+    inlines = [CamaInline]
+
+    # Conteo de camas por cubiculo
+    def total_camas(self, obj):
+        return obj.camas.count()
+    total_camas.short_description = "Camas"
+
+    # Validacion opcional 
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+
+        # Asegurar coherencia: todas las camas del cubiculo tengan la misma sala
+        for cama in obj.camas.all():
+            if cama.sala != obj.sala:
+                cama.sala = obj.sala
+                cama.save()
+
+                
+
 class CamaAdmin(admin.ModelAdmin):
-    list_display = ('numero_cama', 'estado', 'sala', 'fecha_creado', 'fecha_modificado')
+    list_display = ('numero_cama', 'estado','cubiculo', 'sala', 'fecha_creado', 'fecha_modificado')
     search_fields = ('numero_cama', 'sala__nombre_sala')
-    list_filter = ('estado', 'sala')
+    list_filter = ('estado','cubiculo', 'sala')
     readonly_fields = ('fecha_creado', 'fecha_modificado')
 
 class EspecialidadAdmin(admin.ModelAdmin):

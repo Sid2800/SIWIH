@@ -14,18 +14,13 @@
             </div>
             <div class="tituloFormularioPaciente-botones">
                 
-                {% if not readonly_mode %}
-                    <a id="btn-cadaver" class="formularioBotones-boton" style="display: none">
-                        <i class="bi bi-emoji-dizzy-fill"></i>
-                        <span>CADAVER</span>
-                    </a>
-                {% endif %}
 
+                
                 {% if MD == 2  %}
                     
-                    {% if not readonly_mode  %}
+                    {% if not readonly_mode  and not defuncion  %}
 
-                        <a href="{{ url_ingreso }}" class="formularioBotones-boton">
+                        <a id="frmPaciente-boton-agregar_ingreso" href="{{ url_ingreso }}" class="formularioBotones-boton">
                             <i class="bi bi-activity" class="formularioBotones-icono"></i>
                             <span>INGRESO</span> 
                         </a>
@@ -38,6 +33,7 @@
 
                     {% endif %}
 
+
                     {% if  request.user|tiene_rol:"ADMIN:Admision,digitador:Admision,visitante:Admision,auditor:DIRECTIVOS,ADMIN:Imagenologia,digitador:Imagenologia,visitante:Sala"%}
 
                         <a href="{{ url_historial }}" class="formularioBotones-boton">
@@ -46,6 +42,18 @@
                         </a>
 
                     {% endif %}
+
+                    
+                    <a id="frmPaciente-boton-procesos" class="formularioBotones-boton  formularioBotones-boton-menu-desplegable" style="display: none">
+                            <i class="bi bi-caret-down-square"></i>
+                            <span>OTROS</span> 
+                    </a>
+                        
+    
+
+                    
+
+
 
                 
                 {% endif %}
@@ -346,6 +354,9 @@
         {% if defuncion is not None %} 
             dicContexto["defuncion"] = {{ defuncion|lower }}; 
         {% endif %}
+        {% if apto_obito is not None %} 
+            dicContexto["apto_obito"] = {{ apto_obito|lower }}; 
+        {% endif %}
     }
 
     var idPaciente = '{{ object.id }}';
@@ -354,6 +365,7 @@
     var permiso = {{ readonly_mode }};
     dicContexto["soloLectura"] = permiso;
 </script>
-
+<script src="{% static 'core/scripts/modals/paciente_modals.js' %}"></script>
 <script src="{% static 'core/scripts/features/paciente.js' %}"></script>
+
 {% endblock extra_js %}
