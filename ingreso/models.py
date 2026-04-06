@@ -93,6 +93,7 @@ class RecepcionIngresoSala(models.Model):
     def __str__(self):
         return f"Recepción #{self.id} - {self.fecha_recepcion.date()} por {self.recibido_por.username}"
 
+
 class RecepcionIngresoDetalleSala(models.Model):
     recepcion = models.ForeignKey(
         RecepcionIngresoSala,
