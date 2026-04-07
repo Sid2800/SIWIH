@@ -5,6 +5,7 @@ from paciente.models import Paciente, Padre
 from expediente.models import PacienteAsignacion
 from servicio.models import Sala
 from core.services.paciente_service import PacienteService
+from core.services.mapeo_camas_service import MapeoCamasService
 from django.db.models import Func, F, Q, OuterRef, Subquery, DateField, Value, Count
 from django.db.models.functions import Concat
 from django.db import transaction
@@ -409,16 +410,52 @@ class IngresoService:
         
 
     @staticmethod
-    def inactivar_ingreso(ingresoId):
+    def inactivar_ingreso(ingresoId, usuario):
+        """
+        Inactiva un ingreso y libera la cama asignada de forma atómica.
+
+        Solo puede inactivarse un ingreso que:
+          - Exista con el id proporcionado.
+          - No haya sido recibido por SDGI (fecha_recepcion_sdgi es None).
+          - Esté en estado Activo (estado=1).
+
+        Pasos dentro de transaction.atomic():
+          1. Cambia el estado del ingreso a Inactivo (estado=2).
+          2. Cierra la AsignacionCamaPaciente activa del paciente y registra
+             la transición OCUPADA → LIBRE en HistorialEstadoCama.
+
+        Usar atomic() garantiza que el ingreso no quede inactivo con la cama
+        aún marcada como ocupada, ni la cama liberada sin que el ingreso cambie.
+
+        Parámetros:
+          ingresoId (int): PK del ingreso a inactivar.
+          usuario (User):  usuario que ejecuta la acción (se registra en historial).
+
+        Retorna:
+          True  si se inactivó correctamente.
+          False si no se encontró un ingreso que cumpla las condiciones.
+        """
         ingreso = Ingreso.objects.filter(
             id=ingresoId,
             fecha_recepcion_sdgi__isnull=True,
             estado=1
         ).first()
 
-        if ingreso :
-            ingreso.estado = 2
-            ingreso.save()
+        if ingreso:
+            with transaction.atomic():
+                # Paso 1: marcar el ingreso como inactivo
+                ingreso.estado = 2
+                ingreso.save(update_fields=["estado"])
+
+                # Paso 2: liberar la cama - cierra la asignación activa del paciente
+                # y registra OCUPADA → LIBRE en HistorialEstadoCama
+                if ingreso.paciente_id:
+                    MapeoCamasService.cerrar_asignacion_activa_paciente(
+                        paciente_id=ingreso.paciente_id,
+                        usuario=usuario,
+                        cama_id=ingreso.cama_id,
+                    )
+
             return True
 
         return False

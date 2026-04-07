@@ -18,6 +18,7 @@ from core.utils.utilidades_textos import formatear_nombre_completo, formatear_ub
 
 from core.services.expediente_service import ExpedienteService
 from core.services.ingreso.ingreso_service import IngresoService
+from core.services.mapeo_camas_service import MapeoCamasService
 from core.constants.permisos import (
     INGRESO_EDITOR_ROLES,
     INGRESO_EDITOR_UNIDADES,
@@ -93,7 +94,16 @@ class IngresoAddView(UnidadRolRequiredMixin, CreateView):
                     if not cambio:
                         raise Exception("No se logro cambiar la ubicacion del expediente")
 
-                response = super().form_valid(form) # gurada l ingreo 
+                response = super().form_valid(form) # gurada l ingreo
+
+                # Si el ingreso se guarda con cama y paciente, sincroniza la tabla
+                # de asignacion para reutilizar o activar el registro de esa cama.
+                if self.object.cama_id and self.object.paciente_id:
+                    MapeoCamasService.sincronizar_cama_con_ingreso(
+                        cama_id=self.object.cama_id,
+                        paciente_id=self.object.paciente_id,
+                        usuario=self.request.user,
+                    )
 
                 # Mensaje de éxito
                 # URL del PDF
@@ -243,6 +253,15 @@ class IngresoEditView(UnidadRolRequiredMixin, UpdateView):
         if usuario.id:
             form.instance.modificado_por_id = usuario.id
 
+        # Se toma una foto del ingreso antes de guardar para saber cual era la
+        # cama anterior y poder cerrar esa asignacion correctamente.
+        ingreso_anterior = Ingreso.objects.filter(pk=self.object.pk).values(
+            "cama_id",
+            "paciente_id",
+        ).first()
+        cama_anterior_id = ingreso_anterior.get("cama_id") if ingreso_anterior else None
+        paciente_anterior_id = ingreso_anterior.get("paciente_id") if ingreso_anterior else None
+
         datos_acompaniante = self.extraer_datos_acompaniante()
 
         
@@ -258,13 +277,22 @@ class IngresoEditView(UnidadRolRequiredMixin, UpdateView):
 
         try:
             with transaction.atomic():
-                print(datos_acompaniante)
                 acompaniante = IngresoService.procesar_acompaniante(**datos_acompaniante)
                 if acompaniante:
                     form.instance.acompaniante = acompaniante
                 #Cmabiar el eastdo de expediente
 
-                response = super().form_valid(form) # gurada l ingreo 
+                response = super().form_valid(form) # gurada l ingreo
+
+                # Solo sincronizamos camas si el paciente sigue siendo el mismo.
+                # En ese caso la cama anterior se cierra y la cama nueva se activa.
+                if paciente_anterior_id == self.object.paciente_id and self.object.paciente_id:
+                    MapeoCamasService.sincronizar_cambio_cama_en_ingreso(
+                        cama_anterior_id=cama_anterior_id,
+                        cama_nueva_id=self.object.cama_id,
+                        paciente_id=self.object.paciente_id,
+                        usuario=usuario,
+                    )
 
                 return JsonResponse({"success": True,"redirect_url": reverse_lazy('listar_ingresos') })
 
@@ -274,10 +302,6 @@ class IngresoEditView(UnidadRolRequiredMixin, UpdateView):
             messages.error(self.request, f"Se presento un error al registrar el ingreso: {str(e)}")
             return JsonResponse({"success": False, "error": f"Hubo un error al registrar el ingreso: {str(e)}"})
         return response
-
-
-
-        return super().form_valid(form)
     
 
     def form_invalid(self, form):
@@ -754,7 +778,9 @@ def inactivarIngreso(request):
             idIngreso = data.get('id')
             if idIngreso:
                 if Ingreso.objects.filter(id=idIngreso).exists():
-                    resultado = IngresoService.inactivar_ingreso(idIngreso)
+                    # La inactivacion delega el cierre de cama al servicio para que
+                    # el ingreso y la asignacion queden consistentes en una sola operacion.
+                    resultado = IngresoService.inactivar_ingreso(idIngreso, request.user)
                     if resultado:
                         return JsonResponse({"success": resultado })
                     else:

@@ -1,5 +1,6 @@
 from servicio import models as modelosServicio
 from servicio.models import Institucion_salud
+from mapeo_camas.models import AsignacionCamaPaciente
 from core.constants.domain_constants import HEAC_INSTITUCION_ID
 from django.db import transaction
 from django.db.models import Value, F, CharField
@@ -47,7 +48,15 @@ class ServicioService:
 
     @staticmethod
     def obtener_camas_activas():
-        qs = modelosServicio.Cama.objects.filter(estado=1)  # Filtramos las camas activas (estado=1)
+        camas_asignadas_activas = AsignacionCamaPaciente.objects.filter(
+            estado=AsignacionCamaPaciente.Estado.ACTIVA
+        ).values_list("cama_id", flat=True)
+
+        qs = (
+            modelosServicio.Cama.objects.filter(estado=1)
+            .exclude(numero_cama__in=camas_asignadas_activas)
+            .select_related("sala")
+        )
         
         return qs
     

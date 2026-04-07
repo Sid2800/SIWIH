@@ -57,7 +57,8 @@ INSTALLED_APPS = [
     'imagenologia',
     'referencia',
     'clinico',
-    'usuario'
+    'usuario',
+    'mapeo_camas',
 
 
 ]
