@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, date, time
 from django.core.exceptions import ValidationError
 from core.validators.fecha_validator import validar_fecha
+from core.constants.domain_constants import INDICADOR_ANIOS, INDICADOR_DIAS, INDICADOR_MESES 
 import platform
 import locale
 from django.utils import timezone
@@ -102,13 +103,13 @@ def obtener_edad_con_indicador(fecha_nacimiento):
     # Construir el resultado como string
     if anios > 0:
         numero = anios
-        indicador=4
+        indicador=INDICADOR_ANIOS
     elif meses > 0:
         numero = meses
-        indicador=3
+        indicador=INDICADOR_MESES
     elif dias > 0:
         numero = dias
-        indicador=2
+        indicador=INDICADOR_DIAS
     return str(numero), str(indicador)
 
 

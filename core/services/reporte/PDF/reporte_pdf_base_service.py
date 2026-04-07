@@ -3,6 +3,8 @@ from reportlab.lib import colors
 from django.utils.translation import gettext as _
 from django.conf import settings
 import os 
+from core.constants.domain_constants import LogApp
+from core.utils.utilidades_logging import *
 from reportlab.platypus.flowables import Flowable
 
 class ReportePdfBaseService:
@@ -23,12 +25,16 @@ class ReportePdfBaseService:
         logo3 = os.path.join(settings.BASE_DIR, 'core/static/core/img/logo_FUNDAGES.jpg')
         aside = os.path.join(settings.BASE_DIR, 'core/static/core/img/aside_azul.jpg')
 
-
-        pdf.drawImage(aside, x=0, y=-55, width=105, height=900, preserveAspectRatio=True, mask='auto')
-        pdf.drawImage(logo1, x=60, y=y-45, width=75, height=55, preserveAspectRatio=True, mask='auto')
-        pdf.drawImage(logo2, x=ancho-175, y=y-50, width=90, height=65, preserveAspectRatio=True, mask='auto')
-        pdf.drawImage(logo3, x=ancho-105, y=y-50, width=90, height=65, preserveAspectRatio=True, mask='auto')
-
+        try:
+            pdf.drawImage(aside, x=0, y=-55, width=105, height=900, preserveAspectRatio=True, mask='auto')
+            pdf.drawImage(logo1, x=60, y=y-45, width=75, height=55, preserveAspectRatio=True, mask='auto')
+            pdf.drawImage(logo2, x=ancho-175, y=y-50, width=90, height=65, preserveAspectRatio=True, mask='auto')
+            pdf.drawImage(logo3, x=ancho-105, y=y-50, width=90, height=65, preserveAspectRatio=True, mask='auto')
+        except Exception:
+            log_warning(
+                "No se pudo cargar logo en encabezado PDF",
+                app=LogApp.REPORTE
+            )
 
     @staticmethod
     def dibujar_pie_pagina_carta(pdf, alto, ancho, fecha, usuario, usuario_nombre, pagina_actual, total_paginas):
@@ -72,26 +78,28 @@ class ReportePdfBaseService:
         pdf.drawString(x_centro + pdf.stringWidth(pagina_str_normal, "Helvetica", 7), y - 15, pagina_str_bold)
 
         try:
-            # Usamos el logo FUNDAGES como prueba (luego lo cambiás al logo SIWIH)
             watermark = os.path.join(settings.BASE_DIR, 'core/static/core/img/SIWIFINAL.png')
 
-            pdf.saveState()                # Guardar estado gráfico antes de aplicar transparencia
-            pdf.setFillAlpha(0.08)         # Opacidad suave (0.05–0.12 recomendado)
+            pdf.saveState()                
+            pdf.setFillAlpha(0.08)         # Opacidad suave 
             
             # Centramos la marca de agua
             pdf.translate(265, 40)  
-            # Dibujar marca de agua (tamaño grande, centrado)
+        
             pdf.drawImage(
                 watermark,
-                x=0, y=0,            # Para centrar la imagen (ajustable)
-                width=80, height=80,     # Tamaño sugerido de marca de agua
+                x=0, y=0,            
+                width=80, height=80,     
                 preserveAspectRatio=True,
                 mask='auto'
             )
 
-            pdf.restoreState()             # Restaurar configuración original
+            pdf.restoreState()             
         except Exception as e:
-            print("Error dibujando marca de agua:", e)
+            log_warning(
+                "Error dibujando marca de agua en PDF",
+                app=LogApp.REPORTE
+            )
 
 
     @staticmethod

@@ -12,6 +12,8 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 import os
 from dotenv import load_dotenv
 from pathlib import Path
+import logging.config
+from pathlib import Path
 
 load_dotenv()
 
@@ -189,4 +191,49 @@ SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 SESSION_COOKIE_AGE = 1800  # 30 minutos
 
 # Reinicia el tiempo de expiraci�n con cada solicitud activa
+
 SESSION_SAVE_EVERY_REQUEST = True
+
+
+#LOGGER
+BASE_DIR = Path(__file__).resolve().parent.parent
+LOG_DIR = BASE_DIR / "logs"
+LOG_DIR.mkdir(exist_ok=True)
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+
+    "formatters": {
+        "standard": {
+            "format": "[{asctime}] {levelname} [{name}] [{app}] {message}",
+            "style": "{",
+        },
+    },
+
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "standard",
+            "level": "INFO",
+        },
+
+        "siwi_file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": LOG_DIR / "siwi_backend.log",
+            "maxBytes": 1024 * 1024 * 20,  # 5MB
+            "backupCount": 10,
+            "formatter": "standard",
+            "level": "INFO",
+        },
+    },
+
+    "loggers": {
+        "siwi": {
+            "handlers": ["console", "siwi_file"],
+            "level": "INFO",
+            "propagate": False,
+        },
+    },
+}
+

@@ -7,6 +7,8 @@ from django.core.exceptions import ValidationError
 from core.exceptions import EvaluacionDominioError
 from core.validators.main_validator import validar_entero_positivo
 from django.conf import settings
+from core.constants.domain_constants import LogApp
+from core.utils.utilidades_logging import *
 
 
 
@@ -32,12 +34,8 @@ class MediaService:
             'paciente_id': paciente_id
         }
 
-        
-
         try:
             resultado = RequestService.consultar_media_server_LIST(peticion)
-            if not resultado["ok"]:
-                return estudios, True
 
             imagenes_data = resultado["data"]
 
@@ -60,7 +58,12 @@ class MediaService:
 
             return estudios, False
 
-        except Exception:
+        except Exception as e:
+            log_error(
+                f"[FALLO_MEDIA_LIST] paciente_id={paciente_id} estudios={len(estudios)} detalle={str(e)}",
+                app=LogApp.MEDIA 
+            )
+
             for estudio in estudios:
                 estudio['url_imagen'] = None
                 estudio['url_thumb'] = None
@@ -82,7 +85,6 @@ class MediaService:
             id_detalle = est.get("idDetalle")
             id_estudio = est.get("id")
 
-            # Buscar archivo enviado desde el form
             archivo = archivos.get(f"archivo__{frontend_id}")
             accion_estudio = est.get('accionEstudio')
 
@@ -110,20 +112,20 @@ class MediaService:
                     )
                 }
 
-                resultado = RequestService.subir_imagen(payload)
+                RequestService.subir_imagen(payload)
 
-                if not resultado.get("ok"):
-                    warnings.append(
-                        f"No se pudo subir imagen del estudio {id_detalle}"
-                    )
-                else:
-                    success.append(
-                        f"Imagen del estudio {id_detalle} guardada correctamente"
-                    )
+                success.append(
+                    f"Imagen del estudio {id_detalle} guardada correctamente"
+                )
 
             except Exception as e:
+                log_error(
+                    f"[FALLO_SUBIDA] estudio_detalle={id_detalle} paciente_id={paciente_id} detalle={str(e)}",
+                    app=LogApp.MEDIA
+                )
+
                 warnings.append(
-                    f"No se pudo procesar imagen del estudio {id_detalle}: {str(e)}"
+                    f"No se pudo procesar imagen del estudio {id_detalle}"
                 )
 
         return {
@@ -134,7 +136,6 @@ class MediaService:
 
     @staticmethod
     def procesar_imagenes_evaluacion(estudios, archivos, paciente_tipo, paciente_id, usuario):
-
         warnings = []
         success = []
 
@@ -143,7 +144,7 @@ class MediaService:
             id_detalle = est.get("idDetalle")
             accion = est.get("accionImagen")
             accion_estudio = est.get("accionEstudio")
-            id_estudi = est.get("id")
+            id_estudio = est.get("id")
 
             try:
                 accion = AccionImagen(accion)
@@ -154,11 +155,10 @@ class MediaService:
                 accion_estudio = AccionEstudio(accion_estudio)
             except ValueError:
                 raise ValidationError("Acción de estudio inválida.")
-            
-            # Si el estudio fue eliminado, la imagen debe eliminarse también
+
             if accion_estudio == AccionEstudio.DELETE:
                 accion = AccionImagen.DELETE
-            
+
             archivo = archivos.get(f"archivo__{frontend_id}")
 
             try:
@@ -166,13 +166,18 @@ class MediaService:
                     continue
 
                 elif accion == AccionImagen.SYNC:
+
                     if not archivo:
+                        log_warning(
+                            f"[SYNC_SIN_ARCHIVO] estudio_detalle={id_detalle} paciente_id={paciente_id}",
+                            app=LogApp.MEDIA
+                        )
                         warnings.append(
                             f"No se recibió archivo para el estudio {id_detalle}"
                         )
                         continue
 
-                    nombreEstudio = MediaService._obtener_nombre_estudio(id_estudi)
+                    nombre_estudio = MediaService._obtener_nombre_estudio(id_estudio)
 
                     payload = {
                         "app": "RX",
@@ -181,22 +186,21 @@ class MediaService:
                         "paciente_tipo": paciente_tipo,
                         "paciente_id": paciente_id,
                         "archivo": archivo,
-                        "tipo_imagen": nombreEstudio,
+                        "tipo_imagen": nombre_estudio,
                         "usuario_id": usuario.id,
-                        "usuario_nombre":  construir_nombre_dinamico(usuario, ["first_name", "last_name"])
-
+                        "usuario_nombre": construir_nombre_dinamico(
+                            usuario, ["first_name", "last_name"]
+                        )
                     }
-                    resultado = RequestService.subir_imagen(payload)
 
-                    if not resultado.get("ok"):
-                        warnings.append(
-                            f"No se pudo subir imagen del estudio {id_detalle}"
-                        )
-                    else:
-                        success.append(
-                            f"Imagen del estudio {id_detalle} guardada correctamente"
-                        )
+                    RequestService.subir_imagen(payload)
+
+                    success.append(
+                        f"Imagen del estudio {id_detalle} guardada correctamente"
+                    )
+
                 elif accion == AccionImagen.DELETE:
+
                     payload = {
                         "app": "RX",
                         "origen_tipo": "EVALUACIONRXDETALLE",
@@ -209,54 +213,30 @@ class MediaService:
                         )
                     }
 
-                    resultado = RequestService.desactivar_imagen(payload)
+                    RequestService.desactivar_imagen(payload)
 
-
-                    if not resultado.get("ok"):
-                        warnings.append(
-                            f"No se pudo desactivar imagen del estudio {id_detalle}"
-                        )
-                    else:
-                        success.append(
-                            f"Imagen del estudio {id_detalle} desactivada correctamente"
-                        )
+                    success.append(
+                        f"Imagen del estudio {id_detalle} desactivada correctamente"
+                    )
 
             except Exception as e:
+                log_error(
+                    f"[FALLO_PROCESO_IMAGEN] estudio_detalle={id_detalle} paciente_id={paciente_id} detalle={str(e)}",
+                    app=LogApp.MEDIA
+                )
+
                 warnings.append(
-                    f"No se pudo procesar imagen del estudio {id_detalle} {e}"
+                    f"No se pudo procesar imagen del estudio {id_detalle}"
                 )
 
         return {
             "warnings": warnings,
             "success": success
         }
-    
+
 
     @staticmethod
-    def cambiar_imagenes_referencia( paciente_interno_id, paciente_externo_id):
-        """
-        Desactiva imágenes en batch para una evaluación inactivada.
-        """
-
-        payload = {
-            "paciente_interno_id": paciente_interno_id,
-            "paciente_externo_id": paciente_externo_id,
-        }
-
-        resultado = RequestService.migrar_imagenes_externo_a_interno(payload)
-
-        if not resultado.get("ok"):
-
-            raise EvaluacionDominioError(
-                "No se pudieron migrar las imágenes del paciente externo."
-            )
-        
-        return resultado.get("convertidas", 0)
-
-
-    
-    @staticmethod
-    def desactivar_imagenes_evaluacion(detalles_ids,paciente_tipo, paciente_id, usuario):
+    def desactivar_imagenes_evaluacion(detalles_ids, paciente_tipo, paciente_id, usuario):
         warnings = []
         success = []
 
@@ -268,32 +248,76 @@ class MediaService:
             validar_entero_positivo(paciente_tipo)
 
             payload = {
-                    "app": "RX",
-                    "origen_tipo": "EVALUACIONRXDETALLE",
-                    "paciente_tipo": paciente_tipo,
-                    "paciente_id":   paciente_id,
-                    "origen_ids": detalles_ids,
-                    "usuario_id": usuario.id,
-                        "usuario_nombre": construir_nombre_dinamico(
-                            usuario, ["first_name", "last_name"]
-                        )
-                }
-            
+                "app": "RX",
+                "origen_tipo": "EVALUACIONRXDETALLE",
+                "paciente_tipo": paciente_tipo,
+                "paciente_id": paciente_id,
+                "origen_ids": detalles_ids,
+                "usuario_id": usuario.id,
+                "usuario_nombre": construir_nombre_dinamico(
+                    usuario, ["first_name", "last_name"]
+                )
+            }
+
             resultado = RequestService.desactivar_imagenes_batch(payload)
+            desactivadas = resultado.get("desactivadas", 0)
 
-            if not resultado.get("ok"):
-                warnings.append("No se logró desactivar las imágenes.")
+            if desactivadas == 0:
+                log_warning(
+                    f"[SIN_DESACTIVADAS] paciente_id={paciente_id} total_ids={len(detalles_ids)}",
+                    app=LogApp.MEDIA
+                )
+                warnings.append("No se desactivaron imágenes.")
 
-            elif resultado.get("desactivadas"):
+            else:
                 success.append(
-                    f"Se desactivaron correctamente {resultado.get('desactivadas')} imágenes."
+                    f"Se desactivaron correctamente {desactivadas} imágenes."
+                )
+                log_info(
+                    f"Se desactivaron correctamente {desactivadas} imágenes.",
+                    app=LogApp.MEDIA
                 )
 
         except Exception as e:
-            warnings.append(str(e))
+            log_error(
+                f"[FALLO_BATCH_DESACTIVAR] paciente_id={paciente_id} total_ids={len(detalles_ids) if isinstance(detalles_ids, list) else 0} detalle={str(e)}",
+                app=LogApp.MEDIA
+            )
+            warnings.append("Error interno al desactivar imágenes.")
 
         return {
             "warnings": warnings,
             "success": success
         }
 
+
+    @staticmethod
+    def cambiar_imagenes_referencia(paciente_interno_id, paciente_externo_id):
+
+        payload = {
+            "paciente_interno_id": paciente_interno_id,
+            "paciente_externo_id": paciente_externo_id,
+        }
+
+        try:
+            resultado = RequestService.migrar_imagenes_externo_a_interno(payload)
+
+            convertidas = resultado.get("convertidas", 0)
+
+            if convertidas == 0:
+                log_warning(
+                    f"[SIN_MIGRACION] interno_id={paciente_interno_id} externo_id={paciente_externo_id}",
+                    app=LogApp.MEDIA
+                )
+
+            return convertidas
+
+        except Exception as e:
+            log_error(
+                f"[FALLO_MIGRACION] interno_id={paciente_interno_id} externo_id={paciente_externo_id} detalle={str(e)}",
+                app=LogApp.MEDIA
+            )
+
+            raise EvaluacionDominioError(
+                "No se pudieron migrar las imágenes del paciente externo."
+            )

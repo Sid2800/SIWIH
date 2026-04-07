@@ -13,6 +13,8 @@ document.addEventListener('DOMContentLoaded', function() {
         
     };
 
+    let defuncionIngresada = null
+
     // Selectores globales de jQuery para evitar búsquedas repetidas en el DOM
     const $departamento = $("#id_departamento");
     const $municipio = $("#id_municipio");
@@ -66,11 +68,15 @@ document.addEventListener('DOMContentLoaded', function() {
     //boton agregar sector 
     const agregarSector = document.getElementById("agregar_ubicacion");
     //defuncion 
-    const cadaverBtn = document.getElementById("btn-cadaver");
+   
     const checkDefuncion = document.getElementById('switchDefuncion');
 
     // agregar atencion
     const agregar_atencionBtn = document.getElementById("frmPaciente-boton-agregar_atencion");
+    const agregar_ingresoBtn = document.getElementById("frmPaciente-boton-agregar_ingreso");
+    const otrosBtn = document.getElementById("frmPaciente-boton-procesos");
+
+
 
     // Mascaras 
 
@@ -1247,16 +1253,26 @@ agregarSector.addEventListener("click",() =>{
             modo_solo_lectura()
         }
         
-        //mostramos is es defuncion
-        if (dicContexto.defuncion){
-            checkDefuncion.checked = dicContexto.defuncion;
-            cadaverBtn.style.display = "flex";
+        // Determinar si se deben mostrar procesos
+        const mostrarProcesos = dicContexto.defuncion || dicContexto.apto_obito;
+
+        // Estado defunción
+        if (dicContexto.defuncion) {
+            checkDefuncion.checked = true;
+        }
+
+        // Mostrar botón PROCESOS si aplica
+        if (otrosBtn && mostrarProcesos) {
+            otrosBtn.style.display = "flex";
         }
         
         //listener de agregar atencion
-        agregar_atencionBtn.addEventListener('click', async function(event){
-            await mostrarAgregarAtencion();
-        });
+        if (agregar_atencionBtn){
+                agregar_atencionBtn.addEventListener('click', async function(event){
+                await mostrarAgregarAtencion();
+            });
+        }
+        
 
 
 
@@ -1507,40 +1523,79 @@ agregarSector.addEventListener("click",() =>{
             e.preventDefault(); 
             let resultado = await mostrarModalDefuncion();
 
+        
             if (resultado?.guardo === true) {
                 toastr.info(`Defunción procesada correctamente`, "Cambios realizados");
-                cadaverBtn.style.display = "flex";
+                defuncionIngresada = true;
+                
+                const botones = [
+                    agregar_atencionBtn,
+                    agregar_ingresoBtn,
+                ];
+
+                //  aplicar animación
+                botones.forEach(btn => {
+                    if (btn){
+                        btn.classList.add("oculto");
+                    }
+                });
+
+                // ocultar TODOS después de 1 segundo
+                setTimeout(() => {
+                    botones.forEach(btn => {
+                        if (btn){
+                            btn.style.display = "none";
+                        }
+                    });
+                }, 500);
+
+                
+                otrosBtn.style.opacity = 0;
+                otrosBtn.style.display = "flex";
+
+                setTimeout(() => {
+                    otrosBtn.style.transition = "opacity 0.3s ease";
+                    otrosBtn.style.opacity = 1;
+                }, 100);
+        
+
                 
                 $estado.val("P");
                 checkDefuncion.checked = true;
-            } else if (resultado?.guardo === false) {
-                toastr.alert(`No se procesó correctamente la defunción`, 'No se guardaron cambios');
-            }
+            } 
         });
 
-        if (cadaverBtn){
-                cadaverBtn.addEventListener('click', async function(event){
+        if (otrosBtn){
+            otrosBtn.addEventListener('click', async function(event){
                 event.preventDefault();
-                
-                const paciente = {
-                    id: idPaciente,
-                    dni: $dni.val(),
-                    nombre: concatenarLimpio($nombre1.val(), $nombre2.val(), $apellido1.val(), $apellido2.val())
-                };
 
-                let resultado = await entregaEntregaCadaver(paciente)
-                if (resultado?.guardo === true) {
-                    toastr.info(`Entrega procesada correctamente`, "Cambios realizados")
-                    setTimeout(() => {
-                        const nuevaVentana = window.open(resultado.pdf_url, "_blank");
-                            if (!nuevaVentana || nuevaVentana.closed || typeof nuevaVentana.closed === "undefined") {
-                                toastr.error("No se pudo abrir la nueva pestaña. Verifica los permisos del navegador.");
-                            }
-                    }, 1000);
+                let procesos =[]
 
-                } else if (resultado?.guardo === false) {
-                    toastr.alert(`No se procesó correctamente la entrega`, 'No se guardaron cambios');
+                if (dicContexto["defuncion"] || defuncionIngresada){
+                    procesos.push({
+                        nombre: "Entrega cadáver",
+                        identificador: "cadaver"
+                    });
                 }
+
+                if (dicContexto["apto_obito"]){
+                    procesos.push({
+                        nombre: "Obito",
+                        identificador: "obito"
+
+                    });
+                }
+
+                await ModalPacienteProcesos.open({
+                    idPaciente:idPaciente,
+                    procesos,
+                    datos: {
+                            "Paciente": concatenarLimpio($nombre1.val(), $nombre2.val(), $apellido1.val(), $apellido2.val()),
+                            "DNI": $dni.val(),
+                            "Expediente": $expedienteNumero.val()
+                        },
+                
+                });
             });
         }
     }
@@ -1560,6 +1615,8 @@ agregarSector.addEventListener("click",() =>{
         };
         // Hacemos la llamada al backend
         let resultado = await AgregarDefuncionModal(paciente,dicContexto.soloLectura);
+
+
         return resultado
     }
 

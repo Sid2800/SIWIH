@@ -1,6 +1,9 @@
 from ubicacion.models import Sector, Municipio, Aldea, Departamento
 from django.db import transaction
 from datetime import datetime
+from core.constants.domain_constants import LogApp
+from core.utils.utilidades_logging import *
+
 
 class UbicacionService:
     def __init__(self, ubicacion=None):
@@ -73,7 +76,11 @@ class UbicacionService:
             descripcion_sector = data.get('descripcion_sector') 
 
             if not (zona and aldea_id and descripcion_sector):
-                return None  
+                log_warning(
+                    f"[DATOS_INCOMPLETOS_SECTOR] data={data}",
+                    app=LogApp.PACIENTE
+                )
+                return None 
         
             with transaction.atomic():
                 return Sector.objects.create(
@@ -86,6 +93,10 @@ class UbicacionService:
             
                 
         except Exception as e:
+            log_error(
+                f"[FALLO_CREAR_SECTOR] data={data} detalle={str(e)}",
+                app=LogApp.PACIENTE
+            )
             return None
 
 

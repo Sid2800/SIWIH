@@ -27,6 +27,8 @@ from django.shortcuts import  redirect
 from django.utils.timezone import now 
 from django.utils import timezone
 from django.contrib import messages
+from core.constants.domain_constants import LogApp
+from core.utils.utilidades_logging import *
 
 
 # Create your views here.
@@ -344,7 +346,6 @@ class RecepcionAtenciones(View):
                'atenciones': json.dumps(atenciones),
          }
 
-         print(context)
 
          return render(request, 'atencion/recepcion_atenciones.html', context)
       
@@ -375,17 +376,21 @@ def registrarRecepcionAtencion(request):
          # Llamar al servicio
          resultado = RecepcionAtencionService.procesar_recepcion_atencion(observacion, atenciones, usuario)
 
-         if resultado.get('error'):
-               return JsonResponse({'error': resultado['mensaje']}, status=400)
-
-
          #mostrar el comporbante que todo salio bien 
          pdf_url = reverse("reporte_detalle_recepcion_atenciones", kwargs={"recepcion_id":resultado['idRecepcion'] })
          return JsonResponse({"success": True, 'message': resultado['mensaje'],"pdf_url": pdf_url, "redirect_url": reverse_lazy('listar_atenciones') })
 
 
       except Exception as e:
-         return JsonResponse({'error': str(e)}, status=400)
+         log_error(
+            f"[FALLO_RECEPCION_ATENCION] usuario={usuario.id} detalle={str(e)}",
+            app=LogApp.ATENCION
+         )
+
+         return JsonResponse(
+            {'error': 'Ocurrió un error al procesar la recepción de atenciones'},
+            status=500
+         )
 
    return JsonResponse({'error': 'Método no permitido'}, status=405)
 

@@ -2,6 +2,7 @@ from servicio import models as modelosServicio
 from servicio.models import Institucion_salud
 from mapeo_camas.models import AsignacionCamaPaciente
 from core.constants.domain_constants import HEAC_INSTITUCION_ID
+from core.constants.domain_constants import SALAS_EXCLUIDAS, SERVICIOS_AUX_EXTERNOS
 from django.db import transaction
 from django.db.models import Value, F, CharField
 from django.db.models.functions import Concat
@@ -48,6 +49,7 @@ class ServicioService:
 
     @staticmethod
     def obtener_camas_activas():
+
         camas_asignadas_activas = AsignacionCamaPaciente.objects.filter(
             estado=AsignacionCamaPaciente.Estado.ACTIVA
         ).values_list("cama_id", flat=True)
@@ -58,6 +60,9 @@ class ServicioService:
             .select_related("sala")
         )
         
+
+        qs = modelosServicio.Cama.objects.filter(estado=1)  # Filtramos las camas activas (estado=1)
+
         return qs
     
 
@@ -111,7 +116,6 @@ class ServicioService:
         return list(salas)
 
 
-
     @staticmethod
     def obtener_sala_id(idSala):
         try:
@@ -119,7 +123,8 @@ class ServicioService:
             return sala
         except modelosServicio.Sala.DoesNotExist:
             return None
-        
+    
+
     @staticmethod
     def obtener_especialidad_id(idEspecialidad):
         try:
@@ -143,7 +148,6 @@ class ServicioService:
                 # Actualizar la sesión del usuario
                 request.session['zona_codigo'] = nueva_zona.codigo
                 request.session['zona_nombre_zona'] = nueva_zona.nombre_zona
-
                 return nueva_zona
 
         except modelosServicio.Zona.DoesNotExist:
@@ -156,30 +160,25 @@ class ServicioService:
     ojo a la variable que excluye ciertas salas
     """
     @staticmethod    
-    def obtener_dependencias(incluir_externo=True):
-        salas_excluidas = [
-            714,  # aislado covid 
-            200,  # asilado covid
-            512,  # aislado gine se debe consignar únicamente como Gine
-            114,  # aislado medicina
-            206,
-            308,
-            310,  # cirugia pediatrica
-            201,  # medicina hombres y mujeres juntos; existen separados, es mejor
-            711,  #	PUERPERIO ADOLECENTE NORMAL	
-            708,  #	PUERPERIO NORMA
-            713,  #	PUERPERIO QUIRURGICO
-            706,  #	PUERPERIO QUIRURGICO PATOLOGICO
-            709,  #	PUERPERIO VAGINAL PATOLOGICO
-            712,  #	SEPTICO AISLADO
-            707,  #	AMENAZA DE ABORTO
-            705,  #	EMBARAZO PATOLOGICO	
-        ]
+    def obtener_dependencias(incluir_externo=True, solo_emergencia=False):
 
-        serv_auxiliares_externos = [] if incluir_externo else [
-            3,  #cesamo
-            4   #otros hospitales
-        ]
+
+        salas_excluidas = SALAS_EXCLUIDAS
+
+        serv_auxiliares_externos = [] if incluir_externo else SERVICIOS_AUX_EXTERNOS
+
+        def _especialidades_por_servicio(servicio_id, tipo):
+            return (
+                modelosServicio.Especialidad.objects
+                .filter(estado=1, servicio_id=servicio_id)
+                .annotate(
+                    tipo=Value(tipo, output_field=CharField()),
+                    nombre=F('nombre_especialidad'),
+                    origen=Value('ESPECIALIDAD', output_field=CharField()),
+                    clave=Concat(Value('E-'), F('id'), output_field=CharField())
+                )
+                .values('clave', 'nombre', 'tipo', 'origen')
+            )
 
         # Salas hospitalarias activas (excluyendo las no seleccionables)
         salas = (
@@ -195,29 +194,17 @@ class ServicioService:
             .values('clave', 'nombre', 'tipo', 'origen')
         )
 
-        # Especialidades servicio 50 consulta externa
-        especialidades = modelosServicio.Especialidad.objects.filter(estado=1, servicio_id=50).annotate(
-            tipo=Value('CEXT', output_field=CharField()),
-            nombre=F('nombre_especialidad'),
-            origen=Value('ESPECIALIDAD', output_field=CharField()),
-            clave=Concat(Value('E-'), F('id'), output_field=CharField())
-        ).values('clave', 'nombre', 'tipo', 'origen')
+        especialidades = []
 
         # Especialidades emergencia servicio 1000 emercia
-        especialidadesE = modelosServicio.Especialidad.objects.filter(estado=1, servicio_id=1000).annotate(
-            tipo=Value('EMERG', output_field=CharField()),
-            nombre=F('nombre_especialidad'),
-            origen=Value('ESPECIALIDAD', output_field=CharField()),
-            clave=Concat(Value('E-'), F('id'), output_field=CharField())
-        ).values('clave', 'nombre', 'tipo', 'origen')
+        especialidades.append(_especialidades_por_servicio(1000, 'EMERG'))
 
-        # Especialidades emergencia servicio 700 obstetricia
-        especialidadesO = modelosServicio.Especialidad.objects.filter(estado=1, servicio_id=700).annotate(
-            tipo=Value('OBS', output_field=CharField()),
-            nombre=F('nombre_especialidad'),
-            origen=Value('ESPECIALIDAD', output_field=CharField()),
-            clave=Concat(Value('E-'), F('id'), output_field=CharField())
-        ).values('clave', 'nombre', 'tipo', 'origen')
+        if not solo_emergencia:
+            # Especialidades servicio 50 consulta externa
+            especialidades.append(_especialidades_por_servicio(50, 'CEXT'))
+
+            # Especialidades emergencia servicio 700 obstetricia
+            especialidades.append(_especialidades_por_servicio(700, 'OBS'))
 
         # Servicios auxiliares todos los activos 
         servicios = (modelosServicio.ServiciosAux.objects
@@ -233,10 +220,12 @@ class ServicioService:
         )
 
         # Unir todas las listas
-        dependencias = list(chain(salas, especialidadesE, especialidades, especialidadesO, servicios))
+        especialidades = list(chain(*especialidades))
+        dependencias = list(chain(salas, especialidades, servicios))
 
         return dependencias
     
+
 
     @staticmethod
     def obtener_dependencia_y_campo(clave):
@@ -270,3 +259,38 @@ class ServicioService:
 
         else:
             raise ValidationError("Prefijo no reconocido.")
+        
+
+    @staticmethod
+    def encontrar_dependencia_en_instance(instance, prefijo=""):
+        """
+        prefijo = "" → sala
+        prefijo = "area_refiere_" → area_refiere_sala
+        """
+
+        sala = getattr(instance, f"{prefijo}sala", None)
+        especialidad = getattr(instance, f"{prefijo}especialidad", None)
+        servicio_aux = getattr(instance, f"{prefijo}servicio_auxiliar", None)
+
+        if sala:
+            return {
+                "clave": f"S-{sala.id}",
+                "nombre": sala.nombre_sala,
+                "tipo": "HOSP"
+            }
+
+        elif especialidad:
+            return {
+                "clave": f"E-{especialidad.id}",
+                "nombre": especialidad.nombre_especialidad,
+                "tipo": "CEXT"  # lo dejamos así por ahora ✔️
+            }
+
+        elif servicio_aux:
+            return {
+                "clave": f"A-{servicio_aux.id}",
+                "nombre": servicio_aux.nombre_servicio_a,
+                "tipo": "SAUX"
+            }
+
+        return None

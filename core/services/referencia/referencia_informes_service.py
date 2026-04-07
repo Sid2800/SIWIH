@@ -6,10 +6,12 @@ from core.utils.utilidades_fechas import calcular_edad_texto
 from core.utils.utilidades_calculos import calcular_porcentaje
 from core.utils.utilidades_textos import formatear_dni, formatear_expediente, construir_nombre_dinamico
 from django.utils.timezone import localtime
+from core.constants.domain_constants import LogApp
+from core.utils.utilidades_logging import *
 
 class RefInformeService:
     
-    @staticmethod
+    @staticmethod 
     def generarDataInformeReferencia(mes, anio, indice =1, mayor_complejidad = False): # indice seria el columna que agrupara
         """
         Filtra y agrupa datos de ingresos según criterios, calculando totales y porcentajes para resúmenes.
@@ -18,7 +20,11 @@ class RefInformeService:
         try:
             inicio, fin = generar_rango_mes(mes=mes, anio=anio)
         except Exception as e:
-            return {"error": f"Error generando rango de fecha: {str(e)}"}
+            log_error(
+                f"Error generando rango de fechas mes {mes} año {anio}",
+                app=LogApp.REPORTE
+            )
+            return {"error": "Error generando rango de fecha"}
 
         # tipo de referencia (1 = enviadas, 0 = recibidas)
         tipo_ref = 1 if indice in [1, 2, 3, 5] else 0
@@ -47,7 +53,11 @@ class RefInformeService:
                 )
 
         except Exception as e:
-            return {"error": f"Error consultando datos: {str(e)}"}
+            log_error(
+                f"Error consultando referencias mes {mes} año {anio}",
+                app=LogApp.REPORTE
+            )
+            return {"error": "Error consultando datos"}
 
         # ---------------------------------------------------------------------
         # LÓGICA DEL ÍNDICE (sin try porque no necesita capturar todo)
@@ -182,6 +192,10 @@ class RefInformeService:
             }
 
         else:
+            log_warning(
+                f"Índice inválido {indice} en informe referencia",
+                app=LogApp.REPORTE
+            )
             return {'error': 'Índice no válido'}
 
         # ---------------------------------------------------------------------
@@ -215,7 +229,11 @@ class RefInformeService:
         try:
             inicio, fin = generar_rango_mes(mes=mes, anio=anio)
         except Exception as e:
-            return {"error": f"Error generando rango de fechas: {str(e)}"}
+            log_error(
+                f"Error generando rango fechas TIC mes {mes} año {anio}",
+                app=LogApp.REPORTE
+            )
+            return {"error": "Error generando rango de fechas"}
 
         # TRY 2 — consulta a la BD
         try:
@@ -230,11 +248,16 @@ class RefInformeService:
                 .select_related('seguimiento_tic')
             )
         except Exception as e:
-            return {"error": f"Error consultando referencias TIC: {str(e)}"}
+            log_error(
+                f"Error consultando referencias TIC mes {mes} año {anio}",
+                app=LogApp.REPORTE
+            )
+            return {"error": "Error consultando referencias TIC"}
 
         # --- LÓGICA (sin try) ---
 
         total = qs.count()
+
 
         sin_seguimiento = qs.filter(
             seguimiento_tic__isnull=True
@@ -275,7 +298,11 @@ class RefInformeService:
         try:
             inicio, fin = generar_rango_mes(mes=mes, anio=anio)
         except Exception as e:
-            return {"error": f"Error generando rango de fechas: {str(e)}"}
+            log_error(
+                f"Error generando rango fechas gestor mes {mes} año {anio}",
+                app=LogApp.REPORTE
+            )
+            return {"error": "Error generando rango de fechas"}
 
         tabla_final = []
         total_general = 0
@@ -303,7 +330,11 @@ class RefInformeService:
                 )
             )
         except Exception as e:
-            return {"error": f"Error consultando datos de referencias: {str(e)}"}
+            log_error(
+                f"Error consultando referencias gestor mes {mes} año {anio}",
+                app=LogApp.REPORTE
+            )
+            return {"error": "Error consultando datos de referencias"}
 
 
         if indice == 6:
@@ -386,6 +417,10 @@ class RefInformeService:
             total_general = resultado["total_general"]
 
         else:
+            log_warning(
+                f"Índice inválido {indice} en informe gestor",
+                app=LogApp.REPORTE
+            )
             return {"error": "Índice no válido"}
 
         return {
@@ -861,6 +896,10 @@ class RefInformeService:
 
 
             else:
+                log_warning(
+                    f"Índice inválido {indice} en informe respuesta",
+                    app=LogApp.REPORTE
+                )
                 return {'error': 'Índice no válido'}
             
             # Conteo total general
@@ -884,7 +923,10 @@ class RefInformeService:
             }
         
         except Exception as e:
-                print(f"Error al generar data del informe referencias: {e}")
+                log_error(
+                        f"Error al generar data del informe referencias",
+                        app=LogApp.REPORTE
+                    )
                 return None
         
 
@@ -893,7 +935,11 @@ class RefInformeService:
         try:
             inicio, fin = generar_rango_mes(mes=mes, anio=anio)
         except Exception as e:
-            return {"error": f"Error generando rango de fechas: {str(e)}"}
+            log_error(
+                f"Error generando rango fechas detalle especialidad mes {mes} año {anio}",
+                app=LogApp.REPORTE
+            )
+            return {"error": "Error generando rango de fechas"}
 
         id_ref = []
 
@@ -927,7 +973,11 @@ class RefInformeService:
                 })
 
         except Exception as e:
-            return {"error": f"Error consultando referencias del Top 3: {str(e)}"}
+            log_error(
+                f"Error consultando referencias Top3 especialidad mes {mes} año {anio}",
+                app=LogApp.REPORTE
+            )
+            return {"error": "Error consultando referencias del Top 3"}
 
         # ================= OBTENER DIAGNÓSTICOS POR REFERENCIA =================
         top3_diagnosticos_referencia = []
@@ -976,7 +1026,11 @@ class RefInformeService:
                 })
 
         except Exception as e:
-            return {"error": f"Error obteniendo diagnósticos del Top 3: {str(e)}"}
+            log_error(
+                f"Error obteniendo diagnósticos Top3 especialidad mes {mes} año {anio}",
+                app=LogApp.REPORTE
+            )
+            return {"error": "Error obteniendo diagnósticos del Top 3"}
 
         # ================= RETORNO FINAL =================
         return top3_diagnosticos_referencia
@@ -1014,7 +1068,28 @@ class RefInformeService:
                 .select_related(*relaciones)
                 .get(id=id_referencia)
             )
+        except Referencia.DoesNotExist:
+            log_warning(
+                f"Referencia {id_referencia} no encontrada para formato",
+                app=LogApp.REFERENCIAS
+            )
+            raise ValueError("La referencia solicitada no existe.")
 
+        except Referencia.MultipleObjectsReturned:
+            log_error(
+                f"Múltiples referencias encontradas con id {id_referencia}",
+                app=LogApp.REFERENCIAS
+            )
+            raise ValueError("Se encontraron múltiples referencias, lo cual no debería ocurrir.")
+
+        except Exception:
+            log_error(
+                f"Error obteniendo referencia {id_referencia}",
+                app=LogApp.REFERENCIAS
+            )
+            raise
+        
+        try:
             diag_qs = (
                 Referencia_diagnostico.objects
                 .filter(referencia_id=id_referencia, estado=True)
@@ -1043,106 +1118,102 @@ class RefInformeService:
 
             texto = " - ".join(diag_qs)
 
-            fecha_local_fecha_elaboracion = localtime(referencia.fecha_elaboracion)
+        except Exception:
+            log_error(
+                f"Error obteniendo diagnósticos referencia {id_referencia}",
+                app=LogApp.REFERENCIAS
+            )
+            raise
 
-            fecha_local_fecha_recepcion = None
-            if referencia.fecha_recepcion is not None:
-                fecha_local_fecha_recepcion = localtime(referencia.fecha_recepcion)
+        fecha_local_fecha_elaboracion = localtime(referencia.fecha_elaboracion)
 
-            paciente_data = {
-                # Paciente
-                "dni": formatear_dni(referencia.paciente.dni),
-                "expediente": formatear_expediente(referencia.paciente.expediente_numero),
-                "nombres": construir_nombre_dinamico(referencia.paciente, ["primer_nombre", "segundo_nombre"]),
-                "paciente_nombre2": referencia.paciente.segundo_nombre,
-                "apellido1": referencia.paciente.primer_apellido,
-                "apellido2": referencia.paciente.segundo_apellido,
-                "telefono": referencia.paciente.telefono,
-                "sexo": referencia.paciente.sexo,
-                "fecha_nacimiento": referencia.paciente.fecha_nacimiento,
-                "edad_texto": calcular_edad_texto(referencia.paciente.fecha_nacimiento),
+        fecha_local_fecha_recepcion = None
+        if referencia.fecha_recepcion is not None:
+            fecha_local_fecha_recepcion = localtime(referencia.fecha_recepcion)
 
-                # Procedencia (todo plano, sin anidar)
-                "departamento": referencia.paciente.sector.aldea.municipio.departamento.nombre_departamento,
-                "municipio": referencia.paciente.sector.aldea.municipio.nombre_municipio,
-                "direccion": referencia.paciente.sector.nombre_sector,
-            }
+        paciente_data = {
+            # Paciente
+            "dni": formatear_dni(referencia.paciente.dni),
+            "expediente": formatear_expediente(referencia.paciente.expediente_numero),
+            "nombres": construir_nombre_dinamico(referencia.paciente, ["primer_nombre", "segundo_nombre"]),
+            "apellido1": referencia.paciente.primer_apellido,
+            "apellido2": referencia.paciente.segundo_apellido,
+            "telefono": referencia.paciente.telefono,
+            "sexo": referencia.paciente.sexo,
+            "fecha_nacimiento": referencia.paciente.fecha_nacimiento,
+            "edad_texto": calcular_edad_texto(referencia.paciente.fecha_nacimiento),
+
+            # Procedencia (todo plano, sin anidar)
+            "departamento": referencia.paciente.sector.aldea.municipio.departamento.nombre_departamento,
+            "municipio": referencia.paciente.sector.aldea.municipio.nombre_municipio,
+            "direccion": referencia.paciente.sector.nombre_sector,
+        }
 
 
-            referencia_data = {
-                # ref
-                "ref_id": referencia.id,
-                "ref_tipo": referencia.tipo,
-                "ref_motivo": referencia.motivo_id,
-                "ref_motivo_detalle": referencia.motivo_detalle,
-                "ref_diagnosticos": texto,
-                "ref_atencion": referencia.atencion_requerida,
-                "ref_atencion_descripcion": referencia.get_atencion_requerida_display(),
-                "ref_fecha_elaboracion_dia": fecha_local_fecha_elaboracion.day,
-                "ref_fecha_elaboracion_mes": fecha_local_fecha_elaboracion.month,
-                "ref_fecha_elaboracion_anio": fecha_local_fecha_elaboracion.year,
-                "ref_fecha_elaboracion_hora": fecha_local_fecha_elaboracion.strftime("%H:%M"),
-                "ref_elaborado_por": referencia.elaborada_por_id,
-                "ref_elaborado_descripcion": referencia.elaborada_por.nombre_tipo_personal,
-                "ref_oportuna": referencia.oportuna,
-                "ref_justificada": referencia.justificada,
-                "ref_especialidad_destino": (
-                    referencia.especialidad_destino.nombre_referencia_especialidad
-                    if getattr(referencia, "especialidad_destino", None)
-                    else ""
-                ), 
-            }
+        referencia_data = {
+            # ref
+            "ref_id": referencia.id,
+            "ref_tipo": referencia.tipo,
+            "ref_motivo": referencia.motivo_id,
+            "ref_motivo_detalle": referencia.motivo_detalle,
+            "ref_diagnosticos": texto,
+            "ref_atencion": referencia.atencion_requerida,
+            "ref_atencion_descripcion": referencia.get_atencion_requerida_display(),
+            "ref_fecha_elaboracion_dia": fecha_local_fecha_elaboracion.day,
+            "ref_fecha_elaboracion_mes": fecha_local_fecha_elaboracion.month,
+            "ref_fecha_elaboracion_anio": fecha_local_fecha_elaboracion.year,
+            "ref_fecha_elaboracion_hora": fecha_local_fecha_elaboracion.strftime("%H:%M"),
+            "ref_elaborado_por": referencia.elaborada_por_id,
+            "ref_elaborado_descripcion": referencia.elaborada_por.nombre_tipo_personal,
+            "ref_oportuna": referencia.oportuna,
+            "ref_justificada": referencia.justificada,
+            "ref_especialidad_destino": (
+                referencia.especialidad_destino.nombre_referencia_especialidad
+                if getattr(referencia, "especialidad_destino", None)
+                else ""
+            ), 
+        }
 
 
             # instituciones (origen y destino siempre disponibles)
-            referencia_data.update({
-                # institucion origen
-                "institucion_nombre": f"{referencia.institucion_origen.nivel_complejidad_institucional.siglas}-{referencia.institucion_origen.nombre_institucion_salud}",
-                "institucion_red": f"#{referencia.institucion_origen.region_salud.codigo}-{referencia.institucion_origen.region_salud.nombre_region_salud}",
-                "institucion_proveedor_salud": referencia.institucion_origen.proveedor_salud.nombre_proveedor_salud,
-                "institucion_proveedor_salud_id": referencia.institucion_origen.proveedor_salud.id,
-                "institucion_nivel": referencia.institucion_origen.nivel_complejidad_institucional.siglas,
-                "institucion_centralizado": referencia.institucion_origen.centralizado,
-                "institucion_complejidad": referencia.institucion_origen.nivel_complejidad_institucional.nivel_complejidad,
-                "institucion_complejidad_nombre": referencia.institucion_origen.nivel_complejidad_institucional.siglas,
-                
+        referencia_data.update({
+            # institucion origen
+            "institucion_nombre": f"{referencia.institucion_origen.nivel_complejidad_institucional.siglas}-{referencia.institucion_origen.nombre_institucion_salud}",
+            "institucion_red": f"#{referencia.institucion_origen.region_salud.codigo}-{referencia.institucion_origen.region_salud.nombre_region_salud}",
+            "institucion_proveedor_salud": referencia.institucion_origen.proveedor_salud.nombre_proveedor_salud,
+            "institucion_proveedor_salud_id": referencia.institucion_origen.proveedor_salud.id,
+            "institucion_nivel": referencia.institucion_origen.nivel_complejidad_institucional.siglas,
+            "institucion_centralizado": referencia.institucion_origen.centralizado,
+            "institucion_complejidad": referencia.institucion_origen.nivel_complejidad_institucional.nivel_complejidad,
+            "institucion_complejidad_nombre": referencia.institucion_origen.nivel_complejidad_institucional.siglas,
+            
 
-                # institucion destino
-                "institucion_dest_complejidad": referencia.institucion_destino.nivel_complejidad_institucional.nivel_complejidad,
-                "institucion_dest_complejidad_nombre": referencia.institucion_destino.nivel_complejidad_institucional.detalle_nivel_complejidad,
-                "instirucion_dest_nombre": f"{referencia.institucion_destino.nivel_complejidad_institucional.siglas}-{referencia.institucion_destino.nombre_institucion_salud}",
-                "institucion_dest_direccion": f"{referencia.institucion_destino.direccion.aldea.municipio.nombre_municipio}, {referencia.institucion_destino.direccion.aldea.municipio.departamento.nombre_departamento}" if  referencia.institucion_destino.direccion else "",
+            # institucion destino
+            "institucion_dest_complejidad": referencia.institucion_destino.nivel_complejidad_institucional.nivel_complejidad,
+            "institucion_dest_complejidad_nombre": referencia.institucion_destino.nivel_complejidad_institucional.detalle_nivel_complejidad,
+            "instirucion_dest_nombre": f"{referencia.institucion_destino.nivel_complejidad_institucional.siglas}-{referencia.institucion_destino.nombre_institucion_salud}",
+            "institucion_dest_direccion": f"{referencia.institucion_destino.direccion.aldea.municipio.nombre_municipio}, {referencia.institucion_destino.direccion.aldea.municipio.departamento.nombre_departamento}" if  referencia.institucion_destino.direccion else "",
+        })
+
+        # fecha recepcion (solo si existe)
+        if fecha_local_fecha_recepcion:
+            referencia_data.update({
+                "ref_fecha_recepcion_dia": fecha_local_fecha_recepcion.day,
+                "ref_fecha_recepcion_mes": fecha_local_fecha_recepcion.month,
+                "ref_fecha_recepcion_anio": fecha_local_fecha_recepcion.year,
+                "ref_fecha_recepcion_hora": fecha_local_fecha_recepcion.strftime("%H:%M"),
+            })
+        else:
+            referencia_data.update({
+                "ref_fecha_recepcion_dia": "",
+                "ref_fecha_recepcion_mes": "",
+                "ref_fecha_recepcion_anio": "",
+                "ref_fecha_recepcion_hora": "",
             })
 
-            # fecha recepcion (solo si existe)
-            if fecha_local_fecha_recepcion:
-                referencia_data.update({
-                    "ref_fecha_recepcion_dia": fecha_local_fecha_recepcion.day,
-                    "ref_fecha_recepcion_mes": fecha_local_fecha_recepcion.month,
-                    "ref_fecha_recepcion_anio": fecha_local_fecha_recepcion.year,
-                    "ref_fecha_recepcion_hora": fecha_local_fecha_recepcion.strftime("%H:%M"),
-                })
-            else:
-                referencia_data.update({
-                    "ref_fecha_recepcion_dia": "",
-                    "ref_fecha_recepcion_mes": "",
-                    "ref_fecha_recepcion_anio": "",
-                    "ref_fecha_recepcion_hora": "",
-                })
-
-            return referencia_data, paciente_data
-
-        except Referencia.DoesNotExist:
-            raise ValueError("La referencia solicitada no existe.")
-
-        except Referencia.MultipleObjectsReturned:
-            raise ValueError("Se encontraron múltiples referencias, lo cual no debería ocurrir.")
-
-        except Exception as e:
-            raise Exception(f"Error interno al obtener la referencia: {e}")
+        return referencia_data, paciente_data
 
 
-    
     @staticmethod
     def generarDataFormatoRespuesta(id_respuesta):  # 0 recibidas 1 enviadas
 
@@ -1175,6 +1246,7 @@ class RefInformeService:
             'elaborada_por',
         ]
 
+        #respuesta
         try:
             respuesta = (
                 Respuesta.objects
@@ -1182,6 +1254,29 @@ class RefInformeService:
                 .get(id=id_respuesta)
             )
 
+        except Respuesta.DoesNotExist:
+            log_warning(
+                f"Respuesta {id_respuesta} no encontrada para formato",
+                app=LogApp.REFERENCIAS
+            )
+            raise ValueError("La respuesta solicitada no existe.")
+
+        except Respuesta.MultipleObjectsReturned:
+            log_error(
+                f"Múltiples respuestas encontradas con id {id_respuesta}",
+                app=LogApp.REFERENCIAS
+            )
+            raise ValueError("Se encontraron múltiples respuestas, lo cual no debería ocurrir.")
+
+        except Exception:
+            log_error(
+                f"Error obteniendo respuesta {id_respuesta}",
+                app=LogApp.REFERENCIAS
+            )
+            raise
+        
+        #diagnostico
+        try:
             diag_qs = (
                 Respuesta_diagnostico.objects
                 .filter(respuesta_id=id_respuesta, estado=True)
@@ -1206,70 +1301,79 @@ class RefInformeService:
 
             texto = " - ".join(diag_qs)
 
-            fecha_local_fecha_elaboracion = localtime(respuesta.fecha_elaboracion)
-            fecha_local_fecha_recepcion = (
-                localtime(respuesta.fecha_recepcion)
-                if respuesta.fecha_recepcion else None
+        except Exception:
+            log_error(
+                f"Error obteniendo diagnósticos respuesta {id_respuesta}",
+                app=LogApp.REFERENCIAS
             )
+            raise
+        
+        #fechas
+        fecha_local_fecha_elaboracion = localtime(respuesta.fecha_elaboracion)
+        fecha_local_fecha_recepcion = (
+            localtime(respuesta.fecha_recepcion)
+            if respuesta.fecha_recepcion else None
+        )
 
-            ref = respuesta.referencia
-            pac = ref.paciente
+        ref = respuesta.referencia
+        pac = ref.paciente
 
-            paciente_data = {
-                "paciente_dni": formatear_dni(pac.dni),
-                "paciente_expediente": formatear_expediente(pac.expediente_numero),
-                "paciente_nombre1": pac.primer_nombre,
-                "paciente_nombre2": pac.segundo_nombre,
-                "paciente_apellido1": pac.primer_apellido,
-                "paciente_apellido2": pac.segundo_apellido,
-                "paciente_telefono": pac.telefono,
-                "sexo": pac.sexo,
-                "paciente_fecha_nacimiento": pac.fecha_nacimiento,
-                "edad": calcular_edad_texto(pac.fecha_nacimiento),
-                "proc_departamento": pac.sector.aldea.municipio.departamento.nombre_departamento,
-                "proc_municipio": pac.sector.aldea.municipio.nombre_municipio,
-                "proc_sector": pac.sector.nombre_sector,
-            }
+        #paciente
 
-            respuesta_data = {
-                "ref_id": ref.id,
-                "ref_tipo": ref.tipo,
-                "res_motivo": respuesta.motivo_id,
-                "res_motivo_detalle": respuesta.motivo_detalle,
-                "res_diagnosticos": texto,
-                "res_atencion": respuesta.atencion_requerida,
-                "res_atencion_descripcion": respuesta.get_atencion_requerida_display(),
-                "res_fecha_elaboracion_dia": fecha_local_fecha_elaboracion.day,
-                "res_fecha_elaboracion_mes": fecha_local_fecha_elaboracion.month,
-                "res_fecha_elaboracion_anio": fecha_local_fecha_elaboracion.year,
-                "res_fecha_elaboracion_hora": fecha_local_fecha_elaboracion.strftime("%H:%M"),
-                "res_elaborado_por": respuesta.elaborada_por_id,
-                "res_elaborado_descripcion": respuesta.elaborada_por.nombre_tipo_personal,
-            }
+        paciente_data = {
+            "dni": formatear_dni(pac.dni),
+            "expediente": formatear_expediente(pac.expediente_numero),
+            "nombres": construir_nombre_dinamico(pac, ["primer_nombre", "segundo_nombre"]),
+            "apellido1": pac.primer_apellido,
+            "apellido2": pac.segundo_apellido,
+            "telefono": pac.telefono,
+            "sexo": pac.sexo,
+            "fecha_nacimiento": pac.fecha_nacimiento,
+            "edad_texto": calcular_edad_texto(pac.fecha_nacimiento),
+            "departamento": pac.sector.aldea.municipio.departamento.nombre_departamento,
+            "municipio": pac.sector.aldea.municipio.nombre_municipio,
+            "direccion": pac.sector.nombre_sector,
+        }
 
-            inst_or = ref.institucion_origen
-            inst_dest = ref.institucion_destino
+        respuesta_data = {
+            "ref_id": ref.id,
+            "ref_tipo": ref.tipo,
+            "res_motivo": respuesta.motivo_id,
+            "res_motivo_detalle": respuesta.motivo_detalle,
+            "res_diagnosticos": texto,
+            "res_atencion": respuesta.atencion_requerida,
+            "res_atencion_descripcion": respuesta.get_atencion_requerida_display(),
+            "res_fecha_elaboracion_dia": fecha_local_fecha_elaboracion.day,
+            "res_fecha_elaboracion_mes": fecha_local_fecha_elaboracion.month,
+            "res_fecha_elaboracion_anio": fecha_local_fecha_elaboracion.year,
+            "res_fecha_elaboracion_hora": fecha_local_fecha_elaboracion.strftime("%H:%M"),
+            "res_elaborado_por": respuesta.elaborada_por_id,
+            "res_elaborado_descripcion": respuesta.elaborada_por.nombre_tipo_personal,
+        }
 
-            respuesta_data.update({
-                "institucion_or_nombre": f"{inst_or.nivel_complejidad_institucional.siglas}-{inst_or.nombre_institucion_salud}",
-                "institucion_or_red": f"#{inst_or.region_salud.codigo}-{inst_or.region_salud.nombre_region_salud}",
-                "institucion_or_proveedor_salud": inst_or.proveedor_salud.nombre_proveedor_salud,
-                "institucion_or_proveedor_salud_id": inst_or.proveedor_salud.id,
-                "institucion_or_nivel": inst_or.nivel_complejidad_institucional.siglas,
-                "institucion_or_centralizado": inst_or.centralizado,
-                "institucion_or_complejidad": inst_or.nivel_complejidad_institucional.nivel_complejidad,
-                "institucion_or_complejidad_nombre": inst_or.nivel_complejidad_institucional.siglas,
+        inst_or = ref.institucion_origen
+        inst_dest = ref.institucion_destino
 
-                "institucion_resp_complejidad": inst_dest.nivel_complejidad_institucional.nivel_complejidad,
-                "institucion_resp_complejidad_nombre": inst_dest.nivel_complejidad_institucional.detalle_nivel_complejidad,
-                "institucion_resp_nombre": f"{inst_dest.nivel_complejidad_institucional.siglas}-{inst_dest.nombre_institucion_salud}",
-                "institucion_resp_direccion": f"{inst_dest.direccion.aldea.municipio.nombre_municipio}, {inst_dest.direccion.aldea.municipio.departamento.nombre_departamento}",
-                "institucion_resp_red": f"#{inst_dest.region_salud.codigo}-{inst_dest.region_salud.nombre_region_salud}",
-                "institucion_resp_proveedor_salud_id": inst_dest.proveedor_salud.id,
-                "institucion_resp_centralizado": inst_dest.centralizado,
-                "institucion_resp_complejidad": inst_dest.nivel_complejidad_institucional.nivel_complejidad,
-                "institucion_resp_complejidad_nombre": inst_dest.nivel_complejidad_institucional.siglas,
-            })
+        respuesta_data.update({
+            "institucion_or_nombre": f"{inst_or.nivel_complejidad_institucional.siglas}-{inst_or.nombre_institucion_salud}",
+            "institucion_or_red": f"#{inst_or.region_salud.codigo}-{inst_or.region_salud.nombre_region_salud}",
+            "institucion_or_proveedor_salud": inst_or.proveedor_salud.nombre_proveedor_salud,
+            "institucion_or_proveedor_salud_id": inst_or.proveedor_salud.id,
+            "institucion_or_nivel": inst_or.nivel_complejidad_institucional.siglas,
+            "institucion_or_centralizado": inst_or.centralizado,
+            "institucion_or_complejidad": inst_or.nivel_complejidad_institucional.nivel_complejidad,
+            "institucion_or_complejidad_nombre": inst_or.nivel_complejidad_institucional.siglas,
+
+            "institucion_resp_complejidad": inst_dest.nivel_complejidad_institucional.nivel_complejidad,
+            "institucion_resp_complejidad_nombre": inst_dest.nivel_complejidad_institucional.detalle_nivel_complejidad,
+            "institucion_resp_nombre": f"{inst_dest.nivel_complejidad_institucional.siglas}-{inst_dest.nombre_institucion_salud}",
+            "institucion_resp_direccion": f"{inst_dest.direccion.aldea.municipio.nombre_municipio}, {inst_dest.direccion.aldea.municipio.departamento.nombre_departamento}",
+            "institucion_resp_red": f"#{inst_dest.region_salud.codigo}-{inst_dest.region_salud.nombre_region_salud}",
+            "institucion_resp_proveedor_salud_id": inst_dest.proveedor_salud.id,
+            "institucion_resp_centralizado": inst_dest.centralizado,
+            "institucion_resp_complejidad": inst_dest.nivel_complejidad_institucional.nivel_complejidad,
+            "institucion_resp_complejidad_nombre": inst_dest.nivel_complejidad_institucional.siglas,
+        })
 
 
             # Según el seguimiento mandar data extra
@@ -1278,54 +1382,45 @@ class RefInformeService:
             # Caso 3: seguimiento deriva en nueva referencia (usar destino de seguimiento)
 
 
-            if respuesta.area_seguimiento_especialidad:
-                tipo_seguimiento = 1
-            elif respuesta.institucion_destino:
-                tipo_seguimiento = 2
-            elif respuesta.seguimiento_referencia:
-                tipo_seguimiento = 3
-            else:
-                tipo_seguimiento = 0
+        if respuesta.area_seguimiento_especialidad:
+            tipo_seguimiento = 1
+        elif respuesta.institucion_destino:
+            tipo_seguimiento = 2
+        elif respuesta.seguimiento_referencia:
+            tipo_seguimiento = 3
+        else:
+            tipo_seguimiento = 0
 
-            if tipo_seguimiento == 1:
-                respuesta_data.update({
-                    "seguimiento_area": respuesta.area_seguimiento_especialidad.nombre_especialidad,
-                    "institucion_seg_direccion": f"{inst_or.direccion.aldea.municipio.nombre_municipio}, {inst_or.direccion.aldea.municipio.departamento.nombre_departamento}" if inst_or.direccion else "",
-                })
+        if tipo_seguimiento == 1:
+            respuesta_data.update({
+                "seguimiento_area": respuesta.area_seguimiento_especialidad.nombre_especialidad,
+                "institucion_seg_direccion": f"{inst_or.direccion.aldea.municipio.nombre_municipio}, {inst_or.direccion.aldea.municipio.departamento.nombre_departamento}" if inst_or.direccion else "",
+            })
 
-            elif tipo_seguimiento == 2:
-                inst = respuesta.institucion_destino
-                respuesta_data.update({
-                    "institucion_seg_nombre": f"{inst.nivel_complejidad_institucional.siglas}-{inst.nombre_institucion_salud}",
-                    "institucion_seg_complejidad": inst.nivel_complejidad_institucional.nivel_complejidad,
-                    "institucion_seg_complejidad_nombre": inst.nivel_complejidad_institucional.siglas,
-                    "institucion_seg_direccion": f"{inst.direccion.aldea.municipio.nombre_municipio}, {inst.direccion.aldea.municipio.departamento.nombre_departamento}" if inst.direccion else "",
-                })
+        elif tipo_seguimiento == 2:
+            inst = respuesta.institucion_destino
+            respuesta_data.update({
+                "institucion_seg_nombre": f"{inst.nivel_complejidad_institucional.siglas}-{inst.nombre_institucion_salud}",
+                "institucion_seg_complejidad": inst.nivel_complejidad_institucional.nivel_complejidad,
+                "institucion_seg_complejidad_nombre": inst.nivel_complejidad_institucional.siglas,
+                "institucion_seg_direccion": f"{inst.direccion.aldea.municipio.nombre_municipio}, {inst.direccion.aldea.municipio.departamento.nombre_departamento}" if inst.direccion else "",
+            })
 
-            elif tipo_seguimiento == 3:
-                seg_ref = respuesta.seguimiento_referencia
-                inst = seg_ref.institucion_destino
-                respuesta_data.update({
-                    "institucion_seg_nombre": f"{inst.nivel_complejidad_institucional.siglas}-{inst.nombre_institucion_salud}",
-                    "institucion_seg_complejidad": inst.nivel_complejidad_institucional.nivel_complejidad,
-                    "institucion_seg_complejidad_nombre": inst.nivel_complejidad_institucional.siglas,
-                    "institucion_seg_especialidad": (
-                        seg_ref.especialidad_destino.nombre_referencia_especialidad
-                        if seg_ref.especialidad_destino else ""
-                    ),
-                    "institucion_seg_direccion": f"{inst.direccion.aldea.municipio.nombre_municipio}, {inst.direccion.aldea.municipio.departamento.nombre_departamento}" if inst.direccion else "",
-                })
+        elif tipo_seguimiento == 3:
+            seg_ref = respuesta.seguimiento_referencia
+            inst = seg_ref.institucion_destino
+            respuesta_data.update({
+                "institucion_seg_nombre": f"{inst.nivel_complejidad_institucional.siglas}-{inst.nombre_institucion_salud}",
+                "institucion_seg_complejidad": inst.nivel_complejidad_institucional.nivel_complejidad,
+                "institucion_seg_complejidad_nombre": inst.nivel_complejidad_institucional.siglas,
+                "institucion_seg_especialidad": (
+                    seg_ref.especialidad_destino.nombre_referencia_especialidad
+                    if seg_ref.especialidad_destino else ""
+                ),
+                "institucion_seg_direccion": f"{inst.direccion.aldea.municipio.nombre_municipio}, {inst.direccion.aldea.municipio.departamento.nombre_departamento}" if inst.direccion else "",
+            })
 
-            respuesta_data["tipo_seguimiento"] = tipo_seguimiento
+        respuesta_data["tipo_seguimiento"] = tipo_seguimiento
 
-            return respuesta_data, paciente_data
-
-        except Respuesta.DoesNotExist:
-            raise ValueError("La respuesta solicitada no existe.")
-
-        except Respuesta.MultipleObjectsReturned:
-            raise ValueError("Se encontraron múltiples respuestas, lo cual no debería ocurrir.")
-
-        except Exception as e:
-            raise Exception(f"Error interno al obtener la respuesta: {e}")
+        return respuesta_data, paciente_data
 

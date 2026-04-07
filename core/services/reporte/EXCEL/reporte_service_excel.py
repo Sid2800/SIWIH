@@ -7,7 +7,8 @@ from django.utils import timezone
 from PIL import Image as PILImage
 from django.db import connections
 from core.utils.utilidades_fechas import mes_nombre, formatear_fecha
-
+from core.constants.domain_constants import LogApp
+from core.utils.utilidades_logging import *
 
 class ServiceExcel:
     """
@@ -265,214 +266,250 @@ class ServiceExcel:
         usuario = reporte["usuario"]
         usuario_nombre = reporte["usuario_nombre"]
         observacion = reporte.get('observacion', '0')
-        
-        wb = Workbook()
-        ws = wb.active
-        ws.title = "Reporte"
 
-        columnas = len(data[0])
-        col_ini, col_fin = ServiceExcel.configurar_anchos(ws, columnas)
+        try:
+            if not data:
+                log_warning(
+                    f"Excel referencia sin datos informe {informe}",
+                    app=LogApp.REPORTE
+                )
+                raise ValueError("No hay datos para generar el reporte")
+            
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "Reporte"
 
-        ServiceExcel.dibujar_encabezado_excel(ws, col_fin=col_fin)
-        ServiceExcel.dibujar_titulo_excel(ws, titulo, mes, anio, fila=ws.max_row, col_fin=col_fin)
-        ws.append([])
+            columnas = len(data[0])
+            col_ini, col_fin = ServiceExcel.configurar_anchos(ws, columnas)
 
-        encabezado = (
-            [None, etiqueta.upper()] + ServiceExcel.ENCABEZADO_GENERAl
-            if informe in range(1, 10)
-            else [etiqueta.upper()] + ServiceExcel.ENCABEZADOS_ESPECIFICOS.get(informe, ServiceExcel.ENCABEZADO_GENERAl)
-        )
-        ws.append(encabezado)
+            ServiceExcel.dibujar_encabezado_excel(ws, col_fin=col_fin)
+            ServiceExcel.dibujar_titulo_excel(ws, titulo, mes, anio, fila=ws.max_row, col_fin=col_fin)
+            ws.append([])
 
-        ServiceExcel.aplicar_estilo_rango(
-            ws,
-            f"{col_ini}{ws.max_row}:{('D' if columnas <= 3 else col_fin)}{ws.max_row}",
-            font=ServiceExcel.FONT_TITULO_TABLA,
-            fill=ServiceExcel.FILL_TITULO_TABLA,
-            align=ServiceExcel.ALIGN_TITULO,
-            border=ServiceExcel.BORDER_GENERAL,
-        )
-        ws.row_dimensions[ws.max_row].height = ServiceExcel.ROW_HEIGHT_ENCABEZADO
+            encabezado = (
+                [None, etiqueta.upper()] + ServiceExcel.ENCABEZADO_GENERAl
+                if informe in range(1, 10)
+                else [etiqueta.upper()] + ServiceExcel.ENCABEZADOS_ESPECIFICOS.get(informe, ServiceExcel.ENCABEZADO_GENERAl)
+            )
+            ws.append(encabezado)
 
-        fila_enc = ws.max_row
-        ServiceExcel.configurar_impresion(ws, fila_enc)
+            ServiceExcel.aplicar_estilo_rango(
+                ws,
+                f"{col_ini}{ws.max_row}:{('D' if columnas <= 3 else col_fin)}{ws.max_row}",
+                font=ServiceExcel.FONT_TITULO_TABLA,
+                fill=ServiceExcel.FILL_TITULO_TABLA,
+                align=ServiceExcel.ALIGN_TITULO,
+                border=ServiceExcel.BORDER_GENERAL,
+            )
+            ws.row_dimensions[ws.max_row].height = ServiceExcel.ROW_HEIGHT_ENCABEZADO
 
-        fila1 = data[0]
-        indices_pct = [
-            i for i, valor in enumerate(fila1) if isinstance(valor, str) and "%" in valor
-        ]
+            fila_enc = ws.max_row
+            ServiceExcel.configurar_impresion(ws, fila_enc)
 
-        fila_actual = ws.max_row + 1
-        indices_header = []
+            fila1 = data[0]
+            indices_pct = [
+                i for i, valor in enumerate(fila1) if isinstance(valor, str) and "%" in valor
+            ]
 
-        for fila in data:
-            fila = ServiceExcel.procesar_header(list(fila), fila_actual, indices_header)
+            fila_actual = ws.max_row + 1
+            indices_header = []
 
-            for i in indices_pct:
-                fila[i] = ServiceExcel.convertir_porcentaje(fila[i])
+            for fila in data:
+                fila = ServiceExcel.procesar_header(list(fila), fila_actual, indices_header)
 
-            fila_excel = [None] + fila + [None] if columnas <= 3 else fila
-            ws.append(fila_excel)
-            ws.row_dimensions[fila_actual].height = ServiceExcel.ROW_HEIGHT_GENERAL
+                for i in indices_pct:
+                    fila[i] = ServiceExcel.convertir_porcentaje(fila[i])
 
-            col_fin_fila = (
-                get_column_letter(ws.max_column - 1) if columnas <= 3 else col_fin
+                fila_excel = [None] + fila + [None] if columnas <= 3 else fila
+                ws.append(fila_excel)
+                ws.row_dimensions[fila_actual].height = ServiceExcel.ROW_HEIGHT_GENERAL
+
+                col_fin_fila = (
+                    get_column_letter(ws.max_column - 1) if columnas <= 3 else col_fin
+                )
+
+                if fila_actual in indices_header:
+                    ServiceExcel.aplicar_estilo_rango(
+                        ws,
+                        f"{col_ini}{fila_actual}:{col_fin_fila}{fila_actual}",
+                        fill=ServiceExcel.FILL_SUBTITULO,
+                        border=ServiceExcel.BORDER_SUBTITULO_ARRIBA,
+                        font=ServiceExcel.FONT_SUBTITULO,
+                        align=ServiceExcel.ALIGN_GENERAL,
+                    )
+                else:
+                    fill = (
+                        ServiceExcel.FILL_ZEBRA_1 if fila_actual % 2 == 0 else ServiceExcel.FILL_ZEBRA_2
+                    )
+                    ServiceExcel.aplicar_estilo_rango(
+                        ws,
+                        f"{col_ini}{fila_actual}:{col_fin_fila}{fila_actual}",
+                        fill=fill,
+                        border=ServiceExcel.BORDER_GENERAL,
+                        font=ServiceExcel.FONT_GENERAL,
+                        align=ServiceExcel.ALIGN_GENERAL,
+                    )
+
+                for i in indices_pct:
+                    col_excel = i + (2 if columnas <= 3 else 1)
+                    celda = ws.cell(row=fila_actual, column=col_excel)
+                    celda.font = ServiceExcel.FONT_SUBTITULO
+                    celda.number_format = "0.00%"
+
+                col_indent = 2 if columnas <= 3 else 1
+                celda = ws.cell(row=fila_actual, column=col_indent)
+                celda.alignment = (
+                    Alignment(horizontal="center", vertical="center")
+                    if fila_actual in indices_header
+                    else Alignment(horizontal="left", vertical="center", indent=1)
+                )
+
+                fila_actual += 1
+
+            ultima = ws.max_row
+            rango_total = f"{col_ini}{ultima}:{col_fin_fila}{ultima}"
+
+            ws.row_dimensions[ultima].height = ServiceExcel.ROW_HEIGHT_TOTAL
+            ServiceExcel.aplicar_estilo_rango(
+                ws,
+                rango_total,
+                font=ServiceExcel.FONT_TOTAL,
+                fill=ServiceExcel.FILL_TOTAL,
+                align=ServiceExcel.ALIGN_TOTAL,
+                border=ServiceExcel.BORDER_INFERIOR_TOTAL,
             )
 
-            if fila_actual in indices_header:
-                ServiceExcel.aplicar_estilo_rango(
-                    ws,
-                    f"{col_ini}{fila_actual}:{col_fin_fila}{fila_actual}",
-                    fill=ServiceExcel.FILL_SUBTITULO,
-                    border=ServiceExcel.BORDER_SUBTITULO_ARRIBA,
-                    font=ServiceExcel.FONT_SUBTITULO,
-                    align=ServiceExcel.ALIGN_GENERAL,
+            if observacion != '0':
+                ultima = ServiceExcel.escribir_observacion(ws, observacion, ultima, col_fin)
+
+
+
+            ServiceExcel.dibujar_pie_excel(ws, fechaActual, usuario, usuario_nombre)
+
+            nombre_archivo = f"{titulo}_{mes}_{anio}.xlsx"
+
+            response = HttpResponse(
+                content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+            response["Content-Disposition"] = f'attachment; filename="{nombre_archivo}"'
+
+            wb.save(response)
+            return response
+        
+        except ValueError:
+            raise
+
+        except Exception:
+            log_error(
+                f"Error generando Excel referencia informe {reporte.get('informe')} mes {reporte.get('mes')} año {reporte.get('anio')}",
+                app=LogApp.REPORTE
+            )
+            raise
+        
+
+    @staticmethod
+    def GenerarExcelCatalogo(titulos, data, titulo):
+        try:
+            if not data:
+                log_warning(
+                    f"Excel catálogo sin datos: {titulo}",
+                    app=LogApp.REPORTE
                 )
-            else:
+                raise ValueError("No hay datos para generar el catálogo")
+            
+
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "Reporte"
+            columnas = len(data[0])
+            col_letra_fin  = get_column_letter(columnas)
+            #titulo
+            fila = ws.max_row + 1
+            for col in range(1, columnas+1):
+                ws.cell(row=fila, column=col).border = ServiceExcel.BORDER_TITULO
+            ws.merge_cells(f"A{fila}:{col_letra_fin}{fila}")
+            c = ws[f"A{fila}"]
+            c.value = titulo
+            c.alignment = ServiceExcel.ALIGN_TITULO
+            c.font = ServiceExcel.FONT_TITULO
+            ws.row_dimensions[fila].height = 22
+
+
+            ws.append([])
+            ws.append(titulos)
+            fila_titulos = ws.max_row
+            ws.auto_filter.ref = f"A{fila_titulos}:{col_letra_fin}{fila_titulos}"
+            ws.freeze_panes = f"A{fila_titulos + 1}"
+
+
+            ServiceExcel.aplicar_estilo_rango(ws, 
+                        F"A{ws.max_row}:{col_letra_fin}{ws.max_row}",
+                        font=ServiceExcel.FONT_TITULO_TABLA,
+                        fill=ServiceExcel.FILL_TITULO_TABLA,
+                        align=ServiceExcel.ALIGN_PRIMERA_COL,
+                        border=ServiceExcel.BORDER_GENERAL,
+                    ) 
+            ws.row_dimensions[ws.max_row].height = ServiceExcel.ROW_HEIGHT_ENCABEZADO
+
+
+            fila_actual = ws.max_row + 1
+            maximos = [8] * columnas
+            for fila in data:
+                fila = list(fila)
+                
+                ws.append(fila)
+
                 fill = (
-                    ServiceExcel.FILL_ZEBRA_1 if fila_actual % 2 == 0 else ServiceExcel.FILL_ZEBRA_2
-                )
+                        ServiceExcel.FILL_ZEBRA_1 if fila_actual % 2 == 0 else ServiceExcel.FILL_ZEBRA_2)
                 ServiceExcel.aplicar_estilo_rango(
                     ws,
-                    f"{col_ini}{fila_actual}:{col_fin_fila}{fila_actual}",
+                    f"A{fila_actual}:{col_letra_fin}{fila_actual}",
                     fill=fill,
                     border=ServiceExcel.BORDER_GENERAL,
                     font=ServiceExcel.FONT_GENERAL,
-                    align=ServiceExcel.ALIGN_GENERAL,
-                )
-
-            for i in indices_pct:
-                col_excel = i + (2 if columnas <= 3 else 1)
-                celda = ws.cell(row=fila_actual, column=col_excel)
-                celda.font = ServiceExcel.FONT_SUBTITULO
-                celda.number_format = "0.00%"
-
-            col_indent = 2 if columnas <= 3 else 1
-            celda = ws.cell(row=fila_actual, column=col_indent)
-            celda.alignment = (
-                Alignment(horizontal="center", vertical="center")
-                if fila_actual in indices_header
-                else Alignment(horizontal="left", vertical="center", indent=1)
-            )
-
-            fila_actual += 1
-
-        ultima = ws.max_row
-        rango_total = f"{col_ini}{ultima}:{col_fin_fila}{ultima}"
-
-        ws.row_dimensions[ultima].height = ServiceExcel.ROW_HEIGHT_TOTAL
-        ServiceExcel.aplicar_estilo_rango(
-            ws,
-            rango_total,
-            font=ServiceExcel.FONT_TOTAL,
-            fill=ServiceExcel.FILL_TOTAL,
-            align=ServiceExcel.ALIGN_TOTAL,
-            border=ServiceExcel.BORDER_INFERIOR_TOTAL,
-        )
-
-        if observacion != '0':
-            ultima = ServiceExcel.escribir_observacion(ws, observacion, ultima, col_fin)
-
-
-
-        ServiceExcel.dibujar_pie_excel(ws, fechaActual, usuario, usuario_nombre)
-
-        nombre_archivo = f"{titulo}_{mes}_{anio}.xlsx"
-
-        response = HttpResponse(
-            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-        response["Content-Disposition"] = f'attachment; filename="{nombre_archivo}"'
-
-        wb.save(response)
-        return response
-    
-    @staticmethod
-    def GenerarExcelCatalogo(titulos, data, titulo):
-        
-        wb = Workbook()
-        ws = wb.active
-        ws.title = "Reporte"
-        columnas = len(data[0])
-        col_letra_fin  = get_column_letter(columnas)
-        #titulo
-        fila = ws.max_row + 1
-        for col in range(1, columnas+1):
-            ws.cell(row=fila, column=col).border = ServiceExcel.BORDER_TITULO
-        ws.merge_cells(f"A{fila}:{col_letra_fin}{fila}")
-        c = ws[f"A{fila}"]
-        c.value = titulo
-        c.alignment = ServiceExcel.ALIGN_TITULO
-        c.font = ServiceExcel.FONT_TITULO
-        ws.row_dimensions[fila].height = 22
-
-
-        ws.append([])
-        ws.append(titulos)
-        fila_titulos = ws.max_row
-        ws.auto_filter.ref = f"A{fila_titulos}:{col_letra_fin}{fila_titulos}"
-        ws.freeze_panes = f"A{fila_titulos + 1}"
-
-
-        ServiceExcel.aplicar_estilo_rango(ws, 
-                    F"A{ws.max_row}:{col_letra_fin}{ws.max_row}",
-                    font=ServiceExcel.FONT_TITULO_TABLA,
-                    fill=ServiceExcel.FILL_TITULO_TABLA,
                     align=ServiceExcel.ALIGN_PRIMERA_COL,
-                    border=ServiceExcel.BORDER_GENERAL,
-                ) 
-        ws.row_dimensions[ws.max_row].height = ServiceExcel.ROW_HEIGHT_ENCABEZADO
+                )
+                for i in range(0,columnas):
+                    valor = str(fila[i]) if fila[i] is not None else ""
+                    largo = len(valor)
+                    if largo > maximos[i]:
+                        maximos[i] = largo
+                    
+                fila_actual += 1
 
+            factor = 1.2
+            padding = 1
+            MAX_ANCHO = 75
 
-        fila_actual = ws.max_row + 1
-        maximos = [8] * columnas
-        for fila in data:
-            fila = list(fila)
-            
-            ws.append(fila)
+            for num in range(0,columnas):
+                largo = maximos[num]
 
-            fill = (
-                    ServiceExcel.FILL_ZEBRA_1 if fila_actual % 2 == 0 else ServiceExcel.FILL_ZEBRA_2)
-            ServiceExcel.aplicar_estilo_rango(
-                ws,
-                f"A{fila_actual}:{col_letra_fin}{fila_actual}",
-                fill=fill,
-                border=ServiceExcel.BORDER_GENERAL,
-                font=ServiceExcel.FONT_GENERAL,
-                align=ServiceExcel.ALIGN_PRIMERA_COL,
-            )
-            for i in range(0,columnas):
-                valor = str(fila[i]) if fila[i] is not None else ""
-                largo = len(valor)
-                if largo > maximos[i]:
-                    maximos[i] = largo
+                if largo > MAX_ANCHO:
+                    largo = MAX_ANCHO
+
+                ancho = largo*factor + padding
+
+                ws.column_dimensions[get_column_letter(num+1)].width = ancho
                 
-            fila_actual += 1
+            titulo = titulo.replace('/','_').replace(':','-')
+            nombre_archivo = f"{titulo}.xlsx"
 
-        factor = 1.2
-        padding = 1
-        MAX_ANCHO = 75
+            response = HttpResponse(
+                content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+            response["Content-Disposition"] = f'attachment; filename="{nombre_archivo}"'
 
-        for num in range(0,columnas):
-            largo = maximos[num]
+            wb.save(response)
+            return response
+        except ValueError:
+            raise
 
-            if largo > MAX_ANCHO:
-                largo = MAX_ANCHO
-
-            ancho = largo*factor + padding
-
-            ws.column_dimensions[get_column_letter(num+1)].width = ancho
-            
-        titulo = titulo.replace('/','_').replace(':','-')
-        nombre_archivo = f"{titulo}.xlsx"
-
-        response = HttpResponse(
-            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-        response["Content-Disposition"] = f'attachment; filename="{nombre_archivo}"'
-
-        wb.save(response)
-        return response
+        except Exception:
+            log_error(
+                f"Error al generar el catalogo {titulo or "referencias"}",
+                app=LogApp.REPORTE
+            )
+            raise
 
     @staticmethod
     def obtener_data_catalogo(SP, fecha_ini, fecha_fin):

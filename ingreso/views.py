@@ -51,7 +51,6 @@ class IngresoAddView(UnidadRolRequiredMixin, CreateView):
         return initial
 
     def form_valid(self, form):
-        
         usuario_id = self.request.user.id
         zona = form.cleaned_data.get("zona", None)
         #paceinte validaddo en form clean 
@@ -509,6 +508,7 @@ class RecepcionIngresosSala(View):
             messages.warning(request, "Ha ocurrido un error al cargar la información.")
             return redirect(reverse_lazy('home'))
 
+
 def registrarRecepcionIngresosSala(request):
     usuario = request.user
     if not verificar_permisos_usuario(usuario,  INGRESO_EDITOR_ROLES, INGRESO_EDITOR_UNIDADES):
@@ -531,19 +531,20 @@ def registrarRecepcionIngresosSala(request):
             # Llamar al servicio
             resultado = RecepcionIngresoServiceSala.procesar_recepcion_ingreso_sala (observacion, ingresos, usuario)
 
-            if resultado.get('error'):
-                return JsonResponse({'error': resultado['mensaje']}, status=400)
-
-
             #mostrar el comporbante que todo salio bien 
             pdf_url = reverse("reporte_detalle_recepcion_ingresos_sala", kwargs={"recepcion_id":resultado['idRecepcion'] })
             return JsonResponse({"success": True, 'message': resultado['mensaje'],"pdf_url": pdf_url, "redirect_url": reverse_lazy('listar_ingresos') })
 
 
         except Exception as e:
-            return JsonResponse({'error': str(e)}, status=400)
+            return JsonResponse(
+                {'error': 'Error interno al procesar la recepción de ingresos'},
+                status=500
+            )
 
-    return JsonResponse({'error': 'Método no permitido'}, status=405)
+    return JsonResponse({'error': 'Metodo no permitido'}, status=405)
+
+
 
 class RecepcionIngresosSDGI(View):
     def dispatch(self, request, *args, **kwargs):
@@ -581,6 +582,8 @@ class RecepcionIngresosSDGI(View):
             messages.warning(request, f"Ha ocurrido un error al cargar la información.{e}")
             return redirect(reverse_lazy('home'))
 
+
+
 def registrarRecepcionIngresosSDGI(request):
     usuario = request.user
     if not verificar_permisos_usuario(usuario, INGRESO_EDITOR_ROLES, INGRESO_EDITOR_UNIDADES):
@@ -605,16 +608,16 @@ def registrarRecepcionIngresosSDGI(request):
             # Llamar al servicio
             resultado = RecepcionIngresoServiceSDGI.procesar_recepcion_ingreso_sdgi (observacion, ingresos, usuario)
 
-            if resultado.get('error'):
-                return JsonResponse({'error': resultado['mensaje']}, status=400)
-
-
+ 
             #mostrar el comporbante que todo salio bien 
             pdf_url = reverse("reporte_detalle_recepcion_ingresos_sdgi", kwargs={"recepcion_id":resultado['idRecepcion'] })
             return JsonResponse({"success": True, 'message': resultado['mensaje'],"pdf_url": pdf_url, "redirect_url": reverse_lazy('listar_ingresos') })
 
         except Exception as e:
-            return JsonResponse({'error': str(e)}, status=400)
+            return JsonResponse(
+                {'error': 'Error interno al procesar la recepción de ingresos SDGI'},
+                status=500
+            )
 
     return JsonResponse({'error': 'Método no permitido'}, status=405)
 

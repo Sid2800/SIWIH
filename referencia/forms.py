@@ -8,7 +8,7 @@ from servicio.models import Institucion_salud, Especialidad
 from referencia.models import Referencia_especialidad
 from core.services.paciente_service import PacienteService
 from core.services.servicio_service import ServicioService
-from core.validators.main import validar_fecha
+from core.validators.fecha_validator import validar_fecha
 from core.validators.paciente import validar_paciente
 from .validators import validar_instituciones_origen_destino, validar_diagnosticos_json, validar_referencia_para_respuesta
 from django.db.models import Q
@@ -133,11 +133,6 @@ class ReferenciaCreateForm(forms.ModelForm):
             self.fields['idSeguimiento'].initial = 0
             self.fields['motivo_no_atencion'].initial = 0
     
-                
-
-            
-
-
 
         self.fields['fecha_recepcion'].required = False
 
@@ -320,26 +315,16 @@ class ReferenciaEditForm(ReferenciaCreateForm):
                 qs_activas = qs_activas | Institucion_salud.objects.filter(pk=self.instance.institucion_destino.pk)
 
             #agregar la sala aunque no este activa o este oculta
-            if self.instance.area_refiere_sala:
-                clave_actual = f"S-{self.instance.area_refiere_sala.id}"
-                nombre_actual = self.instance.area_refiere_sala.nombre_sala
-                tipo_actual = "HOSP"
-            elif self.instance.area_refiere_especialidad:
-                clave_actual = f"E-{self.instance.area_refiere_especialidad.id}"
-                nombre_actual = self.instance.area_refiere_especialidad.nombre_especialidad
-                tipo_actual = "CEXT"
-            elif self.instance.area_refiere_servicio_auxiliar:
-                clave_actual = f"A-{self.instance.area_refiere_servicio_auxiliar.id}"
-                nombre_actual = self.instance.area_refiere_servicio_auxiliar.nombre_servicio_a
-                tipo_actual = "SAUX"
-            else:
-                clave_actual = None
+            info = ServicioService.encontrar_dependencia_en_instance(self.instance,prefijo="area_refiere_")
 
-            if clave_actual:
+            if info:
+                clave_actual = info["clave"]
+                label = f"{info['nombre']} ({info['tipo']})"
+            
                 # Revisar si ya está en choices
                 if clave_actual not in dict(self.fields['area_refiere'].choices):
                     # Agregarlo al principio
-                    self.fields['area_refiere'].choices = [(clave_actual, f"{nombre_actual} ({tipo_actual})")] + list(self.fields['area_refiere'].choices)
+                    self.fields['area_refiere'].choices = [(clave_actual, f"{label})")] + list(self.fields['area_refiere'].choices)
 
                 self.fields['area_refiere'].initial = clave_actual
 
@@ -811,25 +796,16 @@ class RespuestaEditForm(RespuestaCreateForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)   
 
-        if self.instance.area_reponde_sala:
-            clave_actual = f"S-{self.instance.area_reponde_sala.id}"
-            nombre_actual = self.instance.area_reponde_sala.nombre_sala
-            tipo_actual = "HOSP"
-        elif self.instance.area_reponde_especialidad:
-            clave_actual = f"E-{self.instance.area_reponde_especialidad.id}"
-            nombre_actual = self.instance.area_reponde_especialidad.nombre_especialidad
-            tipo_actual = "CEXT"
-        elif self.instance.area_reponde_servicio_auxiliar:
-            clave_actual = f"A-{self.instance.area_reponde_servicio_auxiliar.id}"
-            nombre_actual = self.instance.area_reponde_servicio_auxiliar.nombre_servicio_a
-            tipo_actual = "SAUX"
-        else:
-            clave_actual = None
+        #agregar la sala aunque no este activa o este oculta
+        info = ServicioService.encontrar_dependencia_en_instance(self.instance,prefijo="area_reponde_")
 
-        if clave_actual:
-                # Revisar si ya está en choices
-                if clave_actual not in dict(self.fields['area_responde'].choices):
-                    # Agregarlo al principio
-                    self.fields['area_responde'].choices = [(clave_actual, f"{nombre_actual} ({tipo_actual})")] + list(self.fields['area_responde'].choices)
+        if info:
+            clave_actual = info["clave"]
+            label = f"{info['nombre']} ({info['tipo']})"
+        
+            # Revisar si ya está en choices
+            if clave_actual not in dict(self.fields['area_responde'].choices):
+                # Agregarlo al principio
+                self.fields['area_responde'].choices = [(clave_actual, f"{label})")] + list(self.fields['area_responde'].choices)
 
-                self.fields['area_responde'].initial = clave_actual
+            self.fields['area_responde'].initial = clave_actual

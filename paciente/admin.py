@@ -52,6 +52,7 @@ class DefuncionAdmin(admin.ModelAdmin):
         'motivo',
         'registrado_por',
         'fecha_registro',
+        'tipo_defuncion'
     )
     search_fields = (
         'paciente__dni',
@@ -73,6 +74,22 @@ class DefuncionAdmin(admin.ModelAdmin):
         return f"{p.primer_nombre} {p.segundo_nombre or ''} {p.primer_apellido} {p.segundo_apellido or ''}".strip()
     get_nombre_completo.short_description = "Nombre completo"
 
+
+
+class ObitoFetalAdmin(admin.ModelAdmin):
+    list_display = ('get_dni','get_nombre_completo','fecha_obito','sala','motivo','responsable_nombre','registrado_por','fecha_registro')
+    search_fields = ('paciente__dni','paciente__primer_nombre','paciente__segundo_nombre','paciente__primer_apellido','paciente__segundo_apellido','responsable_nombre','responsable_dni')
+    autocomplete_fields = ['paciente','sala']
+    list_filter = ('fecha_obito','sala','registrado_por','estado')
+    readonly_fields = ('fecha_registro',)
+
+    def get_dni(self, obj): return obj.paciente.dni
+    get_dni.short_description = "DNI"
+
+    def get_nombre_completo(self, obj):
+        p = obj.paciente
+        return f"{p.primer_nombre} {p.segundo_nombre or ''} {p.primer_apellido} {p.segundo_apellido or ''}".strip()
+    get_nombre_completo.short_description = "Nombre completo"
 
 
 
@@ -101,6 +118,8 @@ admin.site.register(Padre,PadreAdmin)
 admin.site.register(Tipo,TipoAdmin)
 admin.site.register(Clasificacion_diagnostico, Clasificacion_diagnosticoAdmin)
 admin.site.register(Defuncion, DefuncionAdmin)
+admin.site.register(ObitoFetal, ObitoFetalAdmin)
+
 admin.site.register(Paciente,PacienteAdmin)
 
 

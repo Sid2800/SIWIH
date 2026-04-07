@@ -11,11 +11,11 @@ const ModalGaleria = (function () {
             html: `
                 <div class="tituloFormulario-subrallado"></div>
 
-                <div class="modal-galeria-contendor-data">
-                    <div class="modal-galeria-contendor-data-encabezado" id="modalGaleriaHeader"></div>
+                <div class="modal-contendor-data">
+                    <div class="modal-contendor-data-encabezado" id="modalGaleriaHeader"></div>
+
                     <div class="modal-galeria-contendor-imagenes fieldset-falso">
                         <span class="form-subtitulo-fieldset-falso">Estudios Registrados</span>
-
                         <div id="ui-gallery" class="ui-gallery"></div>
 
                     </div>
@@ -29,7 +29,6 @@ const ModalGaleria = (function () {
             customClass: {
                 popup: "contenedor-modal-galeria",
                 title: 'contener-modal-titulo',
-                htmlContainer: 'html-modal-galeria',
                 actions: 'contener-modal-contenedor-botones-min',
                 confirmButton: 'contener-modal-boton-confirmar',
             },
@@ -62,11 +61,11 @@ const ModalGaleria = (function () {
         Object.entries(datos).forEach(([label, value]) => {
 
             const fila = document.createElement("div");
-            fila.className = "modalGaleriaDato";
+            fila.className = "modal-dato";
 
             fila.innerHTML = `
-                <span class="modalGaleriaLabel">${label}</span>
-                <span class="modalGaleriaValor">${value}</span>
+                <span class="modal-dato-label">${label}</span>
+                <span class="modal-dato-valor">${value}</span>
             `;
 
             header.appendChild(fila);

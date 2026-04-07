@@ -2,19 +2,23 @@
 from django.db import connections, OperationalError
 from expediente.models import PacienteAsignacion
 from core.services.servicio_service import ServicioService
-from paciente.models import Paciente, Defuncion, Tipo
+from paciente.models import Paciente, Defuncion, Tipo, ObitoFetal
 from imagenologia.models import PacienteExterno
-from core.utils.utilidades_fechas import calcular_edad_texto, formatear_fecha_simple
+from core.utils.utilidades_fechas import calcular_edad_texto, formatear_fecha_simple, obtener_edad_con_indicador
 from core.utils.utilidades_textos import formatear_ubicacion_completo, formatear_nombre_completo
+from core.validators.fecha_validator import validar_fecha
 from django.db.models import Value, F, Max
-from django.db.models.functions import Concat, Coalesce, TruncMonth
+from django.db.models.functions import Concat, Coalesce, TruncDate
 from django.utils.timezone import now
 from django.contrib.auth.models import User
 from django.db import transaction
 from datetime import datetime, date
 from django.db import connection, models
 from django.utils import timezone
-
+from django.core.exceptions import ValidationError
+from core.constants.domain_constants import LogApp
+from core.utils.utilidades_logging import *
+from core.constants.domain_constants import INDICADOR_ANIOS, EDAD_FERTIL_MAX, EDAD_FERTIL_MIN, GENERO_FEMENINO
 
 class PacienteService:
 
@@ -78,7 +82,12 @@ class PacienteService:
                 return {"data": datos}
 
         except OperationalError as e:
-            return {"error": f"Error de conexión a la base de datos: {str(e)}"}
+            log_error(
+                f"[FALLO_CENSO] dni={dni} detalle={str(e)}",
+                app=LogApp.INTEGRACION
+            )
+            return {"error": "No se pudo consultar el censo"}
+
 
     @staticmethod
     def obtener_pacientes(query=None):
@@ -95,7 +104,8 @@ class PacienteService:
             qs = qs.filter(nombre_completo__icontains=query)
 
         return qs.values("id", "nombre_completo", "dni", "fecha_nacimiento", "sexo")
-            
+
+
     @staticmethod
     def obtener_paciente_propietario(DNI):
         try:
@@ -104,6 +114,7 @@ class PacienteService:
         except PacienteAsignacion.DoesNotExist:
             return None
             
+
     @staticmethod
     def listar_personas_censo(params, start, length, order_column, order_direction):
         where_clauses = []
@@ -179,7 +190,12 @@ class PacienteService:
             return datos, total_filtered  # Devuelve los datos y la cantidad total filtrada
 
         except Exception as e:
-            return {'error': str(e)}, 0
+            log_error(
+                f"[FALLO_LISTAR_CENSO] params={params} start={start} length={length} detalle={str(e)}",
+                app=LogApp.INTEGRACION
+            )
+            return {'error': 'Error al consultar el censo'}, 0
+        
     
     @staticmethod
     def listar_personas_censo_avanzada(params, start, length, order_column, order_direction):
@@ -207,6 +223,9 @@ class PacienteService:
             where_clauses.append("censo.SEGUNDO_APELLIDO LIKE %s")
             query_params.append(params["search_apellido2"].strip() + '%')
 
+        if not isinstance(order_column, int) or order_column >= len(columns):
+            order_column = 0
+
         # Si no hay criterios, devolver una lista vacía
         if len(query_params) < 3:
             return [], 0  # Retorna lista vacía y 0 registros filtrados
@@ -223,7 +242,7 @@ class PacienteService:
             "NOMBRE_DEPARTAMENTO"
         ]
         order_by_column = columns[order_column]
-        order_by_direction = order_direction.upper()
+        order_by_direction = "ASC" if order_direction.upper() != "DESC" else "DESC"
 
         try:
             with connections['censo2025'].cursor() as cursor:
@@ -265,16 +284,29 @@ class PacienteService:
             return datos, total_filtered  # Devuelve los datos y la cantidad total filtrada
 
         except Exception as e:
-            return {'error': str(e)}, 0
+            log_error(
+                f"[FALLO_LISTAR_CENSO_AVANZADO] filtros={list(params.keys())} start={start} length={length} detalle={str(e)}",
+                app=LogApp.INTEGRACION
+            )
+            return {'error': 'Error al consultar el censo'}, 0
         
 
     @staticmethod
     def obtener_defuncion(idPaciente):
         try:
-            relaciones = ['sala', 'registrado_por']
+            relaciones = ['sala','servicio_auxiliar','especialidad', 'registrado_por']
             defuncion = Defuncion.objects.select_related(*relaciones).get(paciente__id=idPaciente)
             return defuncion
         except Defuncion.DoesNotExist:
+            return None
+        
+    @staticmethod
+    def obtener_obito_id(idObito):
+        try:
+            relaciones = ['sala', 'registrado_por']
+            obito = ObitoFetal.objects.select_related(*relaciones).get(id=idObito)
+            return obito
+        except ObitoFetal.DoesNotExist:
             return None
         
     @staticmethod
@@ -298,26 +330,64 @@ class PacienteService:
                     defuncionRegistro.fecha_defuncion = defuncion.fecha
                     cambios = True
 
-                # Validar si hay una nueva sala y si la anterior existe
-                sala_id_nuevo = int(defuncion.sala_id) if defuncion.sala_id else None
-                sala_id_actual = defuncionRegistro.sala.id if defuncionRegistro.sala else None
+                tipo = defuncion.tipo
+                
+                nueva_sala = None
+                nueva_especialidad = None
+                nuevo_aux = None
 
-                if sala_id_actual != sala_id_nuevo:
-                    nueva_sala = ServicioService.obtener_sala_id(sala_id_nuevo)
-                    if nueva_sala:
-                        defuncionRegistro.sala = nueva_sala
-                        cambios = True
+                if tipo != 2:
+                    if defuncion.tipo_dependencia == 'sala':
+                        nueva_sala = defuncion.dependencia
+                        nueva_especialidad = None
+                        nuevo_aux = None
+
+                    elif defuncion.tipo_dependencia == 'especialidad':
+                        nueva_sala = None
+                        nueva_especialidad = defuncion.dependencia
+                        nuevo_aux = None
+
+                    elif defuncion.tipo_dependencia == 'servicio_auxiliar':
+                        nueva_sala = None
+                        nueva_especialidad = None
+                        nuevo_aux = defuncion.dependencia
+
+
+                # Comparar cambios
+                if defuncionRegistro.sala != nueva_sala:
+                    defuncionRegistro.sala = nueva_sala
+                    cambios = True
+
+                if defuncionRegistro.especialidad != nueva_especialidad:
+                    defuncionRegistro.especialidad = nueva_especialidad
+                    cambios = True
+
+                if defuncionRegistro.servicio_auxiliar != nuevo_aux:
+                    defuncionRegistro.servicio_auxiliar = nuevo_aux
+                    cambios = True
+
+
+
+                if defuncionRegistro.tipo_defuncion != tipo:
+                    defuncionRegistro.tipo_defuncion = tipo
+                    cambios= True
 
                 if defuncionRegistro.motivo != defuncion.motivo:
                     defuncionRegistro.motivo = defuncion.motivo
                     cambios = True          
 
-                if cambios:
-                    defuncionRegistro.save()
-                    return True
+                if not cambios:
+                    return False
+
+                defuncionRegistro.save()
+                return True
+            
             except Exception as e:
-                print(f"Error al modificar defunción: {e}")
-                return False
+                log_error(
+                    f"[FALLO_ACTUALIZAR_DEFUNCION] id={defuncionRegistro.id} detalle={str(e)}",
+                    app=LogApp.PACIENTE
+                )
+                raise
 
     
         
@@ -328,87 +398,257 @@ class PacienteService:
                 return actualizar_datos_defuncion(defuncionRegistro)
             except Defuncion.DoesNotExist:
                 return False
+            except Exception:
+                raise
 
                 
         # si tiene id se lo vamos a marcalro como defuncion
-        elif all([defuncion.fecha, defuncion.paciente_id, defuncion.sala_id]):
+        elif all([defuncion.fecha, defuncion.paciente_id]):
+            if defuncion.tipo == 1 and not defuncion.dependencia:
+                raise ValueError("Debe indicar una dependencia para defunción intrahospitalaria")
+            
+            
             try:
                 with transaction.atomic():
-                    Defuncion.objects.create(
-                        fecha_defuncion=defuncion.fecha,
-                        sala_id=int(defuncion.sala_id),
-                        motivo=defuncion.motivo,
-                        paciente_id=defuncion.paciente_id,
-                        registrado_por_id=defuncion.usuario_id
-                    )
+                    kwargs = {
+                        "fecha_defuncion": defuncion.fecha,
+                        "tipo_defuncion": defuncion.tipo,
+                        "motivo": defuncion.motivo,
+                        "paciente_id": defuncion.paciente_id,
+                        "registrado_por_id": defuncion.usuario_id,
+                    }
+
+                    campo = defuncion.tipo_dependencia
+                    if campo:
+                        kwargs[campo] = defuncion.dependencia
+
+                    defNueva = Defuncion.objects.create(**kwargs)
 
                     # Cambiar estado del paciente a pasivo
-                    if not PacienteService.paciente_a_pasivo(defuncion.paciente_id, defuncion.usuario_id):
-                        raise Exception("No se pudo cambiar el estado del paciente a pasivo")
+                    PacienteService.paciente_a_pasivo(defNueva.paciente.id, defuncion.usuario_id)
 
                 return True  # Todo salió bien
+            
             except Exception as e:
-                print(f"Error al procesar defunción: {e}")
-                return False
+                log_error(
+                    f"[FALLO_CREAR_DEFUNCION] paciente={defuncion.paciente_id} detalle={str(e)}",
+                    app=LogApp.PACIENTE
+                )
+                raise
         else:   
-            print("No hay datos")
-            return False
+            log_warning(
+                f"[DATOS_INCOMPLETOS_DEFUNCION] paciente={defuncion.paciente_id}",
+                app=LogApp.PACIENTE
+            )
+            raise ValueError("Datos incompletos para registrar la defunción")
+
+
+    @staticmethod
+    def procesar_obito(obito):
+
+        def actualizar_datos_obito(obitoRegistro):
+            cambios = False
+            try:
+                if obitoRegistro.fecha_obito != obito.fecha:
+                    obitoRegistro.fecha_obito = obito.fecha
+                    cambios = True
+
+                tipo = obito.tipo
+
+                nueva_sala = None
+                nueva_especialidad = None
+                nuevo_aux = None
+
+                if tipo != 2:
+                    
+                    if obito.tipo_dependencia == 'sala':
+                        nueva_sala = obito.dependencia
+                        nueva_especialidad = None
+                        nuevo_aux = None
+
+                    elif obito.tipo_dependencia == 'especialidad':
+                        nueva_sala = None
+                        nueva_especialidad = obito.dependencia
+                        nuevo_aux = None
+
+                    elif obito.tipo_dependencia == 'servicio_auxiliar':
+                        nueva_sala = None
+                        nueva_especialidad = None
+                        nuevo_aux = obito.dependencia
+
+                # Comparaciones
+                if obitoRegistro.sala != nueva_sala:
+                    obitoRegistro.sala = nueva_sala
+                    cambios = True
+
+                if obitoRegistro.especialidad != nueva_especialidad:
+                    obitoRegistro.especialidad = nueva_especialidad
+                    cambios = True
+
+                if obitoRegistro.servicio_auxiliar != nuevo_aux:
+                    obitoRegistro.servicio_auxiliar = nuevo_aux
+                    cambios = True
+
+                if obitoRegistro.tipo_defuncion != tipo:
+                    obitoRegistro.tipo_defuncion = tipo
+                    cambios = True
+
+                if obitoRegistro.responsable_dni != obito.dni_responsable:
+                    obitoRegistro.responsable_dni = obito.dni_responsable
+                    cambios = True
+
+                if obitoRegistro.responsable_nombre != obito.nombre_responsable:
+                    obitoRegistro.responsable_nombre = obito.nombre_responsable
+                    cambios = True
+
+                if cambios:
+                    obitoRegistro.save()
+                    return True, obitoRegistro.id
+
+                return False, None
+
+            except Exception as e:
+                log_error(
+                    f"[FALLO_ACTUALIZAR_OBITO] id={obitoRegistro.id} detalle={str(e)}",
+                    app=LogApp.PACIENTE
+                )
+                raise
+
+
+        # UPDATE
+        if obito.id:
+            try:
+                obitoRegistro = ObitoFetal.objects.get(id=obito.id)
+                return actualizar_datos_obito(obitoRegistro)
+            except ObitoFetal.DoesNotExist:
+                return False, None
+            except Exception:
+                raise
+
+
+        #  CREATE
+        elif all([obito.fecha, obito.paciente_id]):
+
+            if obito.tipo == 1 and not obito.dependencia:
+                raise ValueError("Debe indicar una dependencia para óbito intrahospitalario")
+
+            try:
+                with transaction.atomic():
+                    kwargs = {
+                        "fecha_obito": obito.fecha,
+                        "tipo_defuncion": obito.tipo,
+                        "paciente_id": obito.paciente_id,
+                        "responsable_dni": obito.dni_responsable,
+                        "responsable_nombre": obito.nombre_responsable,
+                        "registrado_por_id": obito.usuario_id,
+                    }
+
+                    campo = obito.tipo_dependencia
+                    if campo:
+                        kwargs[campo] = obito.dependencia
+
+                    obitoNuevo = ObitoFetal.objects.create(**kwargs)
+
+                return True, obitoNuevo.id
+
+            except Exception as e:
+                log_error(
+                    f"[FALLO_CREAR_OBITO] paciente={obito.paciente_id} detalle={str(e)}",
+                    app=LogApp.PACIENTE
+                )
+                raise
+
+        else:
+            log_warning(
+                f"[DATOS_INCOMPLETOS_OBITO] paciente={obito.paciente_id}",
+                app=LogApp.PACIENTE
+            )
+            raise ValueError("Datos incompletos para registrar el óbito")
+
+
 
     @staticmethod
     def procesar_entrega_cadaver(defuncion):
-        
+
         if not defuncion.id:
             # si no viene id defuncion es porque es nueva
             try:
                 defuncionRegistro = Defuncion.objects.get(paciente_id=defuncion.paciente_id)
             except Defuncion.DoesNotExist:
                 return False, 0
-        else: 
-            print(f"id defuncion vacio")
-
+        else:
             try:
                 defuncionRegistro = Defuncion.objects.get(id=defuncion.id)
             except Defuncion.DoesNotExist:
                 return False, 0
-            
-        #para cualquier de los casos lo vamos a ediar
+
         try:
             with transaction.atomic():
+
+                fecha_entrega = datetime.strptime(defuncion.fecha_entrega, "%Y-%m-%d").date()
+
+
+                validar_fecha(fecha_entrega, anio_minimo=2000, permitir_futuro=False)
+                if fecha_entrega < defuncionRegistro.fecha_defuncion:
+                    raise ValidationError("La fecha de entrega no puede ser menor a la fecha de defunción.")
+
                 defuncionRegistro.reponsable_dni = defuncion.reponsable_dni
                 defuncionRegistro.reponsable_nombre = defuncion.reponsable_nombre
+                defuncionRegistro.fecha_entrega = fecha_entrega
                 defuncionRegistro.save()
-                return True,  defuncionRegistro.id
+                return True, defuncionRegistro.id
+
+        except ValidationError:
+            raise
+
         except Exception as e:
-            print(e)
-            return False, 0
+            log_error(
+                f"[FALLO_ENTREGA_CADAVER] paciente={defuncion.paciente_id} id_defuncion={defuncion.id} detalle={str(e)}",
+                app=LogApp.PACIENTE
+            )
+            raise
 
 
     @staticmethod
     def paciente_a_pasivo(idPaciente, idUsuario):
+        # Intentar obtener al paciente (sin excluir el estado "P")
         try:
-            paciente = Paciente.objects.exclude(estado="P").get(id=idPaciente)
+            paciente = Paciente.objects.get(id=idPaciente)
         except Paciente.DoesNotExist:
-            return False
+            raise Exception(f"Paciente con ID {idPaciente} no existe en la base de datos.")
 
+        # Validar existencia del Usuario
         try:
             usuario = User.objects.get(id=idUsuario)
         except User.DoesNotExist:
-            return False
+            raise Exception(f"Usuario con ID {idUsuario} no encontrado.")
 
-        paciente.estado = "P"
-        paciente.modificado_por = usuario
-        paciente.fecha_modificado = now()  
-        paciente.save()
-        return True
+        # Si ya es pasivo, no hacemos nada y retornamos True (porque el objetivo ya se cumplió)
+        if paciente.estado == "P":
+            return True
+
+        #  Si no es pasivo, procedemos a actualizarlo
+        try:
+            paciente.estado = "P"
+            paciente.modificado_por = usuario
+            paciente.fecha_modificado = now()
+            paciente.save()
+            return True
+        except Exception as e:
+            raise Exception(f"Error al guardar el estado pasivo para el paciente {idPaciente}: {str(e)}")
+
+
 
     @staticmethod
     def paciente_a_activo(idPaciente):
         updated = Paciente.objects.filter(id=idPaciente).update(estado="A")
         return updated > 0
 
+
     @staticmethod
     def comprobar_defuncion(paciente):
         return hasattr(paciente, 'defuncion') and paciente.defuncion is not None
+
 
     @staticmethod
     def comprobar_inactivo(idPaciente):
@@ -420,19 +660,37 @@ class PacienteService:
 
     @staticmethod
     def reclasificar_rn_a_hijo(ejecutar=False):
-        """
-        Llama al procedimiento almacenado reclasificar_rn_a_hijo.
-        
-        """
-        with connection.cursor() as cursor:
-            cursor.callproc("reclasificar_rn_a_hijo", [1 if ejecutar else 0])
-            result = cursor.fetchall()
-            
-            if result and len(result[0]) > 0:
-                return result[0][0]  # cantidad_reclasificados
-            return 0
+
+        try:
+            with connection.cursor() as cursor:
+                cursor.callproc("reclasificar_rn_a_hijo", [1 if ejecutar else 0])
+                result = cursor.fetchall()
+
+                if not result or len(result[0]) == 0:
+                    log_warning(
+                        f"[SIN_RESPUESTA_SP] reclasificar_rn_a_hijo ejecutar={ejecutar}",
+                        app=LogApp.PACIENTE
+                    )
+                    return 0
+
+                cantidad = result[0][0]
+
+                log_info(
+                    f"[RECLASIFICACION_RN] ejecutar={ejecutar} total={cantidad}",
+                    app=LogApp.PACIENTE
+                )
+
+                return cantidad
+
+        except Exception as e:
+            log_error(
+                f"[FALLO_SP_RECLASIFICAR] ejecutar={ejecutar} detalle={str(e)}",
+                app=LogApp.PACIENTE
+            )
+            raise
 
 
+    #OJO  SIN USO PERO POTENCIALMENTE NECESARIA
     @staticmethod
     def comprobar_reclasificar_pacientes_pasivos_ultima_visita(ejecutar=True):
         hoy = date.today()
@@ -451,9 +709,6 @@ class PacienteService:
 
             if isinstance(ultima_visita, datetime):
                 ultima_visita = ultima_visita.date()
-
-            
-            print(f"def{defu}   ---   visita{ultima_visita}  --- dni{paciente.dni}")
 
             if ultima_visita >= inicio_anio:
                 pacientes_a_corregir.append(paciente)
@@ -644,6 +899,13 @@ class PacienteService:
                 ).order_by('-total')
 
                 total = qs.count()
+
+                if total == 0:
+                    log_warning(
+                        f"[REPORTE_VACIO] modo={modo} criterios={reporte_criterios}",
+                        app=LogApp.REPORTE
+                    )
+                    
                 resumen = []
                 for item in resumen_raw:
                     porcentaje = (item['total'] / total) * 100 if total > 0 else 0
@@ -661,9 +923,13 @@ class PacienteService:
                 }
 
         except Exception as e:
-            print(f"Error al generar data del paciente: {e}")
+            log_error(
+                    f"[FALLO_REPORTE_PACIENTE] modo={modo} criterios={str(reporte_criterios)} detalle={str(e)}",
+                    app=LogApp.REPORTE
+                )
             return None
             
+
     @staticmethod
     def llenarDatosCamposPaciente(form, paciente, numero_expediente=None):
         form.fields['dniPaciente'].initial = paciente.dni
@@ -683,3 +949,51 @@ class PacienteService:
         )
 
 
+    @staticmethod
+    def esMujerEdadFertil(paciente):
+        if not paciente:
+            return False
+
+        if paciente.sexo != GENERO_FEMENINO:
+            return False
+
+        if not paciente.fecha_nacimiento:
+            return False
+
+        fecha = paciente.fecha_nacimiento
+
+        # Asegurar formato string si tu función lo requiere
+        if not isinstance(fecha, str):
+            fecha = fecha.strftime("%Y-%m-%d")
+
+        numero, indicador = obtener_edad_con_indicador(fecha)
+
+        if indicador != INDICADOR_ANIOS:
+            return False
+
+        edad = int(numero)
+
+        return EDAD_FERTIL_MIN <= edad <= EDAD_FERTIL_MAX
+
+
+    @staticmethod
+    def obtener_obitos_por_paciente(paciente_id):
+
+        qs = ObitoFetal.objects.filter(
+            paciente_id=paciente_id,
+            estado=1
+        ).annotate(
+            fecha=TruncDate('fecha_obito')
+        ).order_by('fecha_obito')
+
+        return list(
+            qs.values(
+                "id",
+                "fecha",  #ya viene solo fecha
+                "motivo",
+                "responsable_nombre",
+                "responsable_dni",
+                "sala_id"
+            )
+        )
+            

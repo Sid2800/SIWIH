@@ -27,6 +27,9 @@ from core.services.expediente_service import ExpedienteService
 from core.services.paciente_service import PacienteService
 from core.services.referencia.referencia_diagnostico_service import RefDiagnosticoService
 from core.services.referencia.referencia_service import ReferenciaService
+from core.utils.utilidades_request import cargar_json
+from core.constants.domain_constants import LogApp
+from core.utils.utilidades_logging import *
 
 
 # Create your views here.
@@ -118,8 +121,7 @@ class ReferenciaAddView(UnidadRolRequiredMixin, CreateView):
             if valor:
                 setattr(form.instance, campo, valor)
                 break 
-
-
+            
         try:
             with transaction.atomic():
                 response = super().form_valid(form) 
@@ -150,7 +152,7 @@ class ReferenciaAddView(UnidadRolRequiredMixin, CreateView):
         
         except Exception as e:
             # logger.error(f"Error al registrar evaluación: {e}")
-            return JsonResponse({"success": False, "error": f"Hubo un error {e} al registrar la referencia, inténtelo nuevamente."})
+            return JsonResponse({"success": False, "error": "Hubo un error al registrar la referencia, inténtelo nuevamente."})
 
 
 class ReferenciaEditView(UnidadRolRequiredMixin, UpdateView):
@@ -434,6 +436,7 @@ class RespuestaCreateUpdateView(View):
         else:
             return self.form_invalid(form)
         
+        
 
 class SeguimientoCreateUpdateView(View):
     
@@ -446,24 +449,35 @@ class SeguimientoCreateUpdateView(View):
     def post(self, request, *args, **kwargs):
 
         usuario = request.user
-        data = json.loads(request.body)
+        data = cargar_json(request.body)
 
-        seguimiento_obj = {
-                "idSeguimiento": data.get("idSeguimiento"),
-                "idReferencia": data.get("idReferencia"),
-                "metodo": data.get("metodo"),
-                "establece_comunicacion": data.get("estableceComunicacion"),
-                "asistio_referencia": data.get("asistioReferencia"),
-                "fuente_info": data.get("fuenteInfo"),
-                "condicion_paciente": data.get("condicionPaciente"),
-                "observaciones": data.get("observaciones"),
-            }
+        try:
+            seguimiento_obj = {
+                    "idSeguimiento": data.get("idSeguimiento"),
+                    "idReferencia": data.get("idReferencia"),
+                    "metodo": data.get("metodo"),
+                    "establece_comunicacion": data.get("estableceComunicacion"),
+                    "asistio_referencia": data.get("asistioReferencia"),
+                    "fuente_info": data.get("fuenteInfo"),
+                    "condicion_paciente": data.get("condicionPaciente"),
+                    "observaciones": data.get("observaciones"),
+                }
 
-        seguimiento = SimpleNamespace(**seguimiento_obj)
-        guardo, idSeguimiento, mensaje = ReferenciaService.crear_actualizar_seguimiento(seguimiento, usuario)
+            seguimiento = SimpleNamespace(**seguimiento_obj)
+            idSeguimiento = ReferenciaService.crear_actualizar_seguimiento(seguimiento, usuario)
 
 
-        return JsonResponse({"guardo": guardo, "idSeguimiento":idSeguimiento, "mensaje": mensaje})
+            return JsonResponse({"guardo": True, "idSeguimiento":idSeguimiento, "mensaje": "Seguimiento guardado correctamente"})
+        except ValueError as e:
+            return JsonResponse({"guardo": False, "idSeguimiento": None, "mensaje": str(e) })
+        except Exception:
+            log_error(
+                f"Error en vista seguimiento referencia {data.get('idReferencia')}",
+                app=LogApp.REFERENCIAS
+            )
+            return JsonResponse({"guardo": False, "idSeguimiento": None, "mensaje": "Error interno, contacte al administrador"
+    })
+
     
 
 def obtener_seguimiento_tic(request):

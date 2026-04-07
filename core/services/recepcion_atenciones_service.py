@@ -7,6 +7,8 @@ from core.services.expediente_service import ExpedienteService
 from ingreso.models import Ingreso
 from django.utils import timezone
 from datetime import timedelta
+from core.constants.domain_constants import LogApp
+from core.utils.utilidades_logging import *
 
 class RecepcionAtencionService:
     def __init__(self, RecepcionAtencion=None):
@@ -41,17 +43,22 @@ class RecepcionAtencionService:
                     id_servicio = atencion.get('idServicio')
                     id_paciente = atencion.get('idPaciente')
                     
-                    resultado = RecepcionAtencionService.procesar_recepcion_atencion_detalle(
+                    RecepcionAtencionService.procesar_recepcion_atencion_detalle(
                         id_atencion, id_servicio, id_paciente, recepcion, usuario
                     )
 
-                    if resultado.get('error'):
-                        raise Exception(resultado['mensaje'])
+            return {
+                'mensaje': "El proceso se realizó correctamente",
+                'idRecepcion': recepcion.id
+            }
+
 
         except Exception as e:
-            return {'error': True, 'mensaje': f"Error al generar los registros: {str(e)}"}
-
-        return {'error': False, 'mensaje': "El proceso se realizó correctamente", 'idRecepcion': recepcion.id}
+            log_error(
+                f"[FALLO_RECEPCION_ATENCION] usuario={usuario.id} total_atenciones={len(atenciones)} detalle={str(e)}",
+                app=LogApp.ATENCION
+            )
+            raise
 
 
     @staticmethod
@@ -79,18 +86,10 @@ class RecepcionAtencionService:
 
 
         except Ingreso.DoesNotExist:
-            return {
-                'error': True,
-                'mensaje': "La atencion indicada no existe"
-            }
+            raise Exception("La atención indicada no existe")
 
         except Exception as e:
-            return {
-                'error': True,
-                'mensaje': f"Error al crear el detalle: {str(e)}"
-            }
-
-        return {'error': False, 'mensaje': "Detalle procesado correctamente"}
+            raise
 
 
     def obtener_detalles(self): # lo usa reporte
@@ -124,5 +123,3 @@ class RecepcionAtencionService:
                 'atencion__especialidad__servicio__nombre_servicio',
                 ))
 
-
- 

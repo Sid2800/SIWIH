@@ -13,9 +13,9 @@ from reportlab.lib.units import inch, mm, cm
 from reportlab.platypus import Paragraph
 from django.utils.translation import gettext as _
 from core.services.expediente_service import ExpedienteService
-from core.services.reporte.PDF.reporte_hospitalizacion_service import ReporteHospitalizacionService
+from core.services.reporte.PDF.reporte_paciente_service import ReportePacienteService
 from core.services.paciente_service import PacienteService
-from core.utils.utilidades_textos import  formatear_dni ,formatear_nombre_completo
+from core.utils.utilidades_textos import  formatear_dni ,formatear_nombre_completo, formatear_expediente
 from core.utils.utilidades_fechas import formatear_fecha, formatear_hora, formatear_fecha_simple, obtener_edad_con_indicador
 from usuario.permisos import verificar_permisos_usuario 
 from .views import dibujar_encabezado, dibujar_pie_pagina_carta
@@ -1425,13 +1425,15 @@ class reporte_hospitalizacion_2026(View):
     
         try:
             data = IngresoFormatosService.construir_data_hoja_hospitalizacion(ingreso_id)
-
-            formato = ReporteHospitalizacionService.GenerarFormatoHojaHospitalizacion2026(data, usuario)
+            formato = ReportePacienteService.GenerarFormatoHojaHospitalizacion2026(data, usuario)
             return formato
             
         except Exception as e:
             return JsonResponse({'error': f'Tenemos problema en generar la información del reporte. {e}'}, status=400)
         
+
+
+
         
 def dibujar_encabezado_epicrisis(pdf, ancho, y):
     pdf.setFillColor(colors.black)
@@ -1451,6 +1453,8 @@ def dibujar_encabezado_epicrisis(pdf, ancho, y):
     pdf.drawImage(logo1, x=85, y=y-45, width=65, height=45, preserveAspectRatio=True, mask='auto')
     pdf.drawImage(logo2, x=ancho-175, y=y-50, width=80, height=55, preserveAspectRatio=True, mask='auto')
     pdf.drawImage(logo3, x=ancho-115, y=y-50, width=80, height=55, preserveAspectRatio=True, mask='auto')
+
+
 
 class reporte_entrega_cadaver(View):
     def dispatch(self, request, *args, **kwargs):
@@ -1482,94 +1486,55 @@ class reporte_entrega_cadaver(View):
             if paciente.dni:
                 expediente = formatear_dni(paciente.dni)
             elif expediente_activo and expediente_activo.numero:
-                expediente = str(expediente_activo.numero).zfill(7)
+                expediente = formatear_expediente(str(expediente_activo.numero))
             else:
                 dniMadre = formatear_dni(paciente.madre.dni) if paciente.madre and paciente.madre.dni else None
                 expediente = dniMadre if dniMadre else "N/A"
 
+            pdf = ReportePacienteService.generar_entrega_cadaver_pdf(defuncion, expediente, usuario)
 
-
+            return pdf
             
-            response = HttpResponse(content_type='application/pdf')
-            response['Content-Disposition'] = f'inline; filename="Entrega-Cadaver-{defuncion.id}.pdf"'
-            pdf = canvas.Canvas(response, pagesize=letter)
-            pdf.setTitle(f"Entrega-Cadaver-{defuncion.id}")
-            ancho, alto = letter
-
-            y = alto - 30  # Margen superior
-
-            # Dibujar encabezado
-            dibujar_encabezado(pdf, ancho, y)  
-
-            #texto Estatico
-            pdf.setFont("Helvetica-Bold", 18)
-            pdf.drawCentredString(ancho / 2, alto - 120, f"AUTORIZACIÓN")
-            pdf.setStrokeColorRGB(0.4, 0.4, 0.4)
-            pdf.line(236, alto - 125, 373, alto - 125)
-            pdf.drawCentredString(ancho / 2, alto - 145, f"ENTREGA DE CADAVERES")
-            pdf.line(190, alto - 150, 425, alto - 150)
-
-            pdf.setFont("Helvetica", 12)
-            pdf.drawString(70, alto - 230, "NOMBRE DEL PACIENTE:")
-            pdf.drawString(70, alto - 260, "EXPEDIENTE:")
-            pdf.drawString(70, alto - 290, "FECHA NACIMIENTO:")
-            pdf.drawString(70, alto - 320, "FECHA DE DEFUNCION:")
-            pdf.drawString(70, alto - 350, "SALA:")
-
-            pdf.drawString(70, alto - 420, "PERSONA RESPONSABLE:")
-
-            #FIRMAS
-            pdf.setStrokeColorRGB(0, 0, 0)
-            pdf.line(70, alto - 600, 250, alto - 600)
-            pdf.setFont("Helvetica-Bold", 12)
-            pdf.drawString(90, alto - 615, "ADMISION Y ARCHIVO")
-            
-
-            pdf.line(340, alto - 600, 550, alto - 600)
-            pdf.drawString(370, alto - 615, "PERSONA RESPONSABLE")
-
-            pdf.drawString(120, alto - 700, "CC.ARCHIVO")
-
-            #TEXTO DINAMICO
-            nombreCompleto = formatear_nombre_completo(defuncion.paciente.primer_nombre,defuncion.paciente.segundo_nombre,defuncion.paciente.primer_apellido,defuncion.paciente.segundo_apellido)[:38]
-            pdf.drawString(240, alto - 230, nombreCompleto)
-
-            #expedeinte 
-            pdf.drawString(240, alto - 260, expediente)
-            
-            #fechaNacimeitno 
-            pdf.drawString(240, alto - 290, formatear_fecha_simple(defuncion.paciente.fecha_nacimiento))
-
-            #fechaDefuncion
-            pdf.drawString(240, alto - 320, formatear_fecha_simple(defuncion.fecha_defuncion))
-
-            #sala
-            if defuncion.sala.servicio.id == 1000:
-                pdf.drawString(240, alto - 350, defuncion.sala.servicio.nombre_servicio)
-            else:
-                pdf.drawString(240, alto - 350, defuncion.sala.nombre_sala)
-
-            #registro
-            pdf.drawString(110, alto - 632,  f"{usuario.first_name.upper()} {usuario.last_name.upper()}"[0:20] )
-
-
-            #reponsable 
-            if defuncion.reponsable_nombre and defuncion.reponsable_dni:
-                pdf.drawString(240, alto - 420, defuncion.reponsable_nombre)
-            #dni responsable
-                pdf.drawString(395, alto - 632, defuncion.reponsable_dni)
-                pdf.drawString(340, alto - 647, defuncion.reponsable_nombre)
-
-            
-
-            fechaActual = timezone.now()
-            dibujar_pie_pagina_carta(pdf, alto, ancho, formatear_fecha(fechaActual), usuario.username.upper(), f"{usuario.first_name.upper()} {usuario.last_name.upper()}",1,1)
-
-
-
-            pdf.save()
-            return response
     
         except Exception as e:
             # Capturar cualquier error inesperado
             return JsonResponse({"error": f"Hubo un error inesperado: {str(e)}"}, status=500)
+
+
+class reporte_obito(View):
+
+    def dispatch(self, request, *args, **kwargs):
+        usuario = request.user
+        if not verificar_permisos_usuario(usuario, ['admin', 'digitador'], ['Admision']):
+            return JsonResponse({'error': 'No tienes permisos'}, status=403)
+
+        return super().dispatch(request, *args, **kwargs)
+
+
+    def get(self, request, obito_id):
+        usuario = request.user
+        if not obito_id:
+            return JsonResponse({"error": "El ID de óbito es requerido."}, status=400)
+
+        try:
+            obito = PacienteService.obtener_obito_id(obito_id)
+
+            if not obito:
+                return JsonResponse({"error": "No se encontró el óbito"}, status=404)
+
+            expediente_activo = ExpedienteService.obtener_expediente_activo_paciente(obito.paciente.id)
+            paciente = obito.paciente
+
+            if paciente.dni:
+                expediente = formatear_dni(paciente.dni)
+            elif expediente_activo and expediente_activo.numero:
+                expediente = formatear_expediente(str(expediente_activo.numero))
+            else:
+                expediente = "N/A"
+
+            pdf = ReportePacienteService.generar_obito_pdf(obito, expediente, usuario)
+
+            return pdf
+
+        except Exception as e:
+            return JsonResponse({"error": f"Error inesperado: {str(e)}"}, status=500)

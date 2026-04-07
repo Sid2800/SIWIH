@@ -15,6 +15,8 @@ reportes_paciente = [
     path('hospitalizacion-26/<int:ingreso_id>/', paciente.reporte_hospitalizacion_2026.as_view(), name='reporte_hospitalizacion_26'),
 
     path('entrega-cadaver/<int:defuncion_id>/', paciente.reporte_entrega_cadaver.as_view(), name='entrega-cadaver'),
+    path('entrega-cadaver-obito/<int:obito_id>/', paciente.reporte_obito.as_view(), name='entrega_cadaver_obito'),
+
 ]
 
 # Reportes de ingreso
