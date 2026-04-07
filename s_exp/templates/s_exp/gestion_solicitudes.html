@@ -11,7 +11,7 @@
         padding: 0.5rem 1rem; border-radius: 1rem;
         border: 1px solid var(--colorLinea);
         background-color: transparent; color: var(--colorTablacelda);
-        cursor: pointer; font-size: 0.85rem; transition: all .2s;
+        cursor: pointer; font-size: 1.4rem; transition: all .2s;
         font-family: var(--fuenteCuerpo);
     }
     .sexp-filtro-btn:hover, .sexp-filtro-btn.active {
@@ -23,23 +23,23 @@
     .sexp-modal-campo textarea, .sexp-modal-campo input {
         width:100%; padding:0.6rem; border-radius:0.6rem;
         border:1px solid var(--colorLinea); background-color:var(--blanco);
-        color:var(--colorTablacelda); font-size:0.9rem;
+        color:var(--colorTablacelda); font-size:1.6rem;
     }
     .sexp-exp-tags { display:flex; gap:0.3rem; flex-wrap:wrap; }
     .sexp-exp-tag {
         background: rgba(99,102,241,0.15); color: #6366f1;
         padding: 0.2rem 0.5rem; border-radius: 0.4rem;
-        font-size: 0.75rem; font-weight: 600;
+        font-size: 1.2rem; font-weight: 600;
     }
 
     /* Nav sub-módulos */
-    .sexp-nav-modulos { display:flex; gap:0.8rem; flex-wrap:wrap; margin-bottom:1rem; }
+    .sexp-nav-modulos { display:flex; gap:1.4rem; flex-wrap:wrap; margin-bottom:1rem; }
     .sexp-nav-link {
         padding: 0.6rem 1.2rem; border-radius: 1rem;
         background-color: var(--blanco); border: 1px solid var(--colorLinea);
         text-decoration: none; color: var(--colorTablacelda);
         display: flex; align-items: center; gap: 0.5rem;
-        font-size: 0.9rem; font-family: var(--fuenteCuerpo);
+        font-size: 1.4rem; font-family: var(--fuenteCuerpo);
         transition: background-color .2s, transform .2s;
     }
     .sexp-nav-link:hover {
@@ -50,6 +50,8 @@
         background-color: var(--colorBoton); color: var(--colorTextoBoton);
         border-color: var(--colorBoton);
     }
+
+    .dataTable { font-size: 1.4rem; }
 </style>
 {% endblock extra_css %}
 
@@ -70,9 +72,7 @@
         <a href="{% url 's_exp_seguimiento' %}" class="sexp-nav-link">
             <i class="bi bi-clock-history"></i> Mis Solicitudes
         </a>
-        <a href="{% url 's_exp_dashboard' %}" class="sexp-nav-link">
-            <i class="bi bi-speedometer2"></i> Panel Admin
-        </a>
+        
         <a href="{% url 's_exp_solicitudes' %}" class="sexp-nav-link sexp-nav-link--active">
             <i class="bi bi-list-check"></i> Gestión Solicitudes
         </a>

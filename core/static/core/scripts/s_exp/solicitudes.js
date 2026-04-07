@@ -46,15 +46,15 @@ function initTabla() {
                 data: 'estado_flujo',
                 render: function (data) {
                     const clases = {
-                        'Pendiente': 'background:rgba(99,102,241,0.2);color:#a5b4fc;',
-                        'Aprobado': 'background:rgba(34,197,94,0.2);color:#22c55e;',
-                        'Rechazado': 'background:rgba(239,68,68,0.2);color:#ef4444;',
-                        'EnPrestamo': 'background:rgba(245,158,11,0.2);color:#f59e0b;',
-                        'Devuelto': 'background:rgba(100,116,139,0.2);color:#94a3b8;',
-                        'DevolucionParcial': 'background:rgba(249,115,22,0.2);color:#f97316;'
+                        'Pendiente': 'background:rgba(99,102,241,0.2);color:var(--negro);',
+                        'Aprobado': 'background:rgba(34,197,94,0.2);color:var(--negro);',
+                        'Rechazado': 'background:rgba(239,68,68,0.2);color:var(--negro);',
+                        'EnPrestamo': 'background:rgba(245,158,11,0.2);color:var(--negro);',
+                        'Devuelto': 'background:rgba(100,116,139,0.2);color:var(--negro);',
+                        'DevolucionParcial': 'background:rgba(249,115,22,0.2);color:var(--negro);'
                     };
                     const estilo = clases[data] || '';
-                    return `<span style="padding:0.25rem 0.6rem;border-radius:20px;font-size:0.75rem;font-weight:600;${estilo}">${data}</span>`;
+                    return `<span style="padding:0.25rem 0.6rem;border-radius:20px;font-size:1.2rem;font-weight:600;${estilo}">${data}</span>`;
                 }
             },
             {
@@ -64,10 +64,10 @@ function initTabla() {
                     if (data.estado_flujo !== 'Pendiente') return '';
                     return `
                         <div style="display:flex;gap:0.3rem;">
-                            <button class="formularioBotones-boton" style="background:#22c55e;color:#fff;border:none;padding:0.3rem 0.6rem;border-radius:6px;cursor:pointer;font-size:0.8rem;" onclick="aprobarSolicitud(${data.id})">
+                            <button class="formularioBotones-boton" style="background:#22c55e;color:var(--negro);border:none;padding:0.3rem 0.6rem;border-radius:6px;cursor:pointer;font-size:1.3rem;" onclick="aprobarSolicitud(${data.id})">
                                 <i class="bi bi-check-lg"></i> Aprobar
                             </button>
-                            <button class="formularioBotones-boton" style="background:#ef4444;color:#fff;border:none;padding:0.3rem 0.6rem;border-radius:6px;cursor:pointer;font-size:0.8rem;" onclick="rechazarSolicitud(${data.id})">
+                            <button class="formularioBotones-boton" style="background:#ef4444;color:var(--negro);border:none;padding:0.3rem 0.6rem;border-radius:6px;cursor:pointer;font-size:1.3rem;" onclick="rechazarSolicitud(${data.id})">
                                 <i class="bi bi-x-lg"></i> Rechazar
                             </button>
                         </div>`;
@@ -76,11 +76,14 @@ function initTabla() {
         ],
         order: [[2, 'desc']],
         language: {
-            url: '//cdn.datatables.net/plug-ins/2.0.0/i18n/es-ES.json',
             processing: "Cargando...",
             search: "Buscar:",
             lengthMenu: "Mostrar _MENU_ registros",
             info: "Mostrando _START_ a _END_ de _TOTAL_",
+            infoEmpty: "Sin registros disponibles",
+            infoFiltered: "(filtrado de _MAX_ registros totales)",
+            loadingRecords: "Cargando registros...",
+            zeroRecords: "No se encontraron resultados",
             paginate: { first: "Primero", last: "Último", next: "→", previous: "←" },
             emptyTable: "No hay solicitudes"
         },
@@ -99,16 +102,18 @@ function initFiltros() {
 
 function aprobarSolicitud(id) {
     Swal.fire({
+        color: 'var(--negro)',
+        background: 'var(--blanco)',
         title: 'Aprobar Solicitud #' + id,
-        html: `
+        html: `<div style="color:var(--negro);">
             <div class="sexp-modal-campo">
                 <label>Tiempo límite (horas, mínimo 24)</label>
-                <input type="number" id="swal-tiempo" min="24" value="24" style="width:100%;padding:0.5rem;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.05);color:inherit;">
+                <input type="number" id="swal-tiempo" min="24" value="24" style="width:100%;padding:0.5rem;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.05);color:white;">
             </div>
             <div class="sexp-modal-campo">
                 <label>Comentarios (opcional)</label>
-                <textarea id="swal-comentarios" rows="2" style="width:100%;padding:0.5rem;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.05);color:inherit;"></textarea>
-            </div>`,
+                <textarea id="swal-comentarios" rows="2" style="width:100%;padding:0.5rem;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.05);color:white;"></textarea>
+            </div></div>`,
         showCancelButton: true,
         confirmButtonText: 'Aprobar',
         cancelButtonText: 'Cancelar',
@@ -153,12 +158,14 @@ function aprobarSolicitud(id) {
 
 function rechazarSolicitud(id) {
     Swal.fire({
+        color: 'var(--negro)',
+        background: 'var(--blanco)',
         title: 'Rechazar Solicitud #' + id,
-        html: `
+        html: `<div style="color:var(--negro);">
             <div class="sexp-modal-campo">
                 <label>Motivo de Rechazo *</label>
-                <textarea id="swal-motivo" rows="3" placeholder="Ingrese el motivo del rechazo (obligatorio)..." style="width:100%;padding:0.5rem;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.05);color:inherit;"></textarea>
-            </div>`,
+                <textarea id="swal-motivo" rows="3" placeholder="Ingrese el motivo del rechazo (obligatorio)..." style="width:100%;padding:0.5rem;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.05);color:white;"></textarea>
+            </div></div>`,
         showCancelButton: true,
         confirmButtonText: 'Rechazar',
         cancelButtonText: 'Cancelar',

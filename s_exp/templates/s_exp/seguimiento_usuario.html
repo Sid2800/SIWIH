@@ -25,13 +25,13 @@
 
     .sexp-sol-header {
         display:flex; justify-content:space-between; align-items:center;
-        margin-bottom:0.8rem; flex-wrap:wrap; gap:0.5rem;
+        margin-bottom:1.4rem; flex-wrap:wrap; gap:0.5rem;
     }
     .sexp-sol-header h3 { margin:0; font-size:1rem; }
 
     .sexp-sol-badge {
-        padding: 0.25rem 0.8rem; border-radius: 2rem;
-        font-size: 0.75rem; font-weight: 700;
+        padding: 0.25rem 1.4rem; border-radius: 2rem;
+        font-size: 1.2rem; font-weight: 700;
     }
     .sexp-sol-badge--pendiente { background: rgba(99,102,241,0.15); color: #6366f1; }
     .sexp-sol-badge--aprobado { background: rgba(34,197,94,0.15); color: #22c55e; }
@@ -43,15 +43,15 @@
 
     .sexp-sol-info {
         display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
-        gap:0.5rem; margin-bottom:0.8rem; font-size:0.85rem;
+        gap:0.5rem; margin-bottom:1.4rem; font-size:0.85rem;
     }
-    .sexp-sol-info label { opacity:0.6; font-size:0.75rem; display:block; }
+    .sexp-sol-info label { opacity:0.6; font-size:1.2rem; display:block; }
 
     .sexp-sol-exps { display:flex; gap:0.3rem; flex-wrap:wrap; margin-bottom:0.5rem; }
     .sexp-exp-tag {
         background: rgba(99,102,241,0.15); color: #6366f1;
         padding: 0.2rem 0.5rem; border-radius: 0.4rem;
-        font-size: 0.75rem; font-weight: 600;
+        font-size: 1.2rem; font-weight: 600;
     }
 
     .sexp-sol-timer {
@@ -60,7 +60,7 @@
     }
     .sexp-sol-rechazo {
         background: rgba(220,53,69,0.1); border-radius: 0.6rem;
-        padding: 0.5rem 0.8rem; margin-top: 0.5rem; font-size: 0.85rem;
+        padding: 0.5rem 1.4rem; margin-top: 0.5rem; font-size: 0.85rem;
     }
     .sexp-devolver-btn {
         padding: 0.5rem 1rem; border-radius: 1rem; border: none;
@@ -71,13 +71,13 @@
     .sexp-devolver-btn:hover { opacity: 0.85; }
 
     /* Nav sub-módulos */
-    .sexp-nav-modulos { display:flex; gap:0.8rem; margin-bottom:1.5rem; flex-wrap:wrap; }
+    .sexp-nav-modulos { display:flex; gap:1.4rem; margin-bottom:1.5rem; flex-wrap:wrap; }
     .sexp-nav-link {
         padding: 0.6rem 1.2rem; border-radius: 1rem;
         background-color: var(--blanco); border: 1px solid var(--colorLinea);
         text-decoration: none; color: var(--colorTablacelda);
         display: flex; align-items: center; gap: 0.5rem;
-        font-size: 0.9rem; font-family: var(--fuenteCuerpo);
+        font-size: 1.6rem; font-family: var(--fuenteCuerpo);
         transition: background-color .2s, transform .2s;
     }
     .sexp-nav-link:hover {
@@ -108,10 +108,7 @@
         <a href="{% url 's_exp_seguimiento' %}" class="sexp-nav-link sexp-nav-link--active">
             <i class="bi bi-clock-history"></i> Mis Solicitudes
         </a>
-        {% if request.user|en_grupo:"administradores" %}
-        <a href="{% url 's_exp_dashboard' %}" class="sexp-nav-link">
-            <i class="bi bi-speedometer2"></i> Panel Admin
-        </a>
+        {% if request.user|tiene_rol_global:"admin" %}
         <a href="{% url 's_exp_solicitudes' %}" class="sexp-nav-link">
             <i class="bi bi-list-check"></i> Gestión Solicitudes
         </a>

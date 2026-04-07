@@ -12,6 +12,7 @@ from django.db.models import Count, Q
 from django.shortcuts import redirect
 
 from .models import (
+    MotivoSolicitud,
     ExpedientePrestamo,
     SolicitudPrestamo,
     SolicitudExpedienteDetalle,
@@ -19,6 +20,7 @@ from .models import (
     Devolucion,
     LogHistorico,
 )
+from usuario.models import PerfilUnidad
 
 logger = logging.getLogger("s_exp")
 
@@ -37,20 +39,32 @@ def _registrar_log(usuario, accion, detalle="", objeto_tipo="", objeto_id=None):
 
 
 # ============================================
-# UTILIDAD: Verificar permisos basados en Groups
+# UTILIDAD: Verificar permisos basados en PerfilUnidad
 # ============================================
 def _es_exp_admin(user):
-    """True si el usuario es admin del módulo (grupo 'administradores', staff o superuser)."""
+    """True si el usuario es admin del módulo.
+    Condiciones: rol 'admin' en PerfilUnidad, grupo 'administradores', staff o superuser.
+    """
     if user.is_superuser or user.is_staff:
         return True
-    return user.groups.filter(name='administradores').exists()
+    if user.groups.filter(name='administradores').exists():
+        return True
+    return PerfilUnidad.objects.filter(usuario=user, rol='admin').exists()
 
 
 def _es_exp_solicitante(user):
-    """True si el usuario tiene acceso al módulo (grupo 'Solicitantes', 'administradores', staff o superuser)."""
-    if user.is_superuser or user.is_staff:
+    """True si el usuario puede acceder al módulo (solicitar expedientes).
+    Condiciones: rol 'exp_solicitante' o 'admin' en PerfilUnidad, o admin del módulo.
+    """
+    if _es_exp_admin(user):
         return True
-    return user.groups.filter(name__in=['Solicitantes', 'administradores']).exists()
+    return PerfilUnidad.objects.filter(usuario=user, rol='exp_solicitante').exists()
+
+
+def _get_unidad_usuario(user):
+    """Obtiene el nombre de la unidad del usuario desde PerfilUnidad."""
+    perfil = PerfilUnidad.objects.filter(usuario=user).first()
+    return perfil.unidad.nombre_unidad if perfil else ''
 
 
 # ============================================
@@ -77,7 +91,9 @@ class SExpUsuarioMixin(LoginRequiredMixin):
 # ============================================
 
 class DashboardAdminView(SExpAdminMixin, TemplateView):
-    template_name = 's_exp/dashboard_admin.html'
+    """Redirige a Gestión de Solicitudes como landing del admin."""
+    def get(self, request, *args, **kwargs):
+        return redirect('s_exp_solicitudes')
 
 
 class GestionSolicitudesView(SExpAdminMixin, TemplateView):
@@ -185,7 +201,7 @@ def listar_solicitudes_api(request):
         if search_value:
             qs = qs.filter(
                 Q(usuario__username__icontains=search_value) |
-                Q(motivo__icontains=search_value) |
+                Q(motivo__nombre__icontains=search_value) |
                 Q(id__icontains=search_value)
             )
 
@@ -207,7 +223,7 @@ def listar_solicitudes_api(request):
                 "usuario_nombre": f"{s.usuario.first_name} {s.usuario.last_name}".strip() or s.usuario.username,
                 "fecha_creacion": s.fecha_creacion.strftime("%d/%m/%Y %H:%M"),
                 "estado_flujo": s.estado_flujo,
-                "motivo": s.motivo,
+                "motivo": s.motivo.nombre if s.motivo else "",
                 "observaciones": s.observaciones or "",
                 "area_destino": s.area_destino or "",
                 "cant_expedientes": s.cant_expedientes,
@@ -368,7 +384,7 @@ def prestamos_activos_api(request):
                 "usuario": p.solicitud.usuario.username,
                 "usuario_nombre": f"{p.solicitud.usuario.first_name} {p.solicitud.usuario.last_name}".strip() or p.solicitud.usuario.username,
                 "area_destino": p.solicitud.area_destino or "",
-                "motivo": p.solicitud.motivo,
+                "motivo": str(p.solicitud.motivo) if p.solicitud.motivo else "",
                 "estado": p.estado,
                 "fecha_aprobacion": p.fecha_aprobacion.strftime("%d/%m/%Y %H:%M"),
                 "fecha_entrega": p.fecha_entrega.strftime("%d/%m/%Y %H:%M") if p.fecha_entrega else None,
@@ -603,12 +619,18 @@ def buscar_expedientes_api(request):
         from expediente.models import Expediente, PacienteAsignacion
         from paciente.models import Paciente
 
-        # IDs de expedientes actualmente prestados (NO disponibles)
-        expedientes_prestados_ids = set(
-            ExpedientePrestamo.objects.filter(
-                estado='Prestado'
-            ).values_list('expediente_id', flat=True)
+        # IDs de expedientes no disponibles (Prestados o en proceso)
+        from .models import SolicitudExpedienteDetalle
+        prestados = set(
+            ExpedientePrestamo.objects.filter(estado='Prestado')
+            .values_list('expediente_id', flat=True)
         )
+        en_proceso = set(
+            SolicitudExpedienteDetalle.objects.filter(
+                solicitud__estado_flujo__in=['Pendiente', 'Aprobado']
+            ).values_list('expediente_prestamo__expediente_id', flat=True)
+        )
+        expedientes_prestados_ids = prestados | en_proceso
 
         resultados = []
 
@@ -738,24 +760,38 @@ def crear_solicitud_api(request):
         return JsonResponse({"error": "Datos inválidos"}, status=400)
 
     expediente_ids = body.get('expedientes', [])  # lista de expediente IDs (de tabla Expediente)
-    motivo = body.get('motivo', '').strip()
+    motivo_id = body.get('motivo_id')
     observaciones = body.get('observaciones', '').strip()
-    area_destino = body.get('area_destino', '').strip()
 
     if not expediente_ids:
         return JsonResponse({"error": "Debe seleccionar al menos un expediente"}, status=400)
-    if not motivo:
+    if not motivo_id:
         return JsonResponse({"error": "El motivo es obligatorio"}, status=400)
+
+    # Validar motivo
+    try:
+        motivo = MotivoSolicitud.objects.get(id=motivo_id, activo=True)
+    except MotivoSolicitud.DoesNotExist:
+        return JsonResponse({"error": "Motivo no válido"}, status=400)
+
+    # Auto-asignar unidad del usuario
+    area_destino = _get_unidad_usuario(request.user)
 
     try:
         from expediente.models import Expediente, PacienteAsignacion
 
-        # Verificar que existan y no estén prestados
-        expedientes_prestados_ids = set(
-            ExpedientePrestamo.objects.filter(
-                estado='Prestado'
-            ).values_list('expediente_id', flat=True)
+        # Verificar que existan y no estén prestados o en proceso
+        from .models import SolicitudExpedienteDetalle
+        prestados = set(
+            ExpedientePrestamo.objects.filter(estado='Prestado')
+            .values_list('expediente_id', flat=True)
         )
+        en_proceso = set(
+            SolicitudExpedienteDetalle.objects.filter(
+                solicitud__estado_flujo__in=['Pendiente', 'Aprobado']
+            ).values_list('expediente_prestamo__expediente_id', flat=True)
+        )
+        expedientes_prestados_ids = prestados | en_proceso
 
         expedientes = Expediente.objects.filter(id__in=expediente_ids)
         if expedientes.count() != len(expediente_ids):
@@ -864,7 +900,7 @@ def mis_solicitudes_api(request):
                 "id": s.id,
                 "fecha_creacion": s.fecha_creacion.strftime("%d/%m/%Y %H:%M"),
                 "estado_flujo": s.estado_flujo,
-                "motivo": s.motivo,
+                "motivo": s.motivo.nombre if s.motivo else "",
                 "observaciones": s.observaciones or "",
                 "area_destino": s.area_destino or "",
                 "expedientes": numeros,
@@ -1108,3 +1144,134 @@ def reportes_data_api(request):
     except Exception as e:
         logger.error(f"Error en reportes_data_api: {e}", exc_info=True)
         return JsonResponse({"error": "Error interno del servidor"}, status=500)
+
+
+# ============================================
+# API: Catálogo de Motivos
+# ============================================
+
+@require_GET
+def motivos_api(request):
+    """Retorna la lista de motivos activos para el dropdown."""
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "No autenticado"}, status=401)
+
+    motivos = MotivoSolicitud.objects.filter(activo=True).order_by('nombre')
+    data = [{"id": m.id, "nombre": m.nombre} for m in motivos]
+    return JsonResponse({"data": data})
+
+
+# ============================================
+# API: Info del usuario (unidad)
+# ============================================
+
+@require_GET
+def info_usuario_api(request):
+    """Retorna información del usuario para el formulario de solicitud."""
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "No autenticado"}, status=401)
+
+    unidad = _get_unidad_usuario(request.user)
+    return JsonResponse({
+        "unidad": unidad,
+        "es_admin": _es_exp_admin(request.user),
+    })
+
+
+# ============================================
+# API: Historial de préstamos por paciente
+# ============================================
+
+@require_GET
+def historial_prestamos_paciente_api(request, paciente_id):
+    """Retorna el historial de préstamos asociados a un paciente."""
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "No autenticado"}, status=401)
+
+    try:
+        from expediente.models import PacienteAsignacion
+
+        # Obtener expedientes del paciente
+        asignaciones = PacienteAsignacion.objects.filter(
+            paciente_id=paciente_id
+        ).select_related('expediente')
+
+        expediente_ids = [a.expediente_id for a in asignaciones]
+
+        if not expediente_ids:
+            return JsonResponse({"data": [], "en_prestamo": False})
+
+        # Buscar detalles de solicitud que involucren esos expedientes
+        detalles = SolicitudExpedienteDetalle.objects.filter(
+            expediente_prestamo__expediente_id__in=expediente_ids
+        ).select_related(
+            'solicitud', 'solicitud__usuario', 'solicitud__motivo',
+            'expediente_prestamo', 'expediente_prestamo__expediente'
+        ).order_by('-solicitud__fecha_creacion')
+
+        data = []
+        en_prestamo_actual = False
+
+        for d in detalles:
+            s = d.solicitud
+            estado = s.estado_flujo
+            if estado in ('EnPrestamo', 'Aprobado') and not d.devuelto:
+                en_prestamo_actual = True
+
+            data.append({
+                "numero_expediente": d.numero_expediente or d.expediente_prestamo.expediente.numero,
+                "fecha_solicitud": s.fecha_creacion.strftime("%d/%m/%Y %H:%M"),
+                "motivo": s.motivo.nombre if s.motivo else "",
+                "solicitante": f"{s.usuario.first_name} {s.usuario.last_name}".strip() or s.usuario.username,
+                "estado": estado,
+                "devuelto": d.devuelto,
+                "area_destino": s.area_destino or "",
+            })
+
+        return JsonResponse({"data": data, "en_prestamo": en_prestamo_actual})
+
+    except Exception as e:
+        logger.error(f"Error en historial_prestamos_paciente_api: {e}", exc_info=True)
+        return JsonResponse({"error": "Error interno del servidor"}, status=500)
+
+
+@require_GET
+def historial_prestamos_expediente_api(request, expediente_id):
+    """Retorna el historial de préstamos asociados a un expediente."""
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "No autenticado"}, status=401)
+
+    try:
+        # Buscar detalles de solicitud que involucren ese expediente
+        detalles = SolicitudExpedienteDetalle.objects.filter(
+            expediente_prestamo__expediente_id=expediente_id
+        ).select_related(
+            'solicitud', 'solicitud__usuario', 'solicitud__motivo',
+            'expediente_prestamo', 'expediente_prestamo__expediente'
+        ).order_by('-solicitud__fecha_creacion')
+
+        data = []
+        en_prestamo_actual = False
+
+        for d in detalles:
+            s = d.solicitud
+            estado = s.estado_flujo
+            if estado in ('EnPrestamo', 'Aprobado') and not d.devuelto:
+                en_prestamo_actual = True
+
+            data.append({
+                "numero_expediente": d.numero_expediente or d.expediente_prestamo.expediente.numero,
+                "fecha_solicitud": s.fecha_creacion.strftime("%d/%m/%Y %H:%M"),
+                "motivo": s.motivo.nombre if s.motivo else "",
+                "solicitante": f"{s.usuario.first_name} {s.usuario.last_name}".strip() or s.usuario.username,
+                "estado": estado,
+                "devuelto": d.devuelto,
+                "area_destino": s.area_destino or "",
+            })
+
+        return JsonResponse({"data": data, "en_prestamo": en_prestamo_actual})
+
+    except Exception as e:
+        logger.error(f"Error en historial_prestamos_expediente_api: {e}", exc_info=True)
+        return JsonResponse({"error": "Error interno del servidor"}, status=500)
+

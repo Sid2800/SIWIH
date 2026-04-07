@@ -15,12 +15,12 @@
     .sexp-dev-card--vencido { border-left-color: #ef4444; }
     .sexp-dev-card--parcial { border-left-color: #f97316; }
 
-    .sexp-dev-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:0.8rem; }
+    .sexp-dev-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:1.4rem; }
     .sexp-dev-header h3 { margin:0; font-size:1rem; }
 
     .sexp-dev-info {
         display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
-        gap:0.5rem; margin-bottom:0.8rem; font-size:0.85rem;
+        gap:0.5rem; margin-bottom:1.4rem; font-size:0.85rem;
     }
     .sexp-dev-info span { opacity:0.7; }
 
@@ -39,23 +39,23 @@
     .sexp-exp-tag {
         background: rgba(99,102,241,0.15); color: #6366f1;
         padding: 0.2rem 0.5rem; border-radius: 0.4rem;
-        font-size: 0.75rem; font-weight: 600; display: inline-block;
+        font-size: 1.2rem; font-weight: 600; display: inline-block;
     }
     .sexp-badge {
         padding: 0.25rem 0.6rem; border-radius: 2rem;
-        font-size: 0.75rem; font-weight: 600;
+        font-size: 1.2rem; font-weight: 600;
     }
     .sexp-badge--vencido { background: rgba(239,68,68,0.15); color: #ef4444; }
     .sexp-badge--normal { background: rgba(99,102,241,0.15); color: #6366f1; }
 
     /* Nav sub-módulos */
-    .sexp-nav-modulos { display:flex; gap:0.8rem; flex-wrap:wrap; margin-bottom:1rem; }
+    .sexp-nav-modulos { display:flex; gap:1.4rem; flex-wrap:wrap; margin-bottom:1rem; }
     .sexp-nav-link {
         padding: 0.6rem 1.2rem; border-radius: 1rem;
         background-color: var(--blanco); border: 1px solid var(--colorLinea);
         text-decoration: none; color: var(--colorTablacelda);
         display: flex; align-items: center; gap: 0.5rem;
-        font-size: 0.9rem; font-family: var(--fuenteCuerpo);
+        font-size: 1.4rem; font-family: var(--fuenteCuerpo);
         transition: background-color .2s, transform .2s;
     }
     .sexp-nav-link:hover {
@@ -66,6 +66,8 @@
         background-color: var(--colorBoton); color: var(--colorTextoBoton);
         border-color: var(--colorBoton);
     }
+
+    .dataTable { font-size: 1.4rem; }
 </style>
 {% endblock extra_css %}
 
@@ -86,9 +88,7 @@
         <a href="{% url 's_exp_seguimiento' %}" class="sexp-nav-link">
             <i class="bi bi-clock-history"></i> Mis Solicitudes
         </a>
-        <a href="{% url 's_exp_dashboard' %}" class="sexp-nav-link">
-            <i class="bi bi-speedometer2"></i> Panel Admin
-        </a>
+        
         <a href="{% url 's_exp_solicitudes' %}" class="sexp-nav-link">
             <i class="bi bi-list-check"></i> Gestión Solicitudes
         </a>
@@ -153,7 +153,7 @@ function renderDevoluciones(data) {
                 <div><span>Devueltos:</span> ${p.cant_devueltos}</div>
                 <div><span>Pendientes:</span> ${p.cant_pendientes}</div>
             </div>
-            <div style="margin-bottom:0.8rem;">${exps}</div>
+            <div style="margin-bottom:1.4rem;">${exps}</div>
             <div class="sexp-dev-actions">
                 <button class="sexp-dev-btn sexp-dev-btn--completa" onclick="procesarDevolucion(${p.id}, ${p.cant_pendientes}, true)">
                     <i class="bi bi-check-circle"></i> Devolución Completa (${p.cant_pendientes})

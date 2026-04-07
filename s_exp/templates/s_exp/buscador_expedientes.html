@@ -23,7 +23,7 @@
     /* Nav sub-módulos */
     .sexp-nav-modulos {
         display: flex;
-        gap: 0.8rem;
+        gap: 1.4rem;
         margin-bottom: 1.5rem;
         flex-wrap: wrap;
     }
@@ -36,9 +36,8 @@
         text-decoration: none;
         color: var(--colorTablacelda);
         display: flex;
-        align-items: center;
         gap: 0.5rem;
-        font-size: 0.9rem;
+        font-size: 1.4rem;
         font-family: var(--fuenteCuerpo);
         transition: background-color .2s, transform .2s, border-color .2s;
     }
@@ -72,7 +71,7 @@
         border: 1px solid var(--colorLinea);
         background-color: var(--blanco);
         color: var(--colorTablacelda);
-        font-size: 0.9rem;
+        font-size: 1.6rem;
         font-family: var(--fuenteCuerpo);
     }
 
@@ -82,7 +81,7 @@
         border: 1px solid var(--colorLinea);
         background-color: var(--blanco);
         color: var(--colorTablacelda);
-        font-size: 0.9rem;
+        font-size: 1.6rem;
         font-family: var(--fuenteCuerpo);
     }
 
@@ -94,6 +93,7 @@
         color: var(--colorTextoBoton);
         cursor: pointer;
         font-weight: 600;
+        font-size: 1.6rem;
         font-family: var(--fuenteCuerpo);
         transition: background-color .2s;
     }
@@ -106,7 +106,7 @@
     .sexp-resultado {
         background-color: var(--blanco);
         border-radius: 1rem;
-        padding: 0.8rem 1rem;
+        padding: 2rem 1.5rem;
         margin-bottom: 0.5rem;
         display: flex;
         justify-content: space-between;
@@ -122,25 +122,25 @@
 
     .sexp-resultado__info h4 {
         margin: 0 0 0.2rem;
-        font-size: 0.95rem;
+        font-size: 1.8rem;
         font-weight: 600;
     }
 
     .sexp-resultado__info p {
         margin: 0;
-        font-size: 0.8rem;
+        font-size: 1.4rem;
         opacity: 0.7;
     }
 
     .sexp-add-btn {
-        padding: 0.4rem 0.8rem;
+        padding: 0.4rem 1.4rem;
         border-radius: 0.6rem;
         border: none;
         background-color: var(--colorRadioBotonActivo);
         color: #fff;
         cursor: pointer;
         font-weight: 600;
-        font-size: 0.8rem;
+        font-size: 1.4rem;
         transition: all .2s;
         white-space: nowrap;
     }
@@ -160,7 +160,7 @@
         display: inline-block;
         padding: 0.2rem 0.6rem;
         border-radius: 2rem;
-        font-size: 0.7rem;
+        font-size: 1.2rem;
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.04em;
@@ -186,7 +186,7 @@
         border-radius: 0.6rem;
         background: rgba(99, 102, 241, 0.15);
         color: #6366f1;
-        font-size: 0.75rem;
+        font-size: 1.2rem;
         font-weight: 600;
     }
 
@@ -203,7 +203,7 @@
 
     .sexp-carrito h3 {
         margin: 0 0 1rem;
-        font-size: 1rem;
+        font-size: 1.6rem;
         display: flex;
         align-items: center;
         gap: 0.5rem;
@@ -216,7 +216,7 @@
         align-items: center;
         padding: 0.6rem 0.5rem;
         border-bottom: 1px solid var(--colorLinea);
-        font-size: 0.85rem;
+        font-size: 1.4rem;
         color: var(--colorTablacelda);
     }
 
@@ -229,7 +229,7 @@
         border: none;
         color: var(--colorEliminarRojo);
         cursor: pointer;
-        font-size: 1rem;
+        font-size: 1.6rem;
         padding: 0.2rem;
         transition: opacity .2s;
     }
@@ -242,7 +242,7 @@
         text-align: center;
         opacity: 0.5;
         padding: 1.5rem;
-        font-size: 0.85rem;
+        font-size: 1.4rem;
         color: var(--colorTablacelda);
     }
 
@@ -256,7 +256,7 @@
         display: block;
         margin-bottom: 0.3rem;
         font-weight: 600;
-        font-size: 0.8rem;
+        font-size: 1.4rem;
         color: var(--colorTablacelda);
     }
 
@@ -269,21 +269,21 @@
         border: 1px solid var(--colorLinea);
         background-color: var(--blanco);
         color: var(--colorTablacelda);
-        font-size: 0.85rem;
-        margin-bottom: 0.8rem;
+        font-size: 1.4rem;
+        margin-bottom: 1.4rem;
         font-family: var(--fuenteCuerpo);
     }
 
     .sexp-submit-btn {
         width: 100%;
-        padding: 0.7rem;
+        padding: 1.2rem;
         border-radius: 1rem;
         border: none;
         background-color: var(--colorBoton);
         color: var(--colorTextoBoton);
         cursor: pointer;
         font-weight: 700;
-        font-size: 0.95rem;
+        font-size: 1.8rem;
         transition: all .2s;
         font-family: var(--fuenteCuerpo);
     }
@@ -304,9 +304,8 @@
         width: 22px;
         height: 22px;
         display: inline-flex;
-        align-items: center;
         justify-content: center;
-        font-size: 0.75rem;
+        font-size: 1.2rem;
         font-weight: 700;
     }
 </style>
@@ -330,10 +329,7 @@
         <a href="{% url 's_exp_seguimiento' %}" class="sexp-nav-link">
             <i class="bi bi-clock-history"></i> Mis Solicitudes
         </a>
-        {% if request.user|en_grupo:"administradores" %}
-        <a href="{% url 's_exp_dashboard' %}" class="sexp-nav-link">
-            <i class="bi bi-speedometer2"></i> Panel Admin
-        </a>
+        {% if request.user|tiene_rol_global:"admin" %}
         <a href="{% url 's_exp_solicitudes' %}" class="sexp-nav-link">
             <i class="bi bi-list-check"></i> Gestión Solicitudes
         </a>
@@ -383,20 +379,13 @@
                 <div class="sexp-carrito-form" id="carrito-form" style="display:none;">
                     <label>Motivo *</label>
                     <select id="solicitud-motivo">
-                        <option value="">Seleccione...</option>
-                        <option value="Consulta Médica">Consulta Médica</option>
-                        <option value="Auditoría">Auditoría</option>
-                        <option value="Trámite Legal">Trámite Legal</option>
-                        <option value="Revisión Administrativa">Revisión Administrativa</option>
-                        <option value="Investigación">Investigación</option>
-                        <option value="Otro">Otro</option>
+                        <option value="">-- Cargando motivos --</option>
                     </select>
 
-                    <label>Área de Destino</label>
-                    <input type="text" id="solicitud-area" placeholder="Ej: Consulta Externa">
+                    <p id="info-unidad" style="font-size:1.4rem; opacity:0.7; margin:0 0 0.5rem;"></p>
 
                     <label>Observaciones</label>
-                    <textarea id="solicitud-observaciones" rows="2" placeholder="Detalles adicionales..."></textarea>
+                    <textarea id="solicitud-observaciones" rows="2" placeholder="Detalles adicionales o área diferente a su unidad..."></textarea>
 
                     <button class="sexp-submit-btn" id="btn-enviar-solicitud" disabled>
                         <i class="bi bi-send"></i> Enviar Solicitud

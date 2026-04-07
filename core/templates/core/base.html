@@ -139,7 +139,7 @@
             {% endif %}
 
 
-            {% if request.user|en_grupo:"Solicitantes:administradores" %}
+            {% if request.user|tiene_unidad:"Solicitante:DIRECTIVOS:Estadistica" %}
             <li>
                <a href="{% url 's_exp_buscador' %}" class="bn-navegacion__enlace">
                   <i class="bi bi-folder2-open bn-navegacion-enlace__logo"></i>
@@ -215,7 +215,7 @@
                   Superusuario
                   {% else %}
                   {% with request.user.perfilunidad_set.first as perfil %}
-                  {{ perfil.rol|upper }} - {{ perfil.unidad.nombre_unidad|upper|slice:":6" }}
+                  {{ perfil.get_rol_display|upper }} - {{ perfil.unidad.nombre_unidad|upper|slice:":6" }}
                   {% endwith %}
                   {% endif %}
                </span>
@@ -425,7 +425,9 @@
          s_exp_crear_solicitud_api: "{% url 's_exp_crear_solicitud_api' %}",
          s_exp_mis_solicitudes_api: "{% url 's_exp_mis_solicitudes_api' %}",
          s_exp_solicitar_devolucion_api: "{% url 's_exp_solicitar_devolucion_api' %}",
-         s_exp_alertas_api: "{% url 's_exp_alertas_api' %}"
+         s_exp_alertas_api: "{% url 's_exp_alertas_api' %}",
+         s_exp_motivos_api: "{% url 's_exp_motivos_api' %}",
+         s_exp_info_usuario_api: "{% url 's_exp_info_usuario_api' %}"
 
       };
 

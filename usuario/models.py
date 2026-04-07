@@ -12,8 +12,7 @@ ROLES = (
     ('digitador', 'Digitador'),
     ('auditor', 'Auditor'),
     ('visitante', 'Visitante'),
-    ('exp_admin', 'Admin Expedientes'),
-    ('exp_solicitante', 'Solicitante Expedientes'),
+    ('exp_solicitante', 'Solicitante'),
 )
 
 class PerfilUnidad(models.Model):

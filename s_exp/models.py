@@ -4,6 +4,30 @@ from expediente.models import Expediente
 
 
 # ============================================
+# CATÁLOGO: MOTIVOS DE SOLICITUD
+# ============================================
+class MotivoSolicitud(models.Model):
+    nombre = models.CharField(
+        max_length=100,
+        unique=True,
+        verbose_name='Motivo'
+    )
+    activo = models.BooleanField(
+        default=True,
+        verbose_name='Activo'
+    )
+
+    class Meta:
+        db_table = 's_exp_motivosolicitud'
+        verbose_name = 'Motivo de Solicitud'
+        verbose_name_plural = 'Motivos de Solicitud'
+        ordering = ['nombre']
+
+    def __str__(self):
+        return self.nombre
+
+
+# ============================================
 # EXPEDIENTE PARA PRÉSTAMO
 # ============================================
 class ExpedientePrestamo(models.Model):
@@ -73,7 +97,10 @@ class SolicitudPrestamo(models.Model):
         default='Pendiente',
         verbose_name='Estado del Flujo'
     )
-    motivo = models.TextField(
+    motivo = models.ForeignKey(
+        MotivoSolicitud,
+        on_delete=models.PROTECT,
+        related_name='solicitudes',
         verbose_name='Motivo de la Solicitud'
     )
     observaciones = models.TextField(
@@ -125,7 +152,6 @@ class SolicitudExpedienteDetalle(models.Model):
         verbose_name='Expediente'
     )
     # Campos historiales: se guardan al crear la solicitud
-    # para conservar la trazabilidad incluso si el expediente se reinicia
     paciente_identidad = models.CharField(
         max_length=50, blank=True, null=True,
         verbose_name='Identidad del Paciente'
@@ -137,6 +163,10 @@ class SolicitudExpedienteDetalle(models.Model):
     numero_expediente = models.PositiveIntegerField(
         null=True, blank=True,
         verbose_name='N° Expediente (snapshot)'
+    )
+    devuelto = models.BooleanField(
+        default=False,
+        verbose_name='Devuelto'
     )
 
     class Meta:

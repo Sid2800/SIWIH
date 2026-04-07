@@ -25,7 +25,7 @@ function renderSolicitudes(data) {
     const container = $('#timeline-solicitudes');
 
     if (!data.length) {
-        container.html('<p style="opacity:0.5; text-align:center;">No tiene solicitudes registradas. <a href="' + window.urls.s_exp_buscador + '" style="color:#6366f1;">Crear una nueva</a></p>');
+        container.html('<p style="opacity:0.5; text-align:center;">No tiene solicitudes registradas. <a href="' + window.urls.s_exp_buscador + '" style="color:var(--negro);">Crear una nueva</a></p>');
         return;
     }
 
@@ -33,12 +33,12 @@ function renderSolicitudes(data) {
     data.forEach(function (s) {
         const claseEstado = s.estado_flujo.toLowerCase().replace(/\s/g, '');
         const badgeEstilos = {
-            'pendiente': 'background:rgba(99,102,241,0.2);color:#a5b4fc;',
-            'aprobado': 'background:rgba(34,197,94,0.2);color:#22c55e;',
-            'rechazado': 'background:rgba(239,68,68,0.2);color:#ef4444;',
-            'enprestamo': 'background:rgba(245,158,11,0.2);color:#f59e0b;',
-            'devuelto': 'background:rgba(100,116,139,0.2);color:#94a3b8;',
-            'devolucionparcial': 'background:rgba(249,115,22,0.2);color:#f97316;'
+            'pendiente': 'background:rgba(99,102,241,0.2);color:var(--negro);',
+            'aprobado': 'background:rgba(34,197,94,0.2);color:var(--negro);',
+            'rechazado': 'background:rgba(239,68,68,0.2);color:var(--negro);',
+            'enprestamo': 'background:rgba(245,158,11,0.2);color:var(--negro);',
+            'devuelto': 'background:rgba(100,116,139,0.2);color:var(--negro);',
+            'devolucionparcial': 'background:rgba(249,115,22,0.2);color:var(--negro);'
         };
         const borderColors = {
             'pendiente': '#6366f1',
@@ -57,7 +57,7 @@ function renderSolicitudes(data) {
         <div class="sexp-sol-card" style="border-left-color:${borderColor};">
             <div class="sexp-sol-header">
                 <h3><i class="bi bi-file-text"></i> Solicitud #${s.id}</h3>
-                <span class="sexp-sol-badge" style="${badgeEstilo}padding:0.25rem 0.8rem;border-radius:20px;font-size:0.75rem;font-weight:700;">${s.estado_flujo}</span>
+                <span class="sexp-sol-badge" style="${badgeEstilo}padding:0.25rem 0.8rem;border-radius:20px;font-size:1.2rem;font-weight:700;">${s.estado_flujo}</span>
             </div>
             <div class="sexp-sol-info">
                 <div><label>Fecha</label>${s.fecha_creacion}</div>
@@ -71,12 +71,12 @@ function renderSolicitudes(data) {
         if (s.prestamo) {
             const p = s.prestamo;
             if (p.motivo_rechazo) {
-                html += `<div class="sexp-sol-rechazo"><i class="bi bi-x-circle" style="color:#ef4444;"></i> <strong>Motivo de rechazo:</strong> ${p.motivo_rechazo}</div>`;
+                html += `<div class="sexp-sol-rechazo"><i class="bi bi-x-circle" style="color:var(--negro);"></i> <strong>Motivo de rechazo:</strong> ${p.motivo_rechazo}</div>`;
             }
             if (p.estado === 'Entregado' || p.estado === 'Vencido' || p.estado === 'DevolucionParcial') {
                 // Timer
                 if (p.tiempo_restante_segundos !== null) {
-                    const timerClass = p.esta_vencido ? 'color:#ef4444;' : (p.porcentaje_tiempo_usado >= 90 ? 'color:#eab308;' : 'color:#22c55e;');
+                    const timerClass = p.esta_vencido ? 'color:var(--negro);' : (p.porcentaje_tiempo_usado >= 90 ? 'color:var(--negro);' : 'color:var(--negro);');
                     let timerText = '';
                     if (p.esta_vencido) {
                         timerText = 'VENCIDO';
@@ -94,7 +94,7 @@ function renderSolicitudes(data) {
                 </button>`;
             }
             if (p.comentarios) {
-                html += `<div style="margin-top:0.5rem;font-size:0.8rem;opacity:0.7;"><i class="bi bi-chat-text"></i> ${p.comentarios}</div>`;
+                html += `<div style="margin-top:0.5rem;font-size:1.3rem;opacity:0.7;"><i class="bi bi-chat-text"></i> ${p.comentarios}</div>`;
             }
         }
 
@@ -106,6 +106,8 @@ function renderSolicitudes(data) {
 
 function solicitarDevolucion(prestamoId) {
     Swal.fire({
+        color: 'var(--negro)',
+        background: 'var(--blanco)',
         title: 'Solicitar Devolución',
         text: '¿Desea iniciar el proceso de devolución de los expedientes? Presente los expedientes al administrador.',
         icon: 'question',

@@ -1,9 +1,9 @@
-
 from .models import Expediente, PacienteAsignacion
 from core.services.expediente_service import ExpedienteService
 from core.services.ingreso.ingreso_service import IngresoService
 from core.services.paciente_service import PacienteService
 from core.services.expediente_service import ExpedienteService
+from core.services.usuario_service import UsuarioService
 from core.utils.utilidades_textos import formatear_nombre_completo, formatear_ubicacion_completo
 from core.utils.utilidades_fechas import formatear_fecha_simple, calcular_edad_texto
 from core.mixins import UnidadRolRequiredMixin
@@ -46,6 +46,18 @@ class ExpedienteAddView(UnidadRolRequiredMixin, CreateView):
 
 class ExpedienteDetailView(DetailView):
     model=Expediente
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        usuario = self.request.user
+        
+        # Obtener tabs habilitadas para el usuario
+        tabs, activo = UsuarioService.obtener_tabs_usuario(usuario)
+        if tabs and activo:
+            context['tabs'] = tabs
+            context['tabActiva'] = activo
+            
+        return context
 
 #Funcion que sirve la api para Frontend del expedietne libre econtrado
 def traer_expediente_libre(request):

@@ -85,3 +85,22 @@ def en_grupo(user, grupos_str):
 
     grupos = [g.strip() for g in grupos_str.split(':') if g.strip()]
     return user.groups.filter(name__in=grupos).exists()
+
+
+@register.filter
+def tiene_rol_global(user, roles_str):
+    """
+    Verifica si el usuario tiene alguno de los roles indicados en CUALQUIER unidad.
+    Uso:
+        user|tiene_rol_global:"exp_solicitante"
+        user|tiene_rol_global:"exp_solicitante:admin"
+    Superusuarios y staff siempre retornan True.
+    """
+    if not user.is_authenticated:
+        return False
+
+    if user.is_superuser or user.is_staff:
+        return True
+
+    roles = [r.strip() for r in roles_str.split(':') if r.strip()]
+    return PerfilUnidad.objects.filter(usuario=user, rol__in=roles).exists()

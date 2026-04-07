@@ -20,13 +20,13 @@ class UsuarioService:
         return int(unidad_id) in perfiles
     
 
-    
     @staticmethod
     def obtener_tabs_usuario(usuario):
         tabs = {
             "ingresos": False,
             "atenciones": False,
             "radiologia": False,
+            "prestamos": False,
         }
 
         activo = None
@@ -42,6 +42,7 @@ class UsuarioService:
         if UsuarioService.pertenece_unidad(usuario, UnidadID.ADMISION):  # ADMISION
             tabs["ingresos"] = True
             tabs["atenciones"] = True
+            tabs["prestamos"] = True
             if not activo:
                 activo = "ingresos"
 

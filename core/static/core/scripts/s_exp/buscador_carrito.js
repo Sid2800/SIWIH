@@ -12,7 +12,42 @@ $(document).ready(function () {
     });
     $('#btn-enviar-solicitud').on('click', enviarSolicitud);
     $('#solicitud-motivo').on('change', validarFormulario);
+
+    // Cargar motivos y unidad del usuario
+    cargarMotivos();
+    cargarInfoUsuario();
 });
+
+
+function cargarMotivos() {
+    $.ajax({
+        url: urls.s_exp_motivos_api,
+        method: 'GET',
+        success: function (resp) {
+            const select = $('#solicitud-motivo');
+            select.html('<option value="">-- Seleccione motivo --</option>');
+            resp.data.forEach(function (m) {
+                select.append(`<option value="${m.id}">${m.nombre}</option>`);
+            });
+        },
+        error: function () {
+            toastr.error('Error al cargar motivos');
+        }
+    });
+}
+
+
+function cargarInfoUsuario() {
+    $.ajax({
+        url: urls.s_exp_info_usuario_api,
+        method: 'GET',
+        success: function (resp) {
+            if (resp.unidad) {
+                $('#info-unidad').text('Destino: ' + resp.unidad);
+            }
+        }
+    });
+}
 
 
 function buscarExpedientes() {
@@ -25,7 +60,7 @@ function buscarExpedientes() {
     }
 
     $.ajax({
-        url: window.urls.s_exp_buscar_expedientes_api,
+        url: urls.s_exp_buscar_expedientes_api,
         method: 'GET',
         data: { q: query, tipo: tipo },
         success: function (resp) {
@@ -72,7 +107,7 @@ function renderResultados(data) {
             <div class="sexp-resultado__info">
                 <h4><i class="bi bi-folder2"></i> Expediente #${item.numero_expediente}</h4>
                 <p><strong>${item.paciente_nombre || 'Sin paciente asignado'}</strong></p>
-                <p style="font-size:0.75rem;">${item.paciente_dni ? 'ID: ' + item.paciente_dni : ''}</p>
+                <p style="font-size:1.2rem;">${item.paciente_dni ? 'ID: ' + item.paciente_dni : ''}</p>
             </div>
             <div style="display:flex; align-items:center; gap:0.5rem;">
                 <span class="sexp-badge ${badgeClass}">${badgeText}</span>
@@ -124,7 +159,7 @@ function renderCarrito() {
         <div class="sexp-carrito-item">
             <div>
                 <strong>#${item.numero_expediente}</strong>
-                <span style="opacity:0.6; font-size:0.8rem;"> — ${item.paciente_nombre || 'N/A'}</span>
+                <span style="opacity:0.6; font-size:1.3rem;"> — ${item.paciente_nombre || 'N/A'}</span>
             </div>
             <button class="sexp-remove-btn" onclick="removerDelCarrito(${item.expediente_id})" title="Quitar">
                 <i class="bi bi-x-circle"></i>
@@ -145,11 +180,11 @@ function validarFormulario() {
 
 
 function enviarSolicitud() {
-    const motivo = $('#solicitud-motivo').val();
-    const area = $('#solicitud-area').val();
+    const motivoId = $('#solicitud-motivo').val();
+    const motivoText = $('#solicitud-motivo option:selected').text();
     const obs = $('#solicitud-observaciones').val();
 
-    if (!motivo) {
+    if (!motivoId) {
         toastr.warning('Seleccione un motivo');
         return;
     }
@@ -159,10 +194,12 @@ function enviarSolicitud() {
     }
 
     Swal.fire({
+        color: 'var(--negro)',
+        background: 'var(--blanco)',
         title: 'Confirmar Solicitud',
-        html: `<p>Está a punto de solicitar <strong>${carrito.length}</strong> expediente(s).</p>
-               <p><strong>Motivo:</strong> ${motivo}</p>
-               <p>¿Desea continuar?</p>`,
+        html: `<div style="color:var(--negro);"><p>Está a punto de solicitar <strong>${carrito.length}</strong> expediente(s).</p>
+               <p><strong>Motivo:</strong> ${motivoText}</p>
+               <p>¿Desea continuar?</p></div>`,
         icon: 'question',
         showCancelButton: true,
         confirmButtonColor: '#6366f1',
@@ -178,12 +215,13 @@ function enviarSolicitud() {
                 contentType: 'application/json',
                 data: JSON.stringify({
                     expedientes: carrito.map(c => c.expediente_id),
-                    motivo: motivo,
-                    observaciones: obs || '',
-                    area_destino: area || ''
+                    motivo_id: parseInt(motivoId),
+                    observaciones: obs || ''
                 }),
                 success: function (resp) {
                     Swal.fire({
+        color: 'var(--negro)',
+        background: 'var(--blanco)',
                         title: '¡Solicitud Enviada!',
                         text: resp.mensaje,
                         icon: 'success',
@@ -192,7 +230,6 @@ function enviarSolicitud() {
                         carrito = [];
                         renderCarrito();
                         $('#solicitud-motivo').val('');
-                        $('#solicitud-area').val('');
                         $('#solicitud-observaciones').val('');
                         $('#resultados-busqueda').html('<p style="opacity:0.5; text-align:center;">Ingrese un criterio de búsqueda para encontrar expedientes.</p>');
                     });

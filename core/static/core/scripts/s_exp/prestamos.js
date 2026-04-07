@@ -49,16 +49,16 @@ function renderPrestamos(data) {
     }
 
     data.forEach(function (p) {
-        const exps = p.expedientes.map(n => `<span class="sexp-exp-tag" style="background:rgba(99,102,241,0.2);color:#a5b4fc;padding:0.2rem 0.5rem;border-radius:4px;font-size:0.75rem;font-weight:600;">#${n}</span>`).join(' ');
+        const exps = p.expedientes.map(n => `<span class="sexp-exp-tag" style="background:rgba(99,102,241,0.2);color:var(--negro);padding:0.2rem 0.5rem;border-radius:4px;font-size:1.2rem;font-weight:600;">#${n}</span>`).join(' ');
 
         let estadoBadge = '';
         const estilosBadge = {
-            'Activo': 'background:rgba(99,102,241,0.2);color:#a5b4fc;',
-            'Entregado': 'background:rgba(245,158,11,0.2);color:#f59e0b;',
-            'Vencido': 'background:rgba(239,68,68,0.2);color:#ef4444;',
-            'DevolucionParcial': 'background:rgba(249,115,22,0.2);color:#f97316;'
+            'Activo': 'background:rgba(99,102,241,0.2);color:var(--negro);',
+            'Entregado': 'background:rgba(245,158,11,0.2);color:var(--negro);',
+            'Vencido': 'background:rgba(239,68,68,0.2);color:var(--negro);',
+            'DevolucionParcial': 'background:rgba(249,115,22,0.2);color:var(--negro);'
         };
-        estadoBadge = `<span style="padding:0.25rem 0.6rem;border-radius:20px;font-size:0.75rem;font-weight:600;${estilosBadge[p.estado] || ''}">${p.estado}</span>`;
+        estadoBadge = `<span style="padding:0.25rem 0.6rem;border-radius:20px;font-size:1.2rem;font-weight:600;${estilosBadge[p.estado] || ''}">${p.estado}</span>`;
 
         let timerHtml = '';
         if (p.estado === 'Entregado' && p.fecha_limite) {
@@ -72,14 +72,14 @@ function renderPrestamos(data) {
             // Iniciar cronómetro
             setTimeout(() => iniciarCronometro(p.id, p.fecha_limite, p.porcentaje_tiempo_usado), 100);
         } else if (p.estado === 'Activo') {
-            timerHtml = '<span style="opacity:0.5;font-size:0.8rem;">Sin entregar</span>';
+            timerHtml = '<span style="opacity:0.5;font-size:1.3rem;">Sin entregar</span>';
         } else {
-            timerHtml = '<span style="opacity:0.5;font-size:0.8rem;">-</span>';
+            timerHtml = '<span style="opacity:0.5;font-size:1.3rem;">-</span>';
         }
 
         let acciones = '';
         if (p.estado === 'Activo') {
-            acciones = `<button style="background:#22c55e;color:#fff;border:none;padding:0.3rem 0.6rem;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:600;" onclick="marcarEntregado(${p.id})">
+            acciones = `<button style="background:#22c55e;color:var(--negro);border:none;padding:0.3rem 0.6rem;border-radius:6px;cursor:pointer;font-size:1.3rem;font-weight:600;" onclick="marcarEntregado(${p.id})">
                 <i class="bi bi-check2-square"></i> Entregar
             </button>`;
         }
@@ -145,6 +145,8 @@ function iniciarCronometro(prestamoId, fechaLimiteISO, porcentaje) {
 
 function marcarEntregado(prestamoId) {
     Swal.fire({
+        color: 'var(--negro)',
+        background: 'var(--blanco)',
         title: '¿Confirmar Entrega?',
         text: 'Se iniciará el cronómetro del préstamo al confirmar.',
         icon: 'question',

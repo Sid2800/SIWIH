@@ -40,7 +40,15 @@ urlpatterns = [
     path('api/solicitar-devolucion/', views.solicitar_devolucion_api, name='s_exp_solicitar_devolucion_api'),
 
     # ==========================================
-    # APIs COMUNES
+    # APIs COMUNES / CATÁLOGOS
     # ==========================================
     path('api/alertas/', views.alertas_usuario_api, name='s_exp_alertas_api'),
+    path('api/motivos/', views.motivos_api, name='s_exp_motivos_api'),
+    path('api/info-usuario/', views.info_usuario_api, name='s_exp_info_usuario_api'),
+    path('api/historial-prestamos-paciente/<int:paciente_id>/',
+         views.historial_prestamos_paciente_api,
+         name='s_exp_historial_prestamos_paciente_api'),
+    path('api/historial-prestamos-expediente/<int:expediente_id>/',
+         views.historial_prestamos_expediente_api,
+         name='s_exp_historial_prestamos_expediente_api'),
 ]

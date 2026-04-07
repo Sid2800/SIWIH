@@ -29,13 +29,13 @@
     .sexp-kpi-card--baja { --kpi-color: #64748b; }
 
     /* Nav sub-módulos */
-    .sexp-nav-modulos { display:flex; gap:0.8rem; flex-wrap:wrap; margin-bottom:1rem; }
+    .sexp-nav-modulos { display:flex; gap:1.4rem; flex-wrap:wrap; margin-bottom:1rem; }
     .sexp-nav-link {
         padding: 0.6rem 1.2rem; border-radius: 1rem;
         background-color: var(--blanco); border: 1px solid var(--colorLinea);
         text-decoration: none; color: var(--colorTablacelda);
         display: flex; align-items: center; gap: 0.5rem;
-        font-size: 0.9rem; font-family: var(--fuenteCuerpo);
+        font-size: 1.4rem; font-family: var(--fuenteCuerpo);
         transition: background-color .2s, transform .2s;
     }
     .sexp-nav-link:hover {
@@ -48,7 +48,7 @@
     }
 
     .sexp-section-title {
-        font-size: 1.1rem; font-weight: 600; margin-bottom: 0.8rem;
+        font-size: 1.4rem; font-weight: 600; margin-bottom: 1.4rem;
         display: flex; align-items: center; gap: 0.5rem;
         color: var(--colorTablacelda);
     }
@@ -57,7 +57,7 @@
     .sexp-alerta-tabla th { text-align:left; padding:0.6rem; opacity:0.7; border-bottom:1px solid var(--colorLinea); }
     .sexp-alerta-tabla td { padding:0.6rem; border-bottom:1px solid var(--colorLinea); }
 
-    .sexp-badge { padding: 0.25rem 0.6rem; border-radius: 2rem; font-size: 0.75rem; font-weight: 600; }
+    .sexp-badge { padding: 0.25rem 0.6rem; border-radius: 2rem; font-size: 1.2rem; font-weight: 600; }
     .sexp-badge--vencido { background: rgba(239,68,68,0.15); color: #ef4444; }
     .sexp-badge--proximo { background: rgba(234,179,8,0.15); color: #eab308; }
     .sexp-badge--parcial { background: rgba(249,115,22,0.15); color: #f97316; }
@@ -81,9 +81,7 @@
         <a href="{% url 's_exp_seguimiento' %}" class="sexp-nav-link">
             <i class="bi bi-clock-history"></i> Mis Solicitudes
         </a>
-        <a href="{% url 's_exp_dashboard' %}" class="sexp-nav-link sexp-nav-link--active">
-            <i class="bi bi-speedometer2"></i> Panel Admin
-        </a>
+        
         <a href="{% url 's_exp_solicitudes' %}" class="sexp-nav-link">
             <i class="bi bi-list-check"></i> Gestión Solicitudes
         </a>

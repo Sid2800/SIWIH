@@ -14,7 +14,7 @@
         color: var(--colorTablacelda);
     }
     .sexp-filtro-grupo { display:flex; flex-direction:column; gap:0.3rem; }
-    .sexp-filtro-grupo label { font-size:0.8rem; font-weight:600; opacity:0.7; }
+    .sexp-filtro-grupo label { font-size:1.4rem; font-weight:600; opacity:0.7; }
     .sexp-filtro-grupo input, .sexp-filtro-grupo select {
         padding: 0.5rem; border-radius: 0.6rem;
         border: 1px solid var(--colorLinea);
@@ -47,7 +47,7 @@
     .sexp-tab {
         padding: 0.6rem 1.2rem; border: none; cursor: pointer;
         background: transparent; color: var(--colorTablacelda);
-        font-size: 0.9rem; font-family: var(--fuenteCuerpo);
+        font-size: 1.4rem; font-family: var(--fuenteCuerpo);
         border-bottom: 2px solid transparent; transition: all .2s;
     }
     .sexp-tab:hover { border-bottom-color: var(--colorLinea); }
@@ -56,13 +56,13 @@
     .sexp-tab-content.active { display:block; }
 
     /* Nav sub-módulos */
-    .sexp-nav-modulos { display:flex; gap:0.8rem; flex-wrap:wrap; margin-bottom:1rem; }
+    .sexp-nav-modulos { display:flex; gap:1.4rem; flex-wrap:wrap; margin-bottom:1rem; }
     .sexp-nav-link {
         padding: 0.6rem 1.2rem; border-radius: 1rem;
         background-color: var(--blanco); border: 1px solid var(--colorLinea);
         text-decoration: none; color: var(--colorTablacelda);
         display: flex; align-items: center; gap: 0.5rem;
-        font-size: 0.9rem; font-family: var(--fuenteCuerpo);
+        font-size: 1.4rem; font-family: var(--fuenteCuerpo);
         transition: background-color .2s, transform .2s;
     }
     .sexp-nav-link:hover {
@@ -73,6 +73,8 @@
         background-color: var(--colorBoton); color: var(--colorTextoBoton);
         border-color: var(--colorBoton);
     }
+
+    .dataTable { font-size: 1.4rem; }
 </style>
 {% endblock extra_css %}
 
@@ -93,9 +95,7 @@
         <a href="{% url 's_exp_seguimiento' %}" class="sexp-nav-link">
             <i class="bi bi-clock-history"></i> Mis Solicitudes
         </a>
-        <a href="{% url 's_exp_dashboard' %}" class="sexp-nav-link">
-            <i class="bi bi-speedometer2"></i> Panel Admin
-        </a>
+        
         <a href="{% url 's_exp_solicitudes' %}" class="sexp-nav-link">
             <i class="bi bi-list-check"></i> Gestión Solicitudes
         </a>
