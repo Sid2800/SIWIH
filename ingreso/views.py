@@ -50,7 +50,6 @@ class IngresoAddView(UnidadRolRequiredMixin, CreateView):
         return initial
 
     def form_valid(self, form):
-        
         usuario_id = self.request.user.id
         zona = form.cleaned_data.get("zona", None)
         #paceinte validaddo en form clean 

@@ -224,7 +224,6 @@ class IngresoEditForm(forms.ModelForm):
         super().__init__(*args, **kwargs) 
             
 
-
     def clean(self):
         cleaned_data = super().clean()
         id_paciente = cleaned_data.get('idPaciente')

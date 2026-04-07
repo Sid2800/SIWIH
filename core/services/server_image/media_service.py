@@ -73,6 +73,9 @@ class MediaService:
 
     @staticmethod
     def agregar_imagenes_evaluacion(estudios, archivos, paciente_tipo, paciente_id, usuario):
+        """
+        Procesa imágenes en modo AGREGAR.
+        """
 
         warnings = []
         success = []

@@ -122,6 +122,7 @@ class EvaluacionRXCreateForm(forms.ModelForm):
         p_externo = self.data.get('paciente_externo_data')
         p_ligado = self.data.get('paciente_ligado_id')
 
+        #valirdad imagenes 
         for nombre, imagen in self.files.items():
             if not nombre.startswith("archivo__"):
                 continue
@@ -282,26 +283,18 @@ class EvaluacionRXEditForm(EvaluacionRXCreateForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        if self.instance.pk:
-            if self.instance.sala:
-                clave_actual = f"S-{self.instance.sala.id}"
-                nombre_actual = self.instance.sala.nombre_sala
-                tipo_actual = "HOSP"
-            elif self.instance.especialidad:
-                clave_actual = f"E-{self.instance.especialidad.id}"
-                nombre_actual = self.instance.especialidad.nombre_especialidad
-                tipo_actual = "CEXT"
-            elif self.instance.servicio_auxiliar:
-                clave_actual = f"A-{self.instance.servicio_auxiliar.id}"
-                nombre_actual = self.instance.servicio_auxiliar.nombre_servicio_a
-                tipo_actual = "SAUX"
-            else:
-                clave_actual = None
 
-            if clave_actual:
-                # Revisar si ya está en choices
-                if clave_actual not in dict(self.fields['dependencia'].choices):
-                    # Agregarlo al principio
-                    self.fields['dependencia'].choices = [(clave_actual, f"{nombre_actual} ({tipo_actual})")] + list(self.fields['dependencia'].choices)
+        #agregar la sala aunque no este activa o este oculta
+        info = ServicioService.encontrar_dependencia_en_instance(self.instance)
 
-                self.fields['dependencia'].initial = clave_actual
+        if info:
+            clave_actual = info["clave"]
+            label = f"{info['nombre']} ({info['tipo']})"
+            
+
+            # Revisar si ya está en choices
+            if clave_actual not in dict(self.fields['dependencia'].choices):
+                # Agregarlo al principio
+                self.fields['dependencia'].choices = [(clave_actual, f"{label})")] + list(self.fields['dependencia'].choices)
+
+            self.fields['dependencia'].initial = clave_actual

@@ -16,9 +16,14 @@ busquedas = [
 
 defunciones = [
     path('defuncion-guardar/', views.guardarDefuncion, name='paciente_guardar_defuncion'),
+    path('obito-guardar/', views.guardarObito, name='paciente_guardar_obito'),
+
     path('obtener-defuncion/', views.obtener_defuncion_paciente, name='obtener_defuncion'),
+    path('obtener-obito/', views.obtener_obito_paciente, name='obtener_obito'),
     path('verificar-defuncion/', views.verificar_defuncion, name='verificar_defuncion'),
     path('registrar-entrega-cadaver/', views.registrarEntregaCadaver, name='registrar_entrega_cadaver'),
+    path('listar-obitos-paciente/', views.obtener_obitos_paciente, name='listar_obitos_paciente'),
+
 
 ]
 

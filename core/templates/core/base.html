@@ -21,6 +21,7 @@
 
    <!-- ICONOS -->
    <link rel="stylesheet" href="{% static 'core/bootstrap-icons/bootstrap-icons.min.css' %}">
+   <link rel="stylesheet" href="{% static 'core/material-icons/material-icons.css' %}">
 
    <!-- ALERTAS -->
    <!-- Toastr -->
@@ -300,6 +301,8 @@
          detallesDomicilio: "{% url 'obtenerDetallesDomicilio' %}",
          listadoDispensacionPaciente: "{% url 'dispensaciones_paciente' %}",
 
+      listarObitosPaciente: "{% url 'listar_obitos_paciente' %}",
+
 
          /* ---------------- EVALUACION RX ---------------- */
 
@@ -369,6 +372,8 @@
          listarEspecialidad: "{% url 'listarEspecialidad' %}",
          cambiarZona: "{% url 'cambiarZona' %}",
          agregarSector: "{% url 'agregarSector' %}",
+
+      
 
 
          /* ---------------- DEFUNCIÓN ---------------- */
@@ -468,8 +473,10 @@
 
    <!-- SCRIPTS PROPIOS -->
    <script src="{% static 'core/scripts/helpers/fechaUtilidades.js' %}"></script>
-
+   <script src="{% static 'core/scripts/helpers/servicio_helpers.js' %}"></script>
    <script src="{% static 'core/scripts/helpers/helpers.js' %}"></script>
+
+
 
    <script src="{% static 'core/scripts/core/main.js' %}"></script>
 
