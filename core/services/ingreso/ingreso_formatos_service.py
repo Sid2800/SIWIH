@@ -202,7 +202,7 @@ class IngresoFormatosService:
 
             cama = str(ingreso_obj.cama.numero_cama) if ingreso_obj.cama else ""
 
-            cubiculo = str(ingreso_obj.cama.cubiculo) if ingreso_obj.cama.cubiculo else ""
+            cubiculo = str(ingreso_obj.cama.cubiculo) if ingreso_obj.cama else ""
                 
             #insitucion Agregada a posteriori para incluir la hija de referencia preciamente llenada
             institucion=ServicioService.obtener_institucion_heac_reporte()

@@ -27,6 +27,7 @@ from core.services.paciente_service import PacienteService
 from core.services.reporte.PDF.reporte_generador_service import ReporteGeneradorService
 from core.services.reporte.EXCEL.reporte_service_excel import ServiceExcel
 from core.constants.stored_procedures import SP_CATALOGO_REFERENCIAS_RECIBIDAS, SP_CATALOGO_REFERENCIAS_ENVIADAS
+from core.constants.permisos import ROLES_GLOBALES
 from core.services.usuario_service import UsuarioService
 from core.services.ubicacion_service import UbicacionService
 from core.services.servicio_service import ServicioService
@@ -44,7 +45,7 @@ from reporte.validators import validar_informe
 
 class ReporteGeneradorView(UnidadRolRequiredMixin, TemplateView):
     template_name = "reporte/reportes_gen.html"
-    required_roles = ['admin','digitador', 'auditor', 'Visitante']
+    required_roles = ['admin','digitador', 'directivo', 'Visitante']
     required_unidades = ['Admision', 'Referencia','Imagenologia', 'DIRECTIVOS']
 
     def get_context_data(self, **kwargs):
@@ -80,7 +81,7 @@ class ReporteGeneradorView(UnidadRolRequiredMixin, TemplateView):
 
         # SUPERUSUARIO o DIRECTIVOS => tienen acceso completo
         if self.request.user.is_superuser or \
-        self.request.user.perfilunidad_set.filter(unidad__nombre_unidad='DIRECTIVOS').exists():
+        self.request.user.perfilunidad_set.filter(rol__in=ROLES_GLOBALES,alcance=2).exists():
 
             modelos.extend([
                 ('paciente', 'Paciente'),
@@ -95,28 +96,29 @@ class ReporteGeneradorView(UnidadRolRequiredMixin, TemplateView):
             context['informesCatalogo'] = informesCatalogo
             context['modelos'] = modelos
 
-        # --------- USUARIOS NORMALES ------------
-        user_unidades = [pu.unidad.nombre_unidad for pu in self.request.user.perfilunidad_set.all()]
+        else:
+            # --------- USUARIOS NORMALES ------------
+            user_unidades = [pu.servicio_unidad.nombre_unidad for pu in self.request.user.perfilunidad_set.all()]
 
-        # Paciente SIEMPRE disponible
-        modelos.append(('paciente', 'Paciente'))
+            # Paciente SIEMPRE disponible
+            modelos.append(('paciente', 'Paciente'))
 
-        # Admision
-        if 'Admision' in user_unidades:
-            modelos.append(('ingreso', 'Ingreso'))
-            modelos.append(('atencion', 'Atencion'))
+            # Admision
+            if 'ADMISION' in user_unidades:
+                modelos.append(('ingreso', 'Ingreso'))
+                modelos.append(('atencion', 'Atencion'))
 
-        # Imagenología
-        if 'Imagenologia' in user_unidades:
-            modelos.append(('imagenologia', 'Evaluación RX'))
-            modelos.append(('estudio_rx', 'Estudio RX'))
-            context.setdefault('informesRx', informesRx)  # evita pisar si ya existe
+            # Imagenología
+            if 'IMAGENOLOGIA' in user_unidades:
+                modelos.append(('imagenologia', 'Evaluación RX'))
+                modelos.append(('estudio_rx', 'Estudio RX'))
+                context.setdefault('informesRx', informesRx)  # evita pisar si ya existe
 
-        # Referencia
-        if 'Referencia' in user_unidades:
-            context.setdefault('informesReferencia', informesReferencia)
-            context.setdefault('informesCatalogo', informesCatalogo[:2])
-                
+            # Referencia
+            if 'REFERENCIA' in user_unidades:
+                context.setdefault('informesReferencia', informesReferencia)
+                context.setdefault('informesCatalogo', informesCatalogo[:2])
+                    
                 
         anio_actual = datetime.now().year
         anios = list(range(2000, anio_actual + 1))

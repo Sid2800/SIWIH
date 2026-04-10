@@ -987,7 +987,7 @@ class PacienteService:
         return list(
             qs.values(
                 "id",
-                "fecha",  # 👈 ya viene solo fecha
+                "fecha",  
                 "motivo",
                 "responsable_nombre",
                 "responsable_dni",

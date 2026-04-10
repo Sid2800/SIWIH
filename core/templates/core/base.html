@@ -205,7 +205,12 @@
                         Superusuario
                      {% else %}
                         {% with request.user.perfilunidad_set.first as perfil %}
-                           {{ perfil.rol|upper }} - {{ perfil.unidad.nombre_unidad|upper|slice:":6" }}
+                           {{ perfil.rol|upper }} 
+                           {% if perfil.servicio_unidad %}
+                           - {{ perfil.servicio_unidad.nombre_corto_unidad|upper }}
+                           {% else %}
+                           - INST
+                           {% endif %}
                         {% endwith %}
                      {% endif %}
                   </span>

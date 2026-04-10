@@ -1,7 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from ubicacion.models import Sector
-
+from core.constants.choices_constants import TipoUnidad, EstadoRegistro, EstadoCama, NivelAtencion
 
 # Create your models here.
 class Zona(models.Model):
@@ -26,8 +26,8 @@ class Servicio(models.Model):
     nombre_corto = models.CharField(max_length=10, verbose_name="Nombre Corto Servicio", default="NA")
     estado = models.SmallIntegerField(
         verbose_name="Estado",
-        choices=[(1, "Activo"), (2, "Inactivo")],
-        default=1
+        choices=EstadoRegistro.choices,
+        default=EstadoRegistro.ACTIVO
     )
     fecha_creado = models.DateTimeField(verbose_name="Fecha Creado", auto_now_add=True)
     creado_por = models.ForeignKey(User, on_delete=models.PROTECT, related_name='servicios_creados')  # Corregido related_name
@@ -70,8 +70,8 @@ class Sala(models.Model):
 
     estado = models.SmallIntegerField(
         verbose_name="Estado",
-        choices=[(1, "Activo"), (2, "Inactivo")],
-        default=1
+        choices=EstadoRegistro.choices,
+        default=EstadoRegistro.ACTIVO
     )
     
     servicio = models.ForeignKey(
@@ -110,8 +110,8 @@ class Cubiculo(models.Model):
 
     estado = models.SmallIntegerField(
         verbose_name="Estado",
-        choices=[(1, "Activo"), (2, "Inactivo")],
-        default=1
+        choices=EstadoRegistro.choices,
+        default=EstadoRegistro.ACTIVO
     )
 
     class Meta:
@@ -127,15 +127,10 @@ class Cubiculo(models.Model):
 class Cama(models.Model):
     numero_cama = models.IntegerField(verbose_name="Número de Cama", primary_key=True)
     
-    ESTADO_CAMAS = [
-        (1, "Disponible"),
-        (2, "Ocupada"),
-        (3, "En Mantenimiento"),
-    ]
     estado = models.IntegerField(
         verbose_name="Estado de la Cama",
-        choices=ESTADO_CAMAS,
-        default=1
+        choices=EstadoCama.choices,
+        default=EstadoCama.DISPONIBLE
     )
     
     sala = models.ForeignKey(
@@ -166,8 +161,8 @@ class Especialidad(models.Model):
 
     estado = models.SmallIntegerField(
         verbose_name="Estado",
-        choices=[(1, "Activo"), (2, "Inactivo")],
-        default=1
+        choices=EstadoRegistro.choices,
+        default=EstadoRegistro.ACTIVO
     )
 
     def __str__(self):
@@ -184,8 +179,8 @@ class ServiciosAux(models.Model):
     nombre_corto_servicio_a = models.CharField(max_length=20, unique=True, blank=True, null=True)
     estado = models.SmallIntegerField(
         verbose_name="Estado",
-        choices=[(1, "Activo"), (2, "Inactivo")],
-        default=1
+        choices=EstadoRegistro.choices,
+        default=EstadoRegistro.ACTIVO
     )
 
     def __str__(self):
@@ -195,6 +190,24 @@ class ServiciosAux(models.Model):
         verbose_name = "Servicio Auxiliar"
         verbose_name_plural = "Servicios Auxiliares"
         ordering = ['nombre_servicio_a']
+
+
+#lugares no clinicos
+
+class Unidad(models.Model):
+    nombre_unidad = models.CharField(max_length=100, unique=True)
+    nombre_corto_unidad = models.CharField(max_length=20, unique=True, blank=True, null=True)
+    tipo = models.PositiveSmallIntegerField(choices=TipoUnidad.choices,   default=TipoUnidad.CLINICA)
+    estado = models.SmallIntegerField(
+        verbose_name="Estado",
+        choices=EstadoRegistro.choices,
+        default=EstadoRegistro.ACTIVO
+    )
+    fecha_creado = models.DateTimeField(verbose_name="Fecha Creado", auto_now_add=True)
+    creado_por = models.ForeignKey(User, on_delete=models.PROTECT, related_name='unidades_creadas')  
+    fecha_modificado = models.DateTimeField(verbose_name="Fecha Editado", auto_now=True)
+    modificado_por = models.ForeignKey(User, on_delete=models.PROTECT, related_name='unidades_modificadas')  
+
 
 
 # REFERENCIA
@@ -208,8 +221,8 @@ class Proveedor_salud(models.Model):
     )
     estado = models.SmallIntegerField(
         verbose_name="Estado",
-        choices=[(1, "Activo"), (2, "Inactivo")],
-        default=1
+        choices=EstadoRegistro.choices,
+        default=EstadoRegistro.ACTIVO
     )
 
     def __str__(self):
@@ -242,8 +255,8 @@ class Nivel_complejidad_institucional(models.Model):
     )
     estado = models.SmallIntegerField(
         verbose_name="Estado",
-        choices=[(1, "Activo"), (2, "Inactivo")],
-        default=1
+        choices=EstadoRegistro.choices,
+        default=EstadoRegistro.ACTIVO
     )
 
     def __str__(self):
@@ -266,8 +279,8 @@ class Region_salud(models.Model):
     )
     estado = models.SmallIntegerField(
         verbose_name="Estado",
-        choices=[(1, "Activo"), (2, "Inactivo")],
-        default=1
+        choices=EstadoRegistro.choices,
+        default=EstadoRegistro.ACTIVO
     )
 
     def __str__(self):
@@ -296,8 +309,8 @@ class Gestor(models.Model):
     )
     estado = models.SmallIntegerField(
         verbose_name="Estado",
-        choices=[(1, "Activo"), (2, "Inactivo")],
-        default=1
+        choices=EstadoRegistro.choices,
+        default=EstadoRegistro.ACTIVO
     )
 
     def __str__(self):
@@ -347,12 +360,8 @@ class Institucion_salud(models.Model):
     )
     nivel_atencion = models.SmallIntegerField(
         verbose_name="Nivel de atencion",
-        choices=[
-            (1, "Primer nivel"),
-            (2, "Segundo nivel"),
-            (3, "Otros")  # Ajusté esta opción
-        ],
-        default=1
+        choices=NivelAtencion.choices,
+        default=NivelAtencion.PRIMER_NIVEL
     )
     centralizado = models.BooleanField(
         verbose_name="Centralizado",
@@ -373,8 +382,8 @@ class Institucion_salud(models.Model):
     )
     estado = models.SmallIntegerField(
         verbose_name="Estado",
-        choices=[(1, "Activo"), (2, "Inactivo")],
-        default=1
+        choices=EstadoRegistro.choices,
+        default=EstadoRegistro.ACTIVO
     )
 
     fecha_creado = models.DateTimeField(verbose_name="Fecha Creado", auto_now_add=True)
