@@ -23,7 +23,7 @@ def tiene_rol(user, valores):
     if user.is_superuser:
         return True
     
-    if user.es_global:
+    if UsuarioService.es_global(user):
         gbal = True
 
     # Aseguramos que sea lista
@@ -61,7 +61,7 @@ def tiene_unidad(user, unidades_str):
     if user.is_superuser:
         return True
     
-    if user.es_global:
+    if UsuarioService.es_global(user):
         return True
 
     # Separar unidades por ':'

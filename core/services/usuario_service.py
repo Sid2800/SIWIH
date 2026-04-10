@@ -2,6 +2,7 @@ from django.contrib.auth.models import User
 from usuario.models import PerfilUnidad
 from core.constants.domain_constants import UnidadID
 from core.constants.choices_constants import AlcanceUsuario
+
 from django.db import connections
 
 class UsuarioService:
@@ -19,7 +20,7 @@ class UsuarioService:
         return int(unidad_id) in perfiles
     
     @staticmethod
-    def es_global(usuario, roles=None):
+    def es_global_roles(usuario, roles=None):
         if usuario.is_superuser:
             return True
 
@@ -42,7 +43,7 @@ class UsuarioService:
 
         activo = None
         # Superuser y rectivos ve todo
-        if usuario.is_superuser or usuario.es_directivo or usuario.es_admin_global or UsuarioService.pertenece_unidad(usuario, UnidadID.SALA):
+        if usuario.is_superuser or UsuarioService.es_directivo(usuario) or UsuarioService.es_admin_global(usuario) or UsuarioService.pertenece_unidad(usuario, UnidadID.SALA):
             for t in tabs.keys():
                 tabs[t] = True
             activo = "ingresos"
@@ -61,3 +62,23 @@ class UsuarioService:
                 activo = "radiologia"
 
         return tabs, activo
+    
+    @staticmethod
+    def es_global(user):
+        return user.perfilunidad_set.filter(
+            alcance=AlcanceUsuario.GLOBAL
+        ).exists()
+
+    @staticmethod
+    def es_directivo(user):
+        return user.perfilunidad_set.filter(
+            alcance=AlcanceUsuario.GLOBAL,
+            rol='directivo'
+        ).exists()
+
+    @staticmethod
+    def es_admin_global(user):
+        return user.perfilunidad_set.filter(
+            alcance=AlcanceUsuario.GLOBAL,
+            rol='admin'
+        ).exists()
