@@ -816,8 +816,11 @@ class ReportePacienteService:
         if ingreso.cama:
             pdf.rect(primer_elemento_izquierda+428, alto-43, 68, 14, stroke=1, fill=0)
             pdf.drawString(primer_elemento_izquierda + 430, alto - 40, f"CAMA: {ingreso.cama}")
+            pdf.setFont("Helvetica-Bold", 7)
+            pdf.drawCentredString(primer_elemento_izquierda + 460, alto - 25, f"CUBICULO: {ReportePdfBaseService.texto_seguro(ingreso.cubiculo, 24)}")
 
         
+        pdf.setFont("Helvetica-Bold", 11.5)
 
         pdf.drawCentredString(primer_elemento_izquierda + 123 , altura_bloque4, ReportePdfBaseService.texto_seguro(acompaniante.nombre, 34))
         pdf.drawCentredString(primer_elemento_izquierda + 365 , altura_bloque4, ReportePdfBaseService.texto_seguro(acompaniante.direccion, 32))
@@ -1047,6 +1050,7 @@ class ReportePacienteService:
         pdf.drawImage(logo1, x=85, y=y-45, width=65, height=45, preserveAspectRatio=True, mask='auto')
         pdf.drawImage(logo2, x=ancho-175, y=y-50, width=80, height=55, preserveAspectRatio=True, mask='auto')
         pdf.drawImage(logo3, x=ancho-115, y=y-50, width=80, height=55, preserveAspectRatio=True, mask='auto')
+
 
     @staticmethod
     def __dibujarEpicrisisFormatoHojaHospitalizacion2026(pdf, ancho, alto, paciente, ingreso):

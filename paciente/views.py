@@ -432,7 +432,7 @@ def listarPacientes(request):
 
     }
 
-    perfiles = PerfilUnidad.objects.filter(usuario=usuario).values_list('unidad_id', flat=True)
+    perfiles = PerfilUnidad.objects.filter(usuario=usuario).values_list('servicio_unidad_id', flat=True)
 
     botones = []
     for unidad_id in perfiles:
@@ -1087,6 +1087,9 @@ def busquedaAvanzada(request):
 
 
 def guardarDefuncion(request):
+    if not verificar_permisos_usuario(request.user, PACIENTE_EDITOR_ROLES, PACIENTE_EDITOR_UNIDADES):
+        return JsonResponse({'error': 'No tienes permisos para realizar esta accion'}, status=403)
+
     try:
         data = parse_json_request(request)
     except ValueError as e:
@@ -1155,6 +1158,11 @@ def guardarDefuncion(request):
 
 
 def guardarObito(request):
+
+    if not verificar_permisos_usuario(request.user, PACIENTE_EDITOR_ROLES, PACIENTE_EDITOR_UNIDADES):
+        return JsonResponse({'error': 'No tienes permisos para realizar esta accion'}, status=403)
+    
+
     try:
         data = parse_json_request(request)
     except ValueError as e:
@@ -1268,6 +1276,7 @@ def obtener_defuncion_paciente(request):
         "tipo_defuncion": defuncion.tipo_defuncion,
         "tipo_defuncion_display": defuncion.get_tipo_defuncion_display()
     })
+
 
 def obtener_obito_paciente(request):
     idObito = request.GET.get('id')
