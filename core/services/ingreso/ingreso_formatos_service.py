@@ -19,6 +19,7 @@ class IngresoFormatosService:
                     "acompaniante__sector__aldea__municipio__departamento",
                     "sala__servicio",
                     "cama__sala__servicio",
+                    "cama__cubiculo",
                     "paciente__padre",
                     "paciente__madre",
                     "paciente__etnia",
@@ -201,6 +202,8 @@ class IngresoFormatosService:
 
             cama = str(ingreso_obj.cama.numero_cama) if ingreso_obj.cama else ""
 
+            cubiculo = str(ingreso_obj.cama.cubiculo) if ingreso_obj.cama.cubiculo else ""
+                
             #insitucion Agregada a posteriori para incluir la hija de referencia preciamente llenada
             institucion=ServicioService.obtener_institucion_heac_reporte()
 
@@ -253,6 +256,8 @@ class IngresoFormatosService:
                     "servicio_id": idservicio,
                     "fecha_ingreso": fechaIngreso,
                     "cama": cama,
+                    "cubiculo": cubiculo
+
                 },
             }
         except Exception:

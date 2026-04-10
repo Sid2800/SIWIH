@@ -121,7 +121,7 @@ class Cubiculo(models.Model):
         unique_together = ("sala", "numero")
 
     def __str__(self):
-        return f"{self.numero}# {self.nombre_cubiculo}"
+        return f"#{self.numero} {self.nombre_cubiculo}"
 
 
 class Cama(models.Model):

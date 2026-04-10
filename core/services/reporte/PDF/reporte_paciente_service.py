@@ -816,8 +816,11 @@ class ReportePacienteService:
         if ingreso.cama:
             pdf.rect(primer_elemento_izquierda+428, alto-43, 68, 14, stroke=1, fill=0)
             pdf.drawString(primer_elemento_izquierda + 430, alto - 40, f"CAMA: {ingreso.cama}")
+            pdf.setFont("Helvetica-Bold", 7)
+            pdf.drawCentredString(primer_elemento_izquierda + 460, alto - 25, f"CUBICULO: {ReportePdfBaseService.texto_seguro(ingreso.cubiculo, 24)}")
 
         
+        pdf.setFont("Helvetica-Bold", 11.5)
 
         pdf.drawCentredString(primer_elemento_izquierda + 123 , altura_bloque4, ReportePdfBaseService.texto_seguro(acompaniante.nombre, 34))
         pdf.drawCentredString(primer_elemento_izquierda + 365 , altura_bloque4, ReportePdfBaseService.texto_seguro(acompaniante.direccion, 32))

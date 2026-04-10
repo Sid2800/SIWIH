@@ -991,7 +991,7 @@ ZONA INFORMES ESTADÍSTICOS
 
         #bloque3h
         alto_bloque3 = alto_bloque2-30
-        pdf.drawString(87, alto_bloque3, ReporteReferenciaService._texto_seguro(paciente.direccion, 22))
+        pdf.drawString(60, alto_bloque3, ReporteReferenciaService._texto_seguro(paciente.direccion, 22))
         pdf.drawString(ancho-385, alto_bloque3, ReporteReferenciaService._texto_seguro(paciente.municipio, 22))
         pdf.drawString(ancho-262, alto_bloque3, ReporteReferenciaService._texto_seguro(paciente.departamento, 22))
 
