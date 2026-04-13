@@ -5,77 +5,7 @@
 {% block title %}Reportes S_EXP{% endblock title %}
 
 {% block extra_css %}
-<style>
-    .sexp-reportes-filtros {
-        background-color: var(--blanco);
-        border-radius: 1rem; padding: 1.2rem; margin-bottom: 1.5rem;
-        display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end;
-        border: 1px solid var(--colorLinea);
-        color: var(--colorTablacelda);
-    }
-    .sexp-filtro-grupo { display:flex; flex-direction:column; gap:0.3rem; }
-    .sexp-filtro-grupo label { font-size:1.4rem; font-weight:600; opacity:0.7; }
-    .sexp-filtro-grupo input, .sexp-filtro-grupo select {
-        padding: 0.5rem; border-radius: 0.6rem;
-        border: 1px solid var(--colorLinea);
-        background-color: var(--blanco); color: var(--colorTablacelda);
-        font-size: 0.85rem; font-family: var(--fuenteCuerpo);
-    }
-    .sexp-filtro-btn {
-        padding: 0.5rem 1.2rem; border-radius: 1rem; border: none;
-        background-color: var(--colorBoton); color: var(--colorTextoBoton);
-        cursor: pointer; font-weight: 600; font-size: 0.85rem;
-        transition: all .2s; font-family: var(--fuenteCuerpo);
-    }
-    .sexp-filtro-btn:hover { opacity: 0.85; }
-    .sexp-filtro-btn--export { background: #22c55e; color: #fff; }
-    .sexp-filtro-btn--export:hover { opacity: 0.85; }
-
-    .sexp-reportes-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(350px,1fr)); gap:1.5rem; }
-    .sexp-reporte-card {
-        background-color: var(--blanco);
-        border-radius: 1rem; padding: 1.2rem;
-        border: 1px solid var(--colorLinea);
-        color: var(--colorTablacelda);
-    }
-    .sexp-reporte-card h3 { margin:0 0 1rem; font-size:1rem; display:flex; align-items:center; gap:0.5rem; }
-    .sexp-reporte-tabla { width:100%; border-collapse:collapse; font-size:0.85rem; color: var(--colorTablacelda); }
-    .sexp-reporte-tabla th { text-align:left; padding:0.5rem; opacity:0.7; border-bottom:1px solid var(--colorLinea); }
-    .sexp-reporte-tabla td { padding:0.5rem; border-bottom:1px solid var(--colorLinea); }
-
-    .sexp-tabs { display:flex; gap:0; margin-bottom:1.5rem; }
-    .sexp-tab {
-        padding: 0.6rem 1.2rem; border: none; cursor: pointer;
-        background: transparent; color: var(--colorTablacelda);
-        font-size: 1.4rem; font-family: var(--fuenteCuerpo);
-        border-bottom: 2px solid transparent; transition: all .2s;
-    }
-    .sexp-tab:hover { border-bottom-color: var(--colorLinea); }
-    .sexp-tab.active { border-bottom-color: var(--colorBoton); font-weight: 600; }
-    .sexp-tab-content { display:none; }
-    .sexp-tab-content.active { display:block; }
-
-    /* Nav sub-módulos */
-    .sexp-nav-modulos { display:flex; gap:1.4rem; flex-wrap:wrap; margin-bottom:1rem; }
-    .sexp-nav-link {
-        padding: 0.6rem 1.2rem; border-radius: 1rem;
-        background-color: var(--blanco); border: 1px solid var(--colorLinea);
-        text-decoration: none; color: var(--colorTablacelda);
-        display: flex; align-items: center; gap: 0.5rem;
-        font-size: 1.4rem; font-family: var(--fuenteCuerpo);
-        transition: background-color .2s, transform .2s;
-    }
-    .sexp-nav-link:hover {
-        background-color: var(--colorMenuHover); color: var(--colorMenuTextoHover);
-        transform: translateY(-1px);
-    }
-    .sexp-nav-link--active {
-        background-color: var(--colorBoton); color: var(--colorTextoBoton);
-        border-color: var(--colorBoton);
-    }
-
-    .dataTable { font-size: 1.4rem; }
-</style>
+<link rel="stylesheet" href="{% static 'core/css/s_exp.css' %}">
 {% endblock extra_css %}
 
 {% block content %}

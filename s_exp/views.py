@@ -139,10 +139,10 @@ def dashboard_stats_api(request):
         total = Expediente.objects.count()
 
         # Expedientes con préstamo activo
-        prestados = ExpedientePrestamo.objects.filter(estado='Prestado').count()
+        prestados = ExpedientePrestamo.objects.filter(estado_id='EXP_PRESTADO').count()
         disponibles = total - prestados
 
-        solicitudes_pendientes = SolicitudPrestamo.objects.filter(estado_flujo='Pendiente').count()
+        solicitudes_pendientes = SolicitudPrestamo.objects.filter(estado_flujo_id='SOL_PENDIENTE').count()
 
         ahora = timezone.now()
         prestamos_activos = Prestamo.objects.filter(estado='Entregado').count()
@@ -196,7 +196,7 @@ def listar_solicitudes_api(request):
         )
 
         if estado_filtro:
-            qs = qs.filter(estado_flujo=estado_filtro)
+            qs = qs.filter(estado_flujo_id=estado_filtro)
 
         if search_value:
             qs = qs.filter(
@@ -222,7 +222,8 @@ def listar_solicitudes_api(request):
                 "usuario": s.usuario.username,
                 "usuario_nombre": f"{s.usuario.first_name} {s.usuario.last_name}".strip() or s.usuario.username,
                 "fecha_creacion": s.fecha_creacion.strftime("%d/%m/%Y %H:%M"),
-                "estado_flujo": s.estado_flujo,
+                "estado_flujo": s.estado_flujo_id,
+                "estado_flujo_nombre": s.estado_flujo.nombre,
                 "motivo": s.motivo.nombre if s.motivo else "",
                 "observaciones": s.observaciones or "",
                 "area_destino": s.area_destino or "",
@@ -261,7 +262,7 @@ def aprobar_solicitud_api(request):
         return JsonResponse({"error": "El tiempo mínimo es de 24 horas"}, status=400)
 
     try:
-        solicitud = SolicitudPrestamo.objects.get(id=solicitud_id, estado_flujo='Pendiente')
+        solicitud = SolicitudPrestamo.objects.get(id=solicitud_id, estado_flujo_id='SOL_PENDIENTE')
     except SolicitudPrestamo.DoesNotExist:
         return JsonResponse({"error": "Solicitud no encontrada o ya procesada"}, status=404)
 
@@ -275,7 +276,7 @@ def aprobar_solicitud_api(request):
                 }, status=400)
 
         # Cambiar estado de la solicitud
-        solicitud.estado_flujo = 'Aprobado'
+        solicitud.estado_flujo_id = 'SOL_APROBADA_ORGANIZANDO'
         solicitud.save()
 
         # Crear el préstamo
@@ -320,12 +321,12 @@ def rechazar_solicitud_api(request):
         return JsonResponse({"error": "El motivo de rechazo es obligatorio"}, status=400)
 
     try:
-        solicitud = SolicitudPrestamo.objects.get(id=solicitud_id, estado_flujo='Pendiente')
+        solicitud = SolicitudPrestamo.objects.get(id=solicitud_id, estado_flujo_id='SOL_PENDIENTE')
     except SolicitudPrestamo.DoesNotExist:
         return JsonResponse({"error": "Solicitud no encontrada o ya procesada"}, status=404)
 
     try:
-        solicitud.estado_flujo = 'Rechazado'
+        solicitud.estado_flujo_id = 'SOL_RECHAZADA'
         solicitud.save()
 
         Prestamo.objects.create(
@@ -431,13 +432,24 @@ def marcar_entregado_api(request):
         prestamo.estado = 'Entregado'
         prestamo.save()
 
-        prestamo.solicitud.estado_flujo = 'EnPrestamo'
+        prestamo.solicitud.estado_flujo_id = 'SOL_EN_PRESTAMO'
         prestamo.solicitud.save()
 
-        # Marcar expedientes como prestados (crear/actualizar ExpedientePrestamo)
+        # Marcar expedientes como prestados
+        from .models import ExpedienteEstadoLog
         for d in prestamo.solicitud.detalles.select_related('expediente_prestamo'):
-            d.expediente_prestamo.estado = 'Prestado'
+            estado_anterior = d.expediente_prestamo.estado
+            d.expediente_prestamo.estado_id = 'EXP_PRESTADO'
             d.expediente_prestamo.save()
+
+            # Registrar en log transaccional
+            ExpedienteEstadoLog.objects.create(
+                expediente=d.expediente_prestamo.expediente,
+                estado_anterior=estado_anterior,
+                estado_nuevo_id='EXP_PRESTADO',
+                usuario=request.user,
+                solicitud=prestamo.solicitud
+            )
 
         _registrar_log(
             request.user, 'PRESTAMO_ENTREGADO',
@@ -557,13 +569,24 @@ def procesar_devolucion_api(request):
             prestamo.fecha_devolucion_real = timezone.now()
             prestamo.save()
 
-            prestamo.solicitud.estado_flujo = 'Devuelto'
+            prestamo.solicitud.estado_flujo_id = 'SOL_FINALIZADA'
             prestamo.solicitud.save()
 
             # Marcar expedientes como disponibles
+            from .models import ExpedienteEstadoLog
             for d in prestamo.solicitud.detalles.select_related('expediente_prestamo'):
-                d.expediente_prestamo.estado = 'Disponible'
+                estado_anterior = d.expediente_prestamo.estado
+                d.expediente_prestamo.estado_id = 'EXP_DISPONIBLE'
                 d.expediente_prestamo.save()
+
+                ExpedienteEstadoLog.objects.create(
+                    expediente=d.expediente_prestamo.expediente,
+                    estado_anterior=estado_anterior,
+                    estado_nuevo_id='EXP_DISPONIBLE',
+                    usuario=request.user,
+                    solicitud=prestamo.solicitud,
+                    observacion="Devolución completa recibida"
+                )
 
             _registrar_log(
                 request.user, 'DEVOLUCION_COMPLETA',
@@ -574,7 +597,7 @@ def procesar_devolucion_api(request):
             prestamo.estado = 'DevolucionParcial'
             prestamo.save()
 
-            prestamo.solicitud.estado_flujo = 'DevolucionParcial'
+            prestamo.solicitud.estado_flujo_id = 'SOL_INCOMPLETA'
             prestamo.solicitud.save()
 
             _registrar_log(
@@ -622,12 +645,12 @@ def buscar_expedientes_api(request):
         # IDs de expedientes no disponibles (Prestados o en proceso)
         from .models import SolicitudExpedienteDetalle
         prestados = set(
-            ExpedientePrestamo.objects.filter(estado='Prestado')
+            ExpedientePrestamo.objects.filter(estado_id='EXP_PRESTADO')
             .values_list('expediente_id', flat=True)
         )
         en_proceso = set(
             SolicitudExpedienteDetalle.objects.filter(
-                solicitud__estado_flujo__in=['Pendiente', 'Aprobado']
+                solicitud__estado_flujo_id__in=['SOL_PENDIENTE', 'SOL_APROBADA_ORGANIZANDO']
             ).values_list('expediente_prestamo__expediente_id', flat=True)
         )
         expedientes_prestados_ids = prestados | en_proceso
@@ -783,12 +806,12 @@ def crear_solicitud_api(request):
         # Verificar que existan y no estén prestados o en proceso
         from .models import SolicitudExpedienteDetalle
         prestados = set(
-            ExpedientePrestamo.objects.filter(estado='Prestado')
+            ExpedientePrestamo.objects.filter(estado_id='EXP_PRESTADO')
             .values_list('expediente_id', flat=True)
         )
         en_proceso = set(
             SolicitudExpedienteDetalle.objects.filter(
-                solicitud__estado_flujo__in=['Pendiente', 'Aprobado']
+                solicitud__estado_flujo_id__in=['SOL_PENDIENTE', 'SOL_APROBADA_ORGANIZANDO']
             ).values_list('expediente_prestamo__expediente_id', flat=True)
         )
         expedientes_prestados_ids = prestados | en_proceso
@@ -814,10 +837,35 @@ def crear_solicitud_api(request):
         # Crear detalles con datos históricos
         for exp in expedientes:
             # Obtener o crear ExpedientePrestamo
-            ep, _ = ExpedientePrestamo.objects.get_or_create(
+            ep, created_ep = ExpedientePrestamo.objects.get_or_create(
                 expediente=exp,
-                defaults={'estado': 'Disponible'}
+                defaults={'estado_id': 'EXP_APARTADO'}
             )
+            if not created_ep:
+                estado_anterior = ep.estado
+                ep.estado_id = 'EXP_APARTADO'
+                ep.save()
+                
+                # Log transaccional para el apartado
+                from .models import ExpedienteEstadoLog
+                ExpedienteEstadoLog.objects.create(
+                    expediente=exp,
+                    estado_anterior=estado_anterior,
+                    estado_nuevo_id='EXP_APARTADO',
+                    usuario=request.user,
+                    solicitud=solicitud,
+                    observacion="Expediente apartado por nueva solicitud"
+                )
+            else:
+                # Log para creación inicial
+                from .models import ExpedienteEstadoLog
+                ExpedienteEstadoLog.objects.create(
+                    expediente=exp,
+                    estado_anterior=None,
+                    estado_nuevo_id='EXP_APARTADO',
+                    usuario=request.user,
+                    solicitud=solicitud
+                )
 
             # Obtener datos del paciente para el snapshot
             asig = PacienteAsignacion.objects.filter(
@@ -899,7 +947,8 @@ def mis_solicitudes_api(request):
             data.append({
                 "id": s.id,
                 "fecha_creacion": s.fecha_creacion.strftime("%d/%m/%Y %H:%M"),
-                "estado_flujo": s.estado_flujo,
+                "estado_flujo": s.estado_flujo_id,
+                "estado_flujo_nombre": s.estado_flujo.nombre,
                 "motivo": s.motivo.nombre if s.motivo else "",
                 "observaciones": s.observaciones or "",
                 "area_destino": s.area_destino or "",
@@ -994,7 +1043,7 @@ def alertas_usuario_api(request):
         # Solicitudes aprobadas listas para retirar
         solicitudes_aprobadas = SolicitudPrestamo.objects.filter(
             usuario=request.user,
-            estado_flujo='Aprobado'
+            estado_flujo_id='SOL_APROBADA_ORGANIZANDO'
         )
         for s in solicitudes_aprobadas:
             alertas.append({
@@ -1007,7 +1056,7 @@ def alertas_usuario_api(request):
         # Solicitudes rechazadas recientes
         solicitudes_rechazadas = SolicitudPrestamo.objects.filter(
             usuario=request.user,
-            estado_flujo='Rechazado'
+            estado_flujo_id='SOL_RECHAZADA'
         ).order_by('-fecha_creacion')[:5]
         for s in solicitudes_rechazadas:
             try:
@@ -1115,7 +1164,7 @@ def reportes_data_api(request):
                 rechazos_filtros['fecha_creacion__lte'] = fecha_fin + ' 23:59:59'
 
             rechazos = SolicitudPrestamo.objects.filter(
-                estado_flujo='Rechazado',
+                estado_flujo_id='SOL_RECHAZADA',
                 **rechazos_filtros
             ).select_related('usuario')
 
@@ -1214,8 +1263,8 @@ def historial_prestamos_paciente_api(request, paciente_id):
 
         for d in detalles:
             s = d.solicitud
-            estado = s.estado_flujo
-            if estado in ('EnPrestamo', 'Aprobado') and not d.devuelto:
+            estado = s.estado_flujo_id
+            if estado in ('SOL_EN_PRESTAMO', 'SOL_APROBADA_ORGANIZANDO') and not d.devuelto:
                 en_prestamo_actual = True
 
             data.append({
@@ -1223,7 +1272,7 @@ def historial_prestamos_paciente_api(request, paciente_id):
                 "fecha_solicitud": s.fecha_creacion.strftime("%d/%m/%Y %H:%M"),
                 "motivo": s.motivo.nombre if s.motivo else "",
                 "solicitante": f"{s.usuario.first_name} {s.usuario.last_name}".strip() or s.usuario.username,
-                "estado": estado,
+                "estado": s.estado_flujo.nombre,
                 "devuelto": d.devuelto,
                 "area_destino": s.area_destino or "",
             })
@@ -1255,8 +1304,8 @@ def historial_prestamos_expediente_api(request, expediente_id):
 
         for d in detalles:
             s = d.solicitud
-            estado = s.estado_flujo
-            if estado in ('EnPrestamo', 'Aprobado') and not d.devuelto:
+            estado = s.estado_flujo_id
+            if estado in ('SOL_EN_PRESTAMO', 'SOL_APROBADA_ORGANIZANDO') and not d.devuelto:
                 en_prestamo_actual = True
 
             data.append({
@@ -1264,7 +1313,7 @@ def historial_prestamos_expediente_api(request, expediente_id):
                 "fecha_solicitud": s.fecha_creacion.strftime("%d/%m/%Y %H:%M"),
                 "motivo": s.motivo.nombre if s.motivo else "",
                 "solicitante": f"{s.usuario.first_name} {s.usuario.last_name}".strip() or s.usuario.username,
-                "estado": estado,
+                "estado": s.estado_flujo.nombre,
                 "devuelto": d.devuelto,
                 "area_destino": s.area_destino or "",
             })

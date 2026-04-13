@@ -31,22 +31,26 @@ function renderSolicitudes(data) {
 
     let html = '';
     data.forEach(function (s) {
-        const claseEstado = s.estado_flujo.toLowerCase().replace(/\s/g, '');
+        const claseEstado = s.estado_flujo.toLowerCase();
         const badgeEstilos = {
-            'pendiente': 'background:rgba(99,102,241,0.2);color:var(--negro);',
-            'aprobado': 'background:rgba(34,197,94,0.2);color:var(--negro);',
-            'rechazado': 'background:rgba(239,68,68,0.2);color:var(--negro);',
-            'enprestamo': 'background:rgba(245,158,11,0.2);color:var(--negro);',
-            'devuelto': 'background:rgba(100,116,139,0.2);color:var(--negro);',
-            'devolucionparcial': 'background:rgba(249,115,22,0.2);color:var(--negro);'
+            'sol_pendiente': 'background:rgba(99,102,241,0.2);color:var(--negro);',
+            'sol_aprobada_organizando': 'background:rgba(34,197,94,0.2);color:var(--negro);',
+            'sol_rechazada': 'background:rgba(239,68,68,0.2);color:var(--negro);',
+            'sol_en_prestamo': 'background:rgba(245,158,11,0.2);color:var(--negro);',
+            'sol_finalizada': 'background:rgba(100,116,139,0.2);color:var(--negro);',
+            'sol_incompleta': 'background:rgba(249,115,22,0.2);color:var(--negro);',
+            'sol_listo_recoger': 'background:rgba(16,185,129,0.2);color:var(--negro);',
+            'sol_en_devolucion': 'background:rgba(139,92,246,0.2);color:var(--negro);'
         };
         const borderColors = {
-            'pendiente': '#6366f1',
-            'aprobado': '#22c55e',
-            'rechazado': '#ef4444',
-            'enprestamo': '#f59e0b',
-            'devuelto': '#64748b',
-            'devolucionparcial': '#f97316'
+            'sol_pendiente': '#6366f1',
+            'sol_aprobada_organizando': '#22c55e',
+            'sol_rechazada': '#ef4444',
+            'sol_en_prestamo': '#f59e0b',
+            'sol_finalizada': '#64748b',
+            'sol_incompleta': '#f97316',
+            'sol_listo_recoger': '#10b981',
+            'sol_en_devolucion': '#8b5cf6'
         };
 
         const exps = s.expedientes.map(n => `<span class="sexp-exp-tag">#${n}</span>`).join(' ');
@@ -57,7 +61,7 @@ function renderSolicitudes(data) {
         <div class="sexp-sol-card" style="border-left-color:${borderColor};">
             <div class="sexp-sol-header">
                 <h3><i class="bi bi-file-text"></i> Solicitud #${s.id}</h3>
-                <span class="sexp-sol-badge" style="${badgeEstilo}padding:0.25rem 0.8rem;border-radius:20px;font-size:1.2rem;font-weight:700;">${s.estado_flujo}</span>
+                <span class="sexp-sol-badge" style="${badgeEstilo}padding:0.25rem 0.8rem;border-radius:20px;font-size:1.2rem;font-weight:700;">${s.estado_flujo_nombre}</span>
             </div>
             <div class="sexp-sol-info">
                 <div><label>Fecha</label>${s.fecha_creacion}</div>

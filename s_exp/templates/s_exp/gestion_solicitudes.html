@@ -5,54 +5,7 @@
 {% block title %}Gestión de Solicitudes{% endblock title %}
 
 {% block extra_css %}
-<style>
-    .sexp-filtros { display:flex; gap:1rem; margin-bottom:1.5rem; flex-wrap:wrap; align-items:center; }
-    .sexp-filtro-btn {
-        padding: 0.5rem 1rem; border-radius: 1rem;
-        border: 1px solid var(--colorLinea);
-        background-color: transparent; color: var(--colorTablacelda);
-        cursor: pointer; font-size: 1.4rem; transition: all .2s;
-        font-family: var(--fuenteCuerpo);
-    }
-    .sexp-filtro-btn:hover, .sexp-filtro-btn.active {
-        background-color: var(--colorBoton); color: var(--colorTextoBoton);
-        border-color: var(--colorBoton);
-    }
-    .sexp-modal-campo { margin-bottom:1rem; }
-    .sexp-modal-campo label { display:block; margin-bottom:0.3rem; font-weight:600; font-size:0.85rem; }
-    .sexp-modal-campo textarea, .sexp-modal-campo input {
-        width:100%; padding:0.6rem; border-radius:0.6rem;
-        border:1px solid var(--colorLinea); background-color:var(--blanco);
-        color:var(--colorTablacelda); font-size:1.6rem;
-    }
-    .sexp-exp-tags { display:flex; gap:0.3rem; flex-wrap:wrap; }
-    .sexp-exp-tag {
-        background: rgba(99,102,241,0.15); color: #6366f1;
-        padding: 0.2rem 0.5rem; border-radius: 0.4rem;
-        font-size: 1.2rem; font-weight: 600;
-    }
-
-    /* Nav sub-módulos */
-    .sexp-nav-modulos { display:flex; gap:1.4rem; flex-wrap:wrap; margin-bottom:1rem; }
-    .sexp-nav-link {
-        padding: 0.6rem 1.2rem; border-radius: 1rem;
-        background-color: var(--blanco); border: 1px solid var(--colorLinea);
-        text-decoration: none; color: var(--colorTablacelda);
-        display: flex; align-items: center; gap: 0.5rem;
-        font-size: 1.4rem; font-family: var(--fuenteCuerpo);
-        transition: background-color .2s, transform .2s;
-    }
-    .sexp-nav-link:hover {
-        background-color: var(--colorMenuHover); color: var(--colorMenuTextoHover);
-        transform: translateY(-1px);
-    }
-    .sexp-nav-link--active {
-        background-color: var(--colorBoton); color: var(--colorTextoBoton);
-        border-color: var(--colorBoton);
-    }
-
-    .dataTable { font-size: 1.4rem; }
-</style>
+<link rel="stylesheet" href="{% static 'core/css/s_exp.css' %}">
 {% endblock extra_css %}
 
 {% block content %}

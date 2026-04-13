@@ -1,32 +1,10 @@
 from django.contrib import admin
 from .models import (
-    MotivoSolicitud,
-    ExpedientePrestamo,
-    SolicitudPrestamo,
-    SolicitudExpedienteDetalle,
-    Prestamo,
-    Devolucion,
-    LogHistorico,
+    MotivoSolicitud, EstadoSolicitud, EstadoExpedienteFisico,
+    ExpedientePrestamo, SolicitudPrestamo, ExpedienteEstadoLog
 )
 
 
-# ============================================
-# Base: Deshabilitar eliminación en modelos operativos
-# ============================================
-class NoDeleteModelAdmin(admin.ModelAdmin):
-    """Base para modelos operativos: prohíbe eliminación."""
-    def has_delete_permission(self, request, obj=None):
-        return False
-
-    def get_actions(self, request):
-        actions = super().get_actions(request)
-        actions.pop('delete_selected', None)
-        return actions
-
-
-# ============================================
-# CATÁLOGO: Motivos (CRUD completo para admin)
-# ============================================
 @admin.register(MotivoSolicitud)
 class MotivoSolicitudAdmin(admin.ModelAdmin):
     list_display = ('nombre', 'activo')
@@ -35,54 +13,41 @@ class MotivoSolicitudAdmin(admin.ModelAdmin):
     list_editable = ('activo',)
 
 
-# ============================================
-# MODELOS OPERATIVOS (sin eliminación)
-# ============================================
+@admin.register(EstadoSolicitud)
+class EstadoSolicitudAdmin(admin.ModelAdmin):
+    list_display = ('codigo', 'nombre')
+    search_fields = ('codigo', 'nombre')
+
+
+@admin.register(EstadoExpedienteFisico)
+class EstadoExpedienteFisicoAdmin(admin.ModelAdmin):
+    list_display = ('codigo', 'nombre')
+    search_fields = ('codigo', 'nombre')
+
+
 @admin.register(ExpedientePrestamo)
-class ExpedientePrestamoAdmin(NoDeleteModelAdmin):
+class ExpedientePrestamoAdmin(admin.ModelAdmin):
     list_display = ('expediente', 'estado', 'ubicacion_fisica')
     list_filter = ('estado',)
     search_fields = ('expediente__numero',)
 
 
-class SolicitudExpedienteDetalleInline(admin.TabularInline):
-    model = SolicitudExpedienteDetalle
-    extra = 0
-    readonly_fields = ('expediente_prestamo', 'paciente_identidad', 'paciente_nombre', 'numero_expediente', 'devuelto')
-
-    def has_delete_permission(self, request, obj=None):
-        return False
-
-
 @admin.register(SolicitudPrestamo)
-class SolicitudPrestamoAdmin(NoDeleteModelAdmin):
-    list_display = ('id', 'usuario', 'motivo', 'estado_flujo', 'area_destino', 'fecha_creacion')
-    list_filter = ('estado_flujo', 'motivo')
-    search_fields = ('usuario__username', 'usuario__first_name', 'usuario__last_name')
-    readonly_fields = ('fecha_creacion',)
-    inlines = [SolicitudExpedienteDetalleInline]
+class SolicitudPrestamoAdmin(admin.ModelAdmin):
+    list_display = ('id', 'usuario', 'estado_flujo', 'fecha_creacion')
+    list_filter = ('estado_flujo', 'fecha_creacion')
+    search_fields = ('id', 'usuario__username')
 
 
-@admin.register(Prestamo)
-class PrestamoAdmin(NoDeleteModelAdmin):
-    list_display = ('id', 'solicitud', 'estado', 'admin_aprobador', 'fecha_aprobacion', 'fecha_limite')
-    list_filter = ('estado',)
-    readonly_fields = ('fecha_aprobacion',)
-
-
-@admin.register(Devolucion)
-class DevolucionAdmin(NoDeleteModelAdmin):
-    list_display = ('id', 'prestamo', 'estado', 'cantidad_recibida', 'fecha_devolucion')
-    list_filter = ('estado',)
-    readonly_fields = ('fecha_devolucion',)
-
-
-@admin.register(LogHistorico)
-class LogHistoricoAdmin(NoDeleteModelAdmin):
-    list_display = ('timestamp', 'accion', 'usuario', 'objeto_tipo', 'objeto_id')
-    list_filter = ('accion', 'objeto_tipo')
-    search_fields = ('usuario__username', 'detalle')
-    readonly_fields = ('timestamp', 'accion', 'usuario', 'detalle', 'objeto_tipo', 'objeto_id')
+@admin.register(ExpedienteEstadoLog)
+class ExpedienteEstadoLogAdmin(admin.ModelAdmin):
+    list_display = ('fecha', 'expediente', 'estado_anterior', 'estado_nuevo', 'usuario')
+    list_filter = ('estado_nuevo', 'fecha')
+    search_fields = ('expediente__numero', 'usuario__username')
+    readonly_fields = ('fecha', 'expediente', 'estado_anterior', 'estado_nuevo', 'usuario', 'solicitud', 'observacion')
 
     def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
         return False

@@ -5,70 +5,7 @@
 {% block title %}Control de Devoluciones{% endblock title %}
 
 {% block extra_css %}
-<style>
-    .sexp-dev-card {
-        background-color: var(--blanco);
-        border-radius: 1rem; padding: 1.2rem; margin-bottom: 1rem;
-        border-left: 4px solid #6366f1;
-        color: var(--colorTablacelda);
-    }
-    .sexp-dev-card--vencido { border-left-color: #ef4444; }
-    .sexp-dev-card--parcial { border-left-color: #f97316; }
-
-    .sexp-dev-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:1.4rem; }
-    .sexp-dev-header h3 { margin:0; font-size:1rem; }
-
-    .sexp-dev-info {
-        display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
-        gap:0.5rem; margin-bottom:1.4rem; font-size:0.85rem;
-    }
-    .sexp-dev-info span { opacity:0.7; }
-
-    .sexp-dev-actions { display:flex; gap:0.5rem; flex-wrap:wrap; }
-    .sexp-dev-btn {
-        padding: 0.5rem 1rem; border-radius: 1rem; border: none;
-        cursor: pointer; font-size: 0.85rem; font-weight: 600;
-        display: flex; align-items: center; gap: 0.3rem; transition: all .2s;
-        font-family: var(--fuenteCuerpo);
-    }
-    .sexp-dev-btn--completa { background: #22c55e; color: #fff; }
-    .sexp-dev-btn--completa:hover { opacity: 0.85; }
-    .sexp-dev-btn--parcial { background: #f59e0b; color: #000; }
-    .sexp-dev-btn--parcial:hover { opacity: 0.85; }
-
-    .sexp-exp-tag {
-        background: rgba(99,102,241,0.15); color: #6366f1;
-        padding: 0.2rem 0.5rem; border-radius: 0.4rem;
-        font-size: 1.2rem; font-weight: 600; display: inline-block;
-    }
-    .sexp-badge {
-        padding: 0.25rem 0.6rem; border-radius: 2rem;
-        font-size: 1.2rem; font-weight: 600;
-    }
-    .sexp-badge--vencido { background: rgba(239,68,68,0.15); color: #ef4444; }
-    .sexp-badge--normal { background: rgba(99,102,241,0.15); color: #6366f1; }
-
-    /* Nav sub-módulos */
-    .sexp-nav-modulos { display:flex; gap:1.4rem; flex-wrap:wrap; margin-bottom:1rem; }
-    .sexp-nav-link {
-        padding: 0.6rem 1.2rem; border-radius: 1rem;
-        background-color: var(--blanco); border: 1px solid var(--colorLinea);
-        text-decoration: none; color: var(--colorTablacelda);
-        display: flex; align-items: center; gap: 0.5rem;
-        font-size: 1.4rem; font-family: var(--fuenteCuerpo);
-        transition: background-color .2s, transform .2s;
-    }
-    .sexp-nav-link:hover {
-        background-color: var(--colorMenuHover); color: var(--colorMenuTextoHover);
-        transform: translateY(-1px);
-    }
-    .sexp-nav-link--active {
-        background-color: var(--colorBoton); color: var(--colorTextoBoton);
-        border-color: var(--colorBoton);
-    }
-
-    .dataTable { font-size: 1.4rem; }
-</style>
+<link rel="stylesheet" href="{% static 'core/css/s_exp.css' %}">
 {% endblock extra_css %}
 
 {% block content %}

@@ -44,24 +44,27 @@ function initTabla() {
             { data: 'area_destino' },
             {
                 data: 'estado_flujo',
-                render: function (data) {
+                render: function (data, type, row) {
                     const clases = {
-                        'Pendiente': 'background:rgba(99,102,241,0.2);color:var(--negro);',
-                        'Aprobado': 'background:rgba(34,197,94,0.2);color:var(--negro);',
-                        'Rechazado': 'background:rgba(239,68,68,0.2);color:var(--negro);',
-                        'EnPrestamo': 'background:rgba(245,158,11,0.2);color:var(--negro);',
-                        'Devuelto': 'background:rgba(100,116,139,0.2);color:var(--negro);',
-                        'DevolucionParcial': 'background:rgba(249,115,22,0.2);color:var(--negro);'
+                        'SOL_PENDIENTE': 'background:rgba(99,102,241,0.2);color:var(--negro);',
+                        'SOL_APROBADA_ORGANIZANDO': 'background:rgba(34,197,94,0.2);color:var(--negro);',
+                        'SOL_RECHAZADA': 'background:rgba(239,68,68,0.2);color:var(--negro);',
+                        'SOL_LISTO_RECOGER': 'background:rgba(16,185,129,0.2);color:var(--negro);',
+                        'SOL_EN_PRESTAMO': 'background:rgba(245,158,11,0.2);color:var(--negro);',
+                        'SOL_EN_DEVOLUCION': 'background:rgba(139,92,246,0.2);color:var(--negro);',
+                        'SOL_INCOMPLETA': 'background:rgba(249,115,22,0.2);color:var(--negro);',
+                        'SOL_FINALIZADA': 'background:rgba(100,116,139,0.2);color:var(--negro);'
                     };
                     const estilo = clases[data] || '';
-                    return `<span style="padding:0.25rem 0.6rem;border-radius:20px;font-size:1.2rem;font-weight:600;${estilo}">${data}</span>`;
+                    const nombre = row.estado_flujo_nombre || data;
+                    return `<span style="padding:0.25rem 0.6rem;border-radius:20px;font-size:1.2rem;font-weight:600;${estilo}">${nombre}</span>`;
                 }
             },
             {
                 data: null,
                 orderable: false,
                 render: function (data) {
-                    if (data.estado_flujo !== 'Pendiente') return '';
+                    if (data.estado_flujo !== 'SOL_PENDIENTE') return '';
                     return `
                         <div style="display:flex;gap:0.3rem;">
                             <button class="formularioBotones-boton" style="background:#22c55e;color:var(--negro);border:none;padding:0.3rem 0.6rem;border-radius:6px;cursor:pointer;font-size:1.3rem;" onclick="aprobarSolicitud(${data.id})">

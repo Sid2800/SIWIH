@@ -21,7 +21,7 @@ $(document).ready(function () {
 
 function cargarMotivos() {
     $.ajax({
-        url: urls.s_exp_motivos_api,
+        url: window.urls.s_exp_motivos_api,
         method: 'GET',
         success: function (resp) {
             const select = $('#solicitud-motivo');
@@ -39,7 +39,7 @@ function cargarMotivos() {
 
 function cargarInfoUsuario() {
     $.ajax({
-        url: urls.s_exp_info_usuario_api,
+        url: window.urls.s_exp_info_usuario_api,
         method: 'GET',
         success: function (resp) {
             if (resp.unidad) {
@@ -60,7 +60,7 @@ function buscarExpedientes() {
     }
 
     $.ajax({
-        url: urls.s_exp_buscar_expedientes_api,
+        url: window.urls.s_exp_buscar_expedientes_api,
         method: 'GET',
         data: { q: query, tipo: tipo },
         success: function (resp) {

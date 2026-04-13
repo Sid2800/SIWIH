@@ -5,90 +5,7 @@
 {% block title %}Mis Solicitudes{% endblock title %}
 
 {% block extra_css %}
-<style>
-    .sexp-timeline { display:flex; flex-direction:column; gap:1rem; }
-
-    .sexp-sol-card {
-        background-color: var(--blanco);
-        border-radius: 1rem; padding: 1.2rem;
-        border-left: 4px solid var(--colorBoton);
-        transition: all .2s;
-        color: var(--colorTablacelda);
-    }
-    .sexp-sol-card--pendiente { border-left-color: #6366f1; }
-    .sexp-sol-card--aprobado { border-left-color: #22c55e; }
-    .sexp-sol-card--rechazado { border-left-color: var(--colorEliminarRojo); }
-    .sexp-sol-card--enprestamo { border-left-color: #f59e0b; }
-    .sexp-sol-card--devuelto { border-left-color: var(--colorControlDeshabilitadoFondo); }
-    .sexp-sol-card--parcial { border-left-color: #f97316; }
-    .sexp-sol-card--anulado { border-left-color: #64748b; }
-
-    .sexp-sol-header {
-        display:flex; justify-content:space-between; align-items:center;
-        margin-bottom:1.4rem; flex-wrap:wrap; gap:0.5rem;
-    }
-    .sexp-sol-header h3 { margin:0; font-size:1rem; }
-
-    .sexp-sol-badge {
-        padding: 0.25rem 1.4rem; border-radius: 2rem;
-        font-size: 1.2rem; font-weight: 700;
-    }
-    .sexp-sol-badge--pendiente { background: rgba(99,102,241,0.15); color: #6366f1; }
-    .sexp-sol-badge--aprobado { background: rgba(34,197,94,0.15); color: #22c55e; }
-    .sexp-sol-badge--rechazado { background: rgba(220,53,69,0.15); color: var(--colorEliminarRojo); }
-    .sexp-sol-badge--enprestamo { background: rgba(245,158,11,0.15); color: #f59e0b; }
-    .sexp-sol-badge--devuelto { background: rgba(100,116,139,0.15); color: #94a3b8; }
-    .sexp-sol-badge--devolucionparcial { background: rgba(249,115,22,0.15); color: #f97316; }
-    .sexp-sol-badge--anulado { background: rgba(100,116,139,0.15); color: #64748b; }
-
-    .sexp-sol-info {
-        display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
-        gap:0.5rem; margin-bottom:1.4rem; font-size:0.85rem;
-    }
-    .sexp-sol-info label { opacity:0.6; font-size:1.2rem; display:block; }
-
-    .sexp-sol-exps { display:flex; gap:0.3rem; flex-wrap:wrap; margin-bottom:0.5rem; }
-    .sexp-exp-tag {
-        background: rgba(99,102,241,0.15); color: #6366f1;
-        padding: 0.2rem 0.5rem; border-radius: 0.4rem;
-        font-size: 1.2rem; font-weight: 600;
-    }
-
-    .sexp-sol-timer {
-        font-family: 'Courier New', monospace;
-        font-weight: 700; font-size: 1rem; margin-top: 0.5rem;
-    }
-    .sexp-sol-rechazo {
-        background: rgba(220,53,69,0.1); border-radius: 0.6rem;
-        padding: 0.5rem 1.4rem; margin-top: 0.5rem; font-size: 0.85rem;
-    }
-    .sexp-devolver-btn {
-        padding: 0.5rem 1rem; border-radius: 1rem; border: none;
-        background-color: #f59e0b; color: #000; cursor: pointer;
-        font-weight: 600; font-size: 0.85rem; transition: all .2s;
-        margin-top: 0.5rem;
-    }
-    .sexp-devolver-btn:hover { opacity: 0.85; }
-
-    /* Nav sub-módulos */
-    .sexp-nav-modulos { display:flex; gap:1.4rem; margin-bottom:1.5rem; flex-wrap:wrap; }
-    .sexp-nav-link {
-        padding: 0.6rem 1.2rem; border-radius: 1rem;
-        background-color: var(--blanco); border: 1px solid var(--colorLinea);
-        text-decoration: none; color: var(--colorTablacelda);
-        display: flex; align-items: center; gap: 0.5rem;
-        font-size: 1.6rem; font-family: var(--fuenteCuerpo);
-        transition: background-color .2s, transform .2s;
-    }
-    .sexp-nav-link:hover {
-        background-color: var(--colorMenuHover); color: var(--colorMenuTextoHover);
-        transform: translateY(-1px);
-    }
-    .sexp-nav-link--active {
-        background-color: var(--colorBoton); color: var(--colorTextoBoton);
-        border-color: var(--colorBoton);
-    }
-</style>
+<link rel="stylesheet" href="{% static 'core/css/s_exp.css' %}">
 {% endblock extra_css %}
 
 {% block content %}
@@ -108,7 +25,7 @@
         <a href="{% url 's_exp_seguimiento' %}" class="sexp-nav-link sexp-nav-link--active">
             <i class="bi bi-clock-history"></i> Mis Solicitudes
         </a>
-        {% if request.user|tiene_rol_global:"admin" %}
+        {% if request.user|tiene_rol:"ADMIN:Admision" %}
         <a href="{% url 's_exp_solicitudes' %}" class="sexp-nav-link">
             <i class="bi bi-list-check"></i> Gestión Solicitudes
         </a>

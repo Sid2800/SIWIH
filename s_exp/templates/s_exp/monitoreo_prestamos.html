@@ -5,64 +5,7 @@
 {% block title %}Monitoreo de Préstamos{% endblock title %}
 
 {% block extra_css %}
-<style>
-    .sexp-timer {
-        font-family: 'Courier New', monospace;
-        font-size: 1.4rem; font-weight: 700;
-        padding: 0.3rem 0.6rem; border-radius: 0.6rem;
-    }
-    .sexp-timer--ok { background: rgba(34,197,94,0.15); color: #22c55e; }
-    .sexp-timer--warn { background: rgba(234,179,8,0.15); color: #eab308; }
-    .sexp-timer--danger { background: rgba(239,68,68,0.15); color: #ef4444; }
-    .sexp-timer--expired { background: rgba(239,68,68,0.25); color: #ef4444; animation: sexp-blink 1s infinite; }
-    @keyframes sexp-blink { 0%,100%{opacity:1;} 50%{opacity:0.5;} }
-
-    .sexp-progress-bar {
-        width: 100%; height: 6px;
-        background-color: var(--colorLinea);
-        border-radius: 3px; overflow: hidden; margin-top: 0.3rem;
-    }
-    .sexp-progress-fill {
-        height: 100%; border-radius: 3px; transition: width 1s linear;
-    }
-    .sexp-progress-fill--ok { background: #22c55e; }
-    .sexp-progress-fill--warn { background: #eab308; }
-    .sexp-progress-fill--danger { background: #ef4444; }
-
-    .sexp-filtros { display:flex; gap:1rem; margin-bottom:1.5rem; flex-wrap:wrap; align-items:center; }
-    .sexp-filtro-btn {
-        padding: 0.5rem 1rem; border-radius: 1rem;
-        border: 1px solid var(--colorLinea);
-        background-color: transparent; color: var(--colorTablacelda);
-        cursor: pointer; font-size: 0.85rem; transition: all .2s;
-        font-family: var(--fuenteCuerpo);
-    }
-    .sexp-filtro-btn:hover, .sexp-filtro-btn.active {
-        background-color: var(--colorBoton); color: var(--colorTextoBoton);
-        border-color: var(--colorBoton);
-    }
-
-    /* Nav sub-módulos */
-    .sexp-nav-modulos { display:flex; gap:1.4rem; flex-wrap:wrap; margin-bottom:1rem; }
-    .sexp-nav-link {
-        padding: 0.6rem 1.2rem; border-radius: 1rem;
-        background-color: var(--blanco); border: 1px solid var(--colorLinea);
-        text-decoration: none; color: var(--colorTablacelda);
-        display: flex; align-items: center; gap: 0.5rem;
-        font-size: 1.4rem; font-family: var(--fuenteCuerpo);
-        transition: background-color .2s, transform .2s;
-    }
-    .sexp-nav-link:hover {
-        background-color: var(--colorMenuHover); color: var(--colorMenuTextoHover);
-        transform: translateY(-1px);
-    }
-    .sexp-nav-link--active {
-        background-color: var(--colorBoton); color: var(--colorTextoBoton);
-        border-color: var(--colorBoton);
-    }
-
-    .dataTable { font-size: 1.4rem; }
-</style>
+<link rel="stylesheet" href="{% static 'core/css/s_exp.css' %}">
 {% endblock extra_css %}
 
 {% block content %}

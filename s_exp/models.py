@@ -28,26 +28,72 @@ class MotivoSolicitud(models.Model):
 
 
 # ============================================
-# EXPEDIENTE PARA PRÉSTAMO
+# CATÁLOGO: ESTADOS DE SOLICITUD
+# ============================================
+class EstadoSolicitud(models.Model):
+    codigo = models.CharField(
+        max_length=50,
+        primary_key=True,
+        verbose_name='Código (Ejem: SOL_PENDIENTE)'
+    )
+    nombre = models.CharField(
+        max_length=100,
+        verbose_name='Nombre del Estado'
+    )
+    descripcion = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name='Descripción'
+    )
+
+    class Meta:
+        db_table = 's_exp_estadosolicitud'
+        verbose_name = 'Estado de Solicitud'
+        verbose_name_plural = 'Estados de Solicitud'
+
+    def __str__(self):
+        return self.nombre
+
+
+# ============================================
+# CATÁLOGO: ESTADOS DEL EXPEDIENTE FISICO
+# ============================================
+class EstadoExpedienteFisico(models.Model):
+    codigo = models.CharField(
+        max_length=50,
+        primary_key=True,
+        verbose_name='Código (Ejem: EXP_DISPONIBLE)'
+    )
+    nombre = models.CharField(
+        max_length=100,
+        verbose_name='Nombre del Estado'
+    )
+
+    class Meta:
+        db_table = 's_exp_estadoexpedientefisico'
+        verbose_name = 'Estado de Expediente Físico'
+        verbose_name_plural = 'Estados de Expediente Físico'
+
+    def __str__(self):
+        return self.nombre
+
+
+# ============================================
+# EXPEDIENTE PARA PRÉSTAMO (Estado Actual)
 # ============================================
 class ExpedientePrestamo(models.Model):
-    ESTADO_CHOICES = [
-        ('Disponible', 'Disponible'),
-        ('Prestado', 'Prestado'),
-        ('Baja', 'Baja'),
-    ]
-
     expediente = models.OneToOneField(
         Expediente,
         on_delete=models.PROTECT,
         related_name='prestamo_info',
         verbose_name='Expediente'
     )
-    estado = models.CharField(
-        max_length=20,
-        choices=ESTADO_CHOICES,
-        default='Disponible',
-        verbose_name='Estado'
+    estado = models.ForeignKey(
+        EstadoExpedienteFisico,
+        on_delete=models.PROTECT,
+        related_name='expedientes',
+        verbose_name='Estado Físico Actual',
+        default='EXP_DISPONIBLE'
     )
     ubicacion_fisica = models.CharField(
         max_length=200,
@@ -63,24 +109,13 @@ class ExpedientePrestamo(models.Model):
         ordering = ['expediente__numero']
 
     def __str__(self):
-        return f"Exp #{self.expediente.numero} - {self.estado}"
+        return f"Exp #{self.expediente.numero} - {self.estado.nombre}"
 
 
 # ============================================
 # SOLICITUD DE PRÉSTAMO
 # ============================================
 class SolicitudPrestamo(models.Model):
-    ESTADO_FLUJO_CHOICES = [
-        ('Pendiente', 'Pendiente'),
-        ('Aprobado', 'Aprobado'),
-        ('Rechazado', 'Rechazado'),
-        ('Listo', 'Listo para Retirar'),
-        ('EnPrestamo', 'En Préstamo'),
-        ('Devuelto', 'Devuelto'),
-        ('DevolucionParcial', 'Devolución Parcial'),
-        ('Anulado', 'Anulado'),
-    ]
-
     usuario = models.ForeignKey(
         User,
         on_delete=models.PROTECT,
@@ -91,11 +126,12 @@ class SolicitudPrestamo(models.Model):
         auto_now_add=True,
         verbose_name='Fecha de Creación'
     )
-    estado_flujo = models.CharField(
-        max_length=30,
-        choices=ESTADO_FLUJO_CHOICES,
-        default='Pendiente',
-        verbose_name='Estado del Flujo'
+    estado_flujo = models.ForeignKey(
+        EstadoSolicitud,
+        on_delete=models.PROTECT,
+        related_name='solicitudes',
+        verbose_name='Estado de la Solicitud',
+        default='SOL_PENDIENTE'
     )
     motivo = models.ForeignKey(
         MotivoSolicitud,
@@ -128,7 +164,7 @@ class SolicitudPrestamo(models.Model):
         ordering = ['-fecha_creacion']
 
     def __str__(self):
-        return f"Solicitud #{self.id} - {self.usuario.username} - {self.estado_flujo}"
+        return f"Solicitud #{self.id} - {self.usuario.username} - {self.estado_flujo.nombre}"
 
     @property
     def cantidad_expedientes(self):
@@ -328,7 +364,7 @@ class Devolucion(models.Model):
 
 
 # ============================================
-# LOG HISTÓRICO
+# LOG HISTÓRICO GENERAL
 # ============================================
 class LogHistorico(models.Model):
     accion = models.CharField(
@@ -370,3 +406,62 @@ class LogHistorico(models.Model):
 
     def __str__(self):
         return f"[{self.timestamp}] {self.accion} - {self.usuario.username}"
+
+
+# ============================================
+# TRANSACCIONAL: HISTORIAL DE ESTADOS EXPEDIENTE
+# ============================================
+class ExpedienteEstadoLog(models.Model):
+    expediente = models.ForeignKey(
+        Expediente,
+        on_delete=models.CASCADE,
+        related_name='historial_estados_fisicos',
+        verbose_name='Expediente'
+    )
+    estado_anterior = models.ForeignKey(
+        EstadoExpedienteFisico,
+        on_delete=models.PROTECT,
+        related_name='logs_como_anterior',
+        null=True,
+        blank=True,
+        verbose_name='Estado Anterior'
+    )
+    estado_nuevo = models.ForeignKey(
+        EstadoExpedienteFisico,
+        on_delete=models.PROTECT,
+        related_name='logs_como_nuevo',
+        verbose_name='Estado Nuevo'
+    )
+    usuario = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name='cambios_estado_fisico',
+        verbose_name='Usuario que cambió'
+    )
+    solicitud = models.ForeignKey(
+        SolicitudPrestamo,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='movimientos_expediente',
+        verbose_name='Solicitud Relacionada'
+    )
+    fecha = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='Fecha/Hora'
+    )
+    observacion = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name='Observación'
+    )
+
+    class Meta:
+        db_table = 's_exp_expedienteestadolog'
+        verbose_name = 'Transacción de Estado'
+        verbose_name_plural = 'Transacciones de Estados'
+        ordering = ['-fecha']
+
+    def __str__(self):
+        return f"Exp #{self.expediente.numero}: {self.estado_nuevo.nombre} ({self.fecha})"
+

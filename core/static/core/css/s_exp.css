@@ -1,0 +1,644 @@
+/* ============================================================
+   S_EXP — Módulo Préstamo de Expedientes
+   Estilos unificados para todas las plantillas del módulo.
+   ============================================================ */
+
+
+/* ======= Navegación sub-módulos (compartido) ======= */
+
+.sexp-nav-modulos {
+    display: flex;
+    gap: 1.4rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.sexp-nav-link {
+    padding: 0.6rem 1.2rem;
+    border-radius: 1rem;
+    background-color: var(--blanco);
+    border: 1px solid var(--colorLinea);
+    text-decoration: none;
+    color: var(--colorTablacelda);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1.4rem;
+    font-family: var(--fuenteCuerpo);
+    transition: background-color .2s, transform .2s, border-color .2s;
+}
+
+.sexp-nav-link:hover {
+    background-color: var(--colorMenuHover);
+    color: var(--colorMenuTextoHover);
+    border-color: var(--colorMenuTextoHover);
+    transform: translateY(-1px);
+}
+
+.sexp-nav-link--active {
+    background-color: var(--colorBoton);
+    color: var(--colorTextoBoton);
+    border-color: var(--colorBoton);
+}
+
+
+/* ======= DataTable base ======= */
+
+.dataTable { font-size: 1.4rem; }
+
+
+/* ======= Badges y Tags compartidos ======= */
+
+.sexp-badge {
+    display: inline-block;
+    padding: 0.2rem 0.6rem;
+    border-radius: 2rem;
+    font-size: 1.2rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.sexp-badge--disponible {
+    background: rgba(34, 197, 94, 0.15);
+    color: #22c55e;
+    border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.sexp-badge--prestado {
+    background: rgba(220, 53, 69, 0.15);
+    color: var(--colorEliminarRojo);
+    border: 1px solid rgba(220, 53, 69, 0.3);
+}
+
+.sexp-badge--en-carrito {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.3rem 0.6rem;
+    border-radius: 0.6rem;
+    background: rgba(99, 102, 241, 0.15);
+    color: #6366f1;
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.sexp-badge--vencido { background: rgba(239,68,68,0.15); color: #ef4444; }
+.sexp-badge--normal  { background: rgba(99,102,241,0.15); color: #6366f1; }
+
+.sexp-exp-tag {
+    background: rgba(99, 102, 241, 0.15);
+    color: #6366f1;
+    padding: 0.2rem 0.5rem;
+    border-radius: 0.4rem;
+    font-size: 1.2rem;
+    font-weight: 600;
+    display: inline-block;
+}
+
+
+/* ======= Filtros compartidos ======= */
+
+.sexp-filtros {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.sexp-filtro-btn {
+    padding: 0.5rem 1rem;
+    border-radius: 1rem;
+    border: 1px solid var(--colorLinea);
+    background-color: transparent;
+    color: var(--colorTablacelda);
+    cursor: pointer;
+    font-size: 1.4rem;
+    transition: all .2s;
+    font-family: var(--fuenteCuerpo);
+}
+
+.sexp-filtro-btn:hover,
+.sexp-filtro-btn.active {
+    background-color: var(--colorBoton);
+    color: var(--colorTextoBoton);
+    border-color: var(--colorBoton);
+}
+
+.sexp-modal-campo { margin-bottom: 1rem; }
+.sexp-modal-campo label {
+    display: block;
+    margin-bottom: 0.3rem;
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+.sexp-modal-campo textarea,
+.sexp-modal-campo input {
+    width: 100%;
+    padding: 0.6rem;
+    border-radius: 0.6rem;
+    border: 1px solid var(--colorLinea);
+    background-color: var(--blanco);
+    color: var(--colorTablacelda);
+    font-size: 1.6rem;
+}
+
+
+/* ============================================================
+   BUSCADOR — Búsqueda y Carrito
+   ============================================================ */
+
+.sexp-buscador-layout {
+    display: grid;
+    grid-template-columns: 1fr 370px;
+    gap: 1.5rem;
+}
+
+@media (max-width: 900px) {
+    .sexp-buscador-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Barra de búsqueda */
+.sexp-search-box {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.sexp-search-input {
+    flex: 1;
+    min-width: 200px;
+    padding: 0.6rem 1rem;
+    border-radius: 1rem;
+    border: 1px solid var(--colorLinea);
+    background-color: var(--blanco);
+    color: var(--colorTablacelda);
+    font-size: 1.6rem;
+    font-family: var(--fuenteCuerpo);
+}
+
+.sexp-search-select {
+    padding: 0.6rem;
+    border-radius: 1rem;
+    border: 1px solid var(--colorLinea);
+    background-color: var(--blanco);
+    color: var(--colorTablacelda);
+    font-size: 1.6rem;
+    font-family: var(--fuenteCuerpo);
+}
+
+.sexp-search-btn {
+    padding: 0.6rem 1.2rem;
+    border-radius: 1rem;
+    border: none;
+    background-color: var(--colorBoton);
+    color: var(--colorTextoBoton);
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 1.6rem;
+    font-family: var(--fuenteCuerpo);
+    transition: background-color .2s;
+}
+
+.sexp-search-btn:hover { opacity: 0.85; }
+
+/* Resultados */
+.sexp-resultado {
+    background-color: var(--blanco);
+    border-radius: 1rem;
+    padding: 2rem 1.5rem;
+    margin-bottom: 0.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all .2s;
+    border: 1px solid var(--colorLinea);
+    color: var(--colorTablacelda);
+}
+
+.sexp-resultado:hover { border-color: var(--colorBoton); }
+
+.sexp-resultado__info h4 {
+    margin: 0 0 0.2rem;
+    font-size: 1.8rem;
+    font-weight: 600;
+}
+
+.sexp-resultado__info p {
+    margin: 0;
+    font-size: 1.4rem;
+    opacity: 0.7;
+}
+
+.sexp-add-btn {
+    padding: 0.4rem 1.4rem;
+    border-radius: 0.6rem;
+    border: none;
+    background-color: var(--colorRadioBotonActivo);
+    color: #fff;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 1.4rem;
+    transition: all .2s;
+    white-space: nowrap;
+}
+
+.sexp-add-btn:hover { opacity: 0.85; }
+
+.sexp-add-btn:disabled {
+    background-color: var(--colorControlDeshabilitadoFondo);
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+/* Carrito */
+.sexp-carrito {
+    background-color: var(--blanco);
+    border-radius: 1.5rem;
+    padding: 1.2rem;
+    position: sticky;
+    top: 1rem;
+    border: 1px solid var(--colorLinea);
+    transition: background-color 0.3s ease;
+}
+
+.sexp-carrito h3 {
+    margin: 0 0 1rem;
+    font-size: 1.6rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--colorTablacelda);
+}
+
+.sexp-carrito-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.6rem 0.5rem;
+    border-bottom: 1px solid var(--colorLinea);
+    font-size: 1.4rem;
+    color: var(--colorTablacelda);
+}
+
+.sexp-carrito-item:last-child { border-bottom: none; }
+
+.sexp-remove-btn {
+    background: none;
+    border: none;
+    color: var(--colorEliminarRojo);
+    cursor: pointer;
+    font-size: 1.6rem;
+    padding: 0.2rem;
+    transition: opacity .2s;
+}
+
+.sexp-remove-btn:hover { opacity: 0.7; }
+
+.sexp-carrito-empty {
+    text-align: center;
+    opacity: 0.5;
+    padding: 1.5rem;
+    font-size: 1.4rem;
+    color: var(--colorTablacelda);
+}
+
+.sexp-carrito-form {
+    margin-top: 1rem;
+    border-top: 1px solid var(--colorLinea);
+    padding-top: 1rem;
+}
+
+.sexp-carrito-form label {
+    display: block;
+    margin-bottom: 0.3rem;
+    font-weight: 600;
+    font-size: 1.4rem;
+    color: var(--colorTablacelda);
+}
+
+.sexp-carrito-form textarea,
+.sexp-carrito-form input,
+.sexp-carrito-form select {
+    width: 100%;
+    padding: 0.5rem;
+    border-radius: 0.6rem;
+    border: 1px solid var(--colorLinea);
+    background-color: var(--blanco);
+    color: var(--colorTablacelda);
+    font-size: 1.4rem;
+    margin-bottom: 1.4rem;
+    font-family: var(--fuenteCuerpo);
+}
+
+.sexp-submit-btn {
+    width: 100%;
+    padding: 1.2rem;
+    border-radius: 1rem;
+    border: none;
+    background-color: var(--colorBoton);
+    color: var(--colorTextoBoton);
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 1.8rem;
+    transition: all .2s;
+    font-family: var(--fuenteCuerpo);
+}
+
+.sexp-submit-btn:hover { opacity: 0.85; }
+
+.sexp-submit-btn:disabled {
+    background-color: var(--colorControlDeshabilitadoFondo);
+    cursor: not-allowed;
+}
+
+.sexp-carrito-count {
+    background-color: var(--colorBoton);
+    color: var(--colorTextoBoton);
+    border-radius: 50%;
+    width: 22px;
+    height: 22px;
+    display: inline-flex;
+    justify-content: center;
+    font-size: 1.2rem;
+    font-weight: 700;
+}
+
+
+/* ============================================================
+   SEGUIMIENTO — Timeline de solicitudes del usuario
+   ============================================================ */
+
+.sexp-timeline { display: flex; flex-direction: column; gap: 1rem; }
+
+.sexp-sol-card {
+    background-color: var(--blanco);
+    border-radius: 1rem;
+    padding: 1.2rem;
+    border-left: 4px solid var(--colorBoton);
+    transition: all .2s;
+    color: var(--colorTablacelda);
+}
+.sexp-sol-card--pendiente   { border-left-color: #6366f1; }
+.sexp-sol-card--aprobado    { border-left-color: #22c55e; }
+.sexp-sol-card--rechazado   { border-left-color: var(--colorEliminarRojo); }
+.sexp-sol-card--enprestamo  { border-left-color: #f59e0b; }
+.sexp-sol-card--devuelto    { border-left-color: var(--colorControlDeshabilitadoFondo); }
+.sexp-sol-card--parcial     { border-left-color: #f97316; }
+.sexp-sol-card--anulado     { border-left-color: #64748b; }
+
+.sexp-sol-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.4rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+.sexp-sol-header h3 { margin: 0; font-size: 1rem; }
+
+.sexp-sol-badge {
+    padding: 0.25rem 1.4rem;
+    border-radius: 2rem;
+    font-size: 1.2rem;
+    font-weight: 700;
+}
+.sexp-sol-badge--pendiente         { background: rgba(99,102,241,0.15);  color: #6366f1; }
+.sexp-sol-badge--aprobado          { background: rgba(34,197,94,0.15);   color: #22c55e; }
+.sexp-sol-badge--rechazado         { background: rgba(220,53,69,0.15);   color: var(--colorEliminarRojo); }
+.sexp-sol-badge--enprestamo        { background: rgba(245,158,11,0.15);  color: #f59e0b; }
+.sexp-sol-badge--devuelto          { background: rgba(100,116,139,0.15); color: #94a3b8; }
+.sexp-sol-badge--devolucionparcial { background: rgba(249,115,22,0.15);  color: #f97316; }
+.sexp-sol-badge--anulado           { background: rgba(100,116,139,0.15); color: #64748b; }
+
+.sexp-sol-info {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 0.5rem;
+    margin-bottom: 1.4rem;
+    font-size: 0.85rem;
+}
+.sexp-sol-info label { opacity: 0.6; font-size: 1.2rem; display: block; }
+
+.sexp-sol-exps { display: flex; gap: 0.3rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+
+.sexp-sol-timer {
+    font-family: 'Courier New', monospace;
+    font-weight: 700;
+    font-size: 1rem;
+    margin-top: 0.5rem;
+}
+.sexp-sol-rechazo {
+    background: rgba(220,53,69,0.1);
+    border-radius: 0.6rem;
+    padding: 0.5rem 1.4rem;
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+}
+.sexp-devolver-btn {
+    padding: 0.5rem 1rem;
+    border-radius: 1rem;
+    border: none;
+    background-color: #f59e0b;
+    color: #000;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.85rem;
+    transition: all .2s;
+    margin-top: 0.5rem;
+}
+.sexp-devolver-btn:hover { opacity: 0.85; }
+
+
+/* ============================================================
+   GESTIÓN DE SOLICITUDES
+   ============================================================ */
+
+.sexp-exp-tags { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+
+
+/* ============================================================
+   MONITOREO — Timers y barras de progreso
+   ============================================================ */
+
+.sexp-timer {
+    font-family: 'Courier New', monospace;
+    font-size: 1.4rem;
+    font-weight: 700;
+    padding: 0.3rem 0.6rem;
+    border-radius: 0.6rem;
+}
+.sexp-timer--ok      { background: rgba(34,197,94,0.15);  color: #22c55e; }
+.sexp-timer--warn    { background: rgba(234,179,8,0.15);  color: #eab308; }
+.sexp-timer--danger  { background: rgba(239,68,68,0.15);  color: #ef4444; }
+.sexp-timer--expired { background: rgba(239,68,68,0.25);  color: #ef4444; animation: sexp-blink 1s infinite; }
+
+@keyframes sexp-blink {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.5; }
+}
+
+.sexp-progress-bar {
+    width: 100%;
+    height: 6px;
+    background-color: var(--colorLinea);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 0.3rem;
+}
+
+.sexp-progress-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 1s linear;
+}
+.sexp-progress-fill--ok     { background: #22c55e; }
+.sexp-progress-fill--warn   { background: #eab308; }
+.sexp-progress-fill--danger { background: #ef4444; }
+
+
+/* ============================================================
+   DEVOLUCIONES
+   ============================================================ */
+
+.sexp-dev-card {
+    background-color: var(--blanco);
+    border-radius: 1rem;
+    padding: 1.2rem;
+    margin-bottom: 1rem;
+    border-left: 4px solid #6366f1;
+    color: var(--colorTablacelda);
+}
+.sexp-dev-card--vencido { border-left-color: #ef4444; }
+.sexp-dev-card--parcial { border-left-color: #f97316; }
+
+.sexp-dev-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.4rem;
+}
+.sexp-dev-header h3 { margin: 0; font-size: 1rem; }
+
+.sexp-dev-info {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 0.5rem;
+    margin-bottom: 1.4rem;
+    font-size: 0.85rem;
+}
+.sexp-dev-info span { opacity: 0.7; }
+
+.sexp-dev-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+
+.sexp-dev-btn {
+    padding: 0.5rem 1rem;
+    border-radius: 1rem;
+    border: none;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    transition: all .2s;
+    font-family: var(--fuenteCuerpo);
+}
+.sexp-dev-btn--completa       { background: #22c55e; color: #fff; }
+.sexp-dev-btn--completa:hover { opacity: 0.85; }
+.sexp-dev-btn--parcial        { background: #f59e0b; color: #000; }
+.sexp-dev-btn--parcial:hover  { opacity: 0.85; }
+
+
+/* ============================================================
+   REPORTES
+   ============================================================ */
+
+.sexp-reportes-filtros {
+    background-color: var(--blanco);
+    border-radius: 1rem;
+    padding: 1.2rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    border: 1px solid var(--colorLinea);
+    color: var(--colorTablacelda);
+}
+
+.sexp-filtro-grupo { display: flex; flex-direction: column; gap: 0.3rem; }
+.sexp-filtro-grupo label { font-size: 1.4rem; font-weight: 600; opacity: 0.7; }
+.sexp-filtro-grupo input,
+.sexp-filtro-grupo select {
+    padding: 0.5rem;
+    border-radius: 0.6rem;
+    border: 1px solid var(--colorLinea);
+    background-color: var(--blanco);
+    color: var(--colorTablacelda);
+    font-size: 0.85rem;
+    font-family: var(--fuenteCuerpo);
+}
+
+.sexp-filtro-btn--export       { background: #22c55e; color: #fff; }
+.sexp-filtro-btn--export:hover { opacity: 0.85; }
+
+.sexp-reportes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 1.5rem;
+}
+
+.sexp-reporte-card {
+    background-color: var(--blanco);
+    border-radius: 1rem;
+    padding: 1.2rem;
+    border: 1px solid var(--colorLinea);
+    color: var(--colorTablacelda);
+}
+.sexp-reporte-card h3 {
+    margin: 0 0 1rem;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.sexp-reporte-tabla {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    color: var(--colorTablacelda);
+}
+.sexp-reporte-tabla th {
+    text-align: left;
+    padding: 0.5rem;
+    opacity: 0.7;
+    border-bottom: 1px solid var(--colorLinea);
+}
+.sexp-reporte-tabla td {
+    padding: 0.5rem;
+    border-bottom: 1px solid var(--colorLinea);
+}
+
+.sexp-tabs { display: flex; gap: 0; margin-bottom: 1.5rem; }
+.sexp-tab {
+    padding: 0.6rem 1.2rem;
+    border: none;
+    cursor: pointer;
+    background: transparent;
+    color: var(--colorTablacelda);
+    font-size: 1.4rem;
+    font-family: var(--fuenteCuerpo);
+    border-bottom: 2px solid transparent;
+    transition: all .2s;
+}
+.sexp-tab:hover  { border-bottom-color: var(--colorLinea); }
+.sexp-tab.active { border-bottom-color: var(--colorBoton); font-weight: 600; }
+
+.sexp-tab-content        { display: none; }
+.sexp-tab-content.active { display: block; }
