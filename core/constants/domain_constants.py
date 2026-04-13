@@ -1,5 +1,6 @@
 from enum import Enum
 
+
 # Institución principal del sistema
 HEAC_INSTITUCION_ID = 65
 
@@ -7,8 +8,7 @@ class UnidadID:
     ADMISION = 1
     IMAGENOLOGIA = 2
     REFERENCIA = 3
-    DIRECTIVOS = 4
-    SALA = 7
+    SALA = 4
 
 class AccionEstudio(str, Enum):
     KEEP = "KEEP"
@@ -71,4 +71,6 @@ EDAD_FERTIL_MIN = 10
 EDAD_FERTIL_MAX = 49
 
 GENERO_FEMENINO = "M"
+
+
 

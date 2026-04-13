@@ -361,7 +361,7 @@ class IngresoEditView(UnidadRolRequiredMixin, UpdateView):
         #modo solo lectura 
         context['solo_lectura'] = (
             (ingreso.fecha_recepcion_sdgi is not None) or 
-            (tiene_rol(self.request.user, "auditor:DIRECTIVOS,visitante:Admision") and not self.request.user.is_superuser)
+            (tiene_rol(self.request.user, "directivo:global,visitante:Admision") and not self.request.user.is_superuser)
         )
 
         return context

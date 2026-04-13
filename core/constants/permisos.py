@@ -19,8 +19,8 @@ ATENCION_EDITOR_ROLES = ["admin", "digitador"]
 ATENCION_EDITOR_UNIDADES = ["Admision"]
 
 # Acceso de solo visualización (listar, obtener modo lectura)
-ATENCION_VISUALIZACION_ROLES = ["admin", "digitador", "visitante", "auditor"]
-ATENCION_VISUALIZACION_UNIDADES = ["Admision","DIRECTIVOS","Sala"]
+ATENCION_VISUALIZACION_ROLES = ["admin", "digitador", "visitante", "directivo"]
+ATENCION_VISUALIZACION_UNIDADES = ["Admision","Sala"]
 
 
 # -----------------------------
@@ -28,8 +28,8 @@ ATENCION_VISUALIZACION_UNIDADES = ["Admision","DIRECTIVOS","Sala"]
 # -----------------------------
 
 # Acceso de solo visualización (listar, obtener modo lectura)
-EXPEDIENTE_VISUALIZACION_ROLES = ["admin", "digitador", "visitante", "auditor"]
-EXPEDIENTE_VISUALIZACION_UNIDADES = ["Admision","DIRECTIVOS"]
+EXPEDIENTE_VISUALIZACION_ROLES = ["admin", "digitador", "visitante", "directivo"]
+EXPEDIENTE_VISUALIZACION_UNIDADES = ["Admision"]
 
 
 # -----------------------------
@@ -41,7 +41,7 @@ IMAGENOLOGIA_EDITOR_ROLES = ["admin", "digitador"]
 IMAGENOLOGIA_EDITOR_UNIDADES = ["Imagenologia"]
 
 # Acceso de solo visualización / edición parcial (Edit, Listar)
-IMAGENOLOGIA_VISUALIZACION_ROLES = ["admin", "digitador", "auditor","visitante"]
+IMAGENOLOGIA_VISUALIZACION_ROLES = ["admin", "digitador", "directivo","visitante"]
 IMAGENOLOGIA_VISUALIZACION_UNIDADES = ["Imagenologia", "DIRECTIVOS","Sala"]
 
 
@@ -54,8 +54,8 @@ INGRESO_EDITOR_ROLES = ["admin", "digitador"]
 INGRESO_EDITOR_UNIDADES = ["Admision"]
 
 # Acceso de visualización / auditoría
-INGRESO_VISUALIZACION_ROLES = ["admin", "digitador", "auditor","visitante"]
-INGRESO_VISUALIZACION_UNIDADES = ["Admision", "DIRECTIVOS","Sala"]
+INGRESO_VISUALIZACION_ROLES = ["admin", "digitador", "directivo", "visitante"]
+INGRESO_VISUALIZACION_UNIDADES = ["Admision","Sala"]
 
 
 # -----------------------------
@@ -67,11 +67,11 @@ INGRESO_VISUALIZACION_UNIDADES = ["Admision", "DIRECTIVOS","Sala"]
 PACIENTE_EDITOR_ROLES = ['admin', 'digitador']
 PACIENTE_EDITOR_UNIDADES = ['Admision']
 
-PACIENTE_VISUALIZACION_ROLES = ['admin', 'digitador', 'auditor','visitante']
-PACIENTE_VISUALIZACION_UNIDADES = ['Admision', 'Imagenologia', 'DIRECTIVOS','Sala']
+PACIENTE_VISUALIZACION_ROLES = ['admin', 'digitador', 'directivo','visitante']
+PACIENTE_VISUALIZACION_UNIDADES = ['Admision', 'Imagenologia','Sala']
 
-PACIENTE_DISPENSACION_ROLES = ['admin', 'auditor']
-PACIENTE_DISPENSACION_UNIDADES = ['Admision', 'Imagenologia', 'DIRECTIVOS']
+PACIENTE_DISPENSACION_ROLES = ['admin', 'directivo']
+PACIENTE_DISPENSACION_UNIDADES = ['Admision', 'Imagenologia']
 
 
 # -----------------------------

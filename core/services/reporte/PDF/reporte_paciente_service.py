@@ -1051,6 +1051,7 @@ class ReportePacienteService:
         pdf.drawImage(logo2, x=ancho-175, y=y-50, width=80, height=55, preserveAspectRatio=True, mask='auto')
         pdf.drawImage(logo3, x=ancho-115, y=y-50, width=80, height=55, preserveAspectRatio=True, mask='auto')
 
+
     @staticmethod
     def __dibujarEpicrisisFormatoHojaHospitalizacion2026(pdf, ancho, alto, paciente, ingreso):
         pdf.showPage()
