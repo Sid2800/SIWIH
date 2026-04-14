@@ -1,7 +1,8 @@
 from django.contrib.auth.models import User
 from usuario.models import PerfilUnidad
 from core.constants.domain_constants import UnidadID
-from core.constants.choices_constants import AlcanceUsuario
+from core.constants.choices_constants import AlcanceUsuario, RolUsuario
+
 
 from django.db import connections
 
@@ -73,7 +74,7 @@ class UsuarioService:
     def es_directivo(user):
         return user.perfilunidad_set.filter(
             alcance=AlcanceUsuario.GLOBAL,
-            rol='directivo'
+            rol=RolUsuario.DIRECTIVO
         ).exists()
 
     @staticmethod
@@ -82,3 +83,40 @@ class UsuarioService:
             alcance=AlcanceUsuario.GLOBAL,
             rol='admin'
         ).exists()
+    
+
+    @staticmethod
+    def obtener_botones_paciente(usuario):
+
+        if usuario.is_superuser or UsuarioService.es_admin_global(usuario):
+            return ["todos"]
+
+        perfiles = PerfilUnidad.objects.select_related("servicio_unidad").filter(usuario=usuario)
+        botones = {"editar_paciente"}  
+
+        if any(
+                p.rol == RolUsuario.DIRECTIVO and p.alcance == AlcanceUsuario.GLOBAL
+                for p in perfiles
+            ):
+            return list(botones)
+
+        for perfil in perfiles:
+            if perfil.rol == RolUsuario.VISITANTE:
+                continue
+
+            unidad_id = perfil.servicio_unidad.id
+
+            if unidad_id == UnidadID.ADMISION:
+                botones.update([
+                    "crear_paciente",
+                    "crear_ingreso",
+                    "crear_atencion"
+                ])
+
+            elif unidad_id == UnidadID.IMAGENOLOGIA:
+                botones.add("crear_evaluacionrx")
+
+            elif unidad_id == UnidadID.REFERENCIA:
+                botones.add("crear_referencia")
+
+        return list(botones)

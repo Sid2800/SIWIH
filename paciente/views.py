@@ -417,29 +417,7 @@ class PacienteEditView(UpdateView):
 def listarPacientes(request):
     usuario = request.user
 
-    # Si es superusuario, darle acceso completo
-    if usuario.is_superuser:
-        context = {
-            "botones": ["todos"]
-        }
-        return render(request, 'paciente/paciente_list.html', context)
-    
-    permisos_por_unidad = {
-        1: ["crear_paciente", "editar_paciente", "crear_ingreso", "crear_atencion"],  # Admisión
-        2: ["crear_evaluacionrx"],  # Imagenología
-        4: ["editar_paciente"], # directivos
-        6: ["crear_referencia"]  # Imagenología
-
-    }
-
-    perfiles = PerfilUnidad.objects.filter(usuario=usuario).values_list('servicio_unidad_id', flat=True)
-
-    botones = []
-    for unidad_id in perfiles:
-        permisos = permisos_por_unidad.get(unidad_id, [])
-        for p in permisos:
-            if p not in botones:  # Evita duplicados y preserva orden
-                botones.append(p)
+    botones =UsuarioService.obtener_botones_paciente(usuario)
 
     context = {
         "botones": json.dumps(botones)  # Se manda ya en el orden original

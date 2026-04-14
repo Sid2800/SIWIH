@@ -34,3 +34,11 @@ class TipoPersonalNoClinico(models.IntegerChoices):
     TECNICO = 3, "TECNICO"
     RESPONSABLE = 4, "RESPONSABLE"
     AUXILIAR = 5, "AUXILIAR"
+
+
+class RolUsuario(models.TextChoices):
+    ADMIN = 'admin', 'Administrador'
+    DIGITADOR = 'digitador', 'Digitador'
+    AUDITOR = 'auditor', 'Auditor'
+    VISITANTE = 'visitante', 'Visitante'
+    DIRECTIVO = 'directivo', 'Directivo'
