@@ -529,9 +529,9 @@ def prestamos_para_devolucion_api(request):
         return JsonResponse({"error": "Sin permisos"}, status=403)
 
     try:
-        # Solo mostrar los que el usuario ya marcó como 'En Devolución'
+        # Mostrar solicitudes marcadas para devolución O con devoluciones incompletas pendientes
         qs = Prestamo.objects.select_related('solicitud__usuario').filter(
-            solicitud__estado_flujo_id='SOL_EN_DEVOLUCION',
+            solicitud__estado_flujo_id__in=['SOL_EN_DEVOLUCION', 'SOL_INCOMPLETA'],
             estado__in=['Entregado', 'Vencido', 'DevolucionParcial']
         ).order_by('fecha_limite')
 
@@ -576,11 +576,11 @@ def solicitar_devolucion_api(request):
         body = json.loads(request.body)
         solicitud_id = body.get('solicitud_id')
         
-        # El usuario solo puede devolver sus propias solicitudes en préstamo
+        # El usuario puede devolver si está en préstamo o si fue incompleta (quedan pendientes)
         solicitud = SolicitudPrestamo.objects.get(
             id=solicitud_id, 
             usuario=request.user, 
-            estado_flujo_id='SOL_EN_PRESTAMO'
+            estado_flujo_id__in=['SOL_EN_PRESTAMO', 'SOL_INCOMPLETA']
         )
         
         solicitud.estado_flujo_id = 'SOL_EN_DEVOLUCION'
@@ -675,27 +675,34 @@ def procesar_devolucion_api(request):
                 observacion="Auditado como NO RECIBIDO (Sigue en préstamo)"
             )
 
-        # 3. Determinar estado final de la solicitud
+        # 4. Determinar estado final de la solicitud
         total_exp = solicitud.detalles.count()
         devueltos_ahora = solicitud.detalles.filter(devuelto=True).count()
+        hay_no_recibidos = len(detalles_no_recibidos) > 0
         
-        if devueltos_ahora >= total_exp:
-            solicitud.estado_flujo_id = 'SOL_FINALIZADA'
-            prestamo.estado = 'Cerrado'
+        if devueltos_ahora >= total_exp and not hay_no_recibidos:
+            # Todo procesado: ver si fue vencido
+            if prestamo.esta_vencido:
+                solicitud.estado_flujo_id = 'SOL_FINALIZADA'
+                prestamo.estado = 'DevueltoVencido'
+            else:
+                solicitud.estado_flujo_id = 'SOL_FINALIZADA'
+                prestamo.estado = 'Cerrado'
             prestamo.fecha_devolucion_real = timezone.now()
         else:
+            # Faltan expedientes (no_recibidos pendientes)
             solicitud.estado_flujo_id = 'SOL_INCOMPLETA'
             prestamo.estado = 'DevolucionParcial'
             
         solicitud.save()
         prestamo.save()
 
-        # Registrar devolución
+        # Registrar devolución parcial
         Devolucion.objects.create(
             prestamo=prestamo,
             cantidad_esperada=total_exp,
             cantidad_recibida=devueltos_ahora,
-            estado='Completa' if devueltos_ahora >= total_exp else 'Incompleta',
+            estado='Completa' if devueltos_ahora >= total_exp and not hay_no_recibidos else 'Incompleta',
             notas_admin=notas
         )
 
@@ -1372,3 +1379,139 @@ def historial_prestamos_expediente_api(request, expediente_id):
         logger.error(f"Error en historial_prestamos_expediente_api: {e}", exc_info=True)
         return JsonResponse({"error": "Error interno del servidor"}, status=500)
 
+
+# ============================================
+# HISTORIAL DE SOLICITUDES (Admin)
+# ============================================
+
+class HistorialSolicitudesView(SExpAdminMixin, TemplateView):
+    template_name = 's_exp/historial_solicitudes.html'
+
+
+@require_GET
+def historial_solicitudes_api(request):
+    """Lista todas las solicitudes (historico) con paginación server-side."""
+    if not _es_exp_admin(request.user):
+        return JsonResponse({"error": "Sin permisos"}, status=403)
+
+    try:
+        draw = int(request.GET.get('draw', 0))
+        start = int(request.GET.get('start', 0))
+        length = int(request.GET.get('length', 25))
+        search_value = request.GET.get('search[value]', '').strip()
+        estado_filtro = request.GET.get('estado', '')
+
+        qs = SolicitudPrestamo.objects.select_related(
+            'usuario', 'estado_flujo', 'motivo'
+        ).annotate(cant_exp=Count('detalles'))
+
+        if estado_filtro:
+            qs = qs.filter(estado_flujo_id=estado_filtro)
+
+        if search_value:
+            qs = qs.filter(
+                Q(usuario__username__icontains=search_value) |
+                Q(usuario__first_name__icontains=search_value) |
+                Q(usuario__last_name__icontains=search_value) |
+                Q(id__icontains=search_value) |
+                Q(motivo__nombre__icontains=search_value)
+            )
+
+        total_records = SolicitudPrestamo.objects.count()
+        filtered_records = qs.count()
+        solicitudes = qs.order_by('-fecha_creacion')[start:start + length]
+
+        data = []
+        for s in solicitudes:
+            numeros = list(
+                s.detalles.values_list('expediente_prestamo__expediente__numero', flat=True)
+            )
+            # Eventos resumen (incompleta, devuelto fuera de tiempo)
+            evento = None
+            prestamo = s.prestamos.first()
+            if s.estado_flujo_id == 'SOL_INCOMPLETA':
+                faltantes = s.detalles.filter(devuelto=False).count()
+                evento = f"⚠️ Incompleta: {faltantes} expediente(s) sin devolver"
+            elif prestamo and prestamo.estado == 'DevueltoVencido':
+                evento = "🕒 Devuelto fuera del tiempo acordado"
+            elif s.estado_flujo_id == 'SOL_FINALIZADA':
+                evento = "✅ Finalizada correctamente"
+
+            data.append({
+                "id": s.id,
+                "usuario": s.usuario.username,
+                "usuario_nombre": f"{s.usuario.first_name} {s.usuario.last_name}".strip() or s.usuario.username,
+                "fecha_creacion": s.fecha_creacion.strftime("%d/%m/%Y %H:%M"),
+                "estado_flujo": s.estado_flujo_id,
+                "estado_flujo_nombre": s.estado_flujo.nombre,
+                "motivo": s.motivo.nombre if s.motivo else "",
+                "area_destino": s.area_destino or "",
+                "expedientes": numeros,
+                "evento_resumen": evento,
+            })
+
+        return JsonResponse({
+            "draw": draw,
+            "recordsTotal": total_records,
+            "recordsFiltered": filtered_records,
+            "data": data,
+        })
+    except Exception as e:
+        logger.error(f"Error en historial_solicitudes_api: {e}", exc_info=True)
+        return JsonResponse({"error": "Error interno del servidor"}, status=500)
+
+
+@require_GET
+def historial_solicitud_detalle_api(request, solicitud_id):
+    """Retorna el detalle completo de una solicitud para el modal del historial."""
+    if not _es_exp_admin(request.user):
+        return JsonResponse({"error": "Sin permisos"}, status=403)
+
+    try:
+        from .models import ExpedienteEstadoLog
+        s = SolicitudPrestamo.objects.select_related(
+            'usuario', 'estado_flujo', 'motivo'
+        ).get(id=solicitud_id)
+
+        # Expedientes con estado físico actual
+        expedientes_data = []
+        for d in s.detalles.select_related('expediente_prestamo__expediente', 'expediente_prestamo__estado'):
+            ep = d.expediente_prestamo
+            expedientes_data.append({
+                "numero": ep.expediente.numero,
+                "paciente": d.paciente_nombre or "",
+                "estado_fisico": ep.estado.nombre if ep.estado else "—",
+                "devuelto": d.devuelto,
+            })
+
+        # Logs de cambios de estado de expedientes en esta solicitud
+        logs = ExpedienteEstadoLog.objects.filter(
+            solicitud=s
+        ).select_related('usuario', 'estado_anterior', 'estado_nuevo').order_by('fecha')
+
+        logs_data = [{
+            "fecha": l.fecha.strftime("%d/%m/%Y %H:%M"),
+            "accion": f"Exp #{l.expediente_id}: {l.estado_anterior.nombre if l.estado_anterior else '—'} → {l.estado_nuevo.nombre}",
+            "usuario": l.usuario.username,
+            "observacion": l.observacion or "",
+        } for l in logs]
+
+        prestamo = s.prestamos.first()
+        return JsonResponse({"data": {
+            "id": s.id,
+            "usuario": s.usuario.username,
+            "usuario_nombre": f"{s.usuario.first_name} {s.usuario.last_name}".strip() or s.usuario.username,
+            "fecha_creacion": s.fecha_creacion.strftime("%d/%m/%Y %H:%M"),
+            "estado_flujo": s.estado_flujo_id,
+            "estado_flujo_nombre": s.estado_flujo.nombre,
+            "motivo": s.motivo.nombre if s.motivo else "",
+            "area_destino": s.area_destino or "",
+            "expedientes": expedientes_data,
+            "logs": logs_data,
+            "prestamo": {"id": prestamo.id, "estado": prestamo.estado} if prestamo else None,
+        }})
+    except SolicitudPrestamo.DoesNotExist:
+        return JsonResponse({"error": "Solicitud no encontrada"}, status=404)
+    except Exception as e:
+        logger.error(f"Error en historial_solicitud_detalle_api: {e}", exc_info=True)
+        return JsonResponse({"error": "Error interno del servidor"}, status=500)

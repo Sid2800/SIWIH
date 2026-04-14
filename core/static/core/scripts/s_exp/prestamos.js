@@ -56,9 +56,19 @@ function renderPrestamos(data) {
             'Activo': 'background:rgba(99,102,241,0.2);color:var(--negro);',
             'Entregado': 'background:rgba(245,158,11,0.2);color:var(--negro);',
             'Vencido': 'background:rgba(239,68,68,0.2);color:var(--negro);',
-            'DevolucionParcial': 'background:rgba(249,115,22,0.2);color:var(--negro);'
+            'DevolucionParcial': 'background:rgba(249,115,22,0.2);color:var(--negro);',
+            'DevueltoVencido': 'background:rgba(239,68,68,0.15);color:var(--negro);border:1px solid #ef4444;',
+            'Cerrado': 'background:rgba(100,116,139,0.2);color:var(--negro);'
         };
-        estadoBadge = `<span style="padding:0.25rem 0.6rem;border-radius:20px;font-size:1.2rem;font-weight:600;${estilosBadge[p.estado] || ''}">${p.estado}</span>`;
+        const labelBadge = {
+            'Activo': 'Activo',
+            'Entregado': 'Entregado',
+            'Vencido': 'Vencido',
+            'DevolucionParcial': 'Devolución Parcial',
+            'DevueltoVencido': 'Devuelto Fuera de Tiempo',
+            'Cerrado': 'Cerrado'
+        };
+        estadoBadge = `<span style="padding:0.25rem 0.6rem;border-radius:20px;font-size:1.2rem;font-weight:600;${estilosBadge[p.estado] || ''}">${labelBadge[p.estado] || p.estado}</span>`;
 
         let timerHtml = '';
         if (p.estado === 'Entregado' && p.fecha_limite) {

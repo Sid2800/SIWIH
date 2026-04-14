@@ -10,6 +10,7 @@ urlpatterns = [
     path('solicitudes/', views.GestionSolicitudesView.as_view(), name='s_exp_solicitudes'),
     path('monitoreo/', views.MonitoreoPrestamosView.as_view(), name='s_exp_monitoreo'),
     path('devoluciones/', views.ControlDevolucionesView.as_view(), name='s_exp_devoluciones'),
+    path('historial/', views.HistorialSolicitudesView.as_view(), name='s_exp_historial'),
     path('reportes/', views.ReportesView.as_view(), name='s_exp_reportes'),
 
     # ==========================================
@@ -31,6 +32,8 @@ urlpatterns = [
     path('api/prestamos-devolucion/', views.prestamos_para_devolucion_api, name='s_exp_prestamos_devolucion_api'),
     path('api/procesar-devolucion/', views.procesar_devolucion_api, name='s_exp_procesar_devolucion_api'),
     path('api/reportes-data/', views.reportes_data_api, name='s_exp_reportes_data_api'),
+    path('api/historial/', views.historial_solicitudes_api, name='s_exp_historial_api'),
+    path('api/historial/<int:solicitud_id>/', views.historial_solicitud_detalle_api, name='s_exp_historial_detalle_api'),
 
     # ==========================================
     # APIs USUARIO

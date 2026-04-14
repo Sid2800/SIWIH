@@ -42,11 +42,14 @@
 
     <div class="sexp-filtros">
         <button class="sexp-filtro-btn active" data-estado="">Todas</button>
-        <button class="sexp-filtro-btn" data-estado="Pendiente">Pendientes</button>
-        <button class="sexp-filtro-btn" data-estado="Aprobado">Aprobadas</button>
-        <button class="sexp-filtro-btn" data-estado="Rechazado">Rechazadas</button>
-        <button class="sexp-filtro-btn" data-estado="EnPrestamo">En Préstamo</button>
-        <button class="sexp-filtro-btn" data-estado="Devuelto">Devueltas</button>
+        <button class="sexp-filtro-btn" data-estado="SOL_PENDIENTE">Pendientes</button>
+        <button class="sexp-filtro-btn" data-estado="SOL_APROBADA_ORGANIZANDO">En preparación</button>
+        <button class="sexp-filtro-btn" data-estado="SOL_LISTO_RECOGER">Listas</button>
+        <button class="sexp-filtro-btn" data-estado="SOL_RECHAZADA">Rechazadas</button>
+        <button class="sexp-filtro-btn" data-estado="SOL_EN_PRESTAMO">En Préstamo</button>
+        <button class="sexp-filtro-btn" data-estado="SOL_EN_DEVOLUCION">En Devolución</button>
+        <button class="sexp-filtro-btn" data-estado="SOL_INCOMPLETA">Incompletas</button>
+        <button class="sexp-filtro-btn" data-estado="SOL_FINALIZADA">Finalizadas</button>
     </div>
 
     <table id="tabla_solicitudes" class="dataTable stripe hover row-border" style="width:100%">

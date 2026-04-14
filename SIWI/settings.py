@@ -60,7 +60,7 @@ INSTALLED_APPS = [
     'referencia',
     'clinico',
     'usuario',
-    's_exp'
+    's_exp',
     'rrhh'
 ]
 
