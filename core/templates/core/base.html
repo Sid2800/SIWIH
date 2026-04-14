@@ -140,7 +140,7 @@
             {% endif %}
 
 
-            {% if request.user|tiene_unidad:"Solicitante:DIRECTIVOS:Estadistica" %}
+            {% if request.user|tiene_unidad:"Solicitante:DIRECTIVOS:Sala" %}
             <li>
                <a href="{% url 's_exp_buscador' %}" class="bn-navegacion__enlace">
                   <i class="bi bi-folder2-open bn-navegacion-enlace__logo"></i>
@@ -301,7 +301,7 @@
          detallesDomicilio: "{% url 'obtenerDetallesDomicilio' %}",
          listadoDispensacionPaciente: "{% url 'dispensaciones_paciente' %}",
 
-      listarObitosPaciente: "{% url 'listar_obitos_paciente' %}",
+         listarObitosPaciente: "{% url 'listar_obitos_paciente' %}",
 
 
          /* ---------------- EVALUACION RX ---------------- */
@@ -373,7 +373,7 @@
          cambiarZona: "{% url 'cambiarZona' %}",
          agregarSector: "{% url 'agregarSector' %}",
 
-      
+
 
 
          /* ---------------- DEFUNCIÓN ---------------- */
@@ -420,6 +420,7 @@
          s_exp_dashboard_stats_api: "{% url 's_exp_dashboard_stats_api' %}",
          s_exp_listar_solicitudes_api: "{% url 's_exp_listar_solicitudes_api' %}",
          s_exp_aprobar_solicitud_api: "{% url 's_exp_aprobar_solicitud_api' %}",
+         s_exp_marcar_listo_api: "{% url 's_exp_marcar_listo_api' %}",
          s_exp_rechazar_solicitud_api: "{% url 's_exp_rechazar_solicitud_api' %}",
          s_exp_prestamos_activos_api: "{% url 's_exp_prestamos_activos_api' %}",
          s_exp_marcar_entregado_api: "{% url 's_exp_marcar_entregado_api' %}",

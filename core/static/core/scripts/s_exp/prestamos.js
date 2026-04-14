@@ -78,10 +78,12 @@ function renderPrestamos(data) {
         }
 
         let acciones = '';
-        if (p.estado === 'Activo') {
+        if (p.estado === 'Activo' && p.solicitud_estado_flujo === 'SOL_LISTO_RECOGER') {
             acciones = `<button style="background:#22c55e;color:var(--negro);border:none;padding:0.3rem 0.6rem;border-radius:6px;cursor:pointer;font-size:1.3rem;font-weight:600;" onclick="marcarEntregado(${p.id})">
                 <i class="bi bi-check2-square"></i> Entregar
             </button>`;
+        } else if (p.estado === 'Activo') {
+            acciones = `<span style="opacity:0.5; font-size:1.2rem; font-style:italic;"><i class="bi bi-hourglass-split"></i> Preparando...</span>`;
         }
 
         tbody.append(`

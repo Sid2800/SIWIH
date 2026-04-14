@@ -75,8 +75,10 @@ function renderDevoluciones(data) {
     let html = '';
     data.forEach(function(p) {
         const claseExtra = p.esta_vencido ? 'sexp-dev-card--vencido' : (p.estado === 'DevolucionParcial' ? 'sexp-dev-card--parcial' : '');
-        const exps = p.expedientes.map(n => `<span class="sexp-exp-tag">#${n}</span>`).join(' ');
         const badgeClass = p.esta_vencido ? 'sexp-badge--vencido' : 'sexp-badge--normal';
+        
+        // Creamos un string con los expedientes para guardarlos en el botón y pasarlos al modal
+        const detallesJSON = encodeURIComponent(JSON.stringify(p.detalles_expedientes));
 
         html += `
         <div class="sexp-dev-card ${claseExtra}">
@@ -86,17 +88,15 @@ function renderDevoluciones(data) {
             </div>
             <div class="sexp-dev-info">
                 <div><span>Usuario:</span> ${p.usuario_nombre}</div>
-                <div><span>Expedientes:</span> ${p.cant_expedientes}</div>
+                <div><span>Total Solic.:</span> ${p.cant_expedientes}</div>
                 <div><span>Devueltos:</span> ${p.cant_devueltos}</div>
-                <div><span>Pendientes:</span> ${p.cant_pendientes}</div>
             </div>
-            <div style="margin-bottom:1.4rem;">${exps}</div>
+            <div style="margin-bottom:1.4rem;">
+                 ${p.detalles_expedientes.map(d => `<span class="sexp-exp-tag">#${d.numero}</span>`).join(' ')}
+            </div>
             <div class="sexp-dev-actions">
-                <button class="sexp-dev-btn sexp-dev-btn--completa" onclick="procesarDevolucion(${p.id}, ${p.cant_pendientes}, true)">
-                    <i class="bi bi-check-circle"></i> Devolución Completa (${p.cant_pendientes})
-                </button>
-                <button class="sexp-dev-btn sexp-dev-btn--parcial" onclick="procesarDevolucion(${p.id}, ${p.cant_pendientes}, false)">
-                    <i class="bi bi-exclamation-triangle"></i> Devolución Parcial
+                <button class="sexp-dev-btn sexp-dev-btn--completa" onclick="abrirModalAuditoria(${p.id}, '${detallesJSON}')">
+                    <i class="bi bi-clipboard-check"></i> Revisar y Auditar Devolución
                 </button>
             </div>
         </div>`;
@@ -104,56 +104,70 @@ function renderDevoluciones(data) {
     container.html(html);
 }
 
-function procesarDevolucion(prestamoId, maxPendientes, esCompleta) {
-    if (esCompleta) {
-        Swal.fire({
-            title: 'Confirmar Devolución Completa',
-            html: `<p>¿Confirma que se recibieron los <b>${maxPendientes}</b> expediente(s) pendientes?</p>
-                   <div style="margin-top:1rem;">
-                       <label style="display:block;margin-bottom:0.3rem;font-weight:600;">Notas (opcional)</label>
-                       <textarea id="swal-notas" rows="2" style="width:100%;padding:0.5rem;border-radius:6px;border:1px solid #ccc;"></textarea>
-                   </div>`,
-            showCancelButton: true,
-            confirmButtonText: 'Confirmar',
-            cancelButtonText: 'Cancelar',
-            confirmButtonColor: '#22c55e',
-            preConfirm: () => ({ notas: document.getElementById('swal-notas').value })
-        }).then((result) => {
-            if (result.isConfirmed) {
-                enviarDevolucion(prestamoId, maxPendientes, result.value.notas);
-            }
-        });
-    } else {
-        Swal.fire({
-            title: 'Devolución Parcial',
-            html: `<div style="margin-bottom:1rem;">
-                       <label style="display:block;margin-bottom:0.3rem;font-weight:600;">Cantidad recibida (máx ${maxPendientes})</label>
-                       <input type="number" id="swal-cantidad" min="1" max="${maxPendientes}" value="1" style="width:100%;padding:0.5rem;border-radius:6px;border:1px solid #ccc;">
-                   </div>
-                   <div>
-                       <label style="display:block;margin-bottom:0.3rem;font-weight:600;">Notas (obligatorio)</label>
-                       <textarea id="swal-notas" rows="3" placeholder="Detalle los expedientes faltantes..." style="width:100%;padding:0.5rem;border-radius:6px;border:1px solid #ccc;"></textarea>
-                   </div>`,
-            showCancelButton: true,
-            confirmButtonText: 'Registrar',
-            cancelButtonText: 'Cancelar',
-            confirmButtonColor: '#f59e0b',
-            preConfirm: () => {
-                const cant = parseInt(document.getElementById('swal-cantidad').value);
-                const notas = document.getElementById('swal-notas').value.trim();
-                if (!notas) { Swal.showValidationMessage('Las notas son obligatorias para devoluciones parciales'); return false; }
-                if (cant < 1 || cant > maxPendientes) { Swal.showValidationMessage(`Cantidad debe ser entre 1 y ${maxPendientes}`); return false; }
-                return { cantidad: cant, notas: notas };
-            }
-        }).then((result) => {
-            if (result.isConfirmed) {
-                enviarDevolucion(prestamoId, result.value.cantidad, result.value.notas);
-            }
-        });
-    }
+function abrirModalAuditoria(prestamoId, detallesEncoded) {
+    const detalles = JSON.parse(decodeURIComponent(detallesEncoded));
+    
+    let expedientesHtml = '<div style="text-align:left; margin-top:1rem; max-height:300px; overflow-y:auto;">';
+    detalles.forEach(d => {
+        expedientesHtml += `
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:0.8rem; border-bottom:1px solid rgba(0,0,0,0.05); gap:1rem;">
+                <div style="font-weight:700; font-size:1.4rem;">#${d.numero}</div>
+                <div style="display:flex; gap:0.5rem;">
+                    <label style="cursor:pointer; display:flex; align-items:center; gap:0.3rem;">
+                        <input type="radio" name="estado_exp_${d.id}" value="recibido" checked> <span style="color:#22c55e;">Recibido</span>
+                    </label>
+                    <label style="cursor:pointer; display:flex; align-items:center; gap:0.3rem;">
+                        <input type="radio" name="estado_exp_${d.id}" value="no_recibido"> <span style="color:#64748b;">No Recibido</span>
+                    </label>
+                    <label style="cursor:pointer; display:flex; align-items:center; gap:0.3rem;">
+                        <input type="radio" name="estado_exp_${d.id}" value="perdido"> <span style="color:#ef4444;">Perdido</span>
+                    </label>
+                </div>
+            </div>`;
+    });
+    expedientesHtml += '</div>';
+
+    Swal.fire({
+        color: 'var(--negro)',
+        background: 'var(--blanco)',
+        title: 'Auditoría de Devolución - Préstamo #' + prestamoId,
+        html: `
+            <p style="font-size:1.2rem; opacity:0.8;">Marque el estado físico de cada expediente recibido:</p>
+            ${expedientesHtml}
+            <div style="margin-top:1.5rem; text-align:left;">
+                <label style="display:block;margin-bottom:0.3rem;font-weight:600;">Notas Generales (opcional)</label>
+                <textarea id="swal-notas" rows="2" style="width:100%;padding:0.5rem;border-radius:6px;border:1px solid #ccc;"></textarea>
+            </div>`,
+        showCancelButton: true,
+        confirmButtonText: 'Finalizar Auditoría',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#22c55e',
+        width: '500px',
+        preConfirm: () => {
+            const recibidos = [];
+            const perdidos = [];
+            const no_recibidos = [];
+            detalles.forEach(d => {
+                const val = document.querySelector(`input[name="estado_exp_${d.id}"]:checked`).value;
+                if (val === 'recibido') recibidos.push(d.id);
+                else if (val === 'perdido') perdidos.push(d.id);
+                else no_recibidos.push(d.id);
+            });
+            return {
+                recibidos: recibidos,
+                perdidos: perdidos,
+                no_recibidos: no_recibidos,
+                notas: document.getElementById('swal-notas').value
+            };
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            enviarAuditoria(prestamoId, result.value);
+        }
+    });
 }
 
-function enviarDevolucion(prestamoId, cantidad, notas) {
+function enviarAuditoria(prestamoId, data) {
     $.ajax({
         url: window.urls.s_exp_procesar_devolucion_api,
         method: 'POST',
@@ -161,14 +175,16 @@ function enviarDevolucion(prestamoId, cantidad, notas) {
         contentType: 'application/json',
         data: JSON.stringify({
             prestamo_id: prestamoId,
-            cantidad_recibida: cantidad,
-            notas: notas || ''
+            detalles_recibidos: data.recibidos,
+            detalles_perdidos: data.perdidos,
+            detalles_no_recibidos: data.no_recibidos,
+            notas: data.notas
         }),
         success: function(resp) {
             if (resp.success) {
-                const msg = resp.estado === 'Completa'
-                    ? 'Devolución completa registrada exitosamente.'
-                    : `Devolución parcial registrada. Faltan ${resp.pendientes} expediente(s).`;
+                const msg = resp.estado === 'SOL_FINALIZADA' 
+                    ? 'Auditoría completa. Todos los expedientes regresaron correctamente.' 
+                    : 'Auditoría parcial guardada. Existen expedientes pendientes o perdidos.';
                 toastr.success(msg);
                 cargarDevoluciones();
             }

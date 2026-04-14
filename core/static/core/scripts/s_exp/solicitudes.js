@@ -64,16 +64,24 @@ function initTabla() {
                 data: null,
                 orderable: false,
                 render: function (data) {
-                    if (data.estado_flujo !== 'SOL_PENDIENTE') return '';
-                    return `
-                        <div style="display:flex;gap:0.3rem;">
-                            <button class="formularioBotones-boton" style="background:#22c55e;color:var(--negro);border:none;padding:0.3rem 0.6rem;border-radius:6px;cursor:pointer;font-size:1.3rem;" onclick="aprobarSolicitud(${data.id})">
-                                <i class="bi bi-check-lg"></i> Aprobar
-                            </button>
-                            <button class="formularioBotones-boton" style="background:#ef4444;color:var(--negro);border:none;padding:0.3rem 0.6rem;border-radius:6px;cursor:pointer;font-size:1.3rem;" onclick="rechazarSolicitud(${data.id})">
-                                <i class="bi bi-x-lg"></i> Rechazar
-                            </button>
-                        </div>`;
+                    if (data.estado_flujo === 'SOL_PENDIENTE') {
+                        return `
+                            <div style="display:flex;gap:0.3rem;">
+                                <button class="formularioBotones-boton" style="background:#22c55e;color:var(--negro);border:none;padding:0.3rem 0.6rem;border-radius:6px;cursor:pointer;font-size:1.3rem;" onclick="aprobarSolicitud(${data.id})">
+                                    <i class="bi bi-check-lg"></i> Aprobar
+                                </button>
+                                <button class="formularioBotones-boton" style="background:#ef4444;color:var(--negro);border:none;padding:0.3rem 0.6rem;border-radius:6px;cursor:pointer;font-size:1.3rem;" onclick="rechazarSolicitud(${data.id})">
+                                    <i class="bi bi-x-lg"></i> Rechazar
+                                </button>
+                            </div>`;
+                    }
+                    if (data.estado_flujo === 'SOL_APROBADA_ORGANIZANDO') {
+                        return `
+                            <button class="formularioBotones-boton" style="background:#10b981;color:var(--negro);border:none;padding:0.3rem 0.6rem;border-radius:6px;cursor:pointer;font-size:1.3rem;" onclick="marcarListo(${data.id})">
+                                <i class="bi bi-box-seam"></i> Marcar Listo
+                            </button>`;
+                    }
+                    return '';
                 }
             }
         ],
@@ -195,6 +203,40 @@ function rechazarSolicitud(id) {
                 success: function (resp) {
                     if (resp.success) {
                         toastr.success('Solicitud rechazada');
+                        tablaSolicitudes.ajax.reload();
+                    }
+                },
+                error: function (xhr) {
+                    const err = xhr.responseJSON ? xhr.responseJSON.error : 'Error desconocido';
+                    toastr.error(err);
+                }
+            });
+        }
+    });
+}
+
+function marcarListo(id) {
+    Swal.fire({
+        color: 'var(--negro)',
+        background: 'var(--blanco)',
+        title: '¿Confirmar que están listos?',
+        text: 'La solicitud #' + id + ' pasará a "Listo para recoger".',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, confirmar',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#10b981'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.ajax({
+                url: window.urls.s_exp_marcar_listo_api,
+                method: 'POST',
+                headers: { 'X-CSRFToken': window.CSRF_TOKEN },
+                contentType: 'application/json',
+                data: JSON.stringify({ solicitud_id: id }),
+                success: function (resp) {
+                    if (resp.success) {
+                        toastr.success('Solicitud marcada como lista');
                         tablaSolicitudes.ajax.reload();
                     }
                 },

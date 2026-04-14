@@ -93,7 +93,7 @@ function renderSolicitudes(data) {
                 }
 
                 // Botón devolver
-                html += `<button class="sexp-devolver-btn" onclick="solicitarDevolucion(${p.id})">
+                html += `<button class="sexp-devolver-btn" onclick="solicitarDevolucion(${s.id})">
                     <i class="bi bi-arrow-return-left"></i> Solicitar Devolución
                 </button>`;
             }
@@ -108,12 +108,12 @@ function renderSolicitudes(data) {
     container.html(html);
 }
 
-function solicitarDevolucion(prestamoId) {
+function solicitarDevolucion(solicitudId) {
     Swal.fire({
         color: 'var(--negro)',
         background: 'var(--blanco)',
         title: 'Solicitar Devolución',
-        text: '¿Desea iniciar el proceso de devolución de los expedientes? Presente los expedientes al administrador.',
+        text: '¿Desea iniciar el proceso de devolución? Entregue los expedientes físicos al administrador para su revisión.',
         icon: 'question',
         showCancelButton: true,
         confirmButtonText: 'Sí, Devolver',
@@ -126,10 +126,11 @@ function solicitarDevolucion(prestamoId) {
                 method: 'POST',
                 headers: { 'X-CSRFToken': window.CSRF_TOKEN },
                 contentType: 'application/json',
-                data: JSON.stringify({ prestamo_id: prestamoId }),
+                data: JSON.stringify({ solicitud_id: solicitudId }),
                 success: function (resp) {
                     if (resp.success) {
-                        toastr.success(resp.mensaje);
+                        toastr.success('Solicitud de devolución enviada. Por favor, entregue los expedientes.');
+                        cargarMisSolicitudes();
                     }
                 },
                 error: function (xhr) {

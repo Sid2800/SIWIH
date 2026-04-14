@@ -63,8 +63,8 @@ def _es_exp_solicitante(user):
 
 def _get_unidad_usuario(user):
     """Obtiene el nombre de la unidad del usuario desde PerfilUnidad."""
-    perfil = PerfilUnidad.objects.filter(usuario=user).first()
-    return perfil.unidad.nombre_unidad if perfil else ''
+    perfil = PerfilUnidad.objects.filter(usuario=user).select_related('servicio_unidad').first()
+    return perfil.servicio_unidad.nombre_unidad if perfil and perfil.servicio_unidad else ''
 
 
 # ============================================
@@ -270,7 +270,7 @@ def aprobar_solicitud_api(request):
         # Verificar disponibilidad de todos los expedientes
         detalles = solicitud.detalles.select_related('expediente_prestamo')
         for d in detalles:
-            if d.expediente_prestamo.estado == 'Prestado':
+            if d.expediente_prestamo.estado_id == 'EXP_PRESTADO':
                 return JsonResponse({
                     "error": f"El expediente #{d.expediente_prestamo.expediente.numero} ya no está disponible"
                 }, status=400)
@@ -278,6 +278,23 @@ def aprobar_solicitud_api(request):
         # Cambiar estado de la solicitud
         solicitud.estado_flujo_id = 'SOL_APROBADA_ORGANIZANDO'
         solicitud.save()
+
+        # Marcar expedientes como apartados si no lo estaban
+        for d in detalles:
+            if d.expediente_prestamo.estado_id != 'EXP_APARTADO':
+                estado_ant = d.expediente_prestamo.estado
+                d.expediente_prestamo.estado_id = 'EXP_APARTADO'
+                d.expediente_prestamo.save()
+                
+                from .models import ExpedienteEstadoLog
+                ExpedienteEstadoLog.objects.create(
+                    expediente=d.expediente_prestamo.expediente,
+                    estado_anterior=estado_ant,
+                    estado_nuevo_id='EXP_APARTADO',
+                    usuario=request.user,
+                    solicitud=solicitud,
+                    observacion="Apartado al aprobar solicitud"
+                )
 
         # Crear el préstamo
         prestamo = Prestamo.objects.create(
@@ -290,7 +307,7 @@ def aprobar_solicitud_api(request):
 
         _registrar_log(
             request.user, 'SOLICITUD_APROBADA',
-            f'Solicitud #{solicitud.id} aprobada. Préstamo #{prestamo.id} creado.',
+            f'Solicitud #{solicitud.id} aprobada. En proceso de organización.',
             'Prestamo', prestamo.id
         )
 
@@ -299,6 +316,35 @@ def aprobar_solicitud_api(request):
 
     except Exception as e:
         logger.error(f"Error en aprobar_solicitud_api: {e}", exc_info=True)
+        return JsonResponse({"error": "Error interno del servidor"}, status=500)
+
+
+@csrf_protect
+@require_POST
+def marcar_listo_recojer_api(request):
+    """Admin marca que los expedientes ya están organizados físicamente y listos en ventanilla."""
+    if not _es_exp_admin(request.user):
+        return JsonResponse({"error": "Sin permisos"}, status=403)
+
+    try:
+        body = json.loads(request.body)
+        solicitud_id = body.get('solicitud_id')
+        
+        solicitud = SolicitudPrestamo.objects.get(id=solicitud_id, estado_flujo_id='SOL_APROBADA_ORGANIZANDO')
+        solicitud.estado_flujo_id = 'SOL_LISTO_RECOGER'
+        solicitud.save()
+
+        _registrar_log(
+            request.user, 'SOLICITUD_LISTA',
+            f'Solicitud #{solicitud.id} marcada como lista para recoger.',
+            'SolicitudPrestamo', solicitud.id
+        )
+
+        return JsonResponse({"success": True})
+    except SolicitudPrestamo.DoesNotExist:
+        return JsonResponse({"error": "Solicitud no encontrada o no está en proceso de organización"}, status=404)
+    except Exception as e:
+        logger.error(f"Error en marcar_listo_recojer_api: {e}", exc_info=True)
         return JsonResponse({"error": "Error interno del servidor"}, status=500)
 
 
@@ -396,6 +442,7 @@ def prestamos_activos_api(request):
                 "esta_vencido": p.esta_vencido,
                 "expedientes": numeros,
                 "cant_expedientes": len(numeros),
+                "solicitud_estado_flujo": p.solicitud.estado_flujo_id,
             }
             data.append(item)
 
@@ -422,6 +469,8 @@ def marcar_entregado_api(request):
 
     try:
         prestamo = Prestamo.objects.get(id=prestamo_id, estado='Activo')
+        if prestamo.solicitud.estado_flujo_id != 'SOL_LISTO_RECOGER':
+             return JsonResponse({"error": "La solicitud debe estar marcada como 'Listo para recoger' antes de entregar."}, status=400)
     except Prestamo.DoesNotExist:
         return JsonResponse({"error": "Préstamo no encontrado o no está en estado Activo"}, status=404)
 
@@ -480,20 +529,21 @@ def prestamos_para_devolucion_api(request):
         return JsonResponse({"error": "Sin permisos"}, status=403)
 
     try:
+        # Solo mostrar los que el usuario ya marcó como 'En Devolución'
         qs = Prestamo.objects.select_related('solicitud__usuario').filter(
+            solicitud__estado_flujo_id='SOL_EN_DEVOLUCION',
             estado__in=['Entregado', 'Vencido', 'DevolucionParcial']
         ).order_by('fecha_limite')
 
         data = []
         for p in qs:
-            numeros = list(
-                p.solicitud.detalles.select_related('expediente_prestamo__expediente')
-                .values_list('expediente_prestamo__expediente__numero', flat=True)
-            )
-
-            total_devuelto = sum(
-                d.cantidad_recibida for d in p.devoluciones.all()
-            )
+            detalles = []
+            for d in p.solicitud.detalles.select_related('expediente_prestamo__expediente').filter(devuelto=False):
+                detalles.append({
+                    "id": d.id,
+                    "numero": d.expediente_prestamo.expediente.numero,
+                    "estado_fisico": d.expediente_prestamo.estado.nombre
+                })
 
             data.append({
                 "id": p.id,
@@ -501,10 +551,9 @@ def prestamos_para_devolucion_api(request):
                 "usuario": p.solicitud.usuario.username,
                 "usuario_nombre": f"{p.solicitud.usuario.first_name} {p.solicitud.usuario.last_name}".strip() or p.solicitud.usuario.username,
                 "estado": p.estado,
-                "expedientes": numeros,
-                "cant_expedientes": len(numeros),
-                "cant_devueltos": total_devuelto,
-                "cant_pendientes": len(numeros) - total_devuelto,
+                "detalles_expedientes": detalles,
+                "cant_expedientes": p.solicitud.detalles.count(),
+                "cant_devueltos": p.solicitud.detalles.filter(devuelto=True).count(),
                 "fecha_limite": p.fecha_limite.isoformat() if p.fecha_limite else None,
                 "esta_vencido": p.esta_vencido,
             })
@@ -518,105 +567,143 @@ def prestamos_para_devolucion_api(request):
 
 @csrf_protect
 @require_POST
+def solicitar_devolucion_api(request):
+    """El personal (usuario) marca que ya no usará los expedientes y los devuelve al archivo."""
+    if not request.user.is_authenticated:
+         return JsonResponse({"error": "No autenticado"}, status=401)
+    
+    try:
+        body = json.loads(request.body)
+        solicitud_id = body.get('solicitud_id')
+        
+        # El usuario solo puede devolver sus propias solicitudes en préstamo
+        solicitud = SolicitudPrestamo.objects.get(
+            id=solicitud_id, 
+            usuario=request.user, 
+            estado_flujo_id='SOL_EN_PRESTAMO'
+        )
+        
+        solicitud.estado_flujo_id = 'SOL_EN_DEVOLUCION'
+        solicitud.save()
+
+        _registrar_log(
+            request.user, 'SOLICITUD_DEVOLUCION_INICIADA',
+            f'Usuario marcó solicitud #{solicitud.id} para devolución.',
+            'SolicitudPrestamo', solicitud.id
+        )
+
+        return JsonResponse({"success": True})
+    except SolicitudPrestamo.DoesNotExist:
+        return JsonResponse({"error": "Solicitud no encontrada o no está en préstamo"}, status=404)
+    except Exception as e:
+        logger.error(f"Error en solicitar_devolucion_api: {e}", exc_info=True)
+        return JsonResponse({"error": "Error interno del servidor"}, status=500)
+
+
+@csrf_protect
+@require_POST
 def procesar_devolucion_api(request):
-    """Procesa una devolución (completa o parcial)."""
+    """Admin audita los expedientes recibidos. Marca cuáles llegaron y cuáles se perdieron."""
     if not _es_exp_admin(request.user):
         return JsonResponse({"error": "Sin permisos"}, status=403)
 
     try:
         body = json.loads(request.body)
-    except json.JSONDecodeError:
-        return JsonResponse({"error": "Datos inválidos"}, status=400)
+        prestamo_id = body.get('prestamo_id')
+        detalles_recibidos = body.get('detalles_recibidos', []) 
+        detalles_perdidos = body.get('detalles_perdidos', [])   
+        detalles_no_recibidos = body.get('detalles_no_recibidos', []) 
+        notas = body.get('notas', '')
 
-    prestamo_id = body.get('prestamo_id')
-    cantidad_recibida = int(body.get('cantidad_recibida', 0))
-    notas = body.get('notas', '')
-
-    try:
-        prestamo = Prestamo.objects.get(
-            id=prestamo_id,
-            estado__in=['Entregado', 'Vencido', 'DevolucionParcial']
-        )
-    except Prestamo.DoesNotExist:
-        return JsonResponse({"error": "Préstamo no encontrado"}, status=404)
-
-    try:
-        cantidad_esperada = prestamo.solicitud.detalles.count()
-        ya_devueltos = sum(d.cantidad_recibida for d in prestamo.devoluciones.all())
-        pendientes = cantidad_esperada - ya_devueltos
-
-        if cantidad_recibida > pendientes:
-            return JsonResponse({
-                "error": f"Solo quedan {pendientes} expedientes pendientes de devolución"
-            }, status=400)
-
-        if cantidad_recibida <= 0:
-            return JsonResponse({"error": "La cantidad recibida debe ser mayor a 0"}, status=400)
-
-        total_devuelto = ya_devueltos + cantidad_recibida
-        estado_dev = 'Completa' if total_devuelto >= cantidad_esperada else 'Parcial'
-
-        devolucion = Devolucion.objects.create(
-            prestamo=prestamo,
-            cantidad_esperada=cantidad_esperada,
-            cantidad_recibida=cantidad_recibida,
-            estado=estado_dev,
-            notas_admin=notas,
-        )
-
-        if estado_dev == 'Completa':
-            prestamo.estado = 'Cerrado'
-            prestamo.fecha_devolucion_real = timezone.now()
-            prestamo.save()
-
-            prestamo.solicitud.estado_flujo_id = 'SOL_FINALIZADA'
-            prestamo.solicitud.save()
-
-            # Marcar expedientes como disponibles
-            from .models import ExpedienteEstadoLog
-            for d in prestamo.solicitud.detalles.select_related('expediente_prestamo'):
-                estado_anterior = d.expediente_prestamo.estado
-                d.expediente_prestamo.estado_id = 'EXP_DISPONIBLE'
-                d.expediente_prestamo.save()
-
+        prestamo = Prestamo.objects.get(id=prestamo_id)
+        solicitud = prestamo.solicitud
+        
+        from .models import ExpedienteEstadoLog
+        
+        # 1. Procesar los que llegaron (Disponibles)
+        for det_id in detalles_recibidos:
+            detalle = SolicitudExpedienteDetalle.objects.get(id=det_id, solicitud=solicitud)
+            if not detalle.devuelto:
+                detalle.devuelto = True
+                detalle.save()
+                
+                ep = detalle.expediente_prestamo
+                estado_ant = ep.estado
+                ep.estado_id = 'EXP_DISPONIBLE'
+                ep.save()
+                
                 ExpedienteEstadoLog.objects.create(
-                    expediente=d.expediente_prestamo.expediente,
-                    estado_anterior=estado_anterior,
+                    expediente=ep.expediente,
+                    estado_anterior=estado_ant,
                     estado_nuevo_id='EXP_DISPONIBLE',
                     usuario=request.user,
-                    solicitud=prestamo.solicitud,
-                    observacion="Devolución completa recibida"
+                    solicitud=solicitud,
+                    observacion="Devuelto correctamente"
                 )
 
-            _registrar_log(
-                request.user, 'DEVOLUCION_COMPLETA',
-                f'Devolución completa del préstamo #{prestamo.id}.',
-                'Devolucion', devolucion.id
+        # 2. Procesar los perdidos (Cuentan como procesados/cerrados para la solicitud)
+        for det_id in detalles_perdidos:
+            detalle = SolicitudExpedienteDetalle.objects.get(id=det_id, solicitud=solicitud)
+            if not detalle.devuelto:
+                detalle.devuelto = True # Se marca como procesado
+                detalle.save()
+                
+                ep = detalle.expediente_prestamo
+                estado_ant = ep.estado
+                ep.estado_id = 'EXP_PERDIDO'
+                ep.save()
+                
+                ExpedienteEstadoLog.objects.create(
+                    expediente=ep.expediente,
+                    estado_anterior=estado_ant,
+                    estado_nuevo_id='EXP_PERDIDO',
+                    usuario=request.user,
+                    solicitud=solicitud,
+                    observacion="Marcado como perdido durante auditoría"
+                )
+
+        # 3. Procesar los NO recibidos (Siguen pendientes)
+        for det_id in detalles_no_recibidos:
+            detalle = SolicitudExpedienteDetalle.objects.get(id=det_id, solicitud=solicitud)
+            ep = detalle.expediente_prestamo
+            ExpedienteEstadoLog.objects.create(
+                expediente=ep.expediente,
+                estado_anterior=ep.estado,
+                estado_nuevo_id='EXP_PRESTADO',
+                usuario=request.user,
+                solicitud=solicitud,
+                observacion="Auditado como NO RECIBIDO (Sigue en préstamo)"
             )
+
+        # 3. Determinar estado final de la solicitud
+        total_exp = solicitud.detalles.count()
+        devueltos_ahora = solicitud.detalles.filter(devuelto=True).count()
+        
+        if devueltos_ahora >= total_exp:
+            solicitud.estado_flujo_id = 'SOL_FINALIZADA'
+            prestamo.estado = 'Cerrado'
+            prestamo.fecha_devolucion_real = timezone.now()
         else:
+            solicitud.estado_flujo_id = 'SOL_INCOMPLETA'
             prestamo.estado = 'DevolucionParcial'
-            prestamo.save()
+            
+        solicitud.save()
+        prestamo.save()
 
-            prestamo.solicitud.estado_flujo_id = 'SOL_INCOMPLETA'
-            prestamo.solicitud.save()
+        # Registrar devolución
+        Devolucion.objects.create(
+            prestamo=prestamo,
+            cantidad_esperada=total_exp,
+            cantidad_recibida=devueltos_ahora,
+            estado='Completa' if devueltos_ahora >= total_exp else 'Incompleta',
+            notas_admin=notas
+        )
 
-            _registrar_log(
-                request.user, 'DEVOLUCION_PARCIAL',
-                f'Devolución parcial del préstamo #{prestamo.id}. Recibidos: {cantidad_recibida}/{pendientes}.',
-                'Devolucion', devolucion.id
-            )
-
-        logger.info(f"Devolución {estado_dev} para préstamo #{prestamo.id} por {request.user.username}")
-        return JsonResponse({
-            "success": True,
-            "estado": estado_dev,
-            "total_devuelto": total_devuelto,
-            "pendientes": cantidad_esperada - total_devuelto,
-        })
+        return JsonResponse({"success": True, "estado": solicitud.estado_flujo_id})
 
     except Exception as e:
         logger.error(f"Error en procesar_devolucion_api: {e}", exc_info=True)
-        return JsonResponse({"error": "Error interno del servidor"}, status=500)
+        return JsonResponse({"error": str(e)}, status=500)
 
 
 # ============================================
@@ -642,18 +729,20 @@ def buscar_expedientes_api(request):
         from expediente.models import Expediente, PacienteAsignacion
         from paciente.models import Paciente
 
-        # IDs de expedientes no disponibles (Prestados o en proceso)
+        # IDs de expedientes no disponibles (Cualquier estado que no sea disponible)
         from .models import SolicitudExpedienteDetalle
-        prestados = set(
-            ExpedientePrestamo.objects.filter(estado_id='EXP_PRESTADO')
+        expedientes_no_disponibles = set(
+            ExpedientePrestamo.objects.exclude(estado_id='EXP_DISPONIBLE')
             .values_list('expediente_id', flat=True)
         )
+        # También las solicitudes activas que podrían no haber actualizado el estado físico aún
         en_proceso = set(
             SolicitudExpedienteDetalle.objects.filter(
-                solicitud__estado_flujo_id__in=['SOL_PENDIENTE', 'SOL_APROBADA_ORGANIZANDO']
+                solicitud__estado_flujo_id__in=['SOL_PENDIENTE', 'SOL_APROBADA_ORGANIZANDO', 'SOL_LISTO_RECOGER', 'SOL_EN_PRESTAMO', 'SOL_EN_DEVOLUCION', 'SOL_INCOMPLETA'],
+                devuelto=False
             ).values_list('expediente_prestamo__expediente_id', flat=True)
         )
-        expedientes_prestados_ids = prestados | en_proceso
+        expedientes_prestados_ids = expedientes_no_disponibles | en_proceso
 
         resultados = []
 
@@ -854,7 +943,7 @@ def crear_solicitud_api(request):
                     estado_nuevo_id='EXP_APARTADO',
                     usuario=request.user,
                     solicitud=solicitud,
-                    observacion="Expediente apartado por nueva solicitud"
+                    observacion="Expediente apartado por solicitud"
                 )
             else:
                 # Log para creación inicial
@@ -961,47 +1050,6 @@ def mis_solicitudes_api(request):
 
     except Exception as e:
         logger.error(f"Error en mis_solicitudes_api: {e}", exc_info=True)
-        return JsonResponse({"error": "Error interno del servidor"}, status=500)
-
-
-@csrf_protect
-@require_POST
-def solicitar_devolucion_api(request):
-    """El usuario solicita iniciar una devolución."""
-    if not _es_exp_solicitante(request.user):
-        return JsonResponse({"error": "Sin permisos"}, status=403)
-
-    try:
-        body = json.loads(request.body)
-    except json.JSONDecodeError:
-        return JsonResponse({"error": "Datos inválidos"}, status=400)
-
-    prestamo_id = body.get('prestamo_id')
-
-    try:
-        prestamo = Prestamo.objects.get(
-            id=prestamo_id,
-            solicitud__usuario=request.user,
-            estado__in=['Entregado', 'Vencido', 'DevolucionParcial']
-        )
-    except Prestamo.DoesNotExist:
-        return JsonResponse({"error": "Préstamo no encontrado"}, status=404)
-
-    try:
-        _registrar_log(
-            request.user, 'DEVOLUCION_SOLICITADA',
-            f'Usuario {request.user.username} solicita devolver préstamo #{prestamo.id}.',
-            'Prestamo', prestamo.id
-        )
-
-        logger.info(f"Devolución solicitada para préstamo #{prestamo.id} por {request.user.username}")
-        return JsonResponse({
-            "success": True,
-            "mensaje": "Su solicitud de devolución ha sido registrada. Presente los expedientes al administrador."
-        })
-
-    except Exception as e:
-        logger.error(f"Error en solicitar_devolucion_api: {e}", exc_info=True)
         return JsonResponse({"error": "Error interno del servidor"}, status=500)
 
 

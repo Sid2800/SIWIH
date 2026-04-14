@@ -24,6 +24,7 @@ urlpatterns = [
     path('api/dashboard-stats/', views.dashboard_stats_api, name='s_exp_dashboard_stats_api'),
     path('api/listar-solicitudes/', views.listar_solicitudes_api, name='s_exp_listar_solicitudes_api'),
     path('api/aprobar-solicitud/', views.aprobar_solicitud_api, name='s_exp_aprobar_solicitud_api'),
+    path('api/marcar-listo/', views.marcar_listo_recojer_api, name='s_exp_marcar_listo_api'),
     path('api/rechazar-solicitud/', views.rechazar_solicitud_api, name='s_exp_rechazar_solicitud_api'),
     path('api/prestamos-activos/', views.prestamos_activos_api, name='s_exp_prestamos_activos_api'),
     path('api/marcar-entregado/', views.marcar_entregado_api, name='s_exp_marcar_entregado_api'),
