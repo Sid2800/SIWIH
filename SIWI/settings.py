@@ -61,8 +61,7 @@ INSTALLED_APPS = [
     'clinico',
     'usuario',
     's_exp'
-
-
+    'rrhh'
 ]
 
 MIDDLEWARE = [
