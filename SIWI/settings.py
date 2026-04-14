@@ -59,9 +59,8 @@ INSTALLED_APPS = [
     'imagenologia',
     'referencia',
     'clinico',
-    'usuario'
-
-
+    'usuario',
+    'rrhh'
 ]
 
 MIDDLEWARE = [
