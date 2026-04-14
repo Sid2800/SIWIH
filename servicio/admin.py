@@ -1,5 +1,5 @@
 from django.contrib import admin
-from servicio.models import Zona, Servicio, Sala, Cama, Especialidad, ServiciosAux, Proveedor_salud, Nivel_complejidad_institucional, Gestor, Institucion_salud
+from servicio.models import Zona, Servicio, Sala, Cama, Especialidad, ServiciosAux, Proveedor_salud, Nivel_complejidad_institucional, Gestor, Institucion_salud, Unidad
 
 class ZonaAdmin(admin.ModelAdmin):
     list_display = ('codigo','nombre_zona', 'estado')
@@ -29,6 +29,51 @@ class CamaInline(admin.TabularInline):
     fields = ('numero_cama', 'estado', 'sala')
     readonly_fields = ('numero_cama',)
     show_change_link = True
+
+
+class UnidadAdmin(admin.ModelAdmin):
+    list_display = (
+        'nombre_unidad',
+        'nombre_corto_unidad',
+        'tipo_display',
+        'estado_display',
+    )
+    list_filter = (
+        'tipo',
+        'estado',
+    )
+
+    search_fields = (
+        'nombre_unidad',
+        'nombre_corto_unidad',
+    )
+
+    list_select_related = ('creado_por', 'modificado_por')
+
+    readonly_fields = (
+        'fecha_creado',
+        'fecha_modificado',
+        'creado_por',
+        'modificado_por',
+    )
+
+
+    def save_model(self, request, obj, form, change):
+        if not obj.pk:
+            obj.creado_por = request.user  
+        obj.modificado_por = request.user 
+        super().save_model(request, obj, form, change)
+
+    def tipo_display(self, obj):
+        return obj.get_tipo_display()
+    tipo_display.short_description = "Tipo"
+
+    def estado_display(self, obj):
+        return obj.get_estado_display()
+    estado_display.short_description = "Estado"
+
+
+
 
 
 @admin.register(Cubiculo)
@@ -159,6 +204,7 @@ class InstitucionSaludAdmin(admin.ModelAdmin):
 # Registro de modelos en la interfaz de administración
 admin.site.register(Servicio, ServicioAdmin)
 admin.site.register(Sala, SalaAdmin)
+admin.site.register(Unidad, UnidadAdmin)
 admin.site.register(Cama, CamaAdmin)
 admin.site.register(Zona,ZonaAdmin)
 admin.site.register(ServiciosAux, ServicioAuxAdmin)

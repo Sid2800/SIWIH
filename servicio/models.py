@@ -208,6 +208,8 @@ class Unidad(models.Model):
     fecha_modificado = models.DateTimeField(verbose_name="Fecha Editado", auto_now=True)
     modificado_por = models.ForeignKey(User, on_delete=models.PROTECT, related_name='unidades_modificadas')  
 
+    def __str__(self):
+        return f"{self.nombre_unidad}"
 
 
 # REFERENCIA
