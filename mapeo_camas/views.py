@@ -780,16 +780,16 @@ def mover_paciente_cama(request):
     })
 
 
-# =============================================================================
+# ===========================================================================
 # actualizar_cama_mapa
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 # API POST para cambio manual de estado de una cama individual desde el mapa.
 # Permite al usuario seleccionar cualquier estado válido y, si el estado
 # es OCUPADA, también debe indicar el paciente a asignar.
 # Si no existe asignación previa para la cama, la crea en estado VACIA
 # antes de aplicar el cambio solicitado.
 # Registra el cambio en HistorialEstadoCama con observación de cambio manual.
-# =============================================================================
+# ===========================================================================
 @login_required
 @require_POST
 def actualizar_cama_mapa(request):
