@@ -49,21 +49,18 @@ class ServicioService:
 
     @staticmethod
     def obtener_camas_activas():
-
-        camas_asignadas_activas = AsignacionCamaPaciente.objects.filter(
-            estado=AsignacionCamaPaciente.Estado.ACTIVA
+        # La disponibilidad se define unicamente por el estado de asignacion de cama.
+            
+        camas_disponibles_ids = AsignacionCamaPaciente.objects.filter(
+            estado=AsignacionCamaPaciente.Estado.VACIA
         ).values_list("cama_id", flat=True)
 
-        qs = (
-            modelosServicio.Cama.objects.filter(estado=1)
-            .exclude(numero_cama__in=camas_asignadas_activas)
+        return (
+            modelosServicio.Cama.objects
+            .filter(numero_cama__in=camas_disponibles_ids)
             .select_related("sala")
+            .order_by("numero_cama")
         )
-        
-
-        qs = modelosServicio.Cama.objects.filter(estado=1)  # Filtramos las camas activas (estado=1)
-
-        return qs
     
 
     @staticmethod

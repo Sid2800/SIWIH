@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from mapeo_camas.models import AsignacionCamaPaciente, HistorialEstadoCama
+from mapeo_camas.models import AsignacionCamaPaciente, HistorialEstadoCama, MovimientoCama
 
 
 @admin.register(AsignacionCamaPaciente)
@@ -60,6 +60,38 @@ class HistorialEstadoCamaAdmin(admin.ModelAdmin):
         return False
     
     def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(MovimientoCama)
+class MovimientoCamaAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "tipo_movimiento",
+        "cama_origen",
+        "cama_destino",
+        "paciente",
+        "usuario",
+        "fecha_hora",
+        "observacion",
+    )
+    list_filter = ("tipo_movimiento", "fecha_hora")
+    search_fields = (
+        "cama_origen__numero_cama",
+        "cama_destino__numero_cama",
+        "paciente__primer_nombre",
+        "paciente__primer_apellido",
+        "paciente__dni",
+        "observacion",
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
         return False
     
     def has_delete_permission(self, request, obj=None):

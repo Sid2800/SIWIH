@@ -128,9 +128,11 @@ class Cama(models.Model):
     numero_cama = models.IntegerField(verbose_name="Número de Cama", primary_key=True)
     
     ESTADO_CAMAS = [
-        (1, "Disponible"),
+        (1, "Vacia"),
         (2, "Ocupada"),
-        (3, "En Mantenimiento"),
+        (3, "Alta"),
+        (4, "Fuera de servicio"),
+        (5, "Consulta externa"),
     ]
     estado = models.IntegerField(
         verbose_name="Estado de la Cama",

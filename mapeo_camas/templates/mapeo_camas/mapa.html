@@ -1,0 +1,261 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}{{ titulo }}{% endblock %}
+
+{% block content %}
+<div class="contenedor2">
+  <div class="tituloFormulario" style="margin-bottom: 1.5rem;">
+    <div class="tituloFormulario-texto">
+      <i class="bi bi-hospital"></i>
+      <h2 class="sin-margen">{{ titulo }}</h2>
+    </div>
+    <div class="tituloFormulario-subrallado"></div>
+  </div>
+
+  <div class="mapa-acciones-superior">
+    <div class="dt-buttons mapa-botones-acciones">
+      <button type="button" class="dt-button" id="btn-iniciar-mapeo" title="Iniciar mapeo de camas">
+        <i class="bi bi-play-circle boton-exportacion"></i>
+      </button>
+      <button type="button" class="dt-button" id="btn-copiar-camas" title="Copiar resumen visible">
+        <i class="bi bi-clipboard boton-exportacion"></i>
+      </button>
+      <button type="button" class="dt-button" id="btn-imprimir-camas" title="Imprimir mapa">
+        <i class="bi bi-printer boton-exportacion"></i>
+      </button>
+      <button type="button" class="dt-button mapa-control-mapeo--oculto" id="btn-terminar-mapeo" title="Terminar mapeo">
+        <i class="bi bi-check2-circle boton-exportacion"></i>
+      </button>
+      <button type="button" class="dt-button mapa-control-mapeo--oculto" id="btn-cancelar-mapeo" title="Cancelar mapeo">
+        <i class="bi bi-x-octagon boton-exportacion"></i>
+      </button>
+    </div>
+
+    <div class="mapa-buscador">
+      <label for="mapa-busqueda" class="mapa-buscador-label">Buscar:</label>
+      <select id="mapa-tipo-busqueda" class="formularioCampo-select">
+        <option value="todo">Todos</option>
+        <option value="cama">Numero cama</option>
+        <option value="paciente">Paciente</option>
+        <option value="estado">Estado</option>
+      </select>
+      <input
+        type="text"
+        id="mapa-busqueda"
+        class="formularioCampo-text"
+        placeholder="Buscar..."
+        autocomplete="off"
+      >
+      <button type="button" class="dt-button" id="btn-limpiar-busqueda" title="Limpiar busqueda">
+        <i class="bi bi-x-circle boton-exportacion"></i>
+      </button>
+    </div>
+  </div>
+
+  <div id="mapa-servicios" class="mapa-grid-servicios"></div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'mapeo_camas/scripts/mapaCamasAsignacion.js' %}"></script>
+<style>
+  .mapa-acciones-superior {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .mapa-buscador {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .mapa-botones-acciones {
+    display: flex;
+    align-items: center;
+    gap: 0.2rem;
+    margin: 0;
+    float: none;
+  }
+
+  .mapa-buscador-label {
+    margin: 0;
+    font-family: var(--fuenteTablaTitulo);
+    font-size: 1.8rem;
+    color: var(--colorTextoMenu);
+  }
+
+  #mapa-tipo-busqueda {
+    min-width: 220px;
+  }
+
+  #mapa-busqueda {
+    min-width: 220px;
+    max-width: 320px;
+  }
+
+  .mapa-grid-servicios {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .mapa-servicio-card {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 1rem;
+  }
+
+  .mapa-servicio-titulo {
+    margin: 0 0 0.7rem;
+    color: #0f172a;
+  }
+
+  .mapa-sala {
+    border: 1px solid #dbe3ef;
+    border-radius: 8px;
+    margin-bottom: 0.7rem;
+    padding: 0.7rem;
+    background: #f8fafc;
+  }
+
+  .mapa-sala:last-child {
+    margin-bottom: 0;
+  }
+
+  .mapa-sala-titulo {
+    margin: 0 0 0.6rem;
+    font-size: 1.3rem;
+    color: #1e293b;
+  }
+
+  .mapa-cubiculo {
+    margin-bottom: 0.5rem;
+  }
+
+  .mapa-cubiculo-titulo {
+    margin: 0 0 0.4rem;
+    font-size: 1.1rem;
+    color: #334155;
+  }
+
+  .mapa-camas-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 0.55rem;
+  }
+
+  .mapa-cama {
+    min-height: 70px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 0.4rem 0.5rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+  }
+
+  .mapa-cama:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 3px 10px rgba(15, 23, 42, 0.15);
+  }
+
+  .mapa-cama-numero {
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1.1;
+  }
+
+  .mapa-cama-estado,
+  .mapa-cama-paciente {
+    font-size: 1.15rem;
+    margin-top: 0.2rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+  }
+
+  /* DNI del paciente: tono más tenue para distinguirlo del nombre */
+  .mapa-cama-dni {
+    font-size: 1.0rem;
+    color: #64748b;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+  }
+
+  .mapa-cama--vacia,
+  .mapa-cama--libre {
+    background: #dcfce7;
+    color: #166534;
+  }
+
+  .mapa-cama--ocupada {
+    background: #fee2e2;
+    color: #991b1b;
+  }
+
+  .mapa-cama--alta {
+    background: #dbeafe;
+    color: #1e40af;
+  }
+
+  .mapa-cama--fuera-servicio,
+  .mapa-cama--mantenimiento {
+    background: #fef3c7;
+    color: #92400e;
+  }
+
+  .mapa-cama--consulta-externa {
+    background: #cffafe;
+    color: #155e75;
+  }
+
+  .mapa-cama--sin-asignacion {
+    background: #e2e8f0;
+    color: #334155;
+  }
+
+  .mapa-cama--mapeada {
+    box-shadow: inset 0 0 0 2px #f59e0b;
+    background-image: linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(245, 158, 11, 0));
+  }
+
+  .mapa-control-mapeo--oculto {
+    display: none;
+  }
+
+  .mapa-vacio {
+    color: #64748b;
+    margin: 0;
+  }
+
+  .modal-cama-limite {
+    margin: 0.3rem 0 0;
+    font-size: 0.95rem;
+    color: #334155;
+    font-weight: 600;
+  }
+
+  @media (max-width: 768px) {
+    .mapa-buscador-label,
+    #mapa-tipo-busqueda,
+    #mapa-busqueda {
+      width: 100%;
+      min-width: 0;
+    }
+
+  }
+</style>
+{% endblock %}
