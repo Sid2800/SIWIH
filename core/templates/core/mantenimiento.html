@@ -1,4 +1,5 @@
-{% extends 'core/base.html'%}
+{% extends 'core/base_media.html'%}
+
 {% block title %}Mantenimiento{% endblock title %}
 
 {% block content %}
@@ -6,18 +7,18 @@
         <div class="tituloFormulario" style="margin-bottom: 2rem;">
             <div class="tituloFormulario-texto"> 
                 <i class="bi bi-wrench-adjustable-circle-fill"></i>
-                <h2 class="sin-margen">Mantenimiento BD</h2>
+                <h2 class="sin-margen">Mantenimiento</h2>
             </div>
             <div class="tituloFormulario-subrallado"></div>
         </div>
 
         
-    <div class="mantenimientoTabla">
+    <div class="mantenimiento-contenedor-tabla">
         <legend><strong>Mantenimientos Listado</strong></legend>
         <table class="tabla-mantenimiento" id="tabla-mantenimiento">
             <thead>
                 <tr>
-                    <th>Numero</th>
+                    <th>N-</th>
                     <th>Descripción</th>
                     <th>Cantidad</th>
                     <th style="text-align: center;" >Acción</th>
@@ -27,14 +28,28 @@
                 <tr>
                     <td>1</td>
                     <td>Reclasificar RN a Hijo de</td>
-                    <td id="cantidad_afectados_rn">XX</td>
-                    <td>
-                        <button class="formularioBotones-boton" id="btn_reclasificar_rn">
+                    <td id="cantidad_afectados_rn" class="tabla-mantenimiento-celda-cantidad">XX</td>
+                    <td class="tabla-mantenimiento-boton-celda">
+                        <button class="tabla-mantenimiento-boton" id="btn_reclasificar_rn">
                             <i class="bi-gear-fill"></i>
                             <span>Realizar</span>
                         </button>
                     </td>
                 </tr>
+                <tr>
+                    
+                    <td>2</td>
+                    <td>Definir Imagenes de usuario</td>
+                    <td id="cantidad_usuarios" class="tabla-mantenimiento-celda-cantidad">XX</td>
+                    <td class="tabla-mantenimiento-boton-celda">
+                        <button class="tabla-mantenimiento-boton" id="btn_definir_imagen_usuario">
+                            <i class="bi-gear-fill"></i>
+                            <span>Realizar</span>
+                        </button>
+                    </td>
+                    
+                </tr>
+
             </tbody>
         </table>
             
@@ -51,7 +66,7 @@
     
     </div>
 
-
+    {{ usuarios|json_script:"usuarios-data" }}
 
     
 {% endblock content %}
@@ -59,7 +74,7 @@
 {% load static %}
 
 
-{% block extra_js %}
+{% block media_js %}
 
     
 <script src="{% static 'core/scripts/maintenance/mantenimiento.js' %}"></script>
@@ -67,18 +82,8 @@
     <script>
     urls['reclasificarRN'] = "{% url 'consulta_reclasificar_rn' %}";
 
-    $(document).ready(function () {
-        $('#tabla-mantenimiento').DataTable({
-        paging: false,
-        searching: false,
-        info: false,
-        ordering: false,
-        lengthChange: false,
-        responsive: true
-        });
-    });
     </script>
 
 
 
-{% endblock extra_js %}
+{% endblock media_js %}

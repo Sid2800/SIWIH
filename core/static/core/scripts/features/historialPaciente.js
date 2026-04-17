@@ -845,7 +845,6 @@ document.addEventListener('DOMContentLoaded', function () {
         ModalGaleria.open({
         titulo: "Evaluación",
             
-
         datos: {
             "Paciente": document.getElementById('historialNombrePaciente').value,
             "Sala": selectedRow.nombre_dependencia,

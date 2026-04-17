@@ -1,5 +1,5 @@
 from core.services.server_image.auth_service import traer_server_token, ImageServerAuthError
-from core.constants.image_server_enpoints import BUSCAR_ARCHIVOS,  SUBIR_IMAGEN, DESACTIVAR_IMAGEN, DESACTIVAR_IMAGEN_BATCH, MIGRAR_IMAGENES_EXTERNO_INTERNO
+from core.constants.image_server_enpoints import BUSCAR_ARCHIVOS, BUSCAR_IMAGENES_USUARIO,  SUBIR_IMAGEN,SUBIR_IMAGEN_USUARIO, DESACTIVAR_IMAGEN, DESACTIVAR_IMAGEN_BATCH, MIGRAR_IMAGENES_EXTERNO_INTERNO
 from core.constants.media_constants  import AppValida, OrigenValido, TipoPaciente
 from django.conf import settings
 import json
@@ -31,6 +31,53 @@ class RequestService:
         except ValueError:
             raise ValueError(f"Tipo '{peticion.paciente_tipo}' no es válido.")
 
+
+    @staticmethod
+    def consultar_media_server_LIST_usuario(peticion_dict):
+        peticion = SimpleNamespace(**peticion_dict)
+
+        try:
+            url = f"{settings.IMAGE_SERVER_URL}{BUSCAR_IMAGENES_USUARIO}"
+            token = traer_server_token()
+
+            payload = {
+                "usuarios_ids": peticion.usuarios_ids,
+            }
+
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json"
+            }
+
+            response = requests.post(
+                url,
+                json=payload,
+                headers=headers,
+                timeout=10
+            )
+
+            response.raise_for_status()
+
+            return {
+                "ok": True,
+                "data": response.json()
+            }
+
+        except ImageServerAuthError:
+            raise  
+
+        except ValueError:
+            raise  
+
+        except requests.exceptions.HTTPError as e:
+            raise RuntimeError(
+                f"HTTP error media server status={e.response.status_code} detalle={e.response.text[:200]}"
+            )
+
+        except requests.exceptions.RequestException as e:
+            raise RuntimeError(
+                f"Error conexión media server LIST: {str(e)}"
+            )
 
 
     @staticmethod
@@ -157,7 +204,72 @@ class RequestService:
 
         except Exception:
             raise
+
+
+    @staticmethod
+    def procesar_imagen_usuario(peticion_dict):
+        peticion = SimpleNamespace(**peticion_dict)
+
+        if not peticion.archivo or not peticion.usuario_id:
+            raise ValueError("archivo y usuario_id son requeridos")
+
+        try:
+            endpoint = f"{settings.IMAGE_SERVER_URL}{SUBIR_IMAGEN_USUARIO}"
+            token = traer_server_token()
+
+            headers = {
+                "Authorization": f"Bearer {token}"
+            }
+
+            content_type = getattr(peticion.archivo, "content_type", None) or "application/octet-stream"
+
+            files = {
+                "archivo": (
+                    peticion.archivo.name,
+                    peticion.archivo,
+                    content_type
+                )
+            }
+
+            data = {
+                "usuario_id": peticion.usuario_id,
+            }
+
+            response = requests.post(
+                endpoint,
+                headers=headers,
+                data=data,
+                files=files,
+                timeout=20
+            )
+
+            try:
+                response_json = response.json()
+            except ValueError:
+                response_json = {
+                    "error": response.text[:500]
+                }
+
+            if response.status_code >= 400:
+                log_error(
+                    f"[MEDIA_UPLOAD_ERROR] status={response.status_code} detalle={response_json}",
+                    app=LogApp.MEDIA
+                )
+                raise RuntimeError(
+                    f"Error subida imagen status={response.status_code}"
+                )
+
+            return {
+                "ok": True,
+                "data": response_json
+            }
+
+        except requests.exceptions.RequestException as e:
+            raise RuntimeError(
+                f"Error conexión subir imagen: {str(e)}"
+            )
         
+    
 
     @staticmethod
     def desactivar_imagen(peticion_dict):

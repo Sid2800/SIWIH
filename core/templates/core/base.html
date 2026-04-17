@@ -193,7 +193,11 @@
 
          <div class="bp-inf-usuario">
             
-            <img src="{% static 'core/img/avatar.jpg' %}" alt="imagen de perfil" class="bp-inf-usuario__imagen">
+            <img 
+               src="{% if usuario_imagen_url %}{{ usuario_imagen_url }}{% else %}{% static 'core/img/avatar.jpg' %}{% endif %}" 
+               alt="imagen de perfil" 
+               class="bp-inf-usuario__imagen"
+            >
             
             <div class="bp-inf-usuario__texto">
                {% if request.user.is_authenticated %}
@@ -268,7 +272,9 @@
 
    /* Configuración general del sistema */
    window.APP_CONFIG = {
-      estudioDefaultImg: "{% static 'core/img/estudio_default.png' %}"
+      estudioDefaultImg: "{% static 'core/img/estudio_default.png' %}",
+      usuarioDefaultImg: "{% static 'core/img/avatar.jpg' %}"
+
    };
 
 
@@ -276,6 +282,13 @@
 
    window.urls = {
 
+
+      /* ---------------- USAURIO ---------------- */
+
+      procesarImagenUsuario: "{% url 'procesar_imagen_usuario' %}",
+
+
+      
       /* ---------------- PACIENTES ---------------- */
 
       obtenerPacienteCenso: "{% url 'obtener-paciente-censo' %}",
@@ -458,6 +471,9 @@
    <script src="{% static 'core/scripts/core/main.js' %}"></script>
 
    <script src="{% static 'core\scripts\media\controlGaleria.js' %}"></script>
+
+   <script src="{% static 'core/scripts/modals/usuario_modals.js' %}"></script>
+
 
 
 

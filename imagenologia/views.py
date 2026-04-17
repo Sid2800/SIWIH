@@ -411,9 +411,6 @@ class EvaluacionRxEditView(UnidadRolRequiredMixin, UpdateView):
                 "error": "Ocurrió un error interno al actualizar la evaluación."
             })
         
-
-
-
 class listarEvaluacionrx(UnidadRolRequiredMixin,TemplateView):
     template_name = 'imagenologia/evaluacionrx_list.html'
     required_roles = permisos.IMAGENOLOGIA_VISUALIZACION_ROLES
@@ -664,8 +661,6 @@ def inactivarEvalucionRX(request):
         return JsonResponse({"success": False, "error": "Error al procesar los datos JSON"}, status=400)
     except Exception as e:
         return JsonResponse({"success": False, "error": f"Error inesperado: {str(e)}"}, status=500)
-
-
 
 
 def obtenerImagenesEvaluacion(request):

@@ -105,6 +105,7 @@ function renderDatosPaciente(containerId, datos = {}) {
 }
 
 const API_URLS = {
+   procesarImagenUsuario: urls["procesarImagenUsuario"],
    obtenerPacienteCenso: urls["obtenerPacienteCenso"],
    busquedaCenso: urls["busquedaCenso"],
    busquedaPaciente: urls["busquedaPaciente"],

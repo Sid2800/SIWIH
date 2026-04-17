@@ -2,7 +2,8 @@ from django.contrib.auth.models import User
 from usuario.models import PerfilUnidad
 from core.constants.domain_constants import UnidadID
 from core.constants.choices_constants import AlcanceUsuario, RolUsuario
-
+from django.db.models import F
+from django.db.models.functions import Coalesce
 
 from django.db import connections
 
@@ -12,7 +13,24 @@ class UsuarioService:
 
     @staticmethod
     def obtener_usuarios_activos():
-        usuarios = User.objects.filter(is_active=True).values('id', 'username')
+        usuarios = (
+            User.objects
+            .filter(is_active=True)
+            .annotate(
+                nombre=Coalesce(
+                    F('empleado__primer_nombre'),
+                    F('first_name')
+                ),
+                apellido=Coalesce(
+                    F('empleado__primer_apellido'),
+                    F('last_name')
+                )
+            )
+            .order_by('username')
+            .values('id', 'username', 'nombre', 'apellido')
+
+        )
+
         return list(usuarios)
 
     @staticmethod
