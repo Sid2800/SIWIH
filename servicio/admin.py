@@ -1,5 +1,5 @@
 from django.contrib import admin
-from servicio.models import Zona, Servicio, Sala, Cama, Especialidad, ServiciosAux, Proveedor_salud, Nivel_complejidad_institucional, Gestor, Institucion_salud, Unidad
+from servicio.models import Zona, Servicio, Sala, Cama, Area_atencion, ServiciosAux, Proveedor_salud, Nivel_complejidad_institucional, Gestor, Institucion_salud, Unidad
 
 class ZonaAdmin(admin.ModelAdmin):
     list_display = ('codigo','nombre_zona', 'estado')
@@ -124,9 +124,9 @@ class CamaAdmin(admin.ModelAdmin):
     list_filter = ('estado','cubiculo', 'sala')
     readonly_fields = ('fecha_creado', 'fecha_modificado')
 
-class EspecialidadAdmin(admin.ModelAdmin):
-    list_display = ('nombre_especialidad', 'servicio_nombre', 'estado')
-    search_fields = ('nombre_especialidad', 'servicio__nombre_servicio')
+class AreaAtencionAdmin(admin.ModelAdmin):
+    list_display = ('nombre_area_atencion', 'servicio_nombre', 'estado')
+    search_fields = ('nombre_area_atencion', 'servicio__nombre_servicio')
     list_filter = ('estado', 'servicio')
 
     def servicio_nombre(self, obj):
@@ -208,7 +208,7 @@ admin.site.register(Unidad, UnidadAdmin)
 admin.site.register(Cama, CamaAdmin)
 admin.site.register(Zona,ZonaAdmin)
 admin.site.register(ServiciosAux, ServicioAuxAdmin)
-admin.site.register(Especialidad, EspecialidadAdmin)
+admin.site.register(Area_atencion, AreaAtencionAdmin)
 
 #referenciaa
 

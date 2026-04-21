@@ -1,7 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from paciente.models import Paciente
-from servicio.models import Sala, Especialidad, ServiciosAux
+from servicio.models import Sala, Area_atencion, ServiciosAux
 from django.core.exceptions import ValidationError
 
 class TipoPaciente:
@@ -93,7 +93,7 @@ class EvaluacionRx(models.Model):  # <- AGREGADO
     paciente = models.ForeignKey(Paciente, on_delete=models.PROTECT, verbose_name="Paciente", related_name='evalacionesRx', blank=True, null=True)
     paciente_externo = models.ForeignKey(PacienteExterno, on_delete=models.PROTECT, verbose_name="Paciente Externo", blank=True, null=True)
     sala = models.ForeignKey(Sala, null=True, blank=True, on_delete=models.SET_NULL)
-    especialidad = models.ForeignKey(Especialidad, null=True, blank=True, on_delete=models.SET_NULL)
+    area_atencion = models.ForeignKey(Area_atencion, null=True, blank=True, on_delete=models.SET_NULL)
     servicio_auxiliar = models.ForeignKey(ServiciosAux, null=True, blank=True, on_delete=models.SET_NULL)
     fecha_creado = models.DateTimeField(verbose_name="Fecha Creado", auto_now_add=True)
     observaciones = models.TextField(verbose_name="Observaciones", null=True,blank=True)

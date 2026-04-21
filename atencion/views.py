@@ -82,7 +82,7 @@ def guardarAtencion(request):
 
          atencion_obj = {
                "fecha": fecha_aware,
-               "especialidad_id": data.get('especialidad'),
+               "area_atencion_id": data.get('area_atencion'),
                "observaciones": data.get('observaciones'),
                "paciente_id": pacienteId,
                "id": data.get('idAtencion'),
@@ -124,7 +124,7 @@ def verificar_atencion_h(request):
                'reciente': True,
                'id': reciente['id'],
                'nombre': nombre_completo,
-               'especialidad': reciente.get('especialidad__nombre_especialidad'),
+               'area_atencion': reciente.get('area_atencion__nombre_area_atencion'),
                'sala': reciente.get('sala__sala_nombre'),
                'fecha_creado': formatear_fecha_dd_mm_yyyy_hh_mm(reciente.get('fecha_creado'))
             })
@@ -232,13 +232,13 @@ def listarAtencionesAPI(request):
 
    # Columnas del DataTable
    columns = [
-      "id",                                # 0
-      "fecha_atencion",                    # 1
-      "fecha_recepcion",                   # 2
-      "especialidad__nombre_especialidad", # 3
-      "paciente__expediente_numero",       # 4
-      "paciente__dni",                     # 5
-      "paciente__primer_nombre",           # 6
+      "id",                                  # 0
+      "fecha_atencion",                      # 1
+      "fecha_recepcion",                     # 2
+      "area_atencion__nombre_area_atencion", # 3
+      "paciente__expediente_numero",         # 4
+      "paciente__dni",                       # 5
+      "paciente__primer_nombre",             # 6
    ]
 
    if order_column < len(columns):
@@ -257,8 +257,8 @@ def listarAtencionesAPI(request):
       "id",
       "fecha_atencion",
       "fecha_recepcion",
-      "especialidad__nombre_especialidad",
-      "especialidad__servicio__nombre_corto",
+      "area_atencion__nombre_area_atencion",
+      "area_atencion__nombre_corto_area_atencion",
       "paciente__expediente_numero",
       "paciente__dni",
       "paciente__primer_nombre",
@@ -297,14 +297,14 @@ def obtener_atencion(request):
    # Construir la respuesta con los datos del paciente
    return JsonResponse({
       "id": atencion.id,
-      "idEspecialidad": atencion.especialidad.id,
-      "especialidadNombre": atencion.especialidad.nombre_especialidad,
+      "idAreaAtencion": atencion.area_atencion.id,
+      "areaAtencionNombre": atencion.area_atencion.nombre_area_atencion,
       "pacienteNombre1": atencion.paciente.primer_nombre,
       "pacienteNombre2": atencion.paciente.segundo_nombre,
       "pacienteApellido1": atencion.paciente.primer_apellido,
       "pacienteApellido2": atencion.paciente.segundo_apellido,
       "pacienteId": atencion.paciente.id,
-      "idServicio": atencion.especialidad.servicio.id,
+      "idServicio": atencion.area_atencion.servicio.id,
       "fecha": atencion.fecha_atencion,
       "observaciones": atencion.observaciones,
       "fechaRecepcion": atencion.fecha_recepcion,

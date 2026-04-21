@@ -1229,7 +1229,7 @@ def obtener_defuncion_paciente(request):
     if not defuncion:
         return JsonResponse({"mensaje": "no defuncion"}, status=200)
     
-    if defuncion.sala or defuncion.servicio_auxiliar or defuncion.especialidad:
+    if defuncion.sala or defuncion.servicio_auxiliar or defuncion.area_atencion:
         info = ServicioService.encontrar_dependencia_en_instance(defuncion)
         if info:
             dependencia_codigo = info["clave"]
@@ -1268,7 +1268,7 @@ def obtener_obito_paciente(request):
         return JsonResponse({"mensaje": "no obito"}, status=200)
 
     # Resolver dependencia
-    if obito.sala or obito.servicio_auxiliar or obito.especialidad:
+    if obito.sala or obito.servicio_auxiliar or obito.area_atencion:
         info = ServicioService.encontrar_dependencia_en_instance(obito)
         if info:
             dependencia_codigo = info["clave"]

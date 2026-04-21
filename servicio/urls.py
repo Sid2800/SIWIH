@@ -9,7 +9,7 @@ urlpatterns = [
     path('listar-sala/',views.ListarSala.as_view(), name='listarSala'),
     path('listar-dependencias/',views.ListarDependencias.as_view(), name='listar_dependencias'),
 
-    path('listar-especialidad/',views.ListarEspecialidadServicio.as_view(), name='listarEspecialidad'),
+    path('listar-area-atencion/',views.ListarAreaAtencionServicio.as_view(), name='listarAreaAtencion'),
 
     path('cambiar-zona/', views.cambiarZona, name='cambiarZona'),
 

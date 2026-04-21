@@ -116,7 +116,7 @@ class ReferenciaAddView(UnidadRolRequiredMixin, CreateView):
 
         form.instance.motivo_no_atencion = motivo_no_atencion
 
-        for campo in ["area_refiere_sala", "area_refiere_especialidad", "area_refiere_servicio_auxiliar"]:
+        for campo in ["area_refiere_sala", "area_refiere_area_atencion", "area_refiere_servicio_auxiliar"]:
             valor = form.cleaned_data.get(campo)
             if valor:
                 setattr(form.instance, campo, valor)
@@ -256,7 +256,7 @@ class ReferenciaEditView(UnidadRolRequiredMixin, UpdateView):
             permisos.REFERENCIA_EDITOR_UNIDADES):
             return JsonResponse({"success": False, "error": f"No tiene permiso para actualizar una referencia"})
 
-        for campo in ["area_refiere_sala", "area_refiere_especialidad", "area_refiere_servicio_auxiliar"]:
+        for campo in ["area_refiere_sala", "area_refiere_area_atencion", "area_refiere_servicio_auxiliar"]:
             valor = form.cleaned_data.get(campo)
             setattr(form.instance, campo, valor if valor else None)
 
@@ -267,6 +267,7 @@ class ReferenciaEditView(UnidadRolRequiredMixin, UpdateView):
                 response = super().form_valid(form)
 
                 #procesar diagnosticos 
+       
                 RefDiagnosticoService.procesar_diagnosticos_referencia(
                     referencia_id=self.object.id,
                     diagnosticos=diagnosticos
@@ -307,7 +308,7 @@ class RespuestaCreateUpdateView(View):
             form.instance.referencia = referencia
 
 
-        for campo in ["area_reponde_sala", "area_reponde_especialidad", "area_reponde_servicio_auxiliar"]:
+        for campo in ["area_reponde_sala", "area_reponde_area_atencion", "area_reponde_servicio_auxiliar"]:
             valor = form.cleaned_data.get(campo)
             setattr(form.instance, campo, valor if valor else None)
 
@@ -337,7 +338,7 @@ class RespuestaCreateUpdateView(View):
                         "elaborada_por": instance.elaborada_por,
                         #area que refiere paso el campo como tal para podemos mapear
                         "area_refiere_sala": instance.area_reponde_sala,
-                        "area_refiere_especialidad": instance.area_reponde_especialidad,
+                        "area_refiere_area_atencion": instance.area_reponde_area_atencion,
                         "area_refiere_servicio_auxiliar": instance.area_reponde_servicio_auxiliar,
                         "especialidad_destino": form.cleaned_data.get('seguimiento_referencia_especialidad_destino'),
                         "observaciones": instance.observaciones                    

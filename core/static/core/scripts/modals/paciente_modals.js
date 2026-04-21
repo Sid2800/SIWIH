@@ -598,7 +598,7 @@ async function AgregarDefuncionModal(paciente, lectura) {
                 "Expediente": paciente.numero
             });
 
-            // Cargar salas, especialidades,  desde el backend
+            // Cargar salas, area_atencion,  desde el backend
             await DependenciaLoader.cargar(dependencia,'defuncion');
             
 
@@ -751,7 +751,7 @@ async function registrarObito(IdObito,idPaciente, datosMadre) {
                 </div>
                 
                 <div class="formularioCampoModal">
-                    <label for="modal-obito-dependencia">Sala</label>
+                    <label for="modal-obito-dependencia">Dependencia</label>
                     <select id="modal-obito-dependencia" class="formularioCampo-select" name="dependencia">
                         <option value="" disabled selected>Seleccione una dependencia</option>
                     </select>

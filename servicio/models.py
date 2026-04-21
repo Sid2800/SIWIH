@@ -154,10 +154,10 @@ class Cama(models.Model):
         return f"Cama {self.numero_cama} - {self.sala.nombre_sala}"
 
 
-class Especialidad(models.Model):
-    servicio = models.ForeignKey(Servicio, on_delete=models.PROTECT, related_name='especialidades')
-    nombre_especialidad = models.CharField(max_length=100, unique=True)
-    nombre_corto_especialidad = models.CharField(max_length=20, unique=True, blank=True, null=True)
+class Area_atencion(models.Model):
+    servicio = models.ForeignKey(Servicio, on_delete=models.PROTECT, related_name='servicio_Area_atencion')
+    nombre_area_atencion = models.CharField(max_length=100, unique=True)
+    nombre_corto_area_atencion = models.CharField(max_length=20, unique=True, blank=True, null=True)
 
     estado = models.SmallIntegerField(
         verbose_name="Estado",
@@ -166,12 +166,12 @@ class Especialidad(models.Model):
     )
 
     def __str__(self):
-        return f"{self.nombre_especialidad} ({self.servicio.nombre_servicio})"
+        return f"{self.nombre_area_atencion} ({self.servicio.nombre_servicio})"
 
     class Meta:
-        verbose_name = "Especialidad"
-        verbose_name_plural = "Especialidades"
-        ordering = ['nombre_especialidad']
+        verbose_name = "Area atencion"
+        verbose_name_plural = "Areas atencion"
+        ordering = ['nombre_area_atencion']
 
 
 class ServiciosAux(models.Model):

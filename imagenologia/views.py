@@ -1,7 +1,7 @@
 from django.shortcuts import render
 from django.utils import timezone
 from datetime import datetime, timedelta
-from servicio.models import Sala, Especialidad, ServiciosAux
+from servicio.models import Sala, Area_atencion, ServiciosAux
 from django.db.models.functions import Concat, Coalesce
 from core.mixins import UnidadRolRequiredMixin
 from core.services.expediente_service import ExpedienteService
@@ -121,7 +121,7 @@ class EvaluacionRxAddView(UnidadRolRequiredMixin, CreateView):
                         form.instance.paciente_externo = paciente_externo_obj
 
                 # ---------- Dependencia ----------
-                for campo in ["sala", "especialidad", "servicio_auxiliar"]:
+                for campo in ["sala", "area_atencion", "servicio_auxiliar"]:
                     valor = form.cleaned_data.get(campo)
                     if valor:
                         setattr(form.instance, campo, valor)
@@ -337,11 +337,11 @@ class EvaluacionRxEditView(UnidadRolRequiredMixin, UpdateView):
                     form.instance.modificado_por = usuario
 
                 # Limpiar dependencias
-                for campo in ["sala", "especialidad", "servicio_auxiliar"]:
+                for campo in ["sala", "area_atencion", "servicio_auxiliar"]:
                     setattr(form.instance, campo, None)
 
                 # Asignar primera dependencia válida
-                for campo in ["sala", "especialidad", "servicio_auxiliar"]:
+                for campo in ["sala", "area_atencion", "servicio_auxiliar"]:
                     valor = form.cleaned_data.get(campo)
                     if valor:
                         setattr(form.instance, campo, valor)
@@ -456,14 +456,14 @@ def listarEvaluacionrxAPI(request):
         total_estudios=Count('detalles', filter=Q(detalles__activo=True)),
         nombre_dependencia=Case(
             When(sala__isnull=False, then=F('sala__nombre_sala')),
-            When(especialidad__isnull=False, then=F('especialidad__nombre_especialidad')),
+            When(area_atencion__isnull=False, then=F('area_atencion__nombre_area_atencion')),
             When(servicio_auxiliar__isnull=False, then=F('servicio_auxiliar__nombre_servicio_a')),
             default=Value('Desconocido'),
             output_field=CharField()
         ),
         tipo_dependencia=Case(
             When(sala__isnull=False, then=Value('HOSP')),
-            When(especialidad__isnull=False, then=Value('CEXT')),
+            When(area_atencion__isnull=False, then=Value('CEXT')),
             When(servicio_auxiliar__isnull=False, then=Value('SVAUX')),
             default=Value('DESC'),
             output_field=CharField()

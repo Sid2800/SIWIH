@@ -1,6 +1,6 @@
 from django.db import models
 from paciente.models import Paciente
-from servicio.models import Institucion_salud, Sala, Especialidad, ServiciosAux, Servicio
+from servicio.models import Institucion_salud, Sala, Area_atencion, ServiciosAux, Servicio
 from clinico.models import Tipo_personal_salud, Diagnostico, Condicion_paciente
 
 from django.contrib.auth.models import User
@@ -116,12 +116,12 @@ class Referencia(models.Model):
         on_delete=models.PROTECT,
         related_name="referencias_enviadas_sala"
     )
-    area_refiere_especialidad = models.ForeignKey(
-        Especialidad,
+    area_refiere_area_atencion = models.ForeignKey(
+        Area_atencion,
         null=True,
         blank=True,
         on_delete=models.PROTECT,
-        related_name="referencias_enviadas_especialidad"
+        related_name="referencias_enviadas_area_atencion"
     )
     area_refiere_servicio_auxiliar = models.ForeignKey(
         ServiciosAux,
@@ -178,7 +178,7 @@ class Referencia(models.Model):
         Retorna el área que refiere solo si la referencia es tipo 'Enviada'.
         """
         if self.tipo == 1:  # Enviada
-            return self.area_refiere_sala or self.area_refiere_especialidad or self.area_refiere_servicio_auxiliar
+            return self.area_refiere_sala or self.area_refiere_area_atencion or self.area_refiere_servicio_auxiliar
         return None  # No aplica para referencias tipo 'Recibida'
     
     @property
@@ -284,9 +284,9 @@ class Respuesta(models.Model):
         Sala, null=True, blank=True, on_delete=models.PROTECT,
         related_name="respuestas_reponde_sala"
     )
-    area_reponde_especialidad = models.ForeignKey(
-        Especialidad, null=True, blank=True, on_delete=models.PROTECT,
-        related_name="respuestas_reponde_especialidad"
+    area_reponde_area_atencion = models.ForeignKey(
+        Area_atencion, null=True, blank=True, on_delete=models.PROTECT,
+        related_name="respuestas_reponde_area_atencion"
     )
     area_reponde_servicio_auxiliar = models.ForeignKey(
         ServiciosAux, null=True, blank=True, on_delete=models.PROTECT,
@@ -294,9 +294,9 @@ class Respuesta(models.Model):
     )
 
     # Área de seguimiento (null indica que el seguimiento no lo damos nosotros)
-    area_seguimiento_especialidad = models.ForeignKey(
-        Especialidad, null=True, blank=True, on_delete=models.PROTECT,
-        related_name="respuestas_seguimiento_especialidad"
+    area_seguimiento_area_atencion = models.ForeignKey(
+        Area_atencion, null=True, blank=True, on_delete=models.PROTECT,
+        related_name="respuestas_seguimiento_area_atencion"
     )
 
     fecha_cita = models.DateField(null=True, blank=True, verbose_name="Fecha cita seguimiento")

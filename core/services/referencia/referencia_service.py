@@ -21,7 +21,7 @@ class ReferenciaService:
 
     @staticmethod
     def crear_referencia_enviada_segun_repuesta(data: dict, diagnosticos, user=None):
-
+        
         try:
             with transaction.atomic():
 
@@ -36,7 +36,7 @@ class ReferenciaService:
                     "atencion_requerida": data.get("atencion_requerida"),
                     "elaborada_por": data.get("elaborada_por"),
                     "area_refiere_sala": data.get("area_refiere_sala"),
-                    "area_refiere_especialidad": data.get("area_refiere_especialidad"),
+                    "area_refiere_area_atencion": data.get("area_refiere_area_atencion"),
                     "area_refiere_servicio_auxiliar": data.get("area_refiere_servicio_auxiliar"),
                     "especialidad_destino": data.get("especialidad_destino"),
                     "observaciones": data.get("observaciones"),
@@ -49,9 +49,10 @@ class ReferenciaService:
 
                 referencia = Referencia.objects.create(**campos)
 
-                # Forzar confirmados
+                # Forzar confirmados y limpinaro el ID de db porque no le pertence 
                 for diag in diagnosticos:
                     diag['confirmado'] = True
+                    diag['idDiagDB'] = None
 
                 # Procesar diagnósticos (ya usa raise internamente)
                 RefDiagnosticoService.procesar_diagnosticos_referencia(

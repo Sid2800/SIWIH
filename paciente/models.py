@@ -3,7 +3,7 @@ from django.utils.timezone import localtime
 from core.utils.utilidades_fechas import formatear_fecha_simple
 from ubicacion.models import Sector
 from django.contrib.auth.models import User
-from servicio.models import Zona, Sala, ServiciosAux, Especialidad
+from servicio.models import Zona, Sala, ServiciosAux, Area_atencion
 from core.utils.utilidades_textos import construir_nombre_dinamico
 from django.db import connections
 
@@ -140,7 +140,7 @@ class Defuncion(models.Model):
     paciente = models.OneToOneField("Paciente", on_delete=models.CASCADE, related_name="defuncion")
     fecha_defuncion = models.DateField(verbose_name="Fecha de defunción")
     sala = models.ForeignKey( Sala, on_delete=models.SET_NULL, null=True , blank=True, related_name="sala")
-    especialidad = models.ForeignKey(Especialidad, on_delete=models.SET_NULL, null=True, blank=True)
+    area_atencion = models.ForeignKey(Area_atencion, on_delete=models.SET_NULL, null=True, blank=True)
     servicio_auxiliar = models.ForeignKey(ServiciosAux, on_delete=models.SET_NULL, null=True, blank=True)
     motivo = models.CharField(max_length=255, null=True, blank=True, verbose_name="Motivo del fallecimiento")
     fecha_entrega = models.DateField(null=True, blank=True, verbose_name="Fecha de entrega de cadaver")
@@ -168,7 +168,7 @@ class ObitoFetal(models.Model):
     paciente = models.ForeignKey("Paciente", on_delete=models.PROTECT, related_name="obitos_fetales", verbose_name="Paciente (madre)")
     fecha_obito = models.DateField( verbose_name="Fecha de óbito fetal")
     sala = models.ForeignKey(Sala, on_delete=models.SET_NULL, null=True, blank=True,related_name="obitos_fetales_sala",verbose_name="Sala")
-    especialidad = models.ForeignKey(Especialidad, on_delete=models.SET_NULL, null=True, blank=True)
+    area_atencion = models.ForeignKey(Area_atencion, on_delete=models.SET_NULL, null=True, blank=True)
     servicio_auxiliar = models.ForeignKey(ServiciosAux, on_delete=models.SET_NULL, null=True, blank=True)
     motivo = models.CharField(max_length=255, null=True, blank=True, verbose_name="Motivo")
     responsable_dni = models.CharField(max_length=40, null=True, blank=True, verbose_name="DNI responsable")

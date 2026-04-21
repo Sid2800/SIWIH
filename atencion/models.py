@@ -2,11 +2,11 @@ from django.db import models
 
 from django.contrib.auth.models import User
 from paciente.models import Paciente
-from servicio.models import Especialidad
+from servicio.models import Area_atencion
 
 class Atencion(models.Model):
    paciente = models.ForeignKey(Paciente, on_delete=models.PROTECT, verbose_name="Paciente",related_name='atenciones')
-   especialidad = models.ForeignKey(Especialidad, on_delete=models.PROTECT, verbose_name="Especialidad")
+   area_atencion = models.ForeignKey(Area_atencion, on_delete=models.PROTECT, verbose_name="Area Atencion")
    fecha_atencion = models.DateTimeField()
    fecha_recepcion = models.DateTimeField(null=True, blank=True)
 

@@ -23,11 +23,11 @@ class AtencionService:
                         atencionRegistro.fecha_atencion = atencion.fecha
                         cambios = True
 
-                  especialidad_id_nuevo = int(atencion.especialidad_id)
-                  if atencionRegistro.especialidad.id != especialidad_id_nuevo:
-                        nueva_especialidad = ServicioService.obtener_especialidad_id(especialidad_id_nuevo)
-                        if nueva_especialidad:
-                              atencionRegistro.especialidad = nueva_especialidad
+                  area_atencion_id_nuevo = int(atencion.area_atencion_id)
+                  if atencionRegistro.area_atencion.id != area_atencion_id_nuevo:
+                        nueva_area_atencion = ServicioService.obtener_area_atencion_id(area_atencion_id_nuevo)
+                        if nueva_area_atencion:
+                              atencionRegistro.area_atencion = nueva_area_atencion
                               cambios = True
 
                   if atencionRegistro.observaciones != atencion.observaciones:
@@ -50,13 +50,13 @@ class AtencionService:
                         )
                         return False
 
-            elif atencion.fecha and atencion.paciente_id and atencion.especialidad_id:
+            elif atencion.fecha and atencion.paciente_id and atencion.area_atencion_id:
                   try:
-                        especialidad_id = int(atencion.especialidad_id)
+                        area_atencion_id = int(atencion.area_atencion_id)
                         with transaction.atomic():
                               atencionObjeto = Atencion.objects.create(
                                     fecha_atencion=atencion.fecha,
-                                    especialidad_id=especialidad_id,
+                                    area_atencion_id=area_atencion_id,
                                     observaciones=atencion.observaciones,
                                     paciente_id=atencion.paciente_id,
                                     creado_por_id=atencion.usuario_id,
@@ -70,7 +70,7 @@ class AtencionService:
                               3: 6   # Consulta externa
                         }
 
-                        ubicacion = mapa_ubicaciones.get(especialidad_id, 0)
+                        ubicacion = mapa_ubicaciones.get(area_atencion_id, 0)
                         if ubicacion:
                               ExpedienteService.cambiar_ubicacion(
                                     atencionObjeto.paciente.id,
@@ -97,8 +97,8 @@ class AtencionService:
             try:
                   # Relaciones directas (JOIN en SQL)
                   qs = Atencion.objects.select_related(
-                  'especialidad',
-                  'especialidad__servicio',
+                  'area_atencion',
+                  'area_atencion__servicio',
                   'creado_por',
                   'modificado_por'
                   )
@@ -118,8 +118,8 @@ class AtencionService:
 
       @staticmethod
       def obtener_servicio_atenciones_activas():
-            atenciones_activas = Atencion.objects.filter(fecha_recepcion__isnull=True).select_related('especialidad__servicio')
-            servicios_ids = atenciones_activas.values_list('especialidad__servicio__id', flat=True).distinct()
+            atenciones_activas = Atencion.objects.filter(fecha_recepcion__isnull=True).select_related('area_atencion__servicio')
+            servicios_ids = atenciones_activas.values_list('area_atencion__servicio__id', flat=True).distinct()
             servicios = Servicio.objects.filter(id__in=servicios_ids, estado=1).values("id", "nombre_servicio")
             return servicios
 
@@ -143,7 +143,7 @@ class AtencionService:
                   "paciente__dni",
                   "paciente__primer_nombre",
                   "paciente__primer_apellido",
-                  "especialidad__servicio__id",
+                  "area_atencion__servicio__id",
             )
             return atenciones
       
@@ -154,7 +154,7 @@ class AtencionService:
                   atenciones_qs = Atencion.objects.filter(
                         paciente_id=id_paciente
                   ).select_related(
-                        'especialidad__servicio',
+                        'area_atencion__servicio',
                         'modificado_por'
                   ).prefetch_related(
                         'recepcion_detalles_atencion__recepcion__recibido_por'
@@ -176,8 +176,8 @@ class AtencionService:
                         "id": atencion.id,
                         "fecha_atencion": atencion.fecha_atencion,
                         "fecha_recepcion": atencion.fecha_recepcion,
-                        "especialidad__nombre_especialidad": atencion.especialidad.nombre_especialidad if atencion.especialidad else None,
-                        "especialidad__servicio__nombre_corto": atencion.especialidad.servicio.nombre_corto if atencion.especialidad and atencion.especialidad.servicio else None,
+                        "area_atencion__nombre_area_atencion": atencion.area_atencion.nombre_area_atencion if atencion.area_atencion else None,
+                        "area_atencion__servicio__nombre_corto": atencion.area_atencion.servicio.nombre_corto if atencion.area_atencion and atencion.area_atencion.servicio else None,
                         "modificado_por__username": atencion.modificado_por.username if atencion.modificado_por else None,
                         "fecha_modificado": atencion.fecha_modificado,
                         "usuario_recibio": usuario_recibio,
@@ -206,7 +206,7 @@ class AtencionService:
                         paciente_id=id_paciente,
                         fecha_creado__gte=limite_central  # filtramos directamente por fecha de creación
                   )
-                  .select_related('paciente', 'especialidad')
+                  .select_related('paciente', 'area_atencion')
                   .order_by('-fecha_creado')  # la más reciente según creación
                   .values(
                         'id',
@@ -214,7 +214,7 @@ class AtencionService:
                         'paciente__segundo_nombre',
                         'paciente__primer_apellido',
                         'paciente__segundo_apellido',
-                        'especialidad__nombre_especialidad',
+                        'area_atencion__nombre_area_atencion',
                         'fecha_atencion',
                         'fecha_creado',
                   )
@@ -260,8 +260,8 @@ class AtencionService:
                         'paciente__sector__aldea__municipio_id': (
                         'paciente__sector__aldea__municipio__nombre_municipio', 'Municipio'
                         ),
-                        'especialidad__servicio_id': ('especialidad__servicio__nombre_servicio', 'servicio'),
-                        'especialidad_id': ('especialidad__nombre_especialidad', 'Especialidad'),
+                        'area_atencion__servicio_id': ('area_atencion__servicio__nombre_servicio', 'servicio'),
+                        'area_atencion_id': ('area_atencion__nombre_area_atencion', 'area atencion'),
                   }
 
                   agrupacion_key = reporte_criterios.get('agrupacion', 'id')
@@ -277,8 +277,8 @@ class AtencionService:
                         # Precargamos relaciones para evitar N+1
                         qs = qs.select_related(
                         'paciente', 
-                        'especialidad', 
-                        'especialidad__servicio', 
+                        'area_atencion', 
+                        'area_atencion__servicio', 
                         'creado_por', 
                         'modificado_por'
                         ).prefetch_related(
@@ -304,9 +304,9 @@ class AtencionService:
                         'paciente__sector__aldea__municipio__departamento__nombre_departamento',
                         'paciente__sector__aldea__municipio__nombre_municipio',
 
-                        'especialidad__nombre_especialidad',
-                        'especialidad__servicio__nombre_servicio',
-                        'especialidad__servicio__nombre_corto',
+                        'area_atencion__nombre_area_atencion',
+                        'area_atencion__servicio__nombre_servicio',
+                        'area_atencion__servicio__nombre_corto',
 
                         # Agregar otros campos específicos de Atencion:
                         'fecha_creado',
@@ -331,22 +331,22 @@ class AtencionService:
 
                   elif modo == 'resumido':
                         # Lógica de agrupación y resumen
-                        if agrupacion_key == 'especialidad_id':
-                              # Agrupación especial combinando especialidad y servicio
+                        if agrupacion_key == 'area_atencion_id':
+                              # Agrupación especial combinando area_atencion y servicio
                               qs_con_combinacion = qs.annotate(
-                                    nombre_combinado_especialidad_servicio=Concat(
-                                          'especialidad__nombre_especialidad',
+                                    nombre_combinado_area_atencion_servicio=Concat(
+                                          'area_atencion__nombre_area_atencion',
                                           Value(' | '),
-                                          'especialidad__servicio__nombre_servicio'
+                                          'area_atencion__servicio__nombre_servicio'
                                     )
                               )
 
-                              resumen_raw = qs_con_combinacion.values('nombre_combinado_especialidad_servicio').annotate(
+                              resumen_raw = qs_con_combinacion.values('nombre_combinado_area_atencion_servicio').annotate(
                                     total=Count('id')
                               ).order_by('-total')
 
-                              nombre_amigable = "Especialidad y Servicio"
-                              campo_agrupado = 'nombre_combinado_especialidad_servicio'
+                              nombre_amigable = "Area Atencion y Servicio"
+                              campo_agrupado = 'nombre_combinado_area_atencion_servicio'
                         else:
                               # Agrupación estándar
                               resumen_raw = qs.values(campo_agrupado).annotate(

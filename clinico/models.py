@@ -42,6 +42,22 @@ class Tipo_personal_salud(models.Model):
         return self.nombre_tipo_personal
     
 
+
+class Especialidad(models.Model):
+    nombre_especialidad = models.CharField(max_length=100, unique=True, verbose_name="Nombre de la especialidad")
+    nombre_corto_especialidad = models.CharField(max_length=20, unique=True, blank=True, null=True, verbose_name="Nombre corto")
+    estado = models.BooleanField(default=True, verbose_name="Activo" )
+
+    def __str__(self):
+        return self.nombre_especialidad
+
+    class Meta:
+        verbose_name = "Especialidad"
+        verbose_name_plural = "Especialidades"
+        ordering = ['nombre_especialidad']
+    
+
+
 class Condicion_paciente(models.Model):
     nombre_condicion_paciente = models.CharField(max_length=100, unique=True)
     estado = models.BooleanField(default=1, verbose_name="Estado")
