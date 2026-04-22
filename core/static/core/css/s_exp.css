@@ -253,20 +253,26 @@
 #swal-exp-list {
     max-height: 220px;
     overflow-y: auto;
-    border: 1px solid var(--colorLinea);
+    border: 1px solid #0a5f5f;
     border-radius: 0.6rem;
     padding: 0.4rem 0;
     margin-bottom: 0.4rem;
+    background: #0d4a4a;
 }
 .sexp-exp-dec-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 0.5rem 0.8rem;
-    border-bottom: 1px solid var(--colorLinea);
+    border-bottom: 1px solid #0a5f5f;
     gap: 0.8rem;
 }
 .sexp-exp-dec-row:last-child { border-bottom: none; }
+#swal-exp-list .sexp-exp-tag {
+    background: rgba(255, 255, 255, 0.15);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
 .sexp-exp-dec-info {
     display: flex;
     align-items: center;
@@ -276,7 +282,7 @@
 }
 .sexp-exp-dec-nombre {
     font-size: 1.3rem;
-    color: var(--colorTablacelda);
+    color: #ffffff;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -292,17 +298,19 @@
     gap: 0.3rem;
     padding: 0.3rem 0.7rem;
     border-radius: 2rem;
-    border: 1px solid var(--colorLinea);
+    border: 1px solid transparent;
     cursor: pointer;
     font-size: 1.3rem;
     user-select: none;
-    transition: background 0.15s;
+    transition: all 0.15s;
+    color: #ffffff;
+    font-weight: 600;
 }
 .sexp-exp-dec-label input[type="radio"] { display: none; }
-.sexp-exp-dec-label--apr { color: #16a34a; border-color: #bbf7d0; }
-.sexp-exp-dec-label--rec { color: #dc2626; border-color: #fecaca; }
-.sexp-exp-dec-label--apr:has(input:checked) { background: #dcfce7; border-color: #16a34a; font-weight: 600; }
-.sexp-exp-dec-label--rec:has(input:checked) { background: #fee2e2; border-color: #dc2626; font-weight: 600; }
+.sexp-exp-dec-label--apr { background: #047857; }
+.sexp-exp-dec-label--rec { background: #991b1b; }
+.sexp-exp-dec-label--apr:has(input:checked) { background: #059669; box-shadow: 0 0 8px rgba(5, 150, 105, 0.4); }
+.sexp-exp-dec-label--rec:has(input:checked) { background: #b91c1c; box-shadow: 0 0 8px rgba(185, 28, 28, 0.4); }
 
 .sexp-modal-tiempo-row input {
     flex: 1;
