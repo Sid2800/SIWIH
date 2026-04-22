@@ -55,4 +55,6 @@ urlpatterns = [
     path('api/historial-prestamos-expediente/<int:expediente_id>/',
          views.historial_prestamos_expediente_api,
          name='s_exp_historial_prestamos_expediente_api'),
+    path('api/notificado-listo/', views.marcar_notificacion_leida_api, name='s_exp_notificado_listo_api'),
+    path('api/vencimiento-leido/', views.marcar_vencimiento_leido_api, name='s_exp_vencimiento_leido_api'),
 ]

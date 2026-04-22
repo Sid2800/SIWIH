@@ -1,5 +1,5 @@
 /**
- * Módulo s_exp — Buscador de Expedientes y Carrito de Solicitud
+ * Módulo s_exp — Buscador de Expedientes y Selección de Solicitud
  * Busca sobre la base SIWI (Paciente + Expediente) y muestra disponibilidad.
  */
 
@@ -97,7 +97,7 @@ function renderResultados(data) {
                 <i class="bi bi-plus-circle"></i> Agregar
             </button>`;
         } else if (enCarrito) {
-            botonHtml = '<span class="sexp-badge--en-carrito"><i class="bi bi-check-circle"></i> En carrito</span>';
+            botonHtml = '<span class="sexp-badge--en-carrito"><i class="bi bi-check-circle"></i> Seleccionado</span>';
         } else {
             botonHtml = '<button class="sexp-add-btn" disabled>No disponible</button>';
         }
@@ -108,6 +108,9 @@ function renderResultados(data) {
                 <h4><i class="bi bi-folder2"></i> Expediente #${item.numero_expediente}</h4>
                 <p><strong>${item.paciente_nombre || 'Sin paciente asignado'}</strong></p>
                 <p style="font-size:1.2rem;">${item.paciente_dni ? 'ID: ' + item.paciente_dni : ''}</p>
+                <p style="font-size:1.2rem; color:var(--primario-oscuro); font-weight:600;">
+                    <i class="bi bi-geo-alt"></i> Ubicación: ${item.ubicacion_fisica || 'Archivo Central'}
+                </p>
             </div>
             <div style="display:flex; align-items:center; gap:0.5rem;">
                 <span class="sexp-badge ${badgeClass}">${badgeText}</span>
@@ -122,14 +125,14 @@ function renderResultados(data) {
 
 function agregarAlCarrito(item) {
     if (carrito.some(c => c.expediente_id === item.expediente_id)) {
-        toastr.info('Este expediente ya está en el carrito');
+        toastr.info('Este expediente ya está en la lista');
         return;
     }
 
     carrito.push(item);
     renderCarrito();
     buscarExpedientes(); // Refrescar para actualizar badges
-    toastr.success(`Expediente #${item.numero_expediente} agregado al carrito`);
+    toastr.success(`Expediente #${item.numero_expediente} agregado a la lista`);
 }
 
 
@@ -148,7 +151,7 @@ function renderCarrito() {
     count.text(carrito.length);
 
     if (!carrito.length) {
-        container.html('<div class="sexp-carrito-empty"><i class="bi bi-cart-x" style="font-size:1.4rem;"></i><br>No hay expedientes seleccionados</div>');
+        container.html('<div class="sexp-carrito-empty"><i class="bi bi-folder-x" style="font-size:1.4rem;"></i><br>No hay expedientes seleccionados</div>');
         form.hide();
         return;
     }
@@ -189,15 +192,13 @@ function enviarSolicitud() {
         return;
     }
     if (!carrito.length) {
-        toastr.warning('Agregue al menos un expediente al carrito');
+        toastr.warning('Agregue al menos un expediente a la lista');
         return;
     }
 
     Swal.fire({
-        color: 'var(--negro)',
-        background: 'var(--blanco)',
         title: 'Confirmar Solicitud',
-        html: `<div style="color:var(--negro);"><p>Está a punto de solicitar <strong>${carrito.length}</strong> expediente(s).</p>
+        html: `<div><p>Está a punto de solicitar <strong>${carrito.length}</strong> expediente(s).</p>
                <p><strong>Motivo:</strong> ${motivoText}</p>
                <p>¿Desea continuar?</p></div>`,
         icon: 'question',
@@ -220,8 +221,6 @@ function enviarSolicitud() {
                 }),
                 success: function (resp) {
                     Swal.fire({
-        color: 'var(--negro)',
-        background: 'var(--blanco)',
                         title: '¡Solicitud Enviada!',
                         text: resp.mensaje,
                         icon: 'success',

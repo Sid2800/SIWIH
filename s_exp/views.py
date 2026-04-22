@@ -6,9 +6,10 @@ from django.http import JsonResponse
 from django.utils import timezone
 from django.views.generic import TemplateView
 from django.views.decorators.http import require_POST, require_GET
-from django.views.decorators.csrf import csrf_protect
+from django.views.decorators.csrf import csrf_protect, csrf_exempt
+
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import Count, Q
+from django.db.models import Count, Q, F
 from django.shortcuts import redirect
 
 from .models import (
@@ -28,11 +29,21 @@ logger = logging.getLogger("s_exp")
 # ============================================
 # UTILIDAD: Registrar Log en BD
 # ============================================
-def _registrar_log(usuario, accion, detalle="", objeto_tipo="", objeto_id=None):
+def _registrar_log(usuario, accion, descripcion, objeto_tipo=None, objeto_id=None):
+    """
+    Registra un evento en la bitácora de auditoría del sistema (ExpedienteLog).
+    
+    Args:
+        usuario: Instancia de User que realiza la acción.
+        accion: Código de la acción (ej. 'SOLICITUD_CREADA').
+        descripcion: Texto explicativo del evento.
+        objeto_tipo: Nombre del modelo afectado (opcional).
+        objeto_id: ID del registro afectado (opcional).
+    """
     LogHistorico.objects.create(
         accion=accion,
         usuario=usuario,
-        detalle=detalle,
+        detalle=descripcion,
         objeto_tipo=objeto_tipo,
         objeto_id=objeto_id,
     )
@@ -42,6 +53,10 @@ def _registrar_log(usuario, accion, detalle="", objeto_tipo="", objeto_id=None):
 # UTILIDAD: Verificar permisos basados en PerfilUnidad
 # ============================================
 def _es_exp_admin(user):
+    """
+    Verifica si un usuario tiene permisos administrativos sobre el módulo de expedientes.
+    Se basa en el rol 'ADMIN:Admision' definido en el sistema SIWI.
+    """
     """True si el usuario es admin del módulo.
     Condiciones: rol 'admin' en PerfilUnidad, grupo 'administradores', staff o superuser.
     """
@@ -180,6 +195,10 @@ def dashboard_stats_api(request):
 
 @require_GET
 def listar_solicitudes_api(request):
+    """
+    API para alimentar el DataTable de gestión de solicitudes (Admin).
+    Soporta filtrado por estado y búsqueda server-side.
+    """
     """Lista solicitudes para el admin (DataTables server-side)."""
     if not _es_exp_admin(request.user):
         return JsonResponse({"error": "Sin permisos"}, status=403)
@@ -212,11 +231,15 @@ def listar_solicitudes_api(request):
 
         data = []
         for s in solicitudes:
-            # Obtener números de expediente desde los detalles
-            detalles_info = list(
-                s.detalles.select_related('expediente_prestamo__expediente')
-                .values_list('expediente_prestamo__expediente__numero', flat=True)
-            )
+            # Obtener expedientes y su estado de entrega
+            detalles_info = []
+            for d in s.detalles.select_related('expediente_prestamo__expediente'):
+                detalles_info.append({
+                    "numero": d.expediente_prestamo.expediente.numero,
+                    "devuelto": d.devuelto,
+                    "fuera_de_tiempo": d.fuera_de_tiempo
+                })
+
             data.append({
                 "id": s.id,
                 "usuario": s.usuario.username,
@@ -256,10 +279,17 @@ def aprobar_solicitud_api(request):
 
     solicitud_id = body.get('solicitud_id')
     comentarios = body.get('comentarios', '')
+    # El tiempo límite puede ser en horas (por defecto) o minutos (modo pruebas)
     tiempo_limite = body.get('tiempo_limite_horas', 24)
+    es_minutos = body.get('es_minutos', False)
 
-    if int(tiempo_limite) < 24:
-        return JsonResponse({"error": "El tiempo mínimo es de 24 horas"}, status=400)
+    # Validamos que el número sea coherente (mínimo 1)
+    if int(tiempo_limite) < 1:
+        return JsonResponse({"error": "El tiempo debe ser mayor a 0"}, status=400)
+
+    # Si NO es en minutos, validamos el mínimo de 24 horas para producción
+    if not es_minutos and int(tiempo_limite) < 24:
+        return JsonResponse({"error": "El tiempo mínimo en horas es de 24"}, status=400)
 
     try:
         solicitud = SolicitudPrestamo.objects.get(id=solicitud_id, estado_flujo_id='SOL_PENDIENTE')
@@ -297,11 +327,13 @@ def aprobar_solicitud_api(request):
                 )
 
         # Crear el préstamo
+        # Se guarda el flag es_minutos para saber cómo calcular el vencimiento al entregar
         prestamo = Prestamo.objects.create(
             solicitud=solicitud,
             admin_aprobador=request.user,
             comentarios=comentarios,
             tiempo_limite_horas=int(tiempo_limite),
+            es_minutos=es_minutos,
             estado='Activo'
         )
 
@@ -351,6 +383,14 @@ def marcar_listo_recojer_api(request):
 @csrf_protect
 @require_POST
 def rechazar_solicitud_api(request):
+    """
+    Rechaza una solicitud de préstamo pendiente.
+    Libera automáticamente los expedientes que estaban apartados (EXP_APARTADO -> EXP_DISPONIBLE).
+    
+    Body JSON:
+        solicitud_id (int): ID de la solicitud a rechazar.
+        motivo (str): Razón del rechazo.
+    """
     """Rechaza una solicitud con motivo obligatorio."""
     if not _es_exp_admin(request.user):
         return JsonResponse({"error": "Sin permisos"}, status=403)
@@ -374,6 +414,23 @@ def rechazar_solicitud_api(request):
     try:
         solicitud.estado_flujo_id = 'SOL_RECHAZADA'
         solicitud.save()
+
+        # Liberar expedientes: volver a ponerlos disponibles
+        from .models import ExpedienteEstadoLog
+        for detalle in solicitud.detalles.select_related('expediente_prestamo'):
+            ep = detalle.expediente_prestamo
+            estado_anterior = ep.estado
+            ep.estado_id = 'EXP_DISPONIBLE'
+            ep.save()
+
+            ExpedienteEstadoLog.objects.create(
+                expediente=ep.expediente,
+                estado_anterior=estado_anterior,
+                estado_nuevo_id='EXP_DISPONIBLE',
+                usuario=request.user,
+                solicitud=solicitud,
+                observacion=f"Expediente liberado por rechazo de solicitud. Motivo: {motivo_rechazo}"
+            )
 
         Prestamo.objects.create(
             solicitud=solicitud,
@@ -402,36 +459,55 @@ def rechazar_solicitud_api(request):
 
 @require_GET
 def prestamos_activos_api(request):
-    """Lista préstamos activos/entregados para monitoreo con cronómetros."""
+    """Lista préstamos activos/entregados para monitoreo con DataTables server-side."""
     if not _es_exp_admin(request.user):
         return JsonResponse({"error": "Sin permisos"}, status=403)
 
     try:
+        draw = int(request.GET.get('draw', 0))
+        start = int(request.GET.get('start', 0))
+        length = int(request.GET.get('length', 10))
+        search_value = request.GET.get('search[value]', '').strip()
         estado_filtro = request.GET.get('estado', '')
 
         qs = Prestamo.objects.select_related(
-            'solicitud__usuario'
+            'solicitud__usuario', 'solicitud__motivo'
         ).filter(
-            estado__in=['Activo', 'Entregado', 'Vencido', 'DevolucionParcial']
+            estado__in=['Activo', 'Entregado', 'Vencido', 'DevolucionParcial', 'DevueltoVencido']
         )
 
         if estado_filtro:
             qs = qs.filter(estado=estado_filtro)
 
+        if search_value:
+            qs = qs.filter(
+                Q(solicitud__usuario__username__icontains=search_value) |
+                Q(id__icontains=search_value) |
+                Q(solicitud__usuario__first_name__icontains=search_value) |
+                Q(solicitud__usuario__last_name__icontains=search_value)
+            )
+
+        total_records = Prestamo.objects.filter(
+            estado__in=['Activo', 'Entregado', 'Vencido', 'DevolucionParcial', 'DevueltoVencido']
+        ).count()
+        filtered_records = qs.count()
+
+        prestamos = qs.order_by('-fecha_aprobacion')[start:start + length]
+
         data = []
-        for p in qs.order_by('-fecha_aprobacion'):
+        for p in prestamos:
             numeros = list(
                 p.solicitud.detalles.select_related('expediente_prestamo__expediente')
                 .values_list('expediente_prestamo__expediente__numero', flat=True)
             )
 
-            item = {
+            data.append({
                 "id": p.id,
                 "solicitud_id": p.solicitud.id,
                 "usuario": p.solicitud.usuario.username,
                 "usuario_nombre": f"{p.solicitud.usuario.first_name} {p.solicitud.usuario.last_name}".strip() or p.solicitud.usuario.username,
                 "area_destino": p.solicitud.area_destino or "",
-                "motivo": str(p.solicitud.motivo) if p.solicitud.motivo else "",
+                "motivo": str(p.solicitud.motivo.nombre) if p.solicitud.motivo else "",
                 "estado": p.estado,
                 "fecha_aprobacion": p.fecha_aprobacion.strftime("%d/%m/%Y %H:%M"),
                 "fecha_entrega": p.fecha_entrega.strftime("%d/%m/%Y %H:%M") if p.fecha_entrega else None,
@@ -443,10 +519,14 @@ def prestamos_activos_api(request):
                 "expedientes": numeros,
                 "cant_expedientes": len(numeros),
                 "solicitud_estado_flujo": p.solicitud.estado_flujo_id,
-            }
-            data.append(item)
+            })
 
-        return JsonResponse({"data": data})
+        return JsonResponse({
+            "draw": draw,
+            "recordsTotal": total_records,
+            "recordsFiltered": filtered_records,
+            "data": data
+        })
 
     except Exception as e:
         logger.error(f"Error en prestamos_activos_api: {e}", exc_info=True)
@@ -477,7 +557,15 @@ def marcar_entregado_api(request):
     try:
         ahora = timezone.now()
         prestamo.fecha_entrega = ahora
-        prestamo.fecha_limite = ahora + timedelta(hours=prestamo.tiempo_limite_horas)
+        
+        # Lógica de vencimiento flexible (Pruebas vs Producción)
+        if prestamo.es_minutos:
+            # Si el préstamo se configuró en minutos (para pruebas)
+            prestamo.fecha_limite = ahora + timedelta(minutes=prestamo.tiempo_limite_horas)
+        else:
+            # Configuración estándar en horas
+            prestamo.fecha_limite = ahora + timedelta(hours=prestamo.tiempo_limite_horas)
+            
         prestamo.estado = 'Entregado'
         prestamo.save()
 
@@ -531,7 +619,7 @@ def prestamos_para_devolucion_api(request):
     try:
         # Mostrar solicitudes marcadas para devolución O con devoluciones incompletas pendientes
         qs = Prestamo.objects.select_related('solicitud__usuario').filter(
-            solicitud__estado_flujo_id__in=['SOL_EN_DEVOLUCION', 'SOL_INCOMPLETA'],
+            solicitud__estado_flujo_id='SOL_EN_DEVOLUCION',
             estado__in=['Entregado', 'Vencido', 'DevolucionParcial']
         ).order_by('fecha_limite')
 
@@ -621,15 +709,21 @@ def procesar_devolucion_api(request):
         from .models import ExpedienteEstadoLog
         
         # 1. Procesar los que llegaron (Disponibles)
+        esta_vencido = prestamo.esta_vencido
+        unidad_usuario = _get_unidad_usuario(request.user)
+
         for det_id in detalles_recibidos:
             detalle = SolicitudExpedienteDetalle.objects.get(id=det_id, solicitud=solicitud)
             if not detalle.devuelto:
                 detalle.devuelto = True
+                if esta_vencido:
+                    detalle.fuera_de_tiempo = True
                 detalle.save()
                 
                 ep = detalle.expediente_prestamo
                 estado_ant = ep.estado
                 ep.estado_id = 'EXP_DISPONIBLE'
+                ep.ubicacion_fisica = unidad_usuario
                 ep.save()
                 
                 ExpedienteEstadoLog.objects.create(
@@ -638,7 +732,7 @@ def procesar_devolucion_api(request):
                     estado_nuevo_id='EXP_DISPONIBLE',
                     usuario=request.user,
                     solicitud=solicitud,
-                    observacion="Devuelto correctamente"
+                    observacion="Devuelto correctamente" + (" (Fuera de tiempo)" if esta_vencido else "")
                 )
 
         # 2. Procesar los perdidos (Cuentan como procesados/cerrados para la solicitud)
@@ -710,15 +804,20 @@ def procesar_devolucion_api(request):
 
     except Exception as e:
         logger.error(f"Error en procesar_devolucion_api: {e}", exc_info=True)
-        return JsonResponse({"error": str(e)}, status=500)
-
-
-# ============================================
-# APIs USUARIO - Buscador y Carrito
-# ============================================
+        return JsonResponse({"error": "Error interno del servidor"}, status=500)
 
 @require_GET
 def buscar_expedientes_api(request):
+    """
+    Buscador principal de expedientes con filtrado de disponibilidad en tiempo real.
+    
+    Query Params:
+        q (str): Término de búsqueda (número, identidad o nombre).
+        tipo (str): 'expediente', 'identidad' o 'nombre'.
+        
+    Returns:
+        JSON con los resultados y flags de 'disponible' (True/False).
+    """
     """
     Busca pacientes en la base SIWI por identidad, N° expediente o nombre.
     Todos los expedientes están disponibles excepto aquellos con préstamo activo.
@@ -754,37 +853,23 @@ def buscar_expedientes_api(request):
         resultados = []
 
         if tipo == 'expediente':
-            # Buscar por número de expediente:
-            # 1) Directo en Expediente.numero (int, sin ceros a la izquierda)
-            # 2) También por Paciente.expediente_numero (varchar, puede tener ceros)
+            # Buscar por número de expediente  — Top 5 resultados
             expedientes_encontrados = set()
-
-            # Intento directo: convertir a int quitando ceros a la izquierda
             try:
                 numero_int = int(query.lstrip("0") or "0")
-                for exp in Expediente.objects.filter(numero=numero_int)[:50]:
+                for exp in Expediente.objects.filter(numero=numero_int)[:5]:
                     expedientes_encontrados.add(exp.id)
             except ValueError:
                 pass
 
-            # Buscar también por el campo expediente_numero del paciente
-            # (coincidencia parcial, sin importar ceros a la izquierda)
-            pacientes_por_exp = Paciente.objects.filter(
-                expediente_numero__icontains=query
-            )[:50]
+            pacientes_por_exp = Paciente.objects.filter(expediente_numero__icontains=query)[:5]
             for pac in pacientes_por_exp:
-                asig = PacienteAsignacion.objects.filter(
-                    paciente=pac
-                ).select_related('expediente').first()
+                asig = PacienteAsignacion.objects.filter(paciente=pac).select_related('expediente').first()
                 if asig:
                     expedientes_encontrados.add(asig.expediente.id)
 
-            # Ahora construir resultados
-            for exp in Expediente.objects.filter(id__in=expedientes_encontrados):
-                asignacion = PacienteAsignacion.objects.filter(
-                    expediente=exp
-                ).select_related('paciente').order_by('-estado').first()
-
+            for exp in Expediente.objects.filter(id__in=expedientes_encontrados)[:5]:
+                asignacion = PacienteAsignacion.objects.filter(expediente=exp).select_related('paciente').order_by('-estado').first()
                 paciente_nombre = ""
                 paciente_dni = ""
                 if asignacion:
@@ -793,6 +878,8 @@ def buscar_expedientes_api(request):
                     paciente_dni = p.dni or ""
 
                 disponible = exp.id not in expedientes_prestados_ids
+                info_exp = ExpedientePrestamo.objects.filter(expediente=exp).first()
+                ubicacion = info_exp.ubicacion_fisica if info_exp and info_exp.ubicacion_fisica else "Archivo Central"
 
                 resultados.append({
                     "expediente_id": exp.id,
@@ -800,25 +887,21 @@ def buscar_expedientes_api(request):
                     "paciente_nombre": paciente_nombre,
                     "paciente_dni": paciente_dni,
                     "disponible": disponible,
+                    "ubicacion_fisica": ubicacion,
                 })
 
         elif tipo == 'identidad':
-            # Buscar por DNI del paciente
             query_limpio = query.replace("-", "").replace(" ", "")
-            pacientes = Paciente.objects.filter(
-                dni__icontains=query_limpio,
-                estado='A'
-            )[:50]
-
+            pacientes = Paciente.objects.filter(dni__icontains=query_limpio, estado='A')[:5]
             for pac in pacientes:
-                asignaciones = PacienteAsignacion.objects.filter(
-                    paciente=pac, estado='1'
-                ).select_related('expediente')
-
+                asignaciones = PacienteAsignacion.objects.filter(paciente=pac, estado='1').select_related('expediente')
                 for asig in asignaciones:
                     exp = asig.expediente
                     disponible = exp.id not in expedientes_prestados_ids
                     paciente_nombre = f"{pac.primer_nombre} {pac.segundo_nombre or ''} {pac.primer_apellido} {pac.segundo_apellido or ''}".strip()
+                    
+                    info_exp = ExpedientePrestamo.objects.filter(expediente=exp).first()
+                    ubicacion = info_exp.ubicacion_fisica if info_exp and info_exp.ubicacion_fisica else "Archivo Central"
 
                     resultados.append({
                         "expediente_id": exp.id,
@@ -826,30 +909,28 @@ def buscar_expedientes_api(request):
                         "paciente_nombre": paciente_nombre,
                         "paciente_dni": pac.dni or "",
                         "disponible": disponible,
+                        "ubicacion_fisica": ubicacion,
                     })
+                    if len(resultados) >= 5:
+                        break
+                if len(resultados) >= 5:
+                    break
 
         elif tipo == 'nombre':
-            # Buscar por nombre del paciente
             palabras = query.split()
             filtro = Q(estado='A')
             for palabra in palabras:
-                filtro &= (
-                    Q(primer_nombre__icontains=palabra) |
-                    Q(segundo_nombre__icontains=palabra) |
-                    Q(primer_apellido__icontains=palabra) |
-                    Q(segundo_apellido__icontains=palabra)
-                )
-            pacientes = Paciente.objects.filter(filtro)[:50]
-
+                filtro &= (Q(primer_nombre__icontains=palabra) | Q(segundo_nombre__icontains=palabra) | Q(primer_apellido__icontains=palabra) | Q(segundo_apellido__icontains=palabra))
+            pacientes = Paciente.objects.filter(filtro)[:5]
             for pac in pacientes:
-                asignaciones = PacienteAsignacion.objects.filter(
-                    paciente=pac, estado='1'
-                ).select_related('expediente')
-
+                asignaciones = PacienteAsignacion.objects.filter(paciente=pac, estado='1').select_related('expediente')
                 for asig in asignaciones:
                     exp = asig.expediente
                     disponible = exp.id not in expedientes_prestados_ids
                     paciente_nombre = f"{pac.primer_nombre} {pac.segundo_nombre or ''} {pac.primer_apellido} {pac.segundo_apellido or ''}".strip()
+                    
+                    info_exp = ExpedientePrestamo.objects.filter(expediente=exp).first()
+                    ubicacion = info_exp.ubicacion_fisica if info_exp and info_exp.ubicacion_fisica else "Archivo Central"
 
                     resultados.append({
                         "expediente_id": exp.id,
@@ -857,7 +938,12 @@ def buscar_expedientes_api(request):
                         "paciente_nombre": paciente_nombre,
                         "paciente_dni": pac.dni or "",
                         "disponible": disponible,
+                        "ubicacion_fisica": ubicacion,
                     })
+                    if len(resultados) >= 5:
+                        break
+                if len(resultados) >= 5:
+                    break
 
         return JsonResponse({"data": resultados})
 
@@ -869,6 +955,10 @@ def buscar_expedientes_api(request):
 @csrf_protect
 @require_POST
 def crear_solicitud_api(request):
+    """
+    Crea una nueva solicitud de préstamo iniciada por un usuario del sistema.
+    Verifica la disponibilidad física de los expedientes antes de permitir la creación.
+    """
     """Crea una solicitud de préstamo con múltiples expedientes (carrito)."""
     if not _es_exp_solicitante(request.user):
         return JsonResponse({"error": "Sin permisos"}, status=403)
@@ -1007,7 +1097,14 @@ def crear_solicitud_api(request):
 
 @require_GET
 def mis_solicitudes_api(request):
-    """Lista las solicitudes del usuario actual (solo su historial)."""
+    """
+    Lista las solicitudes del usuario actual con filtros opcionales de fecha.
+    
+    Query Params:
+        filtro (str): 'hoy', 'semana', 'mes', 'rango' o '' para todas.
+        fecha_inicio (str): Fecha inicio en formato YYYY-MM-DD (aplica con filtro='rango').
+        fecha_fin (str): Fecha fin en formato YYYY-MM-DD (aplica con filtro='rango').
+    """
     if not _es_exp_solicitante(request.user):
         return JsonResponse({"error": "Sin permisos"}, status=403)
 
@@ -1016,12 +1113,50 @@ def mis_solicitudes_api(request):
             usuario=request.user
         ).order_by('-fecha_creacion')
 
+        # --- Aplicar filtros de fecha (mismo patrón que reportes del módulo) ---
+        filtro = request.GET.get('filtro', '').strip()
+        from datetime import date as date_type
+        hoy = date_type.today()
+
+        if filtro == 'hoy':
+            qs = qs.filter(
+                fecha_creacion__gte=str(hoy),
+                fecha_creacion__lte=str(hoy) + ' 23:59:59'
+            )
+        elif filtro == 'semana':
+            inicio_semana = hoy - timedelta(days=hoy.weekday())  # Lunes
+            fin_semana = inicio_semana + timedelta(days=6)        # Domingo
+            qs = qs.filter(
+                fecha_creacion__gte=str(inicio_semana),
+                fecha_creacion__lte=str(fin_semana) + ' 23:59:59'
+            )
+        elif filtro == 'mes':
+            import calendar
+            ultimo_dia = calendar.monthrange(hoy.year, hoy.month)[1]
+            inicio_mes = str(hoy.replace(day=1))
+            fin_mes = str(hoy.replace(day=ultimo_dia))
+            qs = qs.filter(
+                fecha_creacion__gte=inicio_mes,
+                fecha_creacion__lte=fin_mes + ' 23:59:59'
+            )
+        elif filtro == 'rango':
+            fecha_inicio_str = request.GET.get('fecha_inicio', '').strip()
+            fecha_fin_str = request.GET.get('fecha_fin', '').strip()
+            if fecha_inicio_str:
+                qs = qs.filter(fecha_creacion__gte=fecha_inicio_str)
+            if fecha_fin_str:
+                qs = qs.filter(fecha_creacion__lte=fecha_fin_str + ' 23:59:59')
+        # Si filtro está vacío retorna todas las solicitudes
         data = []
         for s in qs:
-            numeros = list(
-                s.detalles.select_related('expediente_prestamo__expediente')
-                .values_list('expediente_prestamo__expediente__numero', flat=True)
-            )
+            # Obtener expedientes y su estado de entrega
+            detalles_info = []
+            for d in s.detalles.select_related('expediente_prestamo__expediente'):
+                detalles_info.append({
+                    "numero": d.expediente_prestamo.expediente.numero,
+                    "devuelto": d.devuelto,
+                    "fuera_de_tiempo": d.fuera_de_tiempo
+                })
 
             prestamo_info = None
             try:
@@ -1048,8 +1183,8 @@ def mis_solicitudes_api(request):
                 "motivo": s.motivo.nombre if s.motivo else "",
                 "observaciones": s.observaciones or "",
                 "area_destino": s.area_destino or "",
-                "expedientes": numeros,
-                "cant_expedientes": len(numeros),
+                "expedientes": detalles_info,
+                "cant_expedientes": len(detalles_info),
                 "prestamo": prestamo_info,
             })
 
@@ -1095,21 +1230,49 @@ def alertas_usuario_api(request):
                     "prestamo_id": p.id,
                 })
 
-        # Solicitudes aprobadas listas para retirar
+        # Alertas de Vencimiento Recurrentes (Sticky cada 5 min)
+        prestamos_vencidos = Prestamo.objects.filter(
+            solicitud__usuario=request.user,
+            estado='Vencido'
+        )
+        ahora = timezone.now()
+        for p in prestamos_vencidos:
+            reaparecer = False
+            if not p.alerta_vencimiento_leida_at:
+                reaparecer = True
+            else:
+                diferencia = ahora - p.alerta_vencimiento_leida_at
+                if diferencia.total_seconds() > 300:  # 5 min
+                    reaparecer = True
+            
+            if reaparecer:
+                alertas.append({
+                    "tipo": "danger",
+                    "titulo": "¡PRÉSTAMO VENCIDO!",
+                    "mensaje": f"El préstamo #{p.id} está vencido. Por favor devuelva los expedientes.",
+                    "prestamo_id": p.id,
+                    "sticky": True,
+                    "tipo_alerta": "vencimiento"
+                })
+
+        # Solicitudes aprobadas listas para retirar (Persistentes hasta que el usuario las acepte)
         solicitudes_aprobadas = SolicitudPrestamo.objects.filter(
             usuario=request.user,
-            estado_flujo_id='SOL_APROBADA_ORGANIZANDO'
+            estado_flujo_id='SOL_LISTO_RECOGER',
+            notificado_listo=False
         )
         for s in solicitudes_aprobadas:
             alertas.append({
-                "tipo": "info",
-                "titulo": "Solicitud Aprobada",
-                "mensaje": f"Su solicitud #{s.id} ha sido aprobada. Puede retirar los expedientes.",
+                "tipo": "success",
+                "titulo": "¡Listo para recoger!",
+                "mensaje": "Sus expedientes ya estan listos para recoger.",
                 "solicitud_id": s.id,
+                "sticky": True
             })
 
         # Solicitudes rechazadas recientes
         solicitudes_rechazadas = SolicitudPrestamo.objects.filter(
+
             usuario=request.user,
             estado_flujo_id='SOL_RECHAZADA'
         ).order_by('-fecha_creacion')[:5]
@@ -1132,122 +1295,221 @@ def alertas_usuario_api(request):
         return JsonResponse({"alertas": []})
 
 
+@csrf_exempt
+@require_POST
+def marcar_notificacion_leida_api(request):
+    """Marca una notificación de 'Listo para recoger' como leída por el usuario."""
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "No autenticado"}, status=401)
+
+    try:
+        import json
+        body = json.loads(request.body)
+        solicitud_id = body.get('solicitud_id')
+
+        if not solicitud_id:
+            return JsonResponse({"error": "Falta ID de solicitud"}, status=400)
+
+        solicitud = SolicitudPrestamo.objects.get(id=solicitud_id, usuario=request.user)
+        solicitud.notificado_listo = True
+        solicitud.save()
+
+        return JsonResponse({"success": True})
+
+    except SolicitudPrestamo.DoesNotExist:
+        return JsonResponse({"error": "Solicitud no encontrada"}, status=404)
+    except Exception as e:
+        logger.error(f"Error en marcar_notificacion_leida_api: {e}", exc_info=True)
+        return JsonResponse({"error": "Error interno"}, status=500)
+
+
+@csrf_exempt
+@require_POST
+def marcar_vencimiento_leido_api(request):
+    """Marca una alerta de vencimiento como aceptada temporalmente (5 min)."""
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "No autenticado"}, status=401)
+
+    try:
+        import json
+        body = json.loads(request.body)
+        prestamo_id = body.get('prestamo_id')
+
+        if not prestamo_id:
+            return JsonResponse({"error": "Falta ID de préstamo"}, status=400)
+
+        prestamo = Prestamo.objects.get(id=prestamo_id, solicitud__usuario=request.user)
+        prestamo.alerta_vencimiento_leida_at = timezone.now()
+        prestamo.save()
+
+        return JsonResponse({"success": True})
+
+    except Prestamo.DoesNotExist:
+        return JsonResponse({"error": "Préstamo no encontrado"}, status=404)
+    except Exception as e:
+        logger.error(f"Error en marcar_vencimiento_leido_api: {e}", exc_info=True)
+        return JsonResponse({"error": "Error interno"}, status=500)
+
+
 # ============================================
 # APIs - Reportes
-# ============================================
 
 @require_GET
 def reportes_data_api(request):
-    """Retorna datos para los reportes con filtros de fecha."""
+    """Retorna datos completos para los reportes con filtros de fecha.
+    Cuenta solicitudes reales (SolicitudPrestamo) en el período seleccionado.
+    """
     if not _es_exp_admin(request.user):
         return JsonResponse({"error": "Sin permisos"}, status=403)
 
     try:
         fecha_inicio = request.GET.get('fecha_inicio', '')
         fecha_fin = request.GET.get('fecha_fin', '')
-        tipo_reporte = request.GET.get('tipo', 'movimiento')
 
-        filtros = {}
+        # Filtros base sobre SolicitudPrestamo.fecha_creacion
+        sol_filtros = {}
         if fecha_inicio:
-            filtros['fecha_aprobacion__gte'] = fecha_inicio
+            sol_filtros['fecha_creacion__gte'] = fecha_inicio
         if fecha_fin:
-            filtros['fecha_aprobacion__lte'] = fecha_fin + ' 23:59:59'
+            sol_filtros['fecha_creacion__lte'] = fecha_fin + ' 23:59:59'
 
-        if tipo_reporte == 'movimiento':
-            prestamos = Prestamo.objects.filter(**filtros).exclude(estado='Cerrado')
+        qs_solicitudes = SolicitudPrestamo.objects.filter(**sol_filtros)
 
-            demanda_area = SolicitudPrestamo.objects.filter(
-                fecha_creacion__gte=fecha_inicio if fecha_inicio else '2000-01-01',
-                fecha_creacion__lte=(fecha_fin + ' 23:59:59') if fecha_fin else '2100-01-01',
-            ).values('area_destino').annotate(
+        # --- RESUMEN GENERAL ---
+        total_solicitudes = qs_solicitudes.count()
+        total_expedientes_solicitados = SolicitudExpedienteDetalle.objects.filter(
+            solicitud__in=qs_solicitudes
+        ).count()
+        total_aprobadas = qs_solicitudes.filter(
+            estado_flujo_id__in=['SOL_APROBADA_ORGANIZANDO', 'SOL_LISTO_RECOGER',
+                                 'SOL_EN_PRESTAMO', 'SOL_EN_DEVOLUCION',
+                                 'SOL_FINALIZADA', 'SOL_INCOMPLETA']
+        ).count()
+        total_rechazadas = qs_solicitudes.filter(
+            estado_flujo_id='SOL_RECHAZADA'
+        ).count()
+        total_pendientes = qs_solicitudes.filter(
+            estado_flujo_id='SOL_PENDIENTE'
+        ).count()
+
+        # --- DEMANDA POR ÁREA ---
+        demanda_area = list(
+            qs_solicitudes.values('area_destino').annotate(
                 total=Count('id')
             ).order_by('-total')
+        )
 
-            motivos = SolicitudPrestamo.objects.filter(
-                fecha_creacion__gte=fecha_inicio if fecha_inicio else '2000-01-01',
-                fecha_creacion__lte=(fecha_fin + ' 23:59:59') if fecha_fin else '2100-01-01',
-            ).values('motivo').annotate(
+        # --- MOTIVOS DE USO ---
+        motivos = list(
+            qs_solicitudes.values(nombre=F('motivo__nombre')).annotate(
                 total=Count('id')
             ).order_by('-total')[:10]
+        )
 
-            return JsonResponse({
-                "tipo": "movimiento",
-                "total_prestamos": prestamos.count(),
-                "demanda_area": list(demanda_area),
-                "motivos": list(motivos),
+        # --- EXPEDIENTE MÁS SOLICITADO ---
+        expedientes_top = list(
+            SolicitudExpedienteDetalle.objects.filter(
+                solicitud__in=qs_solicitudes
+            ).values(
+                numero=F('expediente_prestamo__expediente__numero')
+            ).annotate(
+                total=Count('id')
+            ).order_by('-total')[:10]
+        )
+
+        # --- USUARIOS CON MÁS SOLICITUDES ---
+        usuarios_top = list(
+            qs_solicitudes.values(
+                username=F('usuario__username'),
+                nombre_completo=F('usuario__first_name'),
+            ).annotate(
+                total=Count('id')
+            ).order_by('-total')[:10]
+        )
+        # Construir nombre completo
+        for u in usuarios_top:
+            u['nombre'] = u.pop('nombre_completo', '') or u['username']
+
+        # --- RECHAZOS CON DETALLE ---
+        rechazos_qs = qs_solicitudes.filter(
+            estado_flujo_id='SOL_RECHAZADA'
+        ).select_related('usuario')
+        rechazos = []
+        for s in rechazos_qs:
+            try:
+                motivo_r = s.prestamo.motivo_rechazo or ""
+            except Prestamo.DoesNotExist:
+                motivo_r = ""
+            rechazos.append({
+                "solicitud_id": s.id,
+                "usuario": s.usuario.username,
+                "fecha": s.fecha_creacion.strftime("%d/%m/%Y %H:%M"),
+                "motivo_rechazo": motivo_r,
             })
 
-        elif tipo_reporte == 'incidencias':
-            ahora = timezone.now()
-            morosos = Prestamo.objects.filter(
-                estado__in=['Entregado', 'Vencido'],
-                fecha_limite__lt=ahora,
-                **filtros
-            ).select_related('solicitud__usuario')
+        # --- MOROSIDAD (préstamos vencidos activos) ---
+        ahora = timezone.now()
+        filtros_prestamo = {}
+        if fecha_inicio:
+            filtros_prestamo['fecha_aprobacion__gte'] = fecha_inicio
+        if fecha_fin:
+            filtros_prestamo['fecha_aprobacion__lte'] = fecha_fin + ' 23:59:59'
 
-            morosidad = []
-            for p in morosos:
-                morosidad.append({
-                    "prestamo_id": p.id,
-                    "usuario": p.solicitud.usuario.username,
-                    "area": p.solicitud.area_destino or "",
-                    "fecha_limite": p.fecha_limite.strftime("%d/%m/%Y %H:%M") if p.fecha_limite else "",
-                    "dias_vencido": (ahora - p.fecha_limite).days if p.fecha_limite else 0,
-                })
+        morosos = Prestamo.objects.filter(
+            estado__in=['Entregado', 'Vencido'],
+            fecha_limite__lt=ahora,
+            **filtros_prestamo
+        ).select_related('solicitud__usuario')
 
-            parciales = Prestamo.objects.filter(
-                estado='DevolucionParcial',
-                **filtros
-            ).select_related('solicitud__usuario')
-
-            inconsistencias = []
-            for p in parciales:
-                total = p.solicitud.detalles.count()
-                devueltos = sum(d.cantidad_recibida for d in p.devoluciones.all())
-                inconsistencias.append({
-                    "prestamo_id": p.id,
-                    "usuario": p.solicitud.usuario.username,
-                    "total_expedientes": total,
-                    "devueltos": devueltos,
-                    "faltantes": total - devueltos,
-                })
-
-            rechazos_filtros = {}
-            if fecha_inicio:
-                rechazos_filtros['fecha_creacion__gte'] = fecha_inicio
-            if fecha_fin:
-                rechazos_filtros['fecha_creacion__lte'] = fecha_fin + ' 23:59:59'
-
-            rechazos = SolicitudPrestamo.objects.filter(
-                estado_flujo_id='SOL_RECHAZADA',
-                **rechazos_filtros
-            ).select_related('usuario')
-
-            trazabilidad_rechazos = []
-            for s in rechazos:
-                try:
-                    motivo = s.prestamo.motivo_rechazo or ""
-                except Prestamo.DoesNotExist:
-                    motivo = ""
-                trazabilidad_rechazos.append({
-                    "solicitud_id": s.id,
-                    "usuario": s.usuario.username,
-                    "fecha": s.fecha_creacion.strftime("%d/%m/%Y %H:%M"),
-                    "motivo_rechazo": motivo,
-                })
-
-            return JsonResponse({
-                "tipo": "incidencias",
-                "morosidad": morosidad,
-                "inconsistencias": inconsistencias,
-                "rechazos": trazabilidad_rechazos,
+        morosidad = []
+        for p in morosos:
+            morosidad.append({
+                "prestamo_id": p.id,
+                "usuario": p.solicitud.usuario.username,
+                "area": p.solicitud.area_destino or "",
+                "fecha_limite": p.fecha_limite.strftime("%d/%m/%Y %H:%M") if p.fecha_limite else "",
+                "dias_vencido": (ahora - p.fecha_limite).days if p.fecha_limite else 0,
             })
 
-        return JsonResponse({"error": "Tipo de reporte inválido"}, status=400)
+        # --- INCONSISTENCIAS (devoluciones parciales) ---
+        parciales = Prestamo.objects.filter(
+            estado='DevolucionParcial',
+            **filtros_prestamo
+        ).select_related('solicitud__usuario')
+
+        inconsistencias = []
+        for p in parciales:
+            total_exp = p.solicitud.detalles.count()
+            devueltos = sum(d.cantidad_recibida for d in p.devoluciones.all())
+            inconsistencias.append({
+                "prestamo_id": p.id,
+                "usuario": p.solicitud.usuario.username,
+                "total_expedientes": total_exp,
+                "devueltos": devueltos,
+                "faltantes": total_exp - devueltos,
+            })
+
+        return JsonResponse({
+            "resumen": {
+                "total_solicitudes": total_solicitudes,
+                "total_expedientes": total_expedientes_solicitados,
+                "aprobadas": total_aprobadas,
+                "rechazadas": total_rechazadas,
+                "pendientes": total_pendientes,
+            },
+            "demanda_area": demanda_area,
+            "motivos": motivos,
+            "expedientes_top": expedientes_top,
+            "usuarios_top": usuarios_top,
+            "rechazos": rechazos,
+            "morosidad": morosidad,
+            "inconsistencias": inconsistencias,
+        })
 
     except Exception as e:
         logger.error(f"Error en reportes_data_api: {e}", exc_info=True)
         return JsonResponse({"error": "Error interno del servidor"}, status=500)
+
 
 
 # ============================================

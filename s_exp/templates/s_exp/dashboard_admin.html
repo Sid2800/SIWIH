@@ -5,68 +5,12 @@
 {% block title %}Dashboard Expedientes{% endblock title %}
 
 {% block extra_css %}
-<style>
-    .sexp-dashboard { display:flex; flex-direction:column; gap:1.5rem; }
-
-    .sexp-kpi-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(200px,1fr)); gap:1rem; }
-    .sexp-kpi-card {
-        background-color: var(--blanco);
-        border-radius: 1rem; padding: 1.2rem;
-        display: flex; flex-direction: column; gap: 0.5rem;
-        border-left: 4px solid var(--kpi-color, #6366f1);
-        transition: transform .2s; color: var(--colorTablacelda);
-    }
-    .sexp-kpi-card:hover { transform: translateY(-2px); }
-    .sexp-kpi-card__valor { font-size: 2rem; font-weight: 700; color: var(--kpi-color, #6366f1); }
-    .sexp-kpi-card__titulo { font-size: 0.85rem; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.05em; }
-    .sexp-kpi-card--disponible { --kpi-color: #22c55e; }
-    .sexp-kpi-card--prestado { --kpi-color: #f59e0b; }
-    .sexp-kpi-card--pendiente { --kpi-color: #6366f1; }
-    .sexp-kpi-card--vencido { --kpi-color: #ef4444; }
-    .sexp-kpi-card--parcial { --kpi-color: #f97316; }
-    .sexp-kpi-card--proximo { --kpi-color: #eab308; }
-    .sexp-kpi-card--total { --kpi-color: #8b5cf6; }
-    .sexp-kpi-card--baja { --kpi-color: #64748b; }
-
-    /* Nav sub-módulos */
-    .sexp-nav-modulos { display:flex; gap:1.4rem; flex-wrap:wrap; margin-bottom:1rem; }
-    .sexp-nav-link {
-        padding: 0.6rem 1.2rem; border-radius: 1rem;
-        background-color: var(--blanco); border: 1px solid var(--colorLinea);
-        text-decoration: none; color: var(--colorTablacelda);
-        display: flex; align-items: center; gap: 0.5rem;
-        font-size: 1.4rem; font-family: var(--fuenteCuerpo);
-        transition: background-color .2s, transform .2s;
-    }
-    .sexp-nav-link:hover {
-        background-color: var(--colorMenuHover); color: var(--colorMenuTextoHover);
-        transform: translateY(-1px);
-    }
-    .sexp-nav-link--active {
-        background-color: var(--colorBoton); color: var(--colorTextoBoton);
-        border-color: var(--colorBoton);
-    }
-
-    .sexp-section-title {
-        font-size: 1.4rem; font-weight: 600; margin-bottom: 1.4rem;
-        display: flex; align-items: center; gap: 0.5rem;
-        color: var(--colorTablacelda);
-    }
-
-    .sexp-alerta-tabla { width:100%; border-collapse:collapse; font-size:0.85rem; color: var(--colorTablacelda); }
-    .sexp-alerta-tabla th { text-align:left; padding:0.6rem; opacity:0.7; border-bottom:1px solid var(--colorLinea); }
-    .sexp-alerta-tabla td { padding:0.6rem; border-bottom:1px solid var(--colorLinea); }
-
-    .sexp-badge { padding: 0.25rem 0.6rem; border-radius: 2rem; font-size: 1.2rem; font-weight: 600; }
-    .sexp-badge--vencido { background: rgba(239,68,68,0.15); color: #ef4444; }
-    .sexp-badge--proximo { background: rgba(234,179,8,0.15); color: #eab308; }
-    .sexp-badge--parcial { background: rgba(249,115,22,0.15); color: #f97316; }
-</style>
+<link rel="stylesheet" href="{% static 'core/css/s_exp.css' %}">
 {% endblock extra_css %}
 
 {% block content %}
 <div class="contenedor2">
-    <div class="tituloFormulario" style="margin-bottom: 1.5rem;">
+    <div class="tituloFormulario sexp-margin-bottom-15">
         <div class="tituloFormulario-texto">
             <i class="bi bi-folder2-open"></i>
             <h2 class="sin-margen">Dashboard — Préstamo de Expedientes</h2>

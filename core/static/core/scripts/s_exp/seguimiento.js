@@ -1,19 +1,67 @@
 /**
  * Seguimiento de Solicitudes - s_exp
- * Muestra las solicitudes del usuario con timeline visual.
+ * Muestra las solicitudes del usuario con timeline visual y filtros de fecha.
  */
+
+// Estado actual del filtro
+let filtroActual = '';
+let fechaInicioActual = '';
+let fechaFinActual = '';
+
 $(document).ready(function () {
     cargarMisSolicitudes();
-    // Refresco cada 30 segundos
-    setInterval(cargarMisSolicitudes, 30000);
+    // Refresco cada 30 segundos con el filtro actual
+    setInterval(() => cargarMisSolicitudes(filtroActual, fechaInicioActual, fechaFinActual), 30000);
+
+    // Manejadores de botones de filtro
+    $(document).on('click', '.sexp-filtro-btn[data-filtro]', function () {
+        const filtro = $(this).data('filtro');
+
+        // Actualizar botón activo
+        $('.sexp-filtro-btn[data-filtro]').removeClass('sexp-filtro-btn--active');
+        $(this).addClass('sexp-filtro-btn--active');
+
+        // Mostrar/ocultar panel de rango
+        if (filtro === 'rango') {
+            $('#rango-fechas').show();
+            return; // No cargar aún, esperar que aplique el rango
+        } else {
+            $('#rango-fechas').hide();
+            fechaInicioActual = '';
+            fechaFinActual = '';
+        }
+
+        filtroActual = filtro;
+        cargarMisSolicitudes(filtro);
+    });
+
+    // Aplicar rango de fechas personalizado
+    $('#btn-aplicar-rango').on('click', function () {
+        fechaInicioActual = $('#fecha-inicio').val();
+        fechaFinActual = $('#fecha-fin').val();
+        filtroActual = 'rango';
+        cargarMisSolicitudes('rango', fechaInicioActual, fechaFinActual);
+    });
 });
 
-function cargarMisSolicitudes() {
+/**
+ * Carga y renderiza las solicitudes del usuario, opcionalmente filtradas por fecha.
+ * @param {string} filtro - 'hoy', 'semana', 'mes', 'rango' o '' para todas.
+ * @param {string} fechaInicio - Fecha inicio (YYYY-MM-DD) cuando filtro='rango'.
+ * @param {string} fechaFin - Fecha fin (YYYY-MM-DD) cuando filtro='rango'.
+ */
+function cargarMisSolicitudes(filtro = '', fechaInicio = '', fechaFin = '') {
+    const params = {};
+    if (filtro) params.filtro = filtro;
+    if (fechaInicio) params.fecha_inicio = fechaInicio;
+    if (fechaFin) params.fecha_fin = fechaFin;
+
     $.ajax({
         url: window.urls.s_exp_mis_solicitudes_api,
         method: 'GET',
+        data: params,
         success: function (resp) {
-            renderSolicitudes(resp.data);
+            renderSolicitudes(resp.data, filtro);
         },
         error: function () {
             toastr.error("Error al cargar solicitudes");
@@ -21,11 +69,14 @@ function cargarMisSolicitudes() {
     });
 }
 
-function renderSolicitudes(data) {
+function renderSolicitudes(data, filtro = '') {
     const container = $('#timeline-solicitudes');
 
     if (!data.length) {
-        container.html('<p style="opacity:0.5; text-align:center;">No tiene solicitudes registradas. <a href="' + window.urls.s_exp_buscador + '" style="color:var(--negro);">Crear una nueva</a></p>');
+        const msgFiltro = filtro
+            ? `No hay solicitudes para el período seleccionado.`
+            : `No tiene solicitudes registradas. <a href="${window.urls.s_exp_buscador}" style="color:var(--negro);">Crear una nueva</a>`;
+        container.html(`<p style="opacity:0.5; text-align:center;">${msgFiltro}</p>`);
         return;
     }
 
@@ -53,23 +104,32 @@ function renderSolicitudes(data) {
             'sol_en_devolucion': '#8b5cf6'
         };
 
-        const exps = s.expedientes.map(n => `<span class="sexp-exp-tag">#${n}</span>`).join(' ');
+        const exps = s.expedientes.map(e => {
+            const claseExtra = e.fuera_de_tiempo ? 'sexp-exp-tag--late' : '';
+            const title = e.fuera_de_tiempo ? 'Entregado fuera de tiempo' : '';
+            const num = typeof e === 'object' ? e.numero : e;
+            return `<span class="sexp-exp-tag ${claseExtra}" title="${title}">#${num}</span>`;
+        }).join(' ');
         const badgeEstilo = badgeEstilos[claseEstado] || '';
         const borderColor = borderColors[claseEstado] || '#6366f1';
 
         html += `
-        <div class="sexp-sol-card" style="border-left-color:${borderColor};">
-            <div class="sexp-sol-header">
+        <div class="sexp-sol-card sexp-card-collapsible sexp-collapsed" style="border-left-color:${borderColor};">
+            <div class="sexp-sol-header" onclick="toggleCard(this)">
                 <h3><i class="bi bi-file-text"></i> Solicitud #${s.id}</h3>
-                <span class="sexp-sol-badge" style="${badgeEstilo}padding:0.25rem 0.8rem;border-radius:20px;font-size:1.2rem;font-weight:700;">${s.estado_flujo_nombre}</span>
+                <div style="display:flex; align-items:center; gap:0.8rem;">
+                    <span class="sexp-sol-badge" style="${badgeEstilo}padding:0.25rem 0.8rem;border-radius:20px;font-size:1.2rem;font-weight:700;">${s.estado_flujo_nombre}</span>
+                    <i class="bi bi-chevron-down sexp-card-toggle"></i>
+                </div>
             </div>
-            <div class="sexp-sol-info">
-                <div><label>Fecha</label>${s.fecha_creacion}</div>
-                <div><label>Motivo</label>${s.motivo}</div>
-                <div><label>Área</label>${s.area_destino || '-'}</div>
-                <div><label>Expedientes</label>${s.cant_expedientes}</div>
-            </div>
-            <div class="sexp-sol-exps">${exps}</div>`;
+            <div class="sexp-card-body">
+                <div class="sexp-sol-info">
+                    <div><label>Fecha</label>${s.fecha_creacion}</div>
+                    <div><label>Motivo</label>${s.motivo}</div>
+                    <div><label>Área</label>${s.area_destino || '-'}</div>
+                    <div><label>Expedientes</label>${s.cant_expedientes}</div>
+                </div>
+                <div class="sexp-sol-exps">${exps}</div>`;
 
         // Info del préstamo si existe
         if (s.prestamo) {
@@ -118,7 +178,7 @@ function renderSolicitudes(data) {
             }
         }
 
-        html += `</div>`;
+        html += `</div></div>`;
     });
 
     container.html(html);
@@ -126,8 +186,6 @@ function renderSolicitudes(data) {
 
 function solicitarDevolucion(solicitudId) {
     Swal.fire({
-        color: 'var(--negro)',
-        background: 'var(--blanco)',
         title: 'Solicitar Devolución',
         text: '¿Desea iniciar el proceso de devolución? Entregue los expedientes físicos al administrador para su revisión.',
         icon: 'question',
@@ -156,4 +214,15 @@ function solicitarDevolucion(solicitudId) {
             });
         }
     });
+}
+
+/**
+ * Alterna el estado colapsado/expandido de una tarjeta en móviles.
+ * @param {HTMLElement} headerEl - El elemento header que recibió el click.
+ */
+function toggleCard(headerEl) {
+    if (window.innerWidth <= 768) {
+        const card = $(headerEl).closest('.sexp-card-collapsible');
+        card.toggleClass('sexp-collapsed');
+    }
 }

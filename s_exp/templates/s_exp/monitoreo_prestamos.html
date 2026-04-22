@@ -10,7 +10,7 @@
 
 {% block content %}
 <div class="contenedor2 dataTables_wrapper">
-    <div class="tituloFormulario" style="margin-bottom: 1.5rem;">
+    <div class="tituloFormulario sexp-margin-bottom-15">
         <div class="tituloFormulario-texto">
             <i class="bi bi-binoculars"></i>
             <h2 class="sin-margen">Monitoreo de Préstamos Activos</h2>
@@ -40,11 +40,16 @@
         </a>
     </div>
 
-    <div class="sexp-filtros">
-        <button class="sexp-filtro-btn active" data-estado="">Todos</button>
-        <button class="sexp-filtro-btn" data-estado="Activo">Aprobados (sin entregar)</button>
-        <button class="sexp-filtro-btn" data-estado="Entregado">Entregados</button>
-        <button class="sexp-filtro-btn" data-estado="DevolucionParcial">Devolución Parcial</button>
+    <div class="sexp-filtros sexp-flex-between">
+        <div class="sexp-flex-gap-1">
+            <button class="sexp-filtro-btn active" data-estado="">Todos</button>
+            <button class="sexp-filtro-btn" data-estado="Activo">Aprobados (sin entregar)</button>
+            <button class="sexp-filtro-btn" data-estado="Entregado">Entregados</button>
+            <button class="sexp-filtro-btn" data-estado="DevolucionParcial">Devolución Parcial</button>
+        </div>
+        <button id="btn-refresh-prestamos" class="sexp-nav-link sexp-btn-refresh">
+            <i class="bi bi-arrow-clockwise"></i> Actualizar
+        </button>
     </div>
 
     <table id="tabla_prestamos" class="dataTable stripe hover row-border" style="width:100%">

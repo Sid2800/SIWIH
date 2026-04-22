@@ -10,7 +10,7 @@
 
 {% block content %}
 <div class="contenedor2">
-    <div class="tituloFormulario" style="margin-bottom: 1.5rem;">
+    <div class="tituloFormulario sexp-margin-bottom-15">
         <div class="tituloFormulario-texto">
             <i class="bi bi-bar-chart-line"></i>
             <h2 class="sin-margen">Reportes — Préstamo de Expedientes</h2>
@@ -65,44 +65,95 @@
         <button class="sexp-filtro-btn" id="btn-generar-reporte">
             <i class="bi bi-funnel"></i> Generar
         </button>
+        <button class="sexp-filtro-btn sexp-filtro-btn--export" id="btn-exportar-excel">
+            <i class="bi bi-file-earmark-spreadsheet"></i> Excel
+        </button>
+        <button class="sexp-filtro-btn" id="btn-exportar-pdf" style="background:#ef4444;color:#fff;">
+            <i class="bi bi-file-earmark-pdf"></i> PDF
+        </button>
     </div>
 
     <!-- Tabs -->
     <div class="sexp-tabs">
-        <button class="sexp-tab active" data-tab="movimiento">
-            <i class="bi bi-graph-up"></i> Movimiento
+        <button class="sexp-tab active" data-tab="resumen">
+            <i class="bi bi-speedometer2"></i> Resumen
+        </button>
+        <button class="sexp-tab" data-tab="detalle">
+            <i class="bi bi-table"></i> Detalle por Ranking
         </button>
         <button class="sexp-tab" data-tab="incidencias">
-            <i class="bi bi-exclamation-triangle"></i> Incidencias y Auditoría
+            <i class="bi bi-exclamation-triangle"></i> Incidencias
         </button>
     </div>
 
-    <!-- Tab: Movimiento -->
-    <div class="sexp-tab-content active" id="tab-movimiento">
+    <!-- Tab: Resumen General -->
+    <div class="sexp-tab-content active" id="tab-resumen">
+        <!-- KPIs -->
+        <div class="sexp-kpi-grid" style="margin-bottom:2rem;">
+            <div class="sexp-kpi-card" style="--kpi-color:#6366f1;">
+                <span class="sexp-kpi-card__valor" id="kpi-total-solicitudes">0</span>
+                <span class="sexp-kpi-card__titulo">Solicitudes</span>
+            </div>
+            <div class="sexp-kpi-card" style="--kpi-color:#f59e0b;">
+                <span class="sexp-kpi-card__valor" id="kpi-total-expedientes">0</span>
+                <span class="sexp-kpi-card__titulo">Expedientes Solicitados</span>
+            </div>
+            <div class="sexp-kpi-card" style="--kpi-color:#22c55e;">
+                <span class="sexp-kpi-card__valor" id="kpi-aprobadas">0</span>
+                <span class="sexp-kpi-card__titulo">Aprobadas</span>
+            </div>
+            <div class="sexp-kpi-card" style="--kpi-color:#ef4444;">
+                <span class="sexp-kpi-card__valor" id="kpi-rechazadas">0</span>
+                <span class="sexp-kpi-card__titulo">Rechazadas</span>
+            </div>
+            <div class="sexp-kpi-card" style="--kpi-color:#8b5cf6;">
+                <span class="sexp-kpi-card__valor" id="kpi-pendientes">0</span>
+                <span class="sexp-kpi-card__titulo">Pendientes</span>
+            </div>
+        </div>
+
+        <!-- Tablas resumen -->
         <div class="sexp-reportes-grid">
             <div class="sexp-reporte-card">
-                <h3><i class="bi bi-bar-chart"></i> Volumen de Préstamos</h3>
-                <div id="reporte-volumen" style="text-align:center; padding:1rem; opacity:0.5;">
-                    Presione "Generar" para cargar datos.
-                </div>
-            </div>
-            <div class="sexp-reporte-card">
                 <h3><i class="bi bi-building"></i> Demanda por Área</h3>
-                <div id="reporte-areas">
-                    <table class="sexp-reporte-tabla">
-                        <thead><tr><th>Área</th><th>Solicitudes</th></tr></thead>
-                        <tbody id="tbody-areas"></tbody>
-                    </table>
-                </div>
+                <table class="sexp-reporte-tabla">
+                    <thead><tr><th>Área</th><th>Solicitudes</th></tr></thead>
+                    <tbody id="tbody-areas"></tbody>
+                </table>
             </div>
             <div class="sexp-reporte-card">
                 <h3><i class="bi bi-pie-chart"></i> Motivos de Uso</h3>
-                <div id="reporte-motivos">
-                    <table class="sexp-reporte-tabla">
-                        <thead><tr><th>Motivo</th><th>Cantidad</th></tr></thead>
-                        <tbody id="tbody-motivos"></tbody>
-                    </table>
-                </div>
+                <table class="sexp-reporte-tabla">
+                    <thead><tr><th>Motivo</th><th>Cantidad</th></tr></thead>
+                    <tbody id="tbody-motivos"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab: Detalle por Ranking -->
+    <div class="sexp-tab-content" id="tab-detalle">
+        <div class="sexp-reportes-grid">
+            <div class="sexp-reporte-card">
+                <h3><i class="bi bi-file-text"></i> Expedientes Más Solicitados</h3>
+                <table class="sexp-reporte-tabla">
+                    <thead><tr><th># Expediente</th><th>Veces Solicitado</th></tr></thead>
+                    <tbody id="tbody-expedientes-top"></tbody>
+                </table>
+            </div>
+            <div class="sexp-reporte-card">
+                <h3><i class="bi bi-person-badge"></i> Usuarios con Más Solicitudes</h3>
+                <table class="sexp-reporte-tabla">
+                    <thead><tr><th>Usuario</th><th>Solicitudes</th></tr></thead>
+                    <tbody id="tbody-usuarios-top"></tbody>
+                </table>
+            </div>
+            <div class="sexp-reporte-card">
+                <h3><i class="bi bi-x-circle" style="color:#ef4444;"></i> Trazabilidad de Rechazos</h3>
+                <table class="sexp-reporte-tabla">
+                    <thead><tr><th>Solicitud</th><th>Usuario</th><th>Fecha</th><th>Motivo</th></tr></thead>
+                    <tbody id="tbody-rechazos"></tbody>
+                </table>
             </div>
         </div>
     </div>
@@ -111,7 +162,7 @@
     <div class="sexp-tab-content" id="tab-incidencias">
         <div class="sexp-reportes-grid">
             <div class="sexp-reporte-card">
-                <h3><i class="bi bi-alarm" style="color:#ef4444;"></i> Morosidad</h3>
+                <h3><i class="bi bi-alarm" style="color:var(--colorEliminarRojo);"></i> Morosidad</h3>
                 <table class="sexp-reporte-tabla">
                     <thead><tr><th>Préstamo</th><th>Usuario</th><th>Área</th><th>Días Vencido</th></tr></thead>
                     <tbody id="tbody-morosidad"></tbody>
@@ -122,13 +173,6 @@
                 <table class="sexp-reporte-tabla">
                     <thead><tr><th>Préstamo</th><th>Usuario</th><th>Total</th><th>Devueltos</th><th>Faltantes</th></tr></thead>
                     <tbody id="tbody-inconsistencias"></tbody>
-                </table>
-            </div>
-            <div class="sexp-reporte-card">
-                <h3><i class="bi bi-x-circle" style="color:#ef4444;"></i> Trazabilidad de Rechazos</h3>
-                <table class="sexp-reporte-tabla">
-                    <thead><tr><th>Solicitud</th><th>Usuario</th><th>Fecha</th><th>Motivo</th></tr></thead>
-                    <tbody id="tbody-rechazos"></tbody>
                 </table>
             </div>
         </div>

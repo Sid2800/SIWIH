@@ -1,6 +1,13 @@
 /**
  * Gestión de Solicitudes - s_exp
  * DataTable con server-side processing y acciones de aprobación/rechazo.
+ * 
+ * Funciones principales:
+ *   initTabla()           - Inicializa el DataTable con columnas y server-side processing.
+ *   initFiltros()         - Configura los botones de filtro de estado.
+ *   aprobarSolicitud(id)  - Abre modal para aprobar con tiempo configurable (horas/minutos).
+ *   rechazarSolicitud(id) - Abre modal para rechazar con motivo obligatorio.
+ *   marcarListo(id)       - Confirma que los expedientes están organizados para recoger.
  */
 let tablaSolicitudes;
 let estadoFiltro = '';
@@ -8,8 +15,16 @@ let estadoFiltro = '';
 $(document).ready(function () {
     initTabla();
     initFiltros();
+
+    $('#btn-refresh-solicitudes').on('click', function () {
+        tablaSolicitudes.ajax.reload();
+    });
 });
 
+/**
+ * Inicializa el DataTable de gestión de solicitudes.
+ * Carga datos desde el servidor con paginación, ordenamiento y búsqueda.
+ */
 function initTabla() {
     tablaSolicitudes = $('#tabla_solicitudes').DataTable({
         processing: true,
@@ -25,14 +40,20 @@ function initTabla() {
             {
                 data: null,
                 render: function (data) {
-                    return `<div><strong>${data.usuario_nombre}</strong><br><small style="opacity:0.6;">${data.usuario}</small></div>`;
+                    return `<div><strong>${data.usuario_nombre}</strong><br><small class="sexp-opacity-6">${data.usuario}</small></div>`;
                 }
             },
             { data: 'fecha_creacion' },
             {
                 data: 'expedientes',
                 render: function (data) {
-                    return data.map(n => `<span class="sexp-exp-tag">#${n}</span>`).join(' ');
+                    return data.map(e => {
+                        const num = typeof e === 'object' ? e.numero : e;
+                        const esFuera = e.fuera_de_tiempo;
+                        const cls = esFuera ? 'sexp-exp-tag sexp-exp-tag--late' : 'sexp-exp-tag';
+                        const title = esFuera ? 'Entregado fuera de tiempo' : '';
+                        return `<span class="${cls}" title="${title}">#${num}</span>`;
+                    }).join(' ');
                 }
             },
             {
@@ -45,19 +66,9 @@ function initTabla() {
             {
                 data: 'estado_flujo',
                 render: function (data, type, row) {
-                    const clases = {
-                        'SOL_PENDIENTE': 'background:rgba(99,102,241,0.2);color:var(--negro);',
-                        'SOL_APROBADA_ORGANIZANDO': 'background:rgba(34,197,94,0.2);color:var(--negro);',
-                        'SOL_RECHAZADA': 'background:rgba(239,68,68,0.2);color:var(--negro);',
-                        'SOL_LISTO_RECOGER': 'background:rgba(16,185,129,0.2);color:var(--negro);',
-                        'SOL_EN_PRESTAMO': 'background:rgba(245,158,11,0.2);color:var(--negro);',
-                        'SOL_EN_DEVOLUCION': 'background:rgba(139,92,246,0.2);color:var(--negro);',
-                        'SOL_INCOMPLETA': 'background:rgba(249,115,22,0.2);color:var(--negro);',
-                        'SOL_FINALIZADA': 'background:rgba(100,116,139,0.2);color:var(--negro);'
-                    };
-                    const estilo = clases[data] || '';
                     const nombre = row.estado_flujo_nombre || data;
-                    return `<span style="padding:0.25rem 0.6rem;border-radius:20px;font-size:1.2rem;font-weight:600;${estilo}">${nombre}</span>`;
+                    const cls = 'sexp-estado-badge sexp-estado-badge--' + data.toLowerCase().replace('sol_', '');
+                    return `<span class="${cls}">${nombre}</span>`;
                 }
             },
             {
@@ -66,18 +77,18 @@ function initTabla() {
                 render: function (data) {
                     if (data.estado_flujo === 'SOL_PENDIENTE') {
                         return `
-                            <div style="display:flex;gap:0.3rem;">
-                                <button class="formularioBotones-boton" style="background:#22c55e;color:var(--negro);border:none;padding:0.3rem 0.6rem;border-radius:6px;cursor:pointer;font-size:1.3rem;" onclick="aprobarSolicitud(${data.id})">
+                            <div class="sexp-action-group">
+                                <button class="sexp-action-btn sexp-action-btn--aprobar" onclick="aprobarSolicitud(${data.id})">
                                     <i class="bi bi-check-lg"></i> Aprobar
                                 </button>
-                                <button class="formularioBotones-boton" style="background:#ef4444;color:var(--negro);border:none;padding:0.3rem 0.6rem;border-radius:6px;cursor:pointer;font-size:1.3rem;" onclick="rechazarSolicitud(${data.id})">
+                                <button class="sexp-action-btn sexp-action-btn--rechazar" onclick="rechazarSolicitud(${data.id})">
                                     <i class="bi bi-x-lg"></i> Rechazar
                                 </button>
                             </div>`;
                     }
                     if (data.estado_flujo === 'SOL_APROBADA_ORGANIZANDO') {
                         return `
-                            <button class="formularioBotones-boton" style="background:#10b981;color:var(--negro);border:none;padding:0.3rem 0.6rem;border-radius:6px;cursor:pointer;font-size:1.3rem;" onclick="marcarListo(${data.id})">
+                            <button class="sexp-action-btn sexp-action-btn--listo" onclick="marcarListo(${data.id})">
                                 <i class="bi bi-box-seam"></i> Marcar Listo
                             </button>`;
                     }
@@ -102,6 +113,10 @@ function initTabla() {
     });
 }
 
+/**
+ * Configura los botones de filtro de estado en la barra superior.
+ * Al hacer clic en un filtro, recarga el DataTable con el estado seleccionado.
+ */
 function initFiltros() {
     $('.sexp-filtro-btn').on('click', function () {
         $('.sexp-filtro-btn').removeClass('active');
@@ -111,32 +126,71 @@ function initFiltros() {
     });
 }
 
+/**
+ * Abre el modal de aprobación de una solicitud.
+ * Permite configurar el tiempo límite en horas (producción) o minutos (pruebas).
+ * Al cambiar la unidad, el valor y la validación se actualizan dinámicamente.
+ * 
+ * @param {number} id - ID de la solicitud a aprobar.
+ */
 function aprobarSolicitud(id) {
     Swal.fire({
-        color: 'var(--negro)',
-        background: 'var(--blanco)',
         title: 'Aprobar Solicitud #' + id,
-        html: `<div style="color:var(--negro);">
+        html: `<div style="text-align:left;">
             <div class="sexp-modal-campo">
-                <label>Tiempo límite (horas, mínimo 24)</label>
-                <input type="number" id="swal-tiempo" min="24" value="24" style="width:100%;padding:0.5rem;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.05);color:white;">
+                <label>Tiempo límite</label>
+                <div class="sexp-modal-tiempo-row">
+                    <input type="number" id="swal-tiempo" value="5" min="1" class="sexp-modal-input">
+                    <select id="swal-unidad" class="sexp-modal-select">
+                        <option value="minutos" selected>Minutos (Pruebas)</option>
+                        <option value="horas">Horas</option>
+                    </select>
+                </div>
+                <small id="swal-tiempo-hint" class="sexp-modal-hint">Modo pruebas: ingrese el tiempo en minutos.</small>
             </div>
             <div class="sexp-modal-campo">
                 <label>Comentarios (opcional)</label>
-                <textarea id="swal-comentarios" rows="2" style="width:100%;padding:0.5rem;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.05);color:white;"></textarea>
+                <textarea id="swal-comentarios" rows="2" class="sexp-modal-input"></textarea>
             </div></div>`,
         showCancelButton: true,
-        confirmButtonText: 'Aprobar',
+        confirmButtonText: '<i class="bi bi-check-lg"></i> Aprobar',
         cancelButtonText: 'Cancelar',
-        confirmButtonColor: '#22c55e',
+        confirmButtonColor: '#16a34a',
+        didOpen: () => {
+            // Al cambiar la unidad, actualizar hint y valor por defecto
+            const selUnidad = document.getElementById('swal-unidad');
+            const inputTiempo = document.getElementById('swal-tiempo');
+            const hint = document.getElementById('swal-tiempo-hint');
+
+            selUnidad.addEventListener('change', function () {
+                if (this.value === 'minutos') {
+                    inputTiempo.value = '5';
+                    inputTiempo.min = '1';
+                    hint.textContent = 'Modo pruebas: ingrese el tiempo en minutos.';
+                } else {
+                    inputTiempo.value = '24';
+                    inputTiempo.min = '24';
+                    hint.textContent = 'Mínimo 24 horas para producción.';
+                }
+            });
+        },
         preConfirm: () => {
             const tiempo = parseInt(document.getElementById('swal-tiempo').value);
-            if (tiempo < 24) {
-                Swal.showValidationMessage('El tiempo mínimo es de 24 horas');
+            const unidad = document.getElementById('swal-unidad').value;
+
+            if (isNaN(tiempo) || tiempo < 1) {
+                Swal.showValidationMessage('Ingrese un tiempo válido');
                 return false;
             }
+
+            if (unidad === 'horas' && tiempo < 24) {
+                Swal.showValidationMessage('El tiempo mínimo en horas es de 24');
+                return false;
+            }
+
             return {
                 tiempo: tiempo,
+                es_minutos: (unidad === 'minutos'),
                 comentarios: document.getElementById('swal-comentarios').value
             };
         }
@@ -150,6 +204,7 @@ function aprobarSolicitud(id) {
                 data: JSON.stringify({
                     solicitud_id: id,
                     tiempo_limite_horas: result.value.tiempo,
+                    es_minutos: result.value.es_minutos,
                     comentarios: result.value.comentarios
                 }),
                 success: function (resp) {
@@ -167,20 +222,24 @@ function aprobarSolicitud(id) {
     });
 }
 
+/**
+ * Abre el modal de rechazo de una solicitud.
+ * Requiere motivo obligatorio. Al rechazar, los expedientes apartados se liberan automáticamente.
+ * 
+ * @param {number} id - ID de la solicitud a rechazar.
+ */
 function rechazarSolicitud(id) {
     Swal.fire({
-        color: 'var(--negro)',
-        background: 'var(--blanco)',
         title: 'Rechazar Solicitud #' + id,
-        html: `<div style="color:var(--negro);">
+        html: `<div style="text-align:left;">
             <div class="sexp-modal-campo">
                 <label>Motivo de Rechazo *</label>
-                <textarea id="swal-motivo" rows="3" placeholder="Ingrese el motivo del rechazo (obligatorio)..." style="width:100%;padding:0.5rem;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.05);color:white;"></textarea>
+                <textarea id="swal-motivo" rows="3" placeholder="Ingrese el motivo del rechazo (obligatorio)..." class="sexp-modal-input"></textarea>
             </div></div>`,
         showCancelButton: true,
-        confirmButtonText: 'Rechazar',
+        confirmButtonText: '<i class="bi bi-x-lg"></i> Rechazar',
         cancelButtonText: 'Cancelar',
-        confirmButtonColor: '#ef4444',
+        confirmButtonColor: '#dc2626',
         preConfirm: () => {
             const motivo = document.getElementById('swal-motivo').value.trim();
             if (!motivo) {
@@ -215,17 +274,21 @@ function rechazarSolicitud(id) {
     });
 }
 
+/**
+ * Confirma que los expedientes de una solicitud están organizados y listos para recoger.
+ * Cambia el estado de la solicitud a 'SOL_LISTO_RECOGER'.
+ * 
+ * @param {number} id - ID de la solicitud a marcar como lista.
+ */
 function marcarListo(id) {
     Swal.fire({
-        color: 'var(--negro)',
-        background: 'var(--blanco)',
         title: '¿Confirmar que están listos?',
         text: 'La solicitud #' + id + ' pasará a "Listo para recoger".',
         icon: 'question',
         showCancelButton: true,
         confirmButtonText: 'Sí, confirmar',
         cancelButtonText: 'Cancelar',
-        confirmButtonColor: '#10b981'
+        confirmButtonColor: '#059669'
     }).then((result) => {
         if (result.isConfirmed) {
             $.ajax({

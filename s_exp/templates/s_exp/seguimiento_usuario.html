@@ -10,7 +10,7 @@
 
 {% block content %}
 <div class="contenedor2">
-    <div class="tituloFormulario" style="margin-bottom: 1.5rem;">
+    <div class="tituloFormulario sexp-margin-bottom-15">
         <div class="tituloFormulario-texto">
             <i class="bi bi-clock-history"></i>
             <h2 class="sin-margen">Seguimiento de Mis Solicitudes</h2>
@@ -41,8 +41,26 @@
         {% endif %}
     </div>
 
+    <!-- Barra de filtros de fecha -->
+    <div class="sexp-filtros-fecha">
+        <button class="sexp-filtro-btn sexp-filtro-btn--active" data-filtro="">Todos</button>
+        <button class="sexp-filtro-btn" data-filtro="hoy">Hoy</button>
+        <button class="sexp-filtro-btn" data-filtro="semana">Esta semana</button>
+        <button class="sexp-filtro-btn" data-filtro="mes">Este mes</button>
+        <button class="sexp-filtro-btn" data-filtro="rango">
+            <i class="bi bi-calendar-range"></i> Rango
+        </button>
+        <!-- Rango de fechas (oculto por defecto) -->
+        <div class="sexp-rango-fechas" id="rango-fechas" style="display:none;">
+            <input type="date" id="fecha-inicio" class="sexp-fecha-input" placeholder="Fecha inicio">
+            <span>—</span>
+            <input type="date" id="fecha-fin" class="sexp-fecha-input" placeholder="Fecha fin">
+            <button class="sexp-filtro-btn" id="btn-aplicar-rango">Aplicar</button>
+        </div>
+    </div>
+
     <div class="sexp-timeline" id="timeline-solicitudes">
-        <p style="opacity:0.5; text-align:center;">Cargando solicitudes...</p>
+        <p class="sexp-opacity-5 sexp-text-center">Cargando solicitudes...</p>
     </div>
 </div>
 {% endblock content %}

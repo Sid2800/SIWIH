@@ -10,7 +10,7 @@
 
 {% block content %}
 <div class="contenedor2 dataTables_wrapper">
-    <div class="tituloFormulario" style="margin-bottom: 1.5rem;">
+    <div class="tituloFormulario sexp-margin-bottom-15">
         <div class="tituloFormulario-texto">
             <i class="bi bi-inbox"></i>
             <h2 class="sin-margen">Gestión de Solicitudes de Préstamo</h2>
@@ -40,16 +40,21 @@
         </a>
     </div>
 
-    <div class="sexp-filtros">
-        <button class="sexp-filtro-btn active" data-estado="">Todas</button>
-        <button class="sexp-filtro-btn" data-estado="SOL_PENDIENTE">Pendientes</button>
-        <button class="sexp-filtro-btn" data-estado="SOL_APROBADA_ORGANIZANDO">En preparación</button>
-        <button class="sexp-filtro-btn" data-estado="SOL_LISTO_RECOGER">Listas</button>
-        <button class="sexp-filtro-btn" data-estado="SOL_RECHAZADA">Rechazadas</button>
-        <button class="sexp-filtro-btn" data-estado="SOL_EN_PRESTAMO">En Préstamo</button>
-        <button class="sexp-filtro-btn" data-estado="SOL_EN_DEVOLUCION">En Devolución</button>
-        <button class="sexp-filtro-btn" data-estado="SOL_INCOMPLETA">Incompletas</button>
-        <button class="sexp-filtro-btn" data-estado="SOL_FINALIZADA">Finalizadas</button>
+    <div class="sexp-filtros sexp-flex-between">
+        <div class="sexp-flex-gap-1">
+            <button class="sexp-filtro-btn active" data-estado="">Todas</button>
+            <button class="sexp-filtro-btn" data-estado="SOL_PENDIENTE">Pendientes</button>
+            <button class="sexp-filtro-btn" data-estado="SOL_APROBADA_ORGANIZANDO">En preparación</button>
+            <button class="sexp-filtro-btn" data-estado="SOL_LISTO_RECOGER">Listas</button>
+            <button class="sexp-filtro-btn" data-estado="SOL_RECHAZADA">Rechazadas</button>
+            <button class="sexp-filtro-btn" data-estado="SOL_EN_PRESTAMO">En Préstamo</button>
+            <button class="sexp-filtro-btn" data-estado="SOL_EN_DEVOLUCION">En Devolución</button>
+            <button class="sexp-filtro-btn" data-estado="SOL_INCOMPLETA">Incompletas</button>
+            <button class="sexp-filtro-btn" data-estado="SOL_FINALIZADA">Finalizadas</button>
+        </div>
+        <button id="btn-refresh-solicitudes" class="sexp-nav-link sexp-btn-refresh">
+            <i class="bi bi-arrow-clockwise"></i> Actualizar
+        </button>
     </div>
 
     <table id="tabla_solicitudes" class="dataTable stripe hover row-border" style="width:100%">

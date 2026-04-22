@@ -2555,7 +2555,6 @@ no logro establecer una clase perzonalizada */
    text-decoration: underline;
 }
 
-
 /* Contenedor de botones de acción: layout y ancho */
 .contener-modal-contenedor-botones {
    flex-direction: row;

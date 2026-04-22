@@ -140,7 +140,7 @@
             {% endif %}
 
 
-            {% if request.user|tiene_unidad:"Solicitante:DIRECTIVOS:Sala" %}
+            {% if request.user|tiene_unidad:"Estadistica:Sala" %}
             <li>
                <a href="{% url 's_exp_buscador' %}" class="bn-navegacion__enlace">
                   <i class="bi bi-folder2-open bn-navegacion-enlace__logo"></i>
@@ -436,6 +436,8 @@
          s_exp_info_usuario_api: "{% url 's_exp_info_usuario_api' %}",
          s_exp_historial_api: "{% url 's_exp_historial_api' %}",
          s_exp_historial_detalle_api: "{% url 's_exp_historial_detalle_api' solicitud_id=0 %}".replace('/0/', '/'),
+         s_exp_notificado_listo_api: "{% url 's_exp_notificado_listo_api' %}",
+         s_exp_vencimiento_leido_api: "{% url 's_exp_vencimiento_leido_api' %}",
 
       };
 
@@ -484,6 +486,7 @@
    <script src="{% static 'core/scripts/core/main.js' %}"></script>
 
    <script src="{% static 'core\scripts\media\controlGaleria.js' %}"></script>
+   <script src="{% static 'core/scripts/s_exp/notificaciones_globales.js' %}"></script>
 
 
 

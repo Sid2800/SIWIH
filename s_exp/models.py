@@ -59,6 +59,10 @@ class EstadoSolicitud(models.Model):
 # CATÁLOGO: ESTADOS DEL EXPEDIENTE FISICO
 # ============================================
 class EstadoExpedienteFisico(models.Model):
+    """
+    Define el estado físico actual de un expediente en el archivo
+    (ej. Disponible, Prestado, En Proceso de Ubicación).
+    """
     codigo = models.CharField(
         max_length=50,
         primary_key=True,
@@ -156,6 +160,10 @@ class SolicitudPrestamo(models.Model):
         related_name='solicitudes',
         verbose_name='Expedientes Solicitados'
     )
+    notificado_listo = models.BooleanField(
+        default=False,
+        verbose_name='Notificado al usuario (Listo para recoger)'
+    )
 
     class Meta:
         db_table = 's_exp_solicitudprestamo'
@@ -203,6 +211,10 @@ class SolicitudExpedienteDetalle(models.Model):
     devuelto = models.BooleanField(
         default=False,
         verbose_name='Devuelto'
+    )
+    fuera_de_tiempo = models.BooleanField(
+        default=False,
+        verbose_name='Entregado fuera de tiempo'
     )
 
     class Meta:
@@ -268,6 +280,11 @@ class Prestamo(models.Model):
         null=True,
         verbose_name='Comentarios del Admin'
     )
+    alerta_vencimiento_leida_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='Última alerta de vencimiento aceptada'
+    )
     estado = models.CharField(
         max_length=30,
         choices=ESTADO_CHOICES,
@@ -276,8 +293,13 @@ class Prestamo(models.Model):
     )
     tiempo_limite_horas = models.PositiveIntegerField(
         default=24,
-        verbose_name='Tiempo Límite (horas)',
-        help_text='Mínimo 24 horas. Configurable por préstamo.'
+        verbose_name='Tiempo Límite',
+        help_text='Configurable por préstamo. Representa horas por defecto o minutos si es_minutos es True.'
+    )
+    es_minutos = models.BooleanField(
+        default=False,
+        verbose_name='¿Es en minutos?',
+        help_text='Solo para pruebas. Si es True, el tiempo límite se cuenta en minutos.'
     )
 
     class Meta:

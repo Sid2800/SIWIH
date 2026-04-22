@@ -1,112 +1,134 @@
 /**
  * Monitoreo de Préstamos - s_exp
- * Carga préstamos activos y maneja cronómetros dinámicos.
+ * Utiliza DataTables con procesamiento en servidor y cronómetros dinámicos.
  */
+let tablaPrestamos;
 let timerIntervals = {};
+let estadoFiltro = '';
 
 $(document).ready(function () {
-    cargarPrestamos();
+    initTabla();
     initFiltros();
-    // Actualizar datos cada 2 minutos
-    setInterval(cargarPrestamos, 120000);
+
+    $('#btn-refresh-prestamos').on('click', function () {
+        tablaPrestamos.ajax.reload();
+    });
 });
+
+/**
+ * Inicializa el DataTable de monitoreo de préstamos.
+ */
+function initTabla() {
+    tablaPrestamos = $('#tabla_prestamos').DataTable({
+        processing: true,
+        serverSide: true,
+        ajax: {
+            url: window.urls.s_exp_prestamos_activos_api,
+            data: function (d) {
+                d.estado = estadoFiltro;
+            }
+        },
+        columns: [
+            { data: 'id', render: (data) => `#${data}` },
+            {
+                data: null,
+                render: function (data) {
+                    return `<div><strong>${data.usuario_nombre}</strong><br><small class="sexp-opacity-6">${data.usuario}</small></div>`;
+                }
+            },
+            { data: 'area_destino' },
+            {
+                data: 'expedientes',
+                render: function (data) {
+                    return data.map(n => `<span class="sexp-exp-tag">#${n}</span>`).join(' ');
+                }
+            },
+            {
+                data: 'estado',
+                render: function (data) {
+                    const estilos = {
+                        'Activo': 'background:rgba(99,102,241,0.2);color:var(--negro);',
+                        'Entregado': 'background:rgba(34,197,94,0.2);color:var(--negro);',
+                        'Vencido': 'background:rgba(239,68,68,0.2);color:var(--negro);',
+                        'DevolucionParcial': 'background:rgba(249,115,22,0.2);color:var(--negro);',
+                        'DevueltoVencido': 'background:rgba(239,68,68,0.15);color:var(--negro);border:1px solid #ef4444;',
+                        'Cerrado': 'background:rgba(100,116,139,0.2);color:var(--negro);'
+                    };
+                    const labels = {
+                        'Activo': 'Aprobado',
+                        'Entregado': 'En Préstamo',
+                        'Vencido': 'Vencido',
+                        'DevolucionParcial': 'Devolución Parcial',
+                        'DevueltoVencido': 'Devuelto Tarde',
+                        'Cerrado': 'Cerrado'
+                    };
+                    return `<span class="sexp-estado-badge" style="${estilos[data] || ''}">${labels[data] || data}</span>`;
+                }
+            },
+            {
+                data: null,
+                render: function (p) {
+                    if (p.estado === 'Entregado' && p.fecha_limite) {
+                        const timerId = 'timer-' + p.id;
+                        return `<div>
+                            <span class="sexp-timer" id="${timerId}" data-limite="${p.fecha_limite}" data-porcentaje="${p.porcentaje_tiempo_usado}">--:--:--</span>
+                            <div class="sexp-progress-bar">
+                                <div class="sexp-progress-fill" id="progress-${p.id}" style="width:${p.porcentaje_tiempo_usado}%"></div>
+                            </div>
+                        </div>`;
+                    } else if (p.estado === 'Activo') {
+                        return '<span class="sexp-opacity-5">Sin entregar</span>';
+                    }
+                    return '<span class="sexp-opacity-5">-</span>';
+                }
+            },
+            {
+                data: null,
+                orderable: false,
+                render: function (p) {
+                    if (p.estado === 'Activo' && p.solicitud_estado_flujo === 'SOL_LISTO_RECOGER') {
+                        return `<button class="sexp-action-btn sexp-action-btn--aprobar" onclick="marcarEntregado(${p.id})">
+                            <i class="bi bi-check2-square"></i> Entregar
+                        </button>`;
+                    } else if (p.estado === 'Activo') {
+                        return `<span class="sexp-status-hint"><i class="bi bi-hourglass-split"></i> Preparando...</span>`;
+                    }
+                    return '';
+                }
+            }
+        ],
+        order: [[0, 'desc']],
+        language: {
+            processing: "Cargando...",
+            search: "Buscar usuario/ID:",
+            lengthMenu: "Mostrar _MENU_",
+            info: "Mostrando _START_ a _END_ de _TOTAL_",
+            infoEmpty: "Sin préstamos",
+            infoFiltered: "(filtrado de _MAX_)",
+            paginate: { first: "Primero", last: "Último", next: "→", previous: "←" },
+            zeroRecords: "No se encontraron resultados"
+        },
+        drawCallback: function () {
+            // Reiniciar todos los cronómetros después de cada redibujado de la tabla
+            Object.values(timerIntervals).forEach(clearInterval);
+            timerIntervals = {};
+
+            $('.sexp-timer[data-limite]').each(function () {
+                const id = $(this).attr('id').replace('timer-', '');
+                const limite = $(this).data('limite');
+                const porcentaje = $(this).data('porcentaje');
+                iniciarCronometro(id, limite, porcentaje);
+            });
+        }
+    });
+}
 
 function initFiltros() {
     $('.sexp-filtro-btn').on('click', function () {
         $('.sexp-filtro-btn').removeClass('active');
         $(this).addClass('active');
-        cargarPrestamos($(this).data('estado'));
-    });
-}
-
-function cargarPrestamos(estado) {
-    // Limpiar timers anteriores
-    Object.values(timerIntervals).forEach(clearInterval);
-    timerIntervals = {};
-
-    let url = window.urls.s_exp_prestamos_activos_api;
-    if (estado) url += '?estado=' + estado;
-
-    $.ajax({
-        url: url,
-        method: 'GET',
-        success: function (resp) {
-            renderPrestamos(resp.data);
-        },
-        error: function () {
-            toastr.error("Error al cargar préstamos");
-        }
-    });
-}
-
-function renderPrestamos(data) {
-    const tbody = $('#tabla_prestamos tbody');
-    tbody.empty();
-
-    if (!data.length) {
-        tbody.html('<tr><td colspan="7" style="text-align:center;opacity:0.5;">No hay préstamos activos</td></tr>');
-        return;
-    }
-
-    data.forEach(function (p) {
-        const exps = p.expedientes.map(n => `<span class="sexp-exp-tag" style="background:rgba(99,102,241,0.2);color:var(--negro);padding:0.2rem 0.5rem;border-radius:4px;font-size:1.2rem;font-weight:600;">#${n}</span>`).join(' ');
-
-        let estadoBadge = '';
-        const estilosBadge = {
-            'Activo': 'background:rgba(99,102,241,0.2);color:var(--negro);',
-            'Entregado': 'background:rgba(245,158,11,0.2);color:var(--negro);',
-            'Vencido': 'background:rgba(239,68,68,0.2);color:var(--negro);',
-            'DevolucionParcial': 'background:rgba(249,115,22,0.2);color:var(--negro);',
-            'DevueltoVencido': 'background:rgba(239,68,68,0.15);color:var(--negro);border:1px solid #ef4444;',
-            'Cerrado': 'background:rgba(100,116,139,0.2);color:var(--negro);'
-        };
-        const labelBadge = {
-            'Activo': 'Activo',
-            'Entregado': 'Entregado',
-            'Vencido': 'Vencido',
-            'DevolucionParcial': 'Devolución Parcial',
-            'DevueltoVencido': 'Devuelto Fuera de Tiempo',
-            'Cerrado': 'Cerrado'
-        };
-        estadoBadge = `<span style="padding:0.25rem 0.6rem;border-radius:20px;font-size:1.2rem;font-weight:600;${estilosBadge[p.estado] || ''}">${labelBadge[p.estado] || p.estado}</span>`;
-
-        let timerHtml = '';
-        if (p.estado === 'Entregado' && p.fecha_limite) {
-            const timerId = 'timer-' + p.id;
-            timerHtml = `<div>
-                <span class="sexp-timer" id="${timerId}">--:--:--</span>
-                <div class="sexp-progress-bar">
-                    <div class="sexp-progress-fill" id="progress-${p.id}" style="width:${p.porcentaje_tiempo_usado}%"></div>
-                </div>
-            </div>`;
-            // Iniciar cronómetro
-            setTimeout(() => iniciarCronometro(p.id, p.fecha_limite, p.porcentaje_tiempo_usado), 100);
-        } else if (p.estado === 'Activo') {
-            timerHtml = '<span style="opacity:0.5;font-size:1.3rem;">Sin entregar</span>';
-        } else {
-            timerHtml = '<span style="opacity:0.5;font-size:1.3rem;">-</span>';
-        }
-
-        let acciones = '';
-        if (p.estado === 'Activo' && p.solicitud_estado_flujo === 'SOL_LISTO_RECOGER') {
-            acciones = `<button style="background:#22c55e;color:var(--negro);border:none;padding:0.3rem 0.6rem;border-radius:6px;cursor:pointer;font-size:1.3rem;font-weight:600;" onclick="marcarEntregado(${p.id})">
-                <i class="bi bi-check2-square"></i> Entregar
-            </button>`;
-        } else if (p.estado === 'Activo') {
-            acciones = `<span style="opacity:0.5; font-size:1.2rem; font-style:italic;"><i class="bi bi-hourglass-split"></i> Preparando...</span>`;
-        }
-
-        tbody.append(`
-            <tr>
-                <td>#${p.id}</td>
-                <td><strong>${p.usuario_nombre}</strong><br><small style="opacity:0.6">${p.usuario}</small></td>
-                <td>${p.area_destino || '-'}</td>
-                <td>${exps}</td>
-                <td>${estadoBadge}</td>
-                <td>${timerHtml}</td>
-                <td>${acciones}</td>
-            </tr>
-        `);
+        estadoFiltro = $(this).data('estado');
+        tablaPrestamos.ajax.reload();
     });
 }
 
@@ -122,7 +144,6 @@ function iniciarCronometro(prestamoId, fechaLimiteISO, porcentaje) {
         const diff = fechaLimite - ahora;
 
         if (diff <= 0) {
-            // Vencido
             timerEl.textContent = 'VENCIDO';
             timerEl.className = 'sexp-timer sexp-timer--expired';
             if (progressEl) {
@@ -137,8 +158,6 @@ function iniciarCronometro(prestamoId, fechaLimiteISO, porcentaje) {
         const segundos = Math.floor((diff % 60000) / 1000);
         timerEl.textContent = `${String(horas).padStart(2, '0')}:${String(minutos).padStart(2, '0')}:${String(segundos).padStart(2, '0')}`;
 
-        // Calcular porcentaje y color
-        // Necesitamos saber el total, lo estimamos con fecha_limite y tiempo actual
         if (porcentaje >= 90) {
             timerEl.className = 'sexp-timer sexp-timer--danger';
             if (progressEl) progressEl.className = 'sexp-progress-fill sexp-progress-fill--danger';
@@ -157,9 +176,7 @@ function iniciarCronometro(prestamoId, fechaLimiteISO, porcentaje) {
 
 function marcarEntregado(prestamoId) {
     Swal.fire({
-        color: 'var(--negro)',
-        background: 'var(--blanco)',
-        title: '¿Confirmar Entrega?',
+        title: 'Confirmar entrega',
         text: 'Se iniciará el cronómetro del préstamo al confirmar.',
         icon: 'question',
         showCancelButton: true,
@@ -177,7 +194,7 @@ function marcarEntregado(prestamoId) {
                 success: function (resp) {
                     if (resp.success) {
                         toastr.success('Préstamo entregado. Cronómetro iniciado.');
-                        cargarPrestamos();
+                        tablaPrestamos.ajax.reload();
                     }
                 },
                 error: function (xhr) {

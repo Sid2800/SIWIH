@@ -36,7 +36,7 @@ def poblar_datos():
         ('SOL_EN_PRESTAMO', 'En préstamo', 'Expedientes entregados al personal.'),
         ('SOL_EN_DEVOLUCION', 'En devolución / Por revisar', 'Personal ha retornado los expedientes.'),
         ('SOL_INCOMPLETA', 'Devolución incompleta', 'Faltan expedientes por entregar.'),
-        ('SOL_FINALIZADA', 'Finalizada/Cerrada', 'Todos los expedientes devueltos correctamente.'),
+        ('SOL_FINALIZADA', 'Finalizada', 'Todos los expedientes devueltos correctamente.'),
     ]
     for cod, nom, desc in estados_sol:
         obj, created = EstadoSolicitud.objects.update_or_create(

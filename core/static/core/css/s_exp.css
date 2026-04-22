@@ -1,6 +1,7 @@
 /* ============================================================
    S_EXP — Módulo Préstamo de Expedientes
    Estilos unificados para todas las plantillas del módulo.
+   Compatible con modo claro y oscuro (variables de style.css).
    ============================================================ */
 
 
@@ -96,6 +97,172 @@
     display: inline-block;
 }
 
+.sexp-exp-tag--late {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+
+/* ======= Estado Badges para DataTable (Gestión Solicitudes) =======
+   Colores que funcionan correctamente en modo claro Y oscuro.
+   Usan el color semántico como texto, no var(--negro). */
+
+.sexp-estado-badge {
+    padding: 0.25rem 0.6rem;
+    border-radius: 20px;
+    font-size: 1.2rem;
+    font-weight: 600;
+    display: inline-block;
+    white-space: nowrap;
+}
+
+.sexp-estado-badge--pendiente {
+    background: rgba(99, 102, 241, 0.2);
+    color: #818cf8;
+}
+.sexp-estado-badge--aprobada_organizando {
+    background: rgba(34, 197, 94, 0.2);
+    color: #22c55e;
+}
+.sexp-estado-badge--rechazada {
+    background: rgba(239, 68, 68, 0.2);
+    color: #f87171;
+}
+.sexp-estado-badge--listo_recoger {
+    background: rgba(16, 185, 129, 0.2);
+    color: #34d399;
+}
+.sexp-estado-badge--en_prestamo {
+    background: rgba(245, 158, 11, 0.2);
+    color: #fbbf24;
+}
+.sexp-estado-badge--en_devolucion {
+    background: rgba(139, 92, 246, 0.2);
+    color: #a78bfa;
+}
+.sexp-estado-badge--incompleta {
+    background: rgba(249, 115, 22, 0.2);
+    color: #fb923c;
+}
+.sexp-estado-badge--finalizada {
+    background: rgba(100, 116, 139, 0.2);
+    color: #94a3b8;
+}
+.sexp-estado-badge--anulada {
+    background: rgba(100, 116, 139, 0.15);
+    color: #64748b;
+}
+
+
+/* ======= Botones de Acción en DataTable ======= */
+
+.sexp-action-group {
+    display: flex;
+    gap: 0.3rem;
+    flex-wrap: wrap;
+}
+
+.sexp-action-btn {
+    border: none;
+    padding: 0.3rem 0.6rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 1.3rem;
+    font-weight: 600;
+    font-family: var(--fuenteCuerpo);
+    transition: opacity .2s, transform .1s;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    white-space: nowrap;
+}
+
+.sexp-action-btn:hover {
+    opacity: 0.85;
+    transform: translateY(-1px);
+}
+
+.sexp-action-btn--aprobar {
+    background: rgba(34, 197, 94, 0.2);
+    color: #16a34a;
+    border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.sexp-action-btn--rechazar {
+    background: rgba(239, 68, 68, 0.2);
+    color: #dc2626;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.sexp-action-btn--listo {
+    background: rgba(16, 185, 129, 0.2);
+    color: #059669;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+
+/* ======= Estilos para Modales SweetAlert ======= */
+
+.sexp-modal-campo { margin-bottom: 1rem; }
+.sexp-modal-campo label {
+    display: block;
+    margin-bottom: 0.3rem;
+    font-weight: 600;
+    font-size: 1.4rem;
+    color: var(--colorTablacelda);
+}
+
+.sexp-modal-input {
+    width: 100%;
+    padding: 0.6rem;
+    border-radius: 0.6rem;
+    border: 1px solid var(--colorLinea);
+    background-color: var(--blanco);
+    color: var(--colorTablacelda);
+    font-size: 1.6rem;
+    font-family: var(--fuenteCuerpo);
+    box-sizing: border-box;
+}
+
+.sexp-modal-select {
+    padding: 0.6rem;
+    border-radius: 0.6rem;
+    border: 1px solid var(--colorLinea);
+    background-color: var(--blanco);
+    color: var(--colorTablacelda);
+    font-size: 1.4rem;
+    font-family: var(--fuenteCuerpo);
+}
+
+.sexp-modal-tiempo-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.sexp-modal-tiempo-row input {
+    flex: 1;
+}
+
+.sexp-modal-hint {
+    opacity: 0.6;
+    display: block;
+    margin-top: 0.3rem;
+    font-size: 1.2rem;
+}
+
+.sexp-modal-campo textarea,
+.sexp-modal-campo input[type="number"] {
+    width: 100%;
+    padding: 0.6rem;
+    border-radius: 0.6rem;
+    border: 1px solid var(--colorLinea);
+    background-color: var(--blanco);
+    color: var(--colorTablacelda);
+    font-size: 1.6rem;
+}
+
 
 /* ======= Filtros compartidos ======= */
 
@@ -126,24 +293,6 @@
     border-color: var(--colorBoton);
 }
 
-.sexp-modal-campo { margin-bottom: 1rem; }
-.sexp-modal-campo label {
-    display: block;
-    margin-bottom: 0.3rem;
-    font-weight: 600;
-    font-size: 0.85rem;
-}
-.sexp-modal-campo textarea,
-.sexp-modal-campo input {
-    width: 100%;
-    padding: 0.6rem;
-    border-radius: 0.6rem;
-    border: 1px solid var(--colorLinea);
-    background-color: var(--blanco);
-    color: var(--colorTablacelda);
-    font-size: 1.6rem;
-}
-
 
 /* ============================================================
    BUSCADOR — Búsqueda y Carrito
@@ -153,12 +302,6 @@
     display: grid;
     grid-template-columns: 1fr 370px;
     gap: 1.5rem;
-}
-
-@media (max-width: 900px) {
-    .sexp-buscador-layout {
-        grid-template-columns: 1fr;
-    }
 }
 
 /* Barra de búsqueda */
@@ -377,11 +520,12 @@
 
 .sexp-sol-card {
     background-color: var(--blanco);
-    border-radius: 1rem;
-    padding: 1.2rem;
-    border-left: 4px solid var(--colorBoton);
-    transition: all .2s;
+    border-radius: 1.2rem;
+    padding: 1.6rem;
+    border-left: 5px solid var(--colorBoton);
+    transition: all .3s;
     color: var(--colorTablacelda);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
 }
 .sexp-sol-card--pendiente   { border-left-color: #6366f1; }
 .sexp-sol-card--aprobado    { border-left-color: #22c55e; }
@@ -399,7 +543,7 @@
     flex-wrap: wrap;
     gap: 0.5rem;
 }
-.sexp-sol-header h3 { margin: 0; font-size: 1rem; }
+.sexp-sol-header h3 { margin: 0; font-size: 1.8rem; font-weight: 700; }
 
 .sexp-sol-badge {
     padding: 0.25rem 1.4rem;
@@ -407,51 +551,51 @@
     font-size: 1.2rem;
     font-weight: 700;
 }
-.sexp-sol-badge--pendiente         { background: rgba(99,102,241,0.15);  color: #6366f1; }
+.sexp-sol-badge--pendiente         { background: rgba(99,102,241,0.15);  color: #818cf8; }
 .sexp-sol-badge--aprobado          { background: rgba(34,197,94,0.15);   color: #22c55e; }
 .sexp-sol-badge--rechazado         { background: rgba(220,53,69,0.15);   color: var(--colorEliminarRojo); }
-.sexp-sol-badge--enprestamo        { background: rgba(245,158,11,0.15);  color: #f59e0b; }
+.sexp-sol-badge--enprestamo        { background: rgba(245,158,11,0.15);  color: #fbbf24; }
 .sexp-sol-badge--devuelto          { background: rgba(100,116,139,0.15); color: #94a3b8; }
-.sexp-sol-badge--devolucionparcial { background: rgba(249,115,22,0.15);  color: #f97316; }
+.sexp-sol-badge--devolucionparcial { background: rgba(249,115,22,0.15);  color: #fb923c; }
 .sexp-sol-badge--anulado           { background: rgba(100,116,139,0.15); color: #64748b; }
 
 .sexp-sol-info {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 0.5rem;
-    margin-bottom: 1.4rem;
-    font-size: 0.85rem;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    font-size: 1.4rem;
 }
-.sexp-sol-info label { opacity: 0.6; font-size: 1.2rem; display: block; }
+.sexp-sol-info label { opacity: 0.6; font-size: 1.3rem; display: block; margin-bottom: 0.2rem; }
 
 .sexp-sol-exps { display: flex; gap: 0.3rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
 
 .sexp-sol-timer {
     font-family: 'Courier New', monospace;
     font-weight: 700;
-    font-size: 1rem;
-    margin-top: 0.5rem;
+    font-size: 1.4rem;
+    margin-top: 0.8rem;
 }
 .sexp-sol-rechazo {
     background: rgba(220,53,69,0.1);
-    border-radius: 0.6rem;
-    padding: 0.5rem 1.4rem;
-    margin-top: 0.5rem;
-    font-size: 0.85rem;
+    border-radius: 0.8rem;
+    padding: 1rem 1.4rem;
+    margin-top: 0.8rem;
+    font-size: 1.4rem;
 }
 .sexp-devolver-btn {
-    padding: 0.5rem 1rem;
+    padding: 0.8rem 1.5rem;
     border-radius: 1rem;
     border: none;
     background-color: #f59e0b;
     color: #000;
     cursor: pointer;
-    font-weight: 600;
-    font-size: 0.85rem;
+    font-weight: 700;
+    font-size: 1.4rem;
     transition: all .2s;
-    margin-top: 0.5rem;
+    margin-top: 1rem;
 }
-.sexp-devolver-btn:hover { opacity: 0.85; }
+.sexp-devolver-btn:hover { opacity: 0.85; transform: translateY(-2px); }
 
 
 /* ============================================================
@@ -508,10 +652,12 @@
 .sexp-dev-card {
     background-color: var(--blanco);
     border-radius: 1rem;
-    padding: 1.2rem;
-    margin-bottom: 1rem;
-    border-left: 4px solid #6366f1;
+    padding: 1.5rem; /* Aumentar padding */
+    margin-bottom: 1.2rem;
+    border-left: 5px solid #6366f1;
     color: var(--colorTablacelda);
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
 .sexp-dev-card--vencido { border-left-color: #ef4444; }
 .sexp-dev-card--parcial { border-left-color: #f97316; }
@@ -521,37 +667,51 @@
     justify-content: space-between;
     align-items: center;
     margin-bottom: 1.4rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
 }
-.sexp-dev-header h3 { margin: 0; font-size: 1rem; }
+.sexp-dev-header h3 { 
+    margin: 0; 
+    font-size: 1.6rem; /* Aumentar tamaño de título */
+    font-weight: 700;
+}
+
+/* Icono de colapso - solo visible si se habilita */
+.sexp-card-toggle {
+    display: none;
+    font-size: 1.8rem;
+    transition: transform 0.3s;
+}
+.sexp-collapsed .sexp-card-toggle { transform: rotate(-180deg); }
 
 .sexp-dev-info {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 0.5rem;
-    margin-bottom: 1.4rem;
-    font-size: 0.85rem;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    font-size: 1.4rem; /* Aumentar tamaño de info */
 }
-.sexp-dev-info span { opacity: 0.7; }
+.sexp-dev-info span { font-weight: 700; opacity: 0.9; margin-right: 0.5rem; }
 
 .sexp-dev-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 
 .sexp-dev-btn {
-    padding: 0.5rem 1rem;
-    border-radius: 1rem;
+    padding: 0.8rem 1.4rem;
+    border-radius: 0.8rem;
     border: none;
     cursor: pointer;
-    font-size: 0.85rem;
+    font-size: 1.4rem; /* Aumentar tamaño de botones */
     font-weight: 600;
     display: flex;
     align-items: center;
-    gap: 0.3rem;
+    gap: 0.5rem;
     transition: all .2s;
     font-family: var(--fuenteCuerpo);
 }
 .sexp-dev-btn--completa       { background: #22c55e; color: #fff; }
-.sexp-dev-btn--completa:hover { opacity: 0.85; }
+.sexp-dev-btn--completa:hover { opacity: 0.85; transform: translateY(-1px); }
 .sexp-dev-btn--parcial        { background: #f59e0b; color: #000; }
-.sexp-dev-btn--parcial:hover  { opacity: 0.85; }
+.sexp-dev-btn--parcial:hover  { opacity: 0.85; transform: translateY(-1px); }
 
 
 /* ============================================================
@@ -575,12 +735,12 @@
 .sexp-filtro-grupo label { font-size: 1.4rem; font-weight: 600; opacity: 0.7; }
 .sexp-filtro-grupo input,
 .sexp-filtro-grupo select {
-    padding: 0.5rem;
+    padding: 0.8rem;
     border-radius: 0.6rem;
     border: 1px solid var(--colorLinea);
     background-color: var(--blanco);
     color: var(--colorTablacelda);
-    font-size: 0.85rem;
+    font-size: 1.3rem; /* Aumentar tamaño de inputs de reporte */
     font-family: var(--fuenteCuerpo);
 }
 
@@ -589,19 +749,23 @@
 
 .sexp-reportes-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
     gap: 1.5rem;
 }
 
 .sexp-reporte-card {
     background-color: var(--blanco);
-    border-radius: 1rem;
-    padding: 1.2rem;
+    border-radius: 1.2rem;
+    padding: 1.5rem;
     border: 1px solid var(--colorLinea);
     color: var(--colorTablacelda);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.03);
 }
 .sexp-reporte-card h3 {
-    margin: 0 0 1rem;
+    margin: 0 0 1.2rem;
+    font-size: 1.8rem; /* Aumentar título de reporte */
+    font-weight: 700;
+}
     font-size: 1rem;
     display: flex;
     align-items: center;
@@ -611,21 +775,22 @@
 .sexp-reporte-tabla {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.85rem;
+    font-size: 1.4rem; /* Aumentar tamaño de tabla de reporte */
     color: var(--colorTablacelda);
 }
 .sexp-reporte-tabla th {
     text-align: left;
-    padding: 0.5rem;
-    opacity: 0.7;
-    border-bottom: 1px solid var(--colorLinea);
+    padding: 1rem 0.8rem; /* Más padding */
+    opacity: 0.9;
+    border-bottom: 2px solid var(--colorLinea);
+    font-weight: 700;
 }
 .sexp-reporte-tabla td {
-    padding: 0.5rem;
+    padding: 1rem 0.8rem;
     border-bottom: 1px solid var(--colorLinea);
 }
 
-.sexp-tabs { display: flex; gap: 0; margin-bottom: 1.5rem; }
+.sexp-tabs { display: flex; gap: 0; margin-bottom: 1.5rem; flex-wrap: wrap; }
 .sexp-tab {
     padding: 0.6rem 1.2rem;
     border: none;
@@ -642,3 +807,625 @@
 
 .sexp-tab-content        { display: none; }
 .sexp-tab-content.active { display: block; }
+
+/* ======= Dashboard / KPIs ======= */
+
+.sexp-dashboard {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.sexp-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+}
+
+.sexp-kpi-card {
+    background-color: var(--blanco);
+    border-radius: 1rem;
+    padding: 1.2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    border-left: 4px solid var(--kpi-color, #6366f1);
+    transition: transform 0.2s;
+    color: var(--colorTablacelda);
+}
+
+.sexp-kpi-card:hover {
+    transform: translateY(-2px);
+}
+
+.sexp-kpi-card__valor {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--kpi-color, #6366f1);
+}
+
+.sexp-kpi-card__titulo {
+    font-size: 1.2rem; /* Aumentar título KPI */
+    opacity: 0.85;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Colores de KPIs */
+.sexp-kpi-card--disponible { --kpi-color: #22c55e; }
+.sexp-kpi-card--prestado { --kpi-color: #f59e0b; }
+.sexp-kpi-card--pendiente { --kpi-color: #6366f1; }
+.sexp-kpi-card--vencido { --kpi-color: #ef4444; }
+.sexp-kpi-card--parcial { --kpi-color: #f97316; }
+.sexp-kpi-card--proximo { --kpi-color: #eab308; }
+.sexp-kpi-card--total { --kpi-color: #8b5cf6; }
+.sexp-kpi-card--baja { --kpi-color: #64748b; }
+
+.sexp-section-title {
+    font-size: 1.4rem;
+    font-weight: 600;
+    margin-bottom: 1.4rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--colorTablacelda);
+}
+
+.sexp-alerta-tabla {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    color: var(--colorTablacelda);
+}
+
+.sexp-alerta-tabla th {
+    text-align: left;
+    padding: 0.6rem;
+    opacity: 0.7;
+    border-bottom: 1px solid var(--colorLinea);
+}
+
+.sexp-alerta-tabla td {
+    padding: 0.6rem;
+    border-bottom: 1px solid var(--colorLinea);
+}
+
+/* Modificadores de Badges */
+.sexp-badge--proximo { background: rgba(234, 179, 8, 0.15); color: #eab308; }
+.sexp-badge--parcial { background: rgba(249, 115, 22, 0.15); color: #fb923c; }
+
+/* ======= Utilidades para Limpieza de HTML ======= */
+
+.sexp-margin-bottom-15 { margin-bottom: 1.5rem; }
+.sexp-flex-between { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.sexp-flex-end { display: flex; justify-content: flex-end; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.sexp-flex-gap-1 { display: flex; gap: 1rem; flex-wrap: wrap; }
+
+.sexp-btn-refresh {
+    background: var(--colorBoton) !important;
+    color: var(--colorTextoBoton) !important;
+    border: none !important;
+}
+
+.sexp-full-width { width: 100% !important; }
+.sexp-text-center { text-align: center; }
+.sexp-opacity-5 { opacity: 0.5; }
+.sexp-opacity-6 { opacity: 0.6; }
+.sexp-padding-1 { padding: 1rem; }
+
+
+/* ============================================================
+   RESPONSIVE — Adaptación para Tablets y Móviles
+   ============================================================ */
+
+/* --- Tablets (≤ 1024px) --- */
+@media (max-width: 1024px) {
+    .sexp-buscador-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .sexp-carrito {
+        position: static;
+    }
+
+    .sexp-kpi-grid {
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    }
+
+    .sexp-reportes-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* --- Móviles grandes / Tablets pequeñas (≤ 768px) --- */
+@media (max-width: 768px) {
+    .sexp-nav-modulos {
+        gap: 0.6rem;
+    }
+
+    .sexp-nav-link {
+        padding: 0.5rem 0.8rem;
+        font-size: 1.2rem;
+    }
+
+    .sexp-nav-link i {
+        font-size: 1.4rem;
+    }
+
+    /* Ocultar texto largo en nav, solo iconos */
+    .sexp-nav-link span {
+        display: none;
+    }
+
+    .sexp-filtros {
+        gap: 0.5rem;
+    }
+
+    .sexp-filtro-btn {
+        padding: 0.4rem 0.7rem;
+        font-size: 1.2rem;
+    }
+
+    .sexp-kpi-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .sexp-kpi-card__valor {
+        font-size: 1.6rem;
+    }
+
+    .sexp-sol-info {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .sexp-dev-info {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .sexp-resultado {
+        padding: 1rem;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.8rem;
+    }
+
+    .sexp-resultado__info h4 {
+        font-size: 1.5rem;
+    }
+
+    .sexp-action-group {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .sexp-action-btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    /* DataTable horizontal scroll en pantallas chicas */
+    .dataTables_wrapper {
+        overflow-x: auto;
+    }
+
+    .sexp-dev-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
+
+/* --- Celulares pequeños (≤ 480px) --- */
+@media (max-width: 480px) {
+    .sexp-nav-modulos {
+        gap: 0.4rem;
+    }
+
+    .sexp-nav-link {
+        padding: 0.4rem 0.6rem;
+        font-size: 1.1rem;
+        gap: 0.3rem;
+    }
+
+    .sexp-kpi-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 0.6rem;
+    }
+
+    .sexp-kpi-card {
+        padding: 0.8rem;
+    }
+
+    .sexp-kpi-card__valor {
+        font-size: 1.4rem;
+    }
+
+    .sexp-kpi-card__titulo {
+        font-size: 0.75rem;
+    }
+
+    .sexp-search-box {
+        flex-direction: column;
+    }
+
+    .sexp-search-input {
+        min-width: unset;
+        width: 100%;
+    }
+
+    .sexp-search-select {
+        width: 100%;
+    }
+
+    .sexp-search-btn {
+        width: 100%;
+    }
+
+    .sexp-carrito {
+        border-radius: 1rem;
+        padding: 0.8rem;
+    }
+
+    .sexp-submit-btn {
+        font-size: 1.5rem;
+        padding: 1rem;
+    }
+
+    .sexp-sol-card {
+        padding: 0.8rem;
+    }
+
+    .sexp-sol-info {
+        grid-template-columns: 1fr;
+    }
+
+    .sexp-dev-info {
+        grid-template-columns: 1fr;
+    }
+
+    .sexp-dev-card {
+        padding: 0.8rem;
+    }
+
+    .sexp-tabs {
+        overflow-x: auto;
+    }
+
+    .sexp-tab {
+        white-space: nowrap;
+        font-size: 1.2rem;
+        padding: 0.5rem 0.8rem;
+    }
+
+    .sexp-reportes-filtros {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .sexp-filtro-grupo {
+        width: 100%;
+    }
+
+    .sexp-filtro-grupo input,
+    .sexp-filtro-grupo select {
+        width: 100%;
+    }
+
+    .sexp-modal-tiempo-row {
+        flex-direction: column;
+    }
+
+    .sexp-modal-select {
+        width: 100%;
+    }
+
+}
+
+/* ============================================================
+   SWEETALERT2 — Estilos específicos para el módulo S_EXP
+   Colores personalizados: Fondo verde oscuro (#008B8B), textos blancos, 
+   y campos de entrada blancos con letra negra.
+   ============================================================ */
+
+.swal2-popup {
+   background-color: #008B8B !important;
+   color: #FFFFFF !important;
+   font-size: 1.6rem !important; /* Aumentar tamaño base de fuente */
+   width: 55em !important;      /* Aumentar ancho del mensaje */
+   max-width: 95vw !important;  /* Mantener responsive */
+   border-radius: 1.5rem !important;
+}
+
+.swal2-title {
+   color: #FFFFFF !important;
+   font-size: 2.2rem !important; /* Título más grande */
+   font-weight: 700 !important;
+}
+
+.swal2-html-container, .swal2-content {
+   color: #FFFFFF !important;
+   font-size: 1.6rem !important; /* Texto de contenido más grande */
+}
+
+/* Forzar que los textos genéricos dentro del div también sean blancos y grandes */
+.swal2-html-container div, 
+.swal2-html-container p, 
+.swal2-html-container span, 
+.swal2-html-container label {
+   color: #FFFFFF !important;
+   font-size: 1.6rem !important;
+}
+
+/* Campos de entrada: fondo blanco, letra negra y más grandes */
+.swal2-input, .swal2-textarea, .swal2-select, .sexp-modal-input, .sexp-modal-select {
+   background-color: #FFFFFF !important;
+   color: #000000 !important;
+   border: 1px solid #CCCCCC !important;
+   font-size: 1.6rem !important;
+   height: auto !important;
+   padding: 1rem !important;
+}
+
+.swal2-input:focus, .swal2-textarea:focus, .swal2-select:focus,
+.sexp-modal-input:focus, .sexp-modal-select:focus {
+   border-color: #333333 !important;
+   box-shadow: 0 0 0 .25rem rgba(255, 255, 255, 0.5) !important;
+}
+
+/* Botones de la alerta más grandes */
+.swal2-styled {
+    font-size: 1.6rem !important;
+    padding: 0.8rem 2rem !important;
+    font-weight: 600 !important;
+    border-radius: 0.8rem !important;
+}
+
+/* Validaciones y errores (ideal que resalten en rojo brillante o amarillo) */
+.swal2-validation-message {
+   color: #FFD700 !important; /* Amarillo brillante para contrastar con el fondo #008B8B */
+   font-size: 1.6rem !important;
+   font-weight: bold;
+   background-color: rgba(0, 0, 0, 0.2) !important;
+   border-radius: 8px;
+   font-family: var(--fuenteTablaCuerpo);
+}
+
+/* Clases auxiliares para contenido HTML dentro de SweetAlert */
+.sexp-modal-campo {
+    margin-bottom: 2rem;
+}
+
+.sexp-modal-campo label {
+    display: block;
+    font-weight: 700;
+    font-size: 1.8rem !important;
+    margin-bottom: 0.8rem;
+    color: #FFFFFF !important;
+}
+
+.sexp-modal-tiempo-row {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.sexp-modal-input, .sexp-modal-select {
+    flex: 1;
+    font-size: 1.6rem !important;
+}
+
+.sexp-modal-hint {
+    display: block;
+    margin-top: 0.5rem;
+    font-size: 1.4rem !important;
+    opacity: 0.9;
+    font-style: italic;
+}
+
+/* Ajustes para radio buttons dentro de SweetAlert */
+.swal2-html-container input[type="radio"] {
+    width: 1.8rem;
+    height: 1.8rem;
+    cursor: pointer;
+}
+
+
+/* ============================================================
+   PERSONALIZACIONES SOLICITADAS POR EL USUARIO 
+   ============================================================ */
+
+/* En modo oscuro, hacer que las tarjetitas y el carrito resalten más del fondo padre */
+body.darkmode .sexp-resultado,
+body.darkmode .sexp-carrito {
+    background-color: #3f4247; /* Gris un poco más claro que el contendor principal */
+    border-color: #5a5f66;
+}
+
+/* ============================================================
+   FILTROS DE FECHA — Barra de Mis Solicitudes
+   ============================================================ */
+
+.sexp-filtros-fecha {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding: 1rem 1.2rem;
+    background-color: var(--blanco);
+    border-radius: 1rem;
+    border: 1px solid var(--colorLinea);
+}
+
+.sexp-filtro-btn {
+    padding: 0.5rem 1.2rem;
+    border-radius: 2rem;
+    border: 1px solid var(--colorLinea);
+    background-color: transparent;
+    color: var(--colorTablacelda);
+    cursor: pointer;
+    font-size: 1.3rem;
+    font-family: var(--fuenteCuerpo);
+    font-weight: 500;
+    transition: all .2s;
+}
+
+.sexp-filtro-btn:hover {
+    background-color: var(--colorBoton);
+    color: var(--colorTextoBoton);
+    border-color: var(--colorBoton);
+}
+
+.sexp-filtro-btn--active {
+    background-color: var(--colorBoton) !important;
+    color: var(--colorTextoBoton) !important;
+    border-color: var(--colorBoton) !important;
+    font-weight: 700;
+}
+
+.sexp-rango-fechas {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    color: var(--colorTablacelda);
+    font-size: 1.3rem;
+}
+
+.sexp-fecha-input,
+body.darkmode .sexp-fecha-input {
+    padding: 0.4rem 0.8rem;
+    border-radius: 0.6rem;
+    border: 1px solid #AAAAAA !important;
+    background-color: #FFFFFF !important;  /* Siempre blanco para que el icono sea visible */
+    color: #000000 !important;             /* Texto siempre negro */
+    font-size: 1.3rem;
+    font-family: var(--fuenteCuerpo);
+    cursor: pointer;
+    min-width: 140px;
+}
+
+/* Ícono del calendario siempre visible (sobre fondo blanco siempre es negro) */
+.sexp-fecha-input::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 0.8;
+    filter: none !important; /* Nunca invertir: fondo siempre es blanco */
+}
+
+/* Estilo para las etiquetas de expedientes en el seguimiento */
+.sexp-exp-tag {
+    background: rgba(99,102,241,0.1);
+    color: var(--colorTablacelda);
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+    font-size: 1.3rem; 
+    font-weight: 600;
+    border: 1px solid rgba(99,102,241,0.2);
+}
+
+body.darkmode .sexp-exp-tag {
+    background: rgba(255,255,255,0.05);
+    color: #ffffff;
+    border-color: rgba(255,255,255,0.1);
+}
+/* Forzar colores de modo claro para Combobox y Textbox dentro del Carrito */
+.sexp-carrito-form select,
+.sexp-carrito-form textarea,
+.sexp-carrito-form input,
+body.darkmode .sexp-carrito-form select,
+body.darkmode .sexp-carrito-form textarea,
+body.darkmode .sexp-carrito-form input {
+    background-color: #FFFFFF !important;
+    color: #000000 !important;
+    border: 1px solid #CCCCCC !important;
+}
+
+body.darkmode .sexp-carrito-form select:focus,
+body.darkmode .sexp-carrito-form textarea:focus,
+body.darkmode .sexp-carrito-form input:focus {
+    border-color: #333333 !important;
+}
+
+/* Darle estilo de "tarjetitas" pequeñas a los items agregados en modo oscuro */
+body.darkmode .sexp-carrito-item {
+    background-color: #4f5359; /* Más claro que el fondo del carrito (#3f4247) */
+    border: 1px solid #636870;
+    border-radius: 0.6rem;
+    padding: 0.8rem;
+    margin-bottom: 0.6rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+body.darkmode .sexp-carrito-item:last-child {
+    margin-bottom: 0;
+    border-bottom: 1px solid #636870; /* Prevenir que se quite el borde del ultimo item */
+}
+
+/* Hacer que el texto de los items sea muy visible y claro */
+.sexp-carrito-item .big_skin_checked span {
+    color: #888888; /* Gris en modo claro */
+}
+
+body.darkmode .sexp-carrito-item .big_skin_checked span,
+body.darkmode .sexp-carrito-item span,
+body.darkmode .sexp-carrito-item {
+    color: #FFFFFF !important; /* Blanco puro como fue solicitado */
+}
+
+/* Hacer que el ícono de eliminar resalte más claro en el fondo oscuro */
+body.darkmode .sexp-remove-btn {
+    color: #ff6b6b !important; /* Un rojo mucho más brillante/claro */
+    opacity: 0.9;
+}
+
+body.darkmode .sexp-remove-btn:hover {
+    color: #ff4d4d !important;
+    opacity: 1;
+}
+
+/* Resaltar el botón principal del carrito para que no sea oscuro/aburrido */
+body.darkmode .sexp-submit-btn {
+    background-color: #6366f1 !important; /* Azul/Indigo vibrante */
+    color: #ffffff !important;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+    border: none;
+}
+
+body.darkmode .sexp-submit-btn:hover {
+    background-color: #4f46e5 !important;
+}
+/* ============================================================
+   RESPONSIVE - TARJETAS COLAPSABLES
+   ============================================================ */
+
+/* En móviles, habilitar el comportamiento colapsable */
+@media (max-width: 768px) {
+    .sexp-card-collapsible .sexp-card-toggle {
+        display: block; /* Mostrar la flecha solo en móvil */
+    }
+
+    /* Ocultar el cuerpo cuando está colapsado */
+    .sexp-collapsed .sexp-card-body {
+        display: none !important;
+    }
+
+    /* Estilo del header cuando es colapsable para que parezca botón */
+    .sexp-card-collapsible .sexp-dev-header,
+    .sexp-card-collapsible .sexp-sol-header {
+        cursor: pointer;
+        padding: 0.5rem 0;
+        margin-bottom: 0; /* Quitar margen si está cerrado */
+    }
+
+    .sexp-card-collapsible:not(.sexp-collapsed) .sexp-dev-header,
+    .sexp-card-collapsible:not(.sexp-collapsed) .sexp-sol-header {
+        margin-bottom: 1.2rem; /* Recuperar margen si está abierto */
+        border-bottom: 1px solid rgba(0,0,0,0.05);
+        padding-bottom: 1rem;
+    }
+
+    /* Reducir padding de tarjetas en móvil */
+    .sexp-sol-card, .sexp-dev-card {
+        padding: 1rem;
+    }
+}
