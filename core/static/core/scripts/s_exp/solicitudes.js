@@ -94,11 +94,22 @@ function initTabla() {
                                 </button>
                             </div>`;
                     }
+                    const btnImprimir = `
+                        <button class="sexp-action-btn sexp-action-btn--imprimir" onclick="imprimirSolicitud(${data.id})">
+                            <i class="bi bi-printer"></i> Imprimir
+                        </button>`;
                     if (data.estado_flujo === 'SOL_APROBADA_ORGANIZANDO') {
                         return `
-                            <button class="sexp-action-btn sexp-action-btn--listo" onclick="marcarListo(${data.id})">
-                                <i class="bi bi-box-seam"></i> Marcar Listo
-                            </button>`;
+                            <div class="sexp-action-group">
+                                ${btnImprimir}
+                                <button class="sexp-action-btn sexp-action-btn--listo" onclick="marcarListo(${data.id})">
+                                    <i class="bi bi-box-seam"></i> Marcar Listo
+                                </button>
+                            </div>`;
+                    }
+                    const estadosImprimibles = ['SOL_LISTO_RECOGER', 'SOL_EN_PRESTAMO', 'SOL_EN_DEVOLUCION', 'SOL_FINALIZADA', 'SOL_INCOMPLETA'];
+                    if (estadosImprimibles.includes(data.estado_flujo)) {
+                        return btnImprimir;
                     }
                     return '';
                 }
@@ -412,6 +423,15 @@ function rechazarSolicitud(id) {
             });
         }
     });
+}
+
+/**
+ * Abre el PDF de la solicitud en una nueva pestaña para imprimir.
+ * @param {number} id - ID de la solicitud.
+ */
+function imprimirSolicitud(id) {
+    const url = window.urls.s_exp_imprimir_solicitud_pdf + id + '/';
+    window.open(url, '_blank');
 }
 
 /**

@@ -209,6 +209,12 @@
     border: 1px solid rgba(16, 185, 129, 0.3);
 }
 
+.sexp-action-btn--imprimir {
+    background: rgba(0, 139, 139, 0.2);
+    color: #008b8b;
+    border: 1px solid rgba(0, 139, 139, 0.4);
+}
+
 
 /* ======= Estilos para Modales SweetAlert ======= */
 

@@ -2,7 +2,7 @@ import json
 import logging
 from datetime import timedelta
 
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.utils import timezone
 from django.views.generic import TemplateView
 from django.views.decorators.http import require_POST, require_GET
@@ -470,6 +470,39 @@ def expedientes_solicitud_api(request, solicitud_id):
     except Exception as e:
         logger.error(f"Error en expedientes_solicitud_api: {e}", exc_info=True)
         return JsonResponse({"error": "Error interno del servidor"}, status=500)
+
+
+@require_GET
+def imprimir_solicitud_pdf(request, solicitud_id):
+    """Genera y descarga el PDF de una solicitud (aprobada/organizando/listo/prestamo/devolucion/finalizada)."""
+    if not _es_exp_admin(request.user):
+        return JsonResponse({"error": "Sin permisos"}, status=403)
+
+    estados_permitidos = {
+        'SOL_APROBADA_ORGANIZANDO', 'SOL_LISTO_RECOGER',
+        'SOL_EN_PRESTAMO', 'SOL_EN_DEVOLUCION',
+        'SOL_FINALIZADA', 'SOL_INCOMPLETA',
+    }
+    try:
+        solicitud = SolicitudPrestamo.objects.select_related(
+            'usuario', 'motivo', 'prestamo', 'prestamo__admin_aprobador'
+        ).get(id=solicitud_id)
+    except SolicitudPrestamo.DoesNotExist:
+        return JsonResponse({"error": "Solicitud no encontrada"}, status=404)
+
+    if solicitud.estado_flujo_id not in estados_permitidos:
+        return JsonResponse({"error": "La solicitud no está en un estado imprimible"}, status=400)
+
+    try:
+        from s_exp.services.pdf_solicitud_service import generar_pdf_solicitud
+        pdf_bytes = generar_pdf_solicitud(solicitud)
+    except Exception as e:
+        logger.error(f"Error generando PDF solicitud {solicitud_id}: {e}", exc_info=True)
+        return JsonResponse({"error": "Error al generar el PDF"}, status=500)
+
+    response = HttpResponse(pdf_bytes, content_type='application/pdf')
+    response['Content-Disposition'] = f'inline; filename="solicitud_{solicitud.id}.pdf"'
+    return response
 
 
 @csrf_protect

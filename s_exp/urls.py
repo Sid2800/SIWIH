@@ -26,6 +26,7 @@ urlpatterns = [
     path('api/listar-solicitudes/', views.listar_solicitudes_api, name='s_exp_listar_solicitudes_api'),
     path('api/aprobar-solicitud/', views.aprobar_solicitud_api, name='s_exp_aprobar_solicitud_api'),
     path('api/expedientes-solicitud/<int:solicitud_id>/', views.expedientes_solicitud_api, name='s_exp_expedientes_solicitud_api'),
+    path('api/imprimir-solicitud/<int:solicitud_id>/', views.imprimir_solicitud_pdf, name='s_exp_imprimir_solicitud_pdf'),
     path('api/marcar-listo/', views.marcar_listo_recojer_api, name='s_exp_marcar_listo_api'),
     path('api/rechazar-solicitud/', views.rechazar_solicitud_api, name='s_exp_rechazar_solicitud_api'),
     path('api/prestamos-activos/', views.prestamos_activos_api, name='s_exp_prestamos_activos_api'),
