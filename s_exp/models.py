@@ -208,6 +208,15 @@ class SolicitudExpedienteDetalle(models.Model):
         null=True, blank=True,
         verbose_name='N° Expediente (snapshot)'
     )
+    aprobado = models.BooleanField(
+        default=True,
+        verbose_name='Expediente Aprobado para préstamo'
+    )
+    motivo_rechazo_individual = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name='Motivo de rechazo del expediente'
+    )
     devuelto = models.BooleanField(
         default=False,
         verbose_name='Devuelto'

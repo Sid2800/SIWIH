@@ -103,6 +103,14 @@
     border: 1px solid rgba(239, 68, 68, 0.3);
 }
 
+.sexp-exp-tag--rechazado {
+    background: rgba(107, 114, 128, 0.12);
+    color: #6b7280;
+    border: 1px solid rgba(107, 114, 128, 0.3);
+    text-decoration: line-through;
+    opacity: 0.75;
+}
+
 
 /* ======= Estado Badges para DataTable (Gestión Solicitudes) =======
    Colores que funcionan correctamente en modo claro Y oscuro.
@@ -240,6 +248,61 @@
     gap: 0.5rem;
     align-items: center;
 }
+
+/* Lista de decisiones por expediente en modal de aprobación */
+#swal-exp-list {
+    max-height: 220px;
+    overflow-y: auto;
+    border: 1px solid var(--colorLinea);
+    border-radius: 0.6rem;
+    padding: 0.4rem 0;
+    margin-bottom: 0.4rem;
+}
+.sexp-exp-dec-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 0.8rem;
+    border-bottom: 1px solid var(--colorLinea);
+    gap: 0.8rem;
+}
+.sexp-exp-dec-row:last-child { border-bottom: none; }
+.sexp-exp-dec-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1;
+    min-width: 0;
+}
+.sexp-exp-dec-nombre {
+    font-size: 1.3rem;
+    color: var(--colorTablacelda);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.sexp-exp-dec-btns {
+    display: flex;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+.sexp-exp-dec-label {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.3rem 0.7rem;
+    border-radius: 2rem;
+    border: 1px solid var(--colorLinea);
+    cursor: pointer;
+    font-size: 1.3rem;
+    user-select: none;
+    transition: background 0.15s;
+}
+.sexp-exp-dec-label input[type="radio"] { display: none; }
+.sexp-exp-dec-label--apr { color: #16a34a; border-color: #bbf7d0; }
+.sexp-exp-dec-label--rec { color: #dc2626; border-color: #fecaca; }
+.sexp-exp-dec-label--apr:has(input:checked) { background: #dcfce7; border-color: #16a34a; font-weight: 600; }
+.sexp-exp-dec-label--rec:has(input:checked) { background: #fee2e2; border-color: #dc2626; font-weight: 600; }
 
 .sexp-modal-tiempo-row input {
     flex: 1;

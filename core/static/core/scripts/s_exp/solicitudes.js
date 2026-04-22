@@ -49,9 +49,17 @@ function initTabla() {
                 render: function (data) {
                     return data.map(e => {
                         const num = typeof e === 'object' ? e.numero : e;
+                        const noAprobado = e.aprobado === false;
                         const esFuera = e.fuera_de_tiempo;
-                        const cls = esFuera ? 'sexp-exp-tag sexp-exp-tag--late' : 'sexp-exp-tag';
-                        const title = esFuera ? 'Entregado fuera de tiempo' : '';
+                        let cls = 'sexp-exp-tag';
+                        let title = '';
+                        if (noAprobado) {
+                            cls = 'sexp-exp-tag sexp-exp-tag--rechazado';
+                            title = e.motivo_rechazo_individual ? `No prestado: ${e.motivo_rechazo_individual}` : 'No prestado';
+                        } else if (esFuera) {
+                            cls = 'sexp-exp-tag sexp-exp-tag--late';
+                            title = 'Entregado fuera de tiempo';
+                        }
                         return `<span class="${cls}" title="${title}">#${num}</span>`;
                     }).join(' ');
                 }
@@ -127,16 +135,72 @@ function initFiltros() {
 }
 
 /**
- * Abre el modal de aprobación de una solicitud.
- * Permite configurar el tiempo límite en horas (producción) o minutos (pruebas).
- * Al cambiar la unidad, el valor y la validación se actualizan dinámicamente.
- * 
+ * Carga los expedientes de la solicitud y abre el modal de aprobación.
  * @param {number} id - ID de la solicitud a aprobar.
  */
 function aprobarSolicitud(id) {
     Swal.fire({
+        title: 'Cargando expedientes...',
+        allowOutsideClick: false,
+        didOpen: () => { Swal.showLoading(); }
+    });
+
+    $.ajax({
+        url: window.urls.s_exp_expedientes_solicitud_api + id + '/',
+        method: 'GET',
+        success: function (resp) {
+            Swal.close();
+            _mostrarModalAprobacion(id, resp.expedientes || []);
+        },
+        error: function () {
+            Swal.close();
+            toastr.error('No se pudieron cargar los expedientes de la solicitud');
+        }
+    });
+}
+
+/**
+ * Construye y muestra el modal de aprobación con la lista de expedientes.
+ * Cada expediente puede aprobarse o rechazarse individualmente.
+ * Si alguno se rechaza, el campo de motivo se vuelve obligatorio.
+ *
+ * @param {number} id          - ID de la solicitud.
+ * @param {Array}  expedientes - Lista de objetos {detalle_id, numero, paciente_nombre}.
+ */
+function _mostrarModalAprobacion(id, expedientes) {
+    const expHtml = expedientes.map(function (exp) {
+        const nombre = exp.paciente_nombre ? `<span class="sexp-exp-dec-nombre">${exp.paciente_nombre}</span>` : '';
+        return `
+        <div class="sexp-exp-dec-row" id="sexp-dec-row-${exp.detalle_id}">
+            <div class="sexp-exp-dec-info">
+                <span class="sexp-exp-tag">#${exp.numero}</span>${nombre}
+            </div>
+            <div class="sexp-exp-dec-btns">
+                <label class="sexp-exp-dec-label sexp-exp-dec-label--apr">
+                    <input type="radio" name="dec_${exp.detalle_id}" value="aprobar" checked>
+                    <i class="bi bi-check-circle"></i> Aprobar
+                </label>
+                <label class="sexp-exp-dec-label sexp-exp-dec-label--rec">
+                    <input type="radio" name="dec_${exp.detalle_id}" value="rechazar">
+                    <i class="bi bi-x-circle"></i> Rechazar
+                </label>
+            </div>
+        </div>`;
+    }).join('');
+
+    Swal.fire({
         title: 'Aprobar Solicitud #' + id,
+        width: 640,
         html: `<div style="text-align:left;">
+            <div class="sexp-modal-campo">
+                <label><strong>Expedientes solicitados</strong></label>
+                <div id="swal-exp-list">${expHtml}</div>
+            </div>
+            <div class="sexp-modal-campo" id="swal-rechazo-section" style="display:none;">
+                <label>Motivo de rechazo de expediente(s) <span style="color:#dc2626">*</span></label>
+                <textarea id="swal-motivo-rechazo" rows="2" placeholder="Explique por qué no se prestará(n) ese(os) expediente(s)..." class="sexp-modal-input"></textarea>
+            </div>
+            <hr style="margin:10px 0; opacity:.2;">
             <div class="sexp-modal-campo">
                 <label>Tiempo límite</label>
                 <div class="sexp-modal-tiempo-row">
@@ -149,15 +213,15 @@ function aprobarSolicitud(id) {
                 <small id="swal-tiempo-hint" class="sexp-modal-hint">Modo pruebas: ingrese el tiempo en minutos.</small>
             </div>
             <div class="sexp-modal-campo">
-                <label>Comentarios (opcional)</label>
+                <label>Comentarios generales (opcional)</label>
                 <textarea id="swal-comentarios" rows="2" class="sexp-modal-input"></textarea>
-            </div></div>`,
+            </div>
+        </div>`,
         showCancelButton: true,
         confirmButtonText: '<i class="bi bi-check-lg"></i> Aprobar',
         cancelButtonText: 'Cancelar',
         confirmButtonColor: '#16a34a',
         didOpen: () => {
-            // Al cambiar la unidad, actualizar hint y valor por defecto
             const selUnidad = document.getElementById('swal-unidad');
             const inputTiempo = document.getElementById('swal-tiempo');
             const hint = document.getElementById('swal-tiempo-hint');
@@ -173,6 +237,16 @@ function aprobarSolicitud(id) {
                     hint.textContent = 'Mínimo 24 horas para producción.';
                 }
             });
+
+            // Mostrar/ocultar sección de motivo según si hay rechazados
+            document.getElementById('swal-exp-list').addEventListener('change', function (e) {
+                if (e.target.type !== 'radio') return;
+                const hayRechazados = expedientes.some(function (exp) {
+                    const sel = document.querySelector(`input[name="dec_${exp.detalle_id}"]:checked`);
+                    return sel && sel.value === 'rechazar';
+                });
+                document.getElementById('swal-rechazo-section').style.display = hayRechazados ? 'block' : 'none';
+            });
         },
         preConfirm: () => {
             const tiempo = parseInt(document.getElementById('swal-tiempo').value);
@@ -182,43 +256,64 @@ function aprobarSolicitud(id) {
                 Swal.showValidationMessage('Ingrese un tiempo válido');
                 return false;
             }
-
             if (unidad === 'horas' && tiempo < 24) {
                 Swal.showValidationMessage('El tiempo mínimo en horas es de 24');
                 return false;
             }
 
+            const decisiones = expedientes.map(function (exp) {
+                const sel = document.querySelector(`input[name="dec_${exp.detalle_id}"]:checked`);
+                return { detalle_id: exp.detalle_id, aprobado: !sel || sel.value === 'aprobar' };
+            });
+
+            const hayRechazados = decisiones.some(function (d) { return !d.aprobado; });
+            let motivoRechazo = '';
+            if (hayRechazados) {
+                motivoRechazo = document.getElementById('swal-motivo-rechazo').value.trim();
+                if (!motivoRechazo) {
+                    Swal.showValidationMessage('Debe ingresar el motivo de rechazo para los expedientes rechazados');
+                    return false;
+                }
+            }
+
             return {
                 tiempo: tiempo,
                 es_minutos: (unidad === 'minutos'),
-                comentarios: document.getElementById('swal-comentarios').value
+                comentarios: document.getElementById('swal-comentarios').value,
+                decisiones: decisiones,
+                motivo_rechazo_general: motivoRechazo
             };
         }
     }).then((result) => {
-        if (result.isConfirmed) {
-            $.ajax({
-                url: window.urls.s_exp_aprobar_solicitud_api,
-                method: 'POST',
-                headers: { 'X-CSRFToken': window.CSRF_TOKEN },
-                contentType: 'application/json',
-                data: JSON.stringify({
-                    solicitud_id: id,
-                    tiempo_limite_horas: result.value.tiempo,
-                    es_minutos: result.value.es_minutos,
-                    comentarios: result.value.comentarios
-                }),
-                success: function (resp) {
-                    if (resp.success) {
-                        toastr.success('Solicitud aprobada exitosamente');
-                        tablaSolicitudes.ajax.reload();
-                    }
-                },
-                error: function (xhr) {
-                    const err = xhr.responseJSON ? xhr.responseJSON.error : 'Error desconocido';
-                    toastr.error(err);
+        if (!result.isConfirmed) return;
+
+        $.ajax({
+            url: window.urls.s_exp_aprobar_solicitud_api,
+            method: 'POST',
+            headers: { 'X-CSRFToken': window.CSRF_TOKEN },
+            contentType: 'application/json',
+            data: JSON.stringify({
+                solicitud_id: id,
+                tiempo_limite_horas: result.value.tiempo,
+                es_minutos: result.value.es_minutos,
+                comentarios: result.value.comentarios,
+                expedientes_decisiones: result.value.decisiones,
+                motivo_rechazo_general: result.value.motivo_rechazo_general
+            }),
+            success: function (resp) {
+                if (resp.success) {
+                    const msg = resp.todos_rechazados
+                        ? 'Todos los expedientes rechazados. Solicitud marcada como rechazada.'
+                        : 'Solicitud aprobada exitosamente';
+                    toastr.success(msg);
+                    tablaSolicitudes.ajax.reload();
                 }
-            });
-        }
+            },
+            error: function (xhr) {
+                const err = xhr.responseJSON ? xhr.responseJSON.error : 'Error desconocido';
+                toastr.error(err);
+            }
+        });
     });
 }
 

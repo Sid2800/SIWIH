@@ -235,9 +235,12 @@ def listar_solicitudes_api(request):
             detalles_info = []
             for d in s.detalles.select_related('expediente_prestamo__expediente'):
                 detalles_info.append({
+                    "detalle_id": d.id,
                     "numero": d.expediente_prestamo.expediente.numero,
                     "devuelto": d.devuelto,
-                    "fuera_de_tiempo": d.fuera_de_tiempo
+                    "fuera_de_tiempo": d.fuera_de_tiempo,
+                    "aprobado": d.aprobado,
+                    "motivo_rechazo_individual": d.motivo_rechazo_individual or "",
                 })
 
             data.append({
@@ -268,7 +271,11 @@ def listar_solicitudes_api(request):
 @csrf_protect
 @require_POST
 def aprobar_solicitud_api(request):
-    """Aprueba una solicitud y crea el préstamo."""
+    """
+    Aprueba una solicitud y crea el préstamo.
+    Soporta decisiones individuales por expediente (aprobado/rechazado).
+    Si todos los expedientes son rechazados, la solicitud pasa a SOL_RECHAZADA.
+    """
     if not _es_exp_admin(request.user):
         return JsonResponse({"error": "Sin permisos"}, status=403)
 
@@ -279,17 +286,23 @@ def aprobar_solicitud_api(request):
 
     solicitud_id = body.get('solicitud_id')
     comentarios = body.get('comentarios', '')
-    # El tiempo límite puede ser en horas (por defecto) o minutos (modo pruebas)
     tiempo_limite = body.get('tiempo_limite_horas', 24)
     es_minutos = body.get('es_minutos', False)
+    expedientes_decisiones = body.get('expedientes_decisiones', [])
+    motivo_rechazo_general = body.get('motivo_rechazo_general', '').strip()
 
-    # Validamos que el número sea coherente (mínimo 1)
     if int(tiempo_limite) < 1:
         return JsonResponse({"error": "El tiempo debe ser mayor a 0"}, status=400)
 
-    # Si NO es en minutos, validamos el mínimo de 24 horas para producción
     if not es_minutos and int(tiempo_limite) < 24:
         return JsonResponse({"error": "El tiempo mínimo en horas es de 24"}, status=400)
+
+    # Construir mapa de decisiones por detalle_id (si se proporcionaron)
+    mapa_decisiones = {d['detalle_id']: d.get('aprobado', True) for d in expedientes_decisiones}
+    hay_rechazados_en_decision = any(not v for v in mapa_decisiones.values())
+
+    if hay_rechazados_en_decision and not motivo_rechazo_general:
+        return JsonResponse({"error": "El motivo de rechazo es obligatorio cuando se rechazan expedientes"}, status=400)
 
     try:
         solicitud = SolicitudPrestamo.objects.get(id=solicitud_id, estado_flujo_id='SOL_PENDIENTE')
@@ -297,26 +310,75 @@ def aprobar_solicitud_api(request):
         return JsonResponse({"error": "Solicitud no encontrada o ya procesada"}, status=404)
 
     try:
-        # Verificar disponibilidad de todos los expedientes
-        detalles = solicitud.detalles.select_related('expediente_prestamo')
+        from .models import ExpedienteEstadoLog
+        detalles = list(solicitud.detalles.select_related('expediente_prestamo__expediente'))
+
+        # Verificar que los expedientes aprobados estén disponibles
         for d in detalles:
-            if d.expediente_prestamo.estado_id == 'EXP_PRESTADO':
+            es_aprobado = mapa_decisiones.get(d.id, True)
+            if es_aprobado and d.expediente_prestamo.estado_id == 'EXP_PRESTADO':
                 return JsonResponse({
                     "error": f"El expediente #{d.expediente_prestamo.expediente.numero} ya no está disponible"
                 }, status=400)
 
-        # Cambiar estado de la solicitud
+        # Aplicar decisiones por expediente
+        aprobados = []
+        rechazados = []
+        for d in detalles:
+            es_aprobado = mapa_decisiones.get(d.id, True)
+            d.aprobado = es_aprobado
+            if not es_aprobado:
+                d.motivo_rechazo_individual = motivo_rechazo_general
+                rechazados.append(d)
+            else:
+                aprobados.append(d)
+            d.save()
+
+        todos_rechazados = len(aprobados) == 0
+
+        if todos_rechazados:
+            # Rechazar toda la solicitud
+            solicitud.estado_flujo_id = 'SOL_RECHAZADA'
+            solicitud.save()
+
+            for d in rechazados:
+                ep = d.expediente_prestamo
+                estado_ant = ep.estado
+                ep.estado_id = 'EXP_DISPONIBLE'
+                ep.save()
+                ExpedienteEstadoLog.objects.create(
+                    expediente=ep.expediente,
+                    estado_anterior=estado_ant,
+                    estado_nuevo_id='EXP_DISPONIBLE',
+                    usuario=request.user,
+                    solicitud=solicitud,
+                    observacion=f"Liberado: todos los expedientes rechazados. Motivo: {motivo_rechazo_general}"
+                )
+
+            Prestamo.objects.create(
+                solicitud=solicitud,
+                admin_aprobador=request.user,
+                motivo_rechazo=motivo_rechazo_general,
+                estado='Cerrado'
+            )
+
+            _registrar_log(
+                request.user, 'SOLICITUD_RECHAZADA',
+                f'Solicitud #{solicitud.id} rechazada (todos los expedientes rechazados individualmente). Motivo: {motivo_rechazo_general}',
+                'SolicitudPrestamo', solicitud.id
+            )
+            return JsonResponse({"success": True, "todos_rechazados": True})
+
+        # Al menos un expediente aprobado: continuar con la solicitud
         solicitud.estado_flujo_id = 'SOL_APROBADA_ORGANIZANDO'
         solicitud.save()
 
-        # Marcar expedientes como apartados si no lo estaban
-        for d in detalles:
+        # Aprobados → EXP_APARTADO
+        for d in aprobados:
             if d.expediente_prestamo.estado_id != 'EXP_APARTADO':
                 estado_ant = d.expediente_prestamo.estado
                 d.expediente_prestamo.estado_id = 'EXP_APARTADO'
                 d.expediente_prestamo.save()
-                
-                from .models import ExpedienteEstadoLog
                 ExpedienteEstadoLog.objects.create(
                     expediente=d.expediente_prestamo.expediente,
                     estado_anterior=estado_ant,
@@ -326,8 +388,21 @@ def aprobar_solicitud_api(request):
                     observacion="Apartado al aprobar solicitud"
                 )
 
-        # Crear el préstamo
-        # Se guarda el flag es_minutos para saber cómo calcular el vencimiento al entregar
+        # Rechazados → EXP_DISPONIBLE
+        for d in rechazados:
+            ep = d.expediente_prestamo
+            estado_ant = ep.estado
+            ep.estado_id = 'EXP_DISPONIBLE'
+            ep.save()
+            ExpedienteEstadoLog.objects.create(
+                expediente=ep.expediente,
+                estado_anterior=estado_ant,
+                estado_nuevo_id='EXP_DISPONIBLE',
+                usuario=request.user,
+                solicitud=solicitud,
+                observacion=f"No se prestará en esta solicitud. Motivo: {motivo_rechazo_general}"
+            )
+
         prestamo = Prestamo.objects.create(
             solicitud=solicitud,
             admin_aprobador=request.user,
@@ -337,17 +412,45 @@ def aprobar_solicitud_api(request):
             estado='Activo'
         )
 
+        detalle_rechazo = f" ({len(rechazados)} expediente(s) rechazado(s))" if rechazados else ""
         _registrar_log(
             request.user, 'SOLICITUD_APROBADA',
-            f'Solicitud #{solicitud.id} aprobada. En proceso de organización.',
+            f'Solicitud #{solicitud.id} aprobada{detalle_rechazo}. En proceso de organización.',
             'Prestamo', prestamo.id
         )
 
         logger.info(f"Solicitud #{solicitud.id} aprobada por {request.user.username}")
-        return JsonResponse({"success": True, "prestamo_id": prestamo.id})
+        return JsonResponse({"success": True, "todos_rechazados": False, "prestamo_id": prestamo.id})
 
     except Exception as e:
         logger.error(f"Error en aprobar_solicitud_api: {e}", exc_info=True)
+        return JsonResponse({"error": "Error interno del servidor"}, status=500)
+
+
+@require_GET
+def expedientes_solicitud_api(request, solicitud_id):
+    """Retorna los expedientes de una solicitud pendiente para el modal de aprobación."""
+    if not _es_exp_admin(request.user):
+        return JsonResponse({"error": "Sin permisos"}, status=403)
+
+    try:
+        solicitud = SolicitudPrestamo.objects.get(id=solicitud_id, estado_flujo_id='SOL_PENDIENTE')
+    except SolicitudPrestamo.DoesNotExist:
+        return JsonResponse({"error": "Solicitud no encontrada o ya procesada"}, status=404)
+
+    try:
+        expedientes = []
+        for d in solicitud.detalles.select_related('expediente_prestamo__expediente'):
+            expedientes.append({
+                "detalle_id": d.id,
+                "numero": d.expediente_prestamo.expediente.numero,
+                "paciente_nombre": d.paciente_nombre or "",
+                "paciente_identidad": d.paciente_identidad or "",
+                "estado_fisico": d.expediente_prestamo.estado_id,
+            })
+        return JsonResponse({"expedientes": expedientes})
+    except Exception as e:
+        logger.error(f"Error en expedientes_solicitud_api: {e}", exc_info=True)
         return JsonResponse({"error": "Error interno del servidor"}, status=500)
 
 
@@ -498,6 +601,7 @@ def prestamos_activos_api(request):
         for p in prestamos:
             numeros = list(
                 p.solicitud.detalles.select_related('expediente_prestamo__expediente')
+                .filter(aprobado=True)
                 .values_list('expediente_prestamo__expediente__numero', flat=True)
             )
 
@@ -572,14 +676,13 @@ def marcar_entregado_api(request):
         prestamo.solicitud.estado_flujo_id = 'SOL_EN_PRESTAMO'
         prestamo.solicitud.save()
 
-        # Marcar expedientes como prestados
+        # Solo marcar como prestados los expedientes aprobados
         from .models import ExpedienteEstadoLog
-        for d in prestamo.solicitud.detalles.select_related('expediente_prestamo'):
+        for d in prestamo.solicitud.detalles.select_related('expediente_prestamo').filter(aprobado=True):
             estado_anterior = d.expediente_prestamo.estado
             d.expediente_prestamo.estado_id = 'EXP_PRESTADO'
             d.expediente_prestamo.save()
 
-            # Registrar en log transaccional
             ExpedienteEstadoLog.objects.create(
                 expediente=d.expediente_prestamo.expediente,
                 estado_anterior=estado_anterior,
@@ -626,7 +729,7 @@ def prestamos_para_devolucion_api(request):
         data = []
         for p in qs:
             detalles = []
-            for d in p.solicitud.detalles.select_related('expediente_prestamo__expediente').filter(devuelto=False):
+            for d in p.solicitud.detalles.select_related('expediente_prestamo__expediente').filter(aprobado=True, devuelto=False):
                 detalles.append({
                     "id": d.id,
                     "numero": d.expediente_prestamo.expediente.numero,
@@ -640,8 +743,8 @@ def prestamos_para_devolucion_api(request):
                 "usuario_nombre": f"{p.solicitud.usuario.first_name} {p.solicitud.usuario.last_name}".strip() or p.solicitud.usuario.username,
                 "estado": p.estado,
                 "detalles_expedientes": detalles,
-                "cant_expedientes": p.solicitud.detalles.count(),
-                "cant_devueltos": p.solicitud.detalles.filter(devuelto=True).count(),
+                "cant_expedientes": p.solicitud.detalles.filter(aprobado=True).count(),
+                "cant_devueltos": p.solicitud.detalles.filter(aprobado=True, devuelto=True).count(),
                 "fecha_limite": p.fecha_limite.isoformat() if p.fecha_limite else None,
                 "esta_vencido": p.esta_vencido,
             })
@@ -769,9 +872,9 @@ def procesar_devolucion_api(request):
                 observacion="Auditado como NO RECIBIDO (Sigue en préstamo)"
             )
 
-        # 4. Determinar estado final de la solicitud
-        total_exp = solicitud.detalles.count()
-        devueltos_ahora = solicitud.detalles.filter(devuelto=True).count()
+        # 4. Determinar estado final de la solicitud (solo expedientes aprobados cuentan)
+        total_exp = solicitud.detalles.filter(aprobado=True).count()
+        devueltos_ahora = solicitud.detalles.filter(aprobado=True, devuelto=True).count()
         hay_no_recibidos = len(detalles_no_recibidos) > 0
         
         if devueltos_ahora >= total_exp and not hay_no_recibidos:
@@ -1155,7 +1258,9 @@ def mis_solicitudes_api(request):
                 detalles_info.append({
                     "numero": d.expediente_prestamo.expediente.numero,
                     "devuelto": d.devuelto,
-                    "fuera_de_tiempo": d.fuera_de_tiempo
+                    "fuera_de_tiempo": d.fuera_de_tiempo,
+                    "aprobado": d.aprobado,
+                    "motivo_rechazo_individual": d.motivo_rechazo_individual or "",
                 })
 
             prestamo_info = None
