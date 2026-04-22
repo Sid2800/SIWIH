@@ -3,6 +3,7 @@ const ImageEditor = (() => {
     let overlay = null;
     let cropper = null;
     let resolver = null;
+    let modoActual = "medico";
 
     function createOverlay(){
 
@@ -120,8 +121,10 @@ const ImageEditor = (() => {
 
     }
 
-    function open(file, info={}){
+    function open(file, info={}, modo = "medico"){
         if(!overlay) createOverlay();
+        modoActual = modo;
+
         return new Promise(resolve => {
             resolver = resolve;
             render(file,info);
@@ -156,15 +159,27 @@ const ImageEditor = (() => {
         });
     }
 
-
     function confirm(){
 
-        const canvas = cropper.getCroppedCanvas({
-            maxWidth: 1200,
-            maxHeight: 1200,
-            imageSmoothingEnabled: true,
-            imageSmoothingQuality: "high"
-        });
+        let configCanvas;
+
+        if (modoActual === "usuario") {
+            configCanvas = {
+                width: 300,
+                height: 300,
+                imageSmoothingEnabled: true,
+                imageSmoothingQuality: "high"
+            };
+        } else {
+            configCanvas = {
+                maxWidth: 1200,
+                maxHeight: 1200,
+                imageSmoothingEnabled: true,
+                imageSmoothingQuality: "high"
+            };
+        }
+
+        const canvas = cropper.getCroppedCanvas(configCanvas);
 
         canvas.toBlob(blob => {
 
@@ -176,13 +191,12 @@ const ImageEditor = (() => {
 
             resolver(file);
             close();
-        }, "image/webp", 0.85); 
+        }, "image/webp", modoActual === "usuario" ? 0.8 : 0.9);
 
     }
 
     function cancel(){
         resolver(null);
-
         close();
 
     }

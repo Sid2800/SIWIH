@@ -1,18 +1,16 @@
 from django.contrib import admin
-from .models import Unidad, PerfilUnidad
-
-class UnidadAdmin(admin.ModelAdmin):
-    list_display = ('id','nombre_unidad',)
-    search_fields = ('id','nombre_unidad',)
+from .models import PerfilUnidad
 
 class PerfilUnidadAdmin(admin.ModelAdmin):
-    list_display = ('usuario', 'unidad_nombre', 'rol')
-    list_filter = ('rol', 'unidad__nombre_unidad')
-    search_fields = ('usuario__username', 'unidad__nombre_unidad', 'rol')
+    list_display = ('usuario', 'servicio_unidad_nombre', 'rol', 'alcance')
+    list_filter = ('rol', 'servicio_unidad__nombre_unidad', 'alcance')
+    search_fields = ('usuario__username','alcance', 'servicio_unidad__nombre_unidad', 'rol')
 
-    def unidad_nombre(self, obj):
-        return obj.unidad.nombre_unidad
-    unidad_nombre.short_description = 'Unidad'
+    def servicio_unidad_nombre(self, obj):
+        if not obj.servicio_unidad:
+            return ""
+        return obj.servicio_unidad.nombre_unidad
+    servicio_unidad_nombre.short_description = 'Unidad'
 
-admin.site.register(Unidad, UnidadAdmin)
+
 admin.site.register(PerfilUnidad, PerfilUnidadAdmin)

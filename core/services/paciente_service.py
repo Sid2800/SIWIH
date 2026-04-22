@@ -294,7 +294,7 @@ class PacienteService:
     @staticmethod
     def obtener_defuncion(idPaciente):
         try:
-            relaciones = ['sala','servicio_auxiliar','especialidad', 'registrado_por']
+            relaciones = ['sala','servicio_auxiliar','area_atencion', 'registrado_por']
             defuncion = Defuncion.objects.select_related(*relaciones).get(paciente__id=idPaciente)
             return defuncion
         except Defuncion.DoesNotExist:
@@ -333,23 +333,23 @@ class PacienteService:
                 tipo = defuncion.tipo
                 
                 nueva_sala = None
-                nueva_especialidad = None
+                nueva_area_atencion = None
                 nuevo_aux = None
 
                 if tipo != 2:
                     if defuncion.tipo_dependencia == 'sala':
                         nueva_sala = defuncion.dependencia
-                        nueva_especialidad = None
+                        nueva_area_atencion = None
                         nuevo_aux = None
 
-                    elif defuncion.tipo_dependencia == 'especialidad':
+                    elif defuncion.tipo_dependencia == 'area_atencion':
                         nueva_sala = None
-                        nueva_especialidad = defuncion.dependencia
+                        nueva_area_atencion = defuncion.dependencia
                         nuevo_aux = None
 
                     elif defuncion.tipo_dependencia == 'servicio_auxiliar':
                         nueva_sala = None
-                        nueva_especialidad = None
+                        nueva_area_atencion = None
                         nuevo_aux = defuncion.dependencia
 
 
@@ -358,8 +358,8 @@ class PacienteService:
                     defuncionRegistro.sala = nueva_sala
                     cambios = True
 
-                if defuncionRegistro.especialidad != nueva_especialidad:
-                    defuncionRegistro.especialidad = nueva_especialidad
+                if defuncionRegistro.area_atencion != nueva_area_atencion:
+                    defuncionRegistro.area_atencion = nueva_area_atencion
                     cambios = True
 
                 if defuncionRegistro.servicio_auxiliar != nuevo_aux:
@@ -456,24 +456,24 @@ class PacienteService:
                 tipo = obito.tipo
 
                 nueva_sala = None
-                nueva_especialidad = None
+                nueva_area_atencion = None
                 nuevo_aux = None
 
                 if tipo != 2:
                     
                     if obito.tipo_dependencia == 'sala':
                         nueva_sala = obito.dependencia
-                        nueva_especialidad = None
+                        nueva_area_atencion = None
                         nuevo_aux = None
 
-                    elif obito.tipo_dependencia == 'especialidad':
+                    elif obito.tipo_dependencia == 'area_atencion':
                         nueva_sala = None
-                        nueva_especialidad = obito.dependencia
+                        nueva_area_atencion = obito.dependencia
                         nuevo_aux = None
 
                     elif obito.tipo_dependencia == 'servicio_auxiliar':
                         nueva_sala = None
-                        nueva_especialidad = None
+                        nueva_area_atencion = None
                         nuevo_aux = obito.dependencia
 
                 # Comparaciones
@@ -481,8 +481,8 @@ class PacienteService:
                     obitoRegistro.sala = nueva_sala
                     cambios = True
 
-                if obitoRegistro.especialidad != nueva_especialidad:
-                    obitoRegistro.especialidad = nueva_especialidad
+                if obitoRegistro.area_atencion != nueva_area_atencion:
+                    obitoRegistro.area_atencion = nueva_area_atencion
                     cambios = True
 
                 if obitoRegistro.servicio_auxiliar != nuevo_aux:
@@ -989,7 +989,7 @@ class PacienteService:
         return list(
             qs.values(
                 "id",
-                "fecha",  #ya viene solo fecha
+                "fecha",  
                 "motivo",
                 "responsable_nombre",
                 "responsable_dni",

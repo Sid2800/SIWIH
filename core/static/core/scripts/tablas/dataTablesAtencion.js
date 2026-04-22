@@ -94,9 +94,9 @@ document.addEventListener("DOMContentLoaded", () => {
             data: null,
             render: function (data) {
                 if (data) {
-                    let sala = data.especialidad__nombre_especialidad	;
+                    let sala = data.area_atencion__nombre_area_atencion	;
                     sala = sala.substring(0, 21);
-                    data = concatenarLimpio(sala, "-", data.especialidad__servicio__nombre_corto);
+                    data = concatenarLimpio(sala, "-", data.area_atencion__nombre_corto_area_atencion);
                 }
                 return data;
             }

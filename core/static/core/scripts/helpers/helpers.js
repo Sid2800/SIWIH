@@ -105,6 +105,7 @@ function renderDatosPaciente(containerId, datos = {}) {
 }
 
 const API_URLS = {
+   procesarImagenUsuario: urls["procesarImagenUsuario"],
    obtenerPacienteCenso: urls["obtenerPacienteCenso"],
    busquedaCenso: urls["busquedaCenso"],
    busquedaPaciente: urls["busquedaPaciente"],
@@ -1129,8 +1130,8 @@ async function AgregarAtencionModal(paciente=null, zona=null, atencionId=null) {
                </div>
 
                <div class="formularioCampoModal">
-                  <label for="especialidad">Especialidad</label>
-                  <select id="modal-atencion-especialidad" class="formularioCampo-select" name="especialidad">
+                  <label for="modal-atencion-area-atencion">Are de Atencion</label>
+                  <select id="modal-atencion-area-atencion" class="formularioCampo-select" name="areaAtencion">
                   </select>
                </div>
 
@@ -1174,9 +1175,9 @@ async function AgregarAtencionModal(paciente=null, zona=null, atencionId=null) {
       },
       preConfirm: () => {
          
-         const especialidad = document.getElementById("modal-atencion-especialidad").value;
+         const areaAtencion = document.getElementById("modal-atencion-area-atencion").value;
 
-         if (!especialidad) {
+         if (!areaAtencion) {
             Swal.showValidationMessage('Debe seleccionar una sala');
             return false;
          }
@@ -1194,7 +1195,7 @@ async function AgregarAtencionModal(paciente=null, zona=null, atencionId=null) {
       didOpen: async function () {
          const confirmBtn = Swal.getConfirmButton();
          const titleElement = Swal.getTitle(); 
-         const especialidad = document.getElementById("modal-atencion-especialidad");
+         const areaAtencion = document.getElementById("modal-atencion-area-atencion");
          const fecha = document.getElementById("modal-atencion-fecha");
          const servicio = document.getElementById("modal-atencion-servicio");
          const observaciones = document.getElementById("modal-atencion-observacion");
@@ -1212,18 +1213,18 @@ async function AgregarAtencionModal(paciente=null, zona=null, atencionId=null) {
 
 
          // Cargar especialidaes de backed
-         async function cargarEspecialidades(zona) {
+         async function cargarAreaAtencion(zona) {
             try {
-               const data = await fetchData(urls["listarEspecialidad"], { id_servicio: zona });
+               const data = await fetchData(urls["listarAreaAtencion"], { id_servicio: zona });
 
                if (Array.isArray(data) && data.length > 0) {
-                  especialidad.innerHTML = '';
+                  areaAtencion.innerHTML = '';
                   
                   let tieneId3 = false;
 
                   data.forEach((item) => {
                      const option = new Option(
-                        concatenarLimpio(item.nombre_especialidad, ' | ', item.servicio__nombre_corto),
+                        concatenarLimpio(item.nombre_area_atencion, ' | ', item.servicio__nombre_corto),
                         item.id
                      );
 
@@ -1232,20 +1233,20 @@ async function AgregarAtencionModal(paciente=null, zona=null, atencionId=null) {
                         option.selected = true;
                      }
 
-                     especialidad.appendChild(option);
+                     areaAtencion.appendChild(option);
                   });
 
                   if (!tieneId3) {
                      // Si no se encontró el id 3, seleccionar la primera opción como fallback
-                     especialidad.selectedIndex = 0;
+                     areaAtencion.selectedIndex = 0;
                   }
 
                } else {
-                  console.warn("No se encontraron especialidades.");
+                  console.warn("No se encontraron area_atencion.");
                }
 
             } catch (error) {
-               console.error("Error al cargar especialidades:", error);
+               console.error("Error al cargar area_atencion:", error);
             }
          }
 
@@ -1253,7 +1254,7 @@ async function AgregarAtencionModal(paciente=null, zona=null, atencionId=null) {
             
          servicio.addEventListener("change", async function () {
             const zonaSeleccionada = this.value; 
-            await cargarEspecialidades(zonaSeleccionada);
+            await cargarAreaAtencion(zonaSeleccionada);
 
          });
 
@@ -1261,7 +1262,7 @@ async function AgregarAtencionModal(paciente=null, zona=null, atencionId=null) {
          const hace100Anios = new Date();
          hace100Anios.setFullYear(hoy.getFullYear() - 100);
          if(!atencionId){
-            await cargarEspecialidades(zona);
+            await cargarAreaAtencion(zona);
             servicio.value = `${zona}`;
 
             //fecha de hoy si no es registro 
@@ -1300,8 +1301,8 @@ async function AgregarAtencionModal(paciente=null, zona=null, atencionId=null) {
             detallesModificado.value = concatenarLimpio(atencion.modificado_por," | ", formatFecha(atencion.fecha_modificado)) || "";
             fieldsetRegistro.style.display = 'block';
             servicio.value = atencion.idServicio;
-            cargarEspecialidades(servicio.value);
-            especialidad.value = atencion.idEspecialidad
+            cargarAreaAtencion(servicio.value);
+            areaAtencion.value = atencion.idAreaAtencion
 
             //manejar la fecha de recepcion
             if(atencion.fechaRecepcion){
@@ -1328,7 +1329,7 @@ async function AgregarAtencionModal(paciente=null, zona=null, atencionId=null) {
             fecha.disabled = true;
             fechaRecepcion.disabled = true;
             servicio.disabled = true;
-            especialidad.disabled = true;
+            areaAtencion.disabled = true;
             confirmBtn.disabled = true;
             toastr.info("Formulario en modo solo lectura");
          }
@@ -1338,7 +1339,7 @@ async function AgregarAtencionModal(paciente=null, zona=null, atencionId=null) {
 
    if (modal.isConfirmed) {
         // Guardamos las referencias a los elementos
-         const especialidad = document.getElementById("modal-atencion-especialidad");
+         const areaAtencion = document.getElementById("modal-atencion-area-atencion");
          const fecha = document.getElementById("modal-atencion-fecha");
          const observaciones = document.getElementById("modal-atencion-observacion");
          const idAtencion = document.getElementById("modal-atencion-id");
@@ -1353,7 +1354,7 @@ async function AgregarAtencionModal(paciente=null, zona=null, atencionId=null) {
                      "X-CSRFToken": csrfToken
                },
                body: JSON.stringify({
-                     especialidad: especialidad.value,
+                     area_atencion: areaAtencion.value,
                      fecha: fecha.value,
                      observaciones: observaciones.value.toUpperCase(),
                      idAtencion: idAtencion.value,
@@ -1488,12 +1489,12 @@ async function agregarAtencion(paciente,servicio,atencionID){
 
       if (reciente && reciente.reciente) {
          const nombre = reciente.nombre || '';
-         const especialidad = reciente.especialidad || 'No especificada';
+         const areaAtencion = reciente.area_atencion || 'No especificada';
          const fecha = reciente.fecha_creado || 'desconocida';
 
          toastr.warning(
             `El paciente ${nombre} ya tiene una atención reciente.\n` +
-            `Especialidad: ${especialidad}\n` +
+            `Area: ${areaAtencion}\n` +
             `Fecha: ${fecha}`
          );
          return;

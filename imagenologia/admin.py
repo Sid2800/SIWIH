@@ -27,11 +27,11 @@ class SalaConRegistrosFilter(admin.SimpleListFilter):
 
 
 class EvaluacionRxAdmin(admin.ModelAdmin):
-    list_display = ('fecha', 'paciente', 'sala', 'especialidad', 'servicio_auxiliar')
+    list_display = ('fecha', 'paciente', 'sala', 'area_atencion', 'servicio_auxiliar')
     search_fields = ('paciente__nombre', 'paciente__apellido')
-    list_filter = ('fecha', SalaConRegistrosFilter, 'especialidad', 'servicio_auxiliar')
+    list_filter = ('fecha', SalaConRegistrosFilter, 'area_atencion', 'servicio_auxiliar')
     readonly_fields = ('fecha_creado', 'creado_por', 'fecha_modificado', 'modificado_por')
-    autocomplete_fields = ('paciente', 'sala', 'especialidad', 'servicio_auxiliar', 'creado_por', 'modificado_por')
+    autocomplete_fields = ('paciente', 'sala', 'area_atencion', 'servicio_auxiliar', 'creado_por', 'modificado_por')
     inlines = [EvaluacionRxDetalleInline]  
 
     def save_model(self, request, obj, form, change):

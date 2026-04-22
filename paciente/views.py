@@ -417,29 +417,7 @@ class PacienteEditView(UpdateView):
 def listarPacientes(request):
     usuario = request.user
 
-    # Si es superusuario, darle acceso completo
-    if usuario.is_superuser:
-        context = {
-            "botones": ["todos"]
-        }
-        return render(request, 'paciente/paciente_list.html', context)
-    
-    permisos_por_unidad = {
-        1: ["crear_paciente", "editar_paciente", "crear_ingreso", "crear_atencion"],  # Admisión
-        2: ["crear_evaluacionrx"],  # Imagenología
-        4: ["editar_paciente"], # directivos
-        6: ["crear_referencia"]  # Imagenología
-
-    }
-
-    perfiles = PerfilUnidad.objects.filter(usuario=usuario).values_list('unidad_id', flat=True)
-
-    botones = []
-    for unidad_id in perfiles:
-        permisos = permisos_por_unidad.get(unidad_id, [])
-        for p in permisos:
-            if p not in botones:  # Evita duplicados y preserva orden
-                botones.append(p)
+    botones =UsuarioService.obtener_botones_paciente(usuario)
 
     context = {
         "botones": json.dumps(botones)  # Se manda ya en el orden original
@@ -1087,6 +1065,9 @@ def busquedaAvanzada(request):
 
 
 def guardarDefuncion(request):
+    if not verificar_permisos_usuario(request.user, PACIENTE_EDITOR_ROLES, PACIENTE_EDITOR_UNIDADES):
+        return JsonResponse({'error': 'No tienes permisos para realizar esta accion'}, status=403)
+
     try:
         data = parse_json_request(request)
     except ValueError as e:
@@ -1155,6 +1136,11 @@ def guardarDefuncion(request):
 
 
 def guardarObito(request):
+
+    if not verificar_permisos_usuario(request.user, PACIENTE_EDITOR_ROLES, PACIENTE_EDITOR_UNIDADES):
+        return JsonResponse({'error': 'No tienes permisos para realizar esta accion'}, status=403)
+    
+
     try:
         data = parse_json_request(request)
     except ValueError as e:
@@ -1243,7 +1229,7 @@ def obtener_defuncion_paciente(request):
     if not defuncion:
         return JsonResponse({"mensaje": "no defuncion"}, status=200)
     
-    if defuncion.sala or defuncion.servicio_auxiliar or defuncion.especialidad:
+    if defuncion.sala or defuncion.servicio_auxiliar or defuncion.area_atencion:
         info = ServicioService.encontrar_dependencia_en_instance(defuncion)
         if info:
             dependencia_codigo = info["clave"]
@@ -1269,6 +1255,7 @@ def obtener_defuncion_paciente(request):
         "tipo_defuncion_display": defuncion.get_tipo_defuncion_display()
     })
 
+
 def obtener_obito_paciente(request):
     idObito = request.GET.get('id')
 
@@ -1281,7 +1268,7 @@ def obtener_obito_paciente(request):
         return JsonResponse({"mensaje": "no obito"}, status=200)
 
     # Resolver dependencia
-    if obito.sala or obito.servicio_auxiliar or obito.especialidad:
+    if obito.sala or obito.servicio_auxiliar or obito.area_atencion:
         info = ServicioService.encontrar_dependencia_en_instance(obito)
         if info:
             dependencia_codigo = info["clave"]

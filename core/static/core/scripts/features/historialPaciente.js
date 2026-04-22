@@ -317,12 +317,12 @@ document.addEventListener('DOMContentLoaded', function () {
             data: null,
             render: function (data) {
                 if (data) {
-                    // Obtenemos el nombre de la especialidad y lo limitamos a 20 caracteres
-                    let especialidad = data.especialidad__nombre_especialidad	;
-                    especialidad = especialidad.substring(0, 21);
+                    // Obtenemos el nombre de la area_atencion y lo limitamos a 20 caracteres
+                    let area_atencion = data.area_atencion__nombre_area_atencion	;
+                    area_atencion = area_atencion.substring(0, 21);
                     
                     // Concatenamos la sala truncada con el nombre corto del servicio, usando concatenarLimpio
-                    data = concatenarLimpio(especialidad);
+                    data = concatenarLimpio(area_atencion);
                 }
                 return data;
             }
@@ -388,7 +388,7 @@ document.addEventListener('DOMContentLoaded', function () {
             responsivePriority: 3,
             render: function (data) {
                 if (data) {
-                    // Obtenemos el nombre de la especialidad y lo limitamos a 20 caracteres
+                    // Obtenemos el nombre de la area_atencion y lo limitamos a 20 caracteres
                     let dependencia = data.nombre_dependencia	;
                     dependencia = dependencia.substring(0, 21);
                     let tipo_dependencia = data.tipo_dependencia;
@@ -845,7 +845,6 @@ document.addEventListener('DOMContentLoaded', function () {
         ModalGaleria.open({
         titulo: "Evaluación",
             
-
         datos: {
             "Paciente": document.getElementById('historialNombrePaciente').value,
             "Sala": selectedRow.nombre_dependencia,

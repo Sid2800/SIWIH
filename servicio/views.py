@@ -49,7 +49,7 @@ class ListarSala(View):
         return JsonResponse(zonas, safe=False)
     
 
-class ListarEspecialidadServicio(View):
+class ListarAreaAtencionServicio(View):
     def get(self, request):
         id_servicio = request.GET.get('id_servicio')
 
@@ -63,10 +63,10 @@ class ListarEspecialidadServicio(View):
         except ValueError:
             return JsonResponse({'error': ('El parámetro "id_servicio" debe ser un número entero.')}, status=400)
 
-        # Obtener especialidades activas
-        especialidades = ServicioService.obtener_especialidades_activas_servicio(id_servicio)
+        # Obtener area_atencion activas
+        areas = ServicioService.obtener_areas_atencion_activas_servicio(id_servicio)
 
-        return JsonResponse(especialidades, safe=False)
+        return JsonResponse(areas, safe=False)
     
 
 

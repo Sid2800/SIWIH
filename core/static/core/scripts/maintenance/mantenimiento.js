@@ -4,9 +4,24 @@ $(document).ready(function () {
         reclasificarRN: urls["reclasificarRN"]
     };
 
+    const usuarios = JSON.parse(
+        document.getElementById('usuarios-data').textContent
+    );
+
     //text de busqqueda
     const ReclasificarRN = document.getElementById('cantidad_afectados_rn');
     const BtnReclasificarRN = document.getElementById('btn_reclasificar_rn');
+
+    // text cantidad de usuarios
+    const labelCantidadusuarios = document.getElementById('cantidad_usuarios');
+    const btnDefinirImagenesUsuarios = document.getElementById('btn_definir_imagen_usuario');
+
+
+    
+    if (usuarios){
+        labelCantidadusuarios.textContent  =  usuarios.length;
+    }
+    
 
 
     async function traer_RN_candidatos_HIJO(ejecutar) {
@@ -70,8 +85,26 @@ $(document).ready(function () {
         
     });
 
+    
 
-traer_RN_candidatos_HIJO();
+    btnDefinirImagenesUsuarios.addEventListener('click', async function () {
+        ModalGaleriaUsuario.open(
+            {
+            titulo: "Actualizar imagenes de usuarios",
+            usuarios: usuarios
+            }
+        );
+    });
+
+
+
+
+
+    traer_RN_candidatos_HIJO();
+
+
+
+
     
 });
 
