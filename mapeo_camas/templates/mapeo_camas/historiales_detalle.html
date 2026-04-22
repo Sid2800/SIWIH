@@ -39,10 +39,6 @@
     <input type="date" id="dtf-fecha-inicio" class="formularioCampo-date">
     <label for="dtf-fecha-fin">Hasta</label>
     <input type="date" id="dtf-fecha-fin" class="formularioCampo-date">
-    <label for="dtf-estado">Estado</label>
-    <select id="dtf-estado" class="formularioCampo-select">
-      <option value="">Todos</option>
-    </select>
     <button type="button" class="dt-button" id="dtf-btn-limpiar" title="Limpiar filtros">
       <i class="bi bi-eraser boton-exportacion"></i>
     </button>
@@ -71,7 +67,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'mapeo_camas/scripts/historialesDetalleCamas.js' %}?v=20260505f"></script>
+<script src="{% static 'mapeo_camas/scripts/historialesDetalleCamas.js' %}?v=20260506b"></script>
 <style>
   .contenedor2 {
     overflow-x: hidden;

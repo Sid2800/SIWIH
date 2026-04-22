@@ -15,9 +15,9 @@ document.addEventListener("DOMContentLoaded", function () {
   var btnVistaTabla = document.getElementById("btn-vista-tabla");
 
   var tablaDt = null;
+  // [2026-05-06 FIX] Filtro Estado eliminado; solo se filtra por fecha.
   var dtfFechaInicio = document.getElementById("dtf-fecha-inicio");
   var dtfFechaFin = document.getElementById("dtf-fecha-fin");
-  var dtfEstado = document.getElementById("dtf-estado");
   var dtfLimpiar = document.getElementById("dtf-btn-limpiar");
 
   var estructuraCache = [];
@@ -250,7 +250,6 @@ document.addEventListener("DOMContentLoaded", function () {
         flatItemsCache = aplanarEstructura(estructuraCache);
         renderEstructuraMapeo(estructuraCache);
         contenedor.innerHTML = "";
-        poblarFiltroEstado(flatItemsCache);
         inicializarTablaDetalle();
         aplicarFiltrosCompartidos();
         aplicarVista(vistaActual);
@@ -267,7 +266,7 @@ document.addEventListener("DOMContentLoaded", function () {
     return {
       fechaInicio: fechaIni,
       fechaFin: fechaFin,
-      estado: dtfEstado ? dtfEstado.value.trim().toLowerCase() : ""
+      estado: ""
     };
   }
 
@@ -494,14 +493,13 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   // Eventos filtros
-  [dtfFechaInicio, dtfFechaFin, dtfEstado].forEach(function (el) {
+  [dtfFechaInicio, dtfFechaFin].forEach(function (el) {
     if (el) el.addEventListener("change", aplicarFiltrosCompartidos);
   });
   if (dtfLimpiar) {
     dtfLimpiar.addEventListener("click", function () {
       if (dtfFechaInicio) dtfFechaInicio.value = "";
       if (dtfFechaFin) dtfFechaFin.value = "";
-      if (dtfEstado) dtfEstado.value = "";
       aplicarFiltrosCompartidos();
     });
   }

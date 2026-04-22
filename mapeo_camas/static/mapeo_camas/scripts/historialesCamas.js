@@ -11,6 +11,7 @@ document.addEventListener("DOMContentLoaded", function () {
   var filtroFechaInicio = null;
   var filtroFechaFin = null;
   var tablaDt = null;
+  var ultimaFilaSeleccionada = "";
 
   function formatearFechaHoraCorta(valor) {
     if (!valor) {
@@ -44,18 +45,17 @@ document.addEventListener("DOMContentLoaded", function () {
     window.location.href = API_URLS.detalle + "?" + params.toString();
   }
 
-  function resolverIdFila(tablaRow) {
-    if (!tablaRow) {
-      return "";
+  // [2026-05-06 FIX] Primer clic selecciona fila; segundo clic en la misma fila navega al detalle.
+  function debeNavegarPorSegundoClick(idRegistro) {
+    var id = String(idRegistro || "");
+    if (!id) {
+      return false;
     }
-    if (tablaRow.getAttribute("data-id")) {
-      return tablaRow.getAttribute("data-id");
+    if (ultimaFilaSeleccionada === id) {
+      return true;
     }
-    var filaPrevia = tablaRow.previousElementSibling;
-    if (filaPrevia && filaPrevia.getAttribute("data-id")) {
-      return filaPrevia.getAttribute("data-id");
-    }
-    return "";
+    ultimaFilaSeleccionada = id;
+    return false;
   }
 
   function toggleFiltroCama() {
@@ -70,6 +70,15 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   }
 
+  function normalizarFiltroCama() {
+    if (!filtroCama || !filtroCama.value) {
+      return "";
+    }
+    var valor = String(filtroCama.value).trim();
+    var match = valor.match(/\d+/);
+    return match ? match[0] : valor;
+  }
+
   function paramsBusqueda() {
     var params = new URLSearchParams();
     params.append("tipo", (filtroTipo && filtroTipo.value) ? filtroTipo.value : "mapeo");
@@ -80,8 +89,9 @@ document.addEventListener("DOMContentLoaded", function () {
     if (filtroFechaFin && filtroFechaFin.value) {
       params.append("fecha_fin", filtroFechaFin.value);
     }
-    if (filtroCama && filtroCama.value) {
-      params.append("cama_id", filtroCama.value);
+    var camaBuscada = normalizarFiltroCama();
+    if (camaBuscada) {
+      params.append("cama_id", camaBuscada);
     }
 
     return params;
@@ -123,7 +133,18 @@ document.addEventListener("DOMContentLoaded", function () {
     var filas = tablaBody.querySelectorAll("tr[data-id]");
     filas.forEach(function (fila) {
       fila.addEventListener("click", function () {
-        irADetalle(this.getAttribute("data-id"));
+        tablaBody.querySelectorAll("tr[data-id]").forEach(function (tr) { tr.classList.remove("selected"); });
+        this.classList.add("selected");
+        var idRegistro = this.getAttribute("data-id");
+        if (debeNavegarPorSegundoClick(idRegistro)) {
+          irADetalle(idRegistro);
+        }
+      });
+      fila.addEventListener("dblclick", function () {
+        var idRegistro = this.getAttribute("data-id");
+        if (idRegistro) {
+          irADetalle(idRegistro);
+        }
       });
     });
   }
@@ -196,11 +217,17 @@ document.addEventListener("DOMContentLoaded", function () {
     labelCama.htmlFor = "filtro-cama";
     fechasFiltro.appendChild(labelCama);
 
-    filtroCama = document.createElement("select");
+    filtroCama = document.createElement("input");
+    filtroCama.type = "text";
     filtroCama.id = "filtro-cama";
     filtroCama.className = "formularioCampo-select";
-    filtroCama.innerHTML = '<option value="">Todas</option>';
+    filtroCama.placeholder = "Buscar cama (ej: 101)";
+    filtroCama.setAttribute("list", "historiales-camas-list");
     fechasFiltro.appendChild(filtroCama);
+
+    var listaCamas = document.createElement("datalist");
+    listaCamas.id = "historiales-camas-list";
+    fechasFiltro.appendChild(listaCamas);
 
     var hoyDate = new Date();
     var hace30DiasDate = new Date();
@@ -237,8 +264,14 @@ document.addEventListener("DOMContentLoaded", function () {
       toggleFiltroCama();
       cargarTabla();
     });
-    filtroCama.addEventListener("change", function () {
-      cargarTabla();
+    var timerBusquedaCama = null;
+    filtroCama.addEventListener("input", function () {
+      if (timerBusquedaCama) {
+        clearTimeout(timerBusquedaCama);
+      }
+      timerBusquedaCama = setTimeout(function () {
+        cargarTabla();
+      }, 260);
     });
     filtroFechaInicio.addEventListener("change", function () {
       cargarTabla();
@@ -258,11 +291,16 @@ document.addEventListener("DOMContentLoaded", function () {
           return;
         }
 
-        var opciones = '<option value="">Todas</option>';
+        var dataList = document.getElementById("historiales-camas-list");
+        if (!dataList) {
+          return;
+        }
+
+        var opciones = "";
         (data.results || []).forEach(function (item) {
-          opciones += '<option value="' + escaparHtml(item.id) + '">Cama ' + escaparHtml(item.numero_cama) + " - " + escaparHtml(item.ubicacion) + "</option>";
+          opciones += '<option value="' + escaparHtml(item.numero_cama) + '">Cama ' + escaparHtml(item.numero_cama) + " - " + escaparHtml(item.ubicacion) + "</option>";
         });
-        filtroCama.innerHTML = opciones;
+        dataList.innerHTML = opciones;
       })
       .catch(function () {
         // Si falla catálogo, se mantiene la opción por defecto.
@@ -276,13 +314,11 @@ document.addEventListener("DOMContentLoaded", function () {
 
     tablaDt = $("#tabla-historiales").DataTable({
       responsive: true,
-      processing: true,
       serverSide: false,
       lengthMenu: [10, 25, 50, 100],
       pageLength: 10,
       ordering: false,
       searching: true,
-      select: { style: "single" },
       data: [],
       columns: [
         { data: "referencia", defaultContent: "", className: "all" },
@@ -300,7 +336,7 @@ document.addEventListener("DOMContentLoaded", function () {
       ],
       createdRow: function (row, data) {
         row.setAttribute("data-id", String(data.id || ""));
-        row.setAttribute("title", "Doble clic para ver detalle");
+        row.setAttribute("title", "Clic para seleccionar · doble clic para abrir detalle");
       },
       language: {
         lengthMenu: "Mostrar _MENU_ por página",
@@ -329,13 +365,6 @@ document.addEventListener("DOMContentLoaded", function () {
           }
         },
         {
-          text: '<i class="bi bi-search boton-exportacion"></i>',
-          titleAttr: "Buscar",
-          action: function () {
-            cargarTabla();
-          }
-        },
-        {
           text: '<i class="bi bi-eraser boton-exportacion"></i>',
           titleAttr: "Limpiar filtros",
           action: function () {
@@ -352,20 +381,29 @@ document.addEventListener("DOMContentLoaded", function () {
     construirControlesFiltro();
 
     // Navegar al detalle al hacer clic en una fila, incluyendo filas-child de DataTables responsive.
-    // Las filas-child tienen clase .child y no tienen datos propios; su fila padre es la inmediata anterior.
-    // Se ignoran clics en el control de expand/collapse (.dtr-control) para no interferir con responsive.
+    // [2026-05-06 FIX] Primer clic selecciona y expande datos ocultos (responsive); segundo clic navega.
     function resolverFilaDt(tr) {
-      // Ignorar clic en el control de expansión responsive
       var targetTr = tr.hasClass("child") ? tr.prev("tr") : tr;
       var row = tablaDt.row(targetTr);
       return row.data() ? row : null;
     }
 
+    function expandirFilaResponsive(row, trPadre) {
+      if (!row || !trPadre || !trPadre.length) {
+        return;
+      }
+      if (!row.child.isShown()) {
+        row.child.show();
+        trPadre.addClass("parent");
+      }
+    }
+
     $("#tabla-historiales tbody")
       .off("click.historial dblclick.historial keydown.historial")
       .on("click.historial", "tr", function (e) {
-        // Solo resaltar la fila al hacer clic simple (sin navegar)
-        if ($(e.target).closest(".dtr-control").length) {
+        // Ignorar clic en fila child (el padre ya maneja todo)
+        if ($(this).hasClass("child")) {
+          $(this).prev("tr").trigger("click.historial");
           return;
         }
         var row = resolverFilaDt($(this));
@@ -374,12 +412,17 @@ document.addEventListener("DOMContentLoaded", function () {
         }
         $("#tabla-historiales tbody tr").removeClass("selected");
         $(this).addClass("selected");
+
+        var rowData = row.data();
+        var idRegistro = String((rowData && rowData.id) || "");
+        if (debeNavegarPorSegundoClick(idRegistro)) {
+          irADetalle(idRegistro);
+        } else {
+          expandirFilaResponsive(row, $(this));
+        }
       })
       .on("dblclick.historial", "tr", function (e) {
         // Navegar al detalle al hacer doble clic
-        if ($(e.target).closest(".dtr-control").length) {
-          return;
-        }
         var row = resolverFilaDt($(this));
         if (!row) {
           return;
@@ -404,7 +447,6 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   inicializarDataTable();
-  construirControlesFiltro();
   cargarFiltroCamas();
   cargarTabla();
 });
