@@ -172,33 +172,27 @@ function _mostrarModalAprobacion(id, expedientes) {
         const nombre = exp.paciente_nombre ? `<span class="sexp-exp-dec-nombre">${exp.paciente_nombre}</span>` : '';
         return `
         <div class="sexp-exp-dec-row" id="sexp-dec-row-${exp.detalle_id}">
-            <div class="sexp-exp-dec-info">
-                <span class="sexp-exp-tag">#${exp.numero}</span>${nombre}
-            </div>
-            <div class="sexp-exp-dec-btns">
-                <label class="sexp-exp-dec-label sexp-exp-dec-label--apr">
-                    <input type="radio" name="dec_${exp.detalle_id}" value="aprobar" checked>
-                    <i class="bi bi-check-circle"></i> Aprobar
+            <div class="sexp-exp-dec-head">
+                <label class="sexp-exp-dec-check" title="Marcado = aprobado, desmarcado = rechazado">
+                    <input type="checkbox" id="exp-check-${exp.detalle_id}" data-detalle="${exp.detalle_id}" checked>
+                    <span class="sexp-exp-dec-checkmark"></span>
                 </label>
-                <label class="sexp-exp-dec-label sexp-exp-dec-label--rec">
-                    <input type="radio" name="dec_${exp.detalle_id}" value="rechazar">
-                    <i class="bi bi-x-circle"></i> Rechazar
-                </label>
+                <span class="sexp-exp-tag">#${exp.numero}</span>
+                ${nombre}
+                <span class="sexp-exp-dec-estado" id="exp-estado-${exp.detalle_id}">Aprobado</span>
             </div>
+            <textarea id="exp-obs-${exp.detalle_id}" rows="2" class="sexp-modal-input sexp-exp-dec-obs"
+                placeholder="Observaciones / motivos de rechazo..."></textarea>
         </div>`;
     }).join('');
 
     Swal.fire({
         title: 'Aprobar Solicitud #' + id,
-        width: 640,
+        width: 680,
         html: `<div style="text-align:left;">
             <div class="sexp-modal-campo">
-                <label><strong>Expedientes solicitados</strong></label>
+                <label><strong>Expedientes solicitados</strong> <small style="font-weight:normal; opacity:.75;">(desmarca los que NO se prestarán)</small></label>
                 <div id="swal-exp-list">${expHtml}</div>
-            </div>
-            <div class="sexp-modal-campo" id="swal-rechazo-section" style="display:none;">
-                <label>Motivo de rechazo de expediente(s) <span style="color:#dc2626">*</span></label>
-                <textarea id="swal-motivo-rechazo" rows="2" placeholder="Explique por qué no se prestará(n) ese(os) expediente(s)..." class="sexp-modal-input"></textarea>
             </div>
             <hr style="margin:10px 0; opacity:.2;">
             <div class="sexp-modal-campo">
@@ -206,11 +200,12 @@ function _mostrarModalAprobacion(id, expedientes) {
                 <div class="sexp-modal-tiempo-row">
                     <input type="number" id="swal-tiempo" value="5" min="1" class="sexp-modal-input">
                     <select id="swal-unidad" class="sexp-modal-select">
-                        <option value="minutos" selected>Minutos (Pruebas)</option>
+                        <option value="minutos" selected>Minutos</option>
                         <option value="horas">Horas</option>
+                        <option value="dias">Días</option>
                     </select>
                 </div>
-                <small id="swal-tiempo-hint" class="sexp-modal-hint">Modo pruebas: ingrese el tiempo en minutos.</small>
+                <small id="swal-tiempo-hint" class="sexp-modal-hint">Ingrese el tiempo en minutos.</small>
             </div>
             <div class="sexp-modal-campo">
                 <label>Comentarios generales (opcional)</label>
@@ -226,26 +221,56 @@ function _mostrarModalAprobacion(id, expedientes) {
             const inputTiempo = document.getElementById('swal-tiempo');
             const hint = document.getElementById('swal-tiempo-hint');
 
-            selUnidad.addEventListener('change', function () {
-                if (this.value === 'minutos') {
-                    inputTiempo.value = '5';
-                    inputTiempo.min = '1';
-                    hint.textContent = 'Modo pruebas: ingrese el tiempo en minutos.';
-                } else {
-                    inputTiempo.value = '24';
-                    inputTiempo.min = '24';
-                    hint.textContent = 'Mínimo 24 horas para producción.';
-                }
-            });
+            // Calcula horas disponibles hasta las 4 PM de hoy
+            function horasHastaCuatroPM() {
+                const ahora = new Date();
+                const limite = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 16, 0, 0);
+                const diffMs = limite - ahora;
+                return diffMs > 0 ? Math.floor(diffMs / (1000 * 60 * 60)) : 0;
+            }
 
-            // Mostrar/ocultar sección de motivo según si hay rechazados
+            function actualizarHintTiempo() {
+                const unidad = selUnidad.value;
+                if (unidad === 'minutos') {
+                    inputTiempo.min = '1';
+                    inputTiempo.max = '';
+                    if (!inputTiempo.value || parseInt(inputTiempo.value) < 1) inputTiempo.value = '5';
+                    hint.textContent = 'Ingrese el tiempo en minutos.';
+                } else if (unidad === 'horas') {
+                    const maxH = horasHastaCuatroPM();
+                    inputTiempo.min = '1';
+                    inputTiempo.max = String(maxH);
+                    if (maxH <= 0) {
+                        hint.textContent = 'Ya pasó la hora límite (4:00 PM). Use "Días" o "Minutos".';
+                        inputTiempo.value = '';
+                    } else {
+                        inputTiempo.value = String(maxH);
+                        hint.textContent = `Horas solo el mismo día, máximo hasta las 4:00 PM (disponible: ${maxH}h).`;
+                    }
+                } else if (unidad === 'dias') {
+                    inputTiempo.min = '1';
+                    inputTiempo.max = '3';
+                    inputTiempo.value = '1';
+                    hint.textContent = 'De 1 a 3 días. Vencimiento a las 4:00 PM del último día.';
+                }
+            }
+            selUnidad.addEventListener('change', actualizarHintTiempo);
+
+            // Toggle aprobar/rechazar por expediente
             document.getElementById('swal-exp-list').addEventListener('change', function (e) {
-                if (e.target.type !== 'radio') return;
-                const hayRechazados = expedientes.some(function (exp) {
-                    const sel = document.querySelector(`input[name="dec_${exp.detalle_id}"]:checked`);
-                    return sel && sel.value === 'rechazar';
-                });
-                document.getElementById('swal-rechazo-section').style.display = hayRechazados ? 'block' : 'none';
+                if (e.target.type !== 'checkbox') return;
+                const detId = e.target.dataset.detalle;
+                const row = document.getElementById(`sexp-dec-row-${detId}`);
+                const estado = document.getElementById(`exp-estado-${detId}`);
+                if (e.target.checked) {
+                    row.classList.remove('sexp-exp-dec-row--rechazado');
+                    estado.textContent = 'Aprobado';
+                    estado.className = 'sexp-exp-dec-estado sexp-exp-dec-estado--apr';
+                } else {
+                    row.classList.add('sexp-exp-dec-row--rechazado');
+                    estado.textContent = 'Rechazado';
+                    estado.className = 'sexp-exp-dec-estado sexp-exp-dec-estado--rec';
+                }
             });
         },
         preConfirm: () => {
@@ -256,32 +281,53 @@ function _mostrarModalAprobacion(id, expedientes) {
                 Swal.showValidationMessage('Ingrese un tiempo válido');
                 return false;
             }
-            if (unidad === 'horas' && tiempo < 24) {
-                Swal.showValidationMessage('El tiempo mínimo en horas es de 24');
-                return false;
-            }
 
-            const decisiones = expedientes.map(function (exp) {
-                const sel = document.querySelector(`input[name="dec_${exp.detalle_id}"]:checked`);
-                return { detalle_id: exp.detalle_id, aprobado: !sel || sel.value === 'aprobar' };
-            });
-
-            const hayRechazados = decisiones.some(function (d) { return !d.aprobado; });
-            let motivoRechazo = '';
-            if (hayRechazados) {
-                motivoRechazo = document.getElementById('swal-motivo-rechazo').value.trim();
-                if (!motivoRechazo) {
-                    Swal.showValidationMessage('Debe ingresar el motivo de rechazo para los expedientes rechazados');
+            // Validación de horas: mismo día, no pasar 4 PM
+            if (unidad === 'horas') {
+                const ahora = new Date();
+                const limite = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 16, 0, 0);
+                const maxH = limite > ahora ? Math.floor((limite - ahora) / (1000 * 60 * 60)) : 0;
+                if (maxH <= 0) {
+                    Swal.showValidationMessage('Ya pasó la hora límite (4:00 PM). Use "Días" o "Minutos".');
+                    return false;
+                }
+                if (tiempo > maxH) {
+                    Swal.showValidationMessage(`Máximo ${maxH} hora(s) hoy (tope 4:00 PM). Si necesita más, use "Días".`);
                     return false;
                 }
             }
 
+            if (unidad === 'dias' && (tiempo < 1 || tiempo > 3)) {
+                Swal.showValidationMessage('Días debe estar entre 1 y 3 (máx. 72 horas).');
+                return false;
+            }
+
+            // Recolectar decisiones + observaciones por expediente
+            const decisiones = [];
+            for (const exp of expedientes) {
+                const check = document.getElementById(`exp-check-${exp.detalle_id}`);
+                const obs = document.getElementById(`exp-obs-${exp.detalle_id}`).value.trim();
+                const aprobado = check.checked;
+                if (!aprobado && !obs) {
+                    Swal.showValidationMessage(`El expediente #${exp.numero} está rechazado: debe ingresar motivo en observaciones.`);
+                    return false;
+                }
+                decisiones.push({
+                    detalle_id: exp.detalle_id,
+                    aprobado: aprobado,
+                    observaciones: obs
+                });
+            }
+
+            // Convertir valor a horas si se eligieron días
+            const tiempoHoras = (unidad === 'dias') ? tiempo * 24 : tiempo;
+            const esMinutos = (unidad === 'minutos');
+
             return {
-                tiempo: tiempo,
-                es_minutos: (unidad === 'minutos'),
+                tiempo_horas: tiempoHoras,
+                es_minutos: esMinutos,
                 comentarios: document.getElementById('swal-comentarios').value,
-                decisiones: decisiones,
-                motivo_rechazo_general: motivoRechazo
+                decisiones: decisiones
             };
         }
     }).then((result) => {
@@ -294,11 +340,10 @@ function _mostrarModalAprobacion(id, expedientes) {
             contentType: 'application/json',
             data: JSON.stringify({
                 solicitud_id: id,
-                tiempo_limite_horas: result.value.tiempo,
+                tiempo_limite_horas: result.value.tiempo_horas,
                 es_minutos: result.value.es_minutos,
                 comentarios: result.value.comentarios,
-                expedientes_decisiones: result.value.decisiones,
-                motivo_rechazo_general: result.value.motivo_rechazo_general
+                expedientes_decisiones: result.value.decisiones
             }),
             success: function (resp) {
                 if (resp.success) {

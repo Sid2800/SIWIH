@@ -289,20 +289,31 @@ def aprobar_solicitud_api(request):
     tiempo_limite = body.get('tiempo_limite_horas', 24)
     es_minutos = body.get('es_minutos', False)
     expedientes_decisiones = body.get('expedientes_decisiones', [])
-    motivo_rechazo_general = body.get('motivo_rechazo_general', '').strip()
 
     if int(tiempo_limite) < 1:
         return JsonResponse({"error": "El tiempo debe ser mayor a 0"}, status=400)
 
-    if not es_minutos and int(tiempo_limite) < 24:
-        return JsonResponse({"error": "El tiempo mínimo en horas es de 24"}, status=400)
+    # Validar tope de 72 horas cuando no es modo minutos (el frontend ya convierte días a horas)
+    if not es_minutos and int(tiempo_limite) > 72:
+        return JsonResponse({"error": "El tiempo máximo de préstamo es 72 horas (3 días)"}, status=400)
 
-    # Construir mapa de decisiones por detalle_id (si se proporcionaron)
-    mapa_decisiones = {d['detalle_id']: d.get('aprobado', True) for d in expedientes_decisiones}
-    hay_rechazados_en_decision = any(not v for v in mapa_decisiones.values())
+    # Mapa de decisiones: {detalle_id: {aprobado, observaciones}}
+    mapa_decisiones = {}
+    for d in expedientes_decisiones:
+        det_id = d.get('detalle_id')
+        if det_id is None:
+            continue
+        mapa_decisiones[det_id] = {
+            'aprobado': d.get('aprobado', True),
+            'observaciones': (d.get('observaciones') or '').strip(),
+        }
 
-    if hay_rechazados_en_decision and not motivo_rechazo_general:
-        return JsonResponse({"error": "El motivo de rechazo es obligatorio cuando se rechazan expedientes"}, status=400)
+    # Validar que los rechazados tengan observaciones (motivo)
+    for det_id, info in mapa_decisiones.items():
+        if not info['aprobado'] and not info['observaciones']:
+            return JsonResponse({
+                "error": "Todo expediente rechazado debe tener un motivo en sus observaciones"
+            }, status=400)
 
     try:
         solicitud = SolicitudPrestamo.objects.get(id=solicitud_id, estado_flujo_id='SOL_PENDIENTE')
@@ -315,8 +326,8 @@ def aprobar_solicitud_api(request):
 
         # Verificar que los expedientes aprobados estén disponibles
         for d in detalles:
-            es_aprobado = mapa_decisiones.get(d.id, True)
-            if es_aprobado and d.expediente_prestamo.estado_id == 'EXP_PRESTADO':
+            info = mapa_decisiones.get(d.id, {'aprobado': True, 'observaciones': ''})
+            if info['aprobado'] and d.expediente_prestamo.estado_id == 'EXP_PRESTADO':
                 return JsonResponse({
                     "error": f"El expediente #{d.expediente_prestamo.expediente.numero} ya no está disponible"
                 }, status=400)
@@ -325,14 +336,21 @@ def aprobar_solicitud_api(request):
         aprobados = []
         rechazados = []
         for d in detalles:
-            es_aprobado = mapa_decisiones.get(d.id, True)
-            d.aprobado = es_aprobado
-            if not es_aprobado:
-                d.motivo_rechazo_individual = motivo_rechazo_general
-                rechazados.append(d)
-            else:
+            info = mapa_decisiones.get(d.id, {'aprobado': True, 'observaciones': ''})
+            d.aprobado = info['aprobado']
+            # Guardar SIEMPRE las observaciones (tanto aprobados como rechazados pueden tenerlas)
+            d.motivo_rechazo_individual = info['observaciones'] or None
+            if info['aprobado']:
                 aprobados.append(d)
+            else:
+                rechazados.append(d)
             d.save()
+
+        # Texto motivo general: usamos las primeras observaciones de rechazados (para Prestamo.motivo_rechazo si aplica)
+        motivo_rechazo_general = " | ".join(
+            f"#{d.expediente_prestamo.expediente.numero}: {d.motivo_rechazo_individual}"
+            for d in rechazados if d.motivo_rechazo_individual
+        )
 
         todos_rechazados = len(aprobados) == 0
 
