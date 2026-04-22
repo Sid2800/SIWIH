@@ -5,6 +5,8 @@ from mapeo_camas import views
 
 urlpatterns = [
     path("", views.MapeoCamasMapaView.as_view(), name="mapeo_camas_mapa"),
+    path("historiales/", views.MapeoCamasHistorialView.as_view(), name="mapeo_camas_historiales"),
+    path("historiales/detalle/", views.MapeoCamasHistorialDetalleView.as_view(), name="mapeo_camas_historiales_detalle"),
     path("api/estado-mapeo/", views.estado_mapeo, name="mapeo_camas_estado_mapeo"),
     path("api/iniciar-mapeo/", views.iniciar_mapeo, name="mapeo_camas_iniciar_mapeo"),
     path("api/terminar-mapeo/", views.terminar_mapeo, name="mapeo_camas_terminar_mapeo"),
@@ -15,4 +17,8 @@ urlpatterns = [
     path("api/camas-disponibles/", views.camas_disponibles_mapa, name="mapeo_camas_camas_disponibles"),
     path("api/mover-paciente/", views.mover_paciente_cama, name="mapeo_camas_mover_paciente"),
     path("api/procesar-cama-mapeo/", views.procesar_cama_mapeo, name="mapeo_camas_procesar_cama_mapeo"),
+    path("api/sincronizar-camas/", views.sincronizar_camas_superadmin, name="sincronizar-camas-superadmin"),
+    path("api/historiales/camas/", views.historiales_camas_filtro, name="mapeo_camas_historiales_camas"),
+    path("api/historiales/data/", views.historiales_data, name="mapeo_camas_historiales_data"),
+    path("api/historiales/cards/", views.historiales_cards_data, name="mapeo_camas_historiales_cards"),
 ]

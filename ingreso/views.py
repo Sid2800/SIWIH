@@ -12,6 +12,7 @@ from django import forms
 from django.db import transaction
 from django.utils.timezone import now 
 from django.http.response import JsonResponse, HttpResponseRedirect
+from django.views.decorators.http import require_POST
 from django.shortcuts import get_object_or_404, redirect
 from core.utils.utilidades_fechas import  formatear_fecha_simple,calcular_edad_texto, formatear_fecha2, formatear_fecha_dd_mm_yyyy,formatear_fecha_dd_mm_yyyy_hh_mm
 from core.utils.utilidades_textos import formatear_nombre_completo, formatear_ubicacion_completo

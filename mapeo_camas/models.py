@@ -17,13 +17,13 @@ class AsignacionCamaPaciente(models.Model):
     # Catálogo de estados posibles de una cama.
     # VACIA         → cama disponible, sin paciente.
     # OCUPADA       → cama con paciente internado.
-    # ALTA          → paciente en proceso de alta, cama pendiente de limpieza.
+    # PRE_ALTA      → paciente en pre alta; pendiente de liberar la cama.
     # FUERA_SERVICIO→ cama no disponible por mantenimiento u otra razón.
     # CONSULTA_EXTERNA → cama reservada para uso de consulta externa.
     class Estado(models.TextChoices):
         VACIA = "VACIA", "Vacia"
         OCUPADA = "OCUPADA", "Ocupada"
-        ALTA = "ALTA", "Alta"
+        PRE_ALTA = "PRE_ALTA", "Pre alta"
         FUERA_SERVICIO = "FUERA_SERVICIO", "Fuera de servicio"
         CONSULTA_EXTERNA = "CONSULTA_EXTERNA", "Consulta externa"
 
@@ -155,12 +155,13 @@ class AsignacionCamaPaciente(models.Model):
 # =============================================================================
 class HistorialEstadoCama(models.Model):
 
-    # Mismo catálogo de estados que AsignacionCamaPaciente.
-    # Ambos modelos comparten la misma semántica.
+    # Catálogo para auditoría histórica.
+    # Incluye ALTA como valor legado para no perder trazabilidad.
     class Estado(models.TextChoices):
         VACIA             = "VACIA",             "Vacia"
         OCUPADA           = "OCUPADA",           "Ocupada"
-        ALTA              = "ALTA",              "Alta"
+        PRE_ALTA          = "PRE_ALTA",          "Pre alta"
+        ALTA              = "ALTA",              "Alta (historico)"
         FUERA_SERVICIO    = "FUERA_SERVICIO",    "Fuera de servicio"
         CONSULTA_EXTERNA  = "CONSULTA_EXTERNA",  "Consulta externa"
 
@@ -342,6 +343,12 @@ class MapeoSesionCama(models.Model):
         default=Estado.EN_PROGRESO,
         db_index=True,
         verbose_name="Estado",
+    )
+    observacion = models.CharField(
+        max_length=500,
+        blank=True,
+        default="Sin Observaciones",
+        verbose_name="Observacion",
     )
 
     class Meta:

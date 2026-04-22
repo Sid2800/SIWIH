@@ -1,0 +1,227 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}{{ titulo }}{% endblock %}
+
+{% block content %}
+<div class="contenedor2">
+  <div class="tituloFormulario" style="margin-bottom: 1.5rem;">
+    <div class="tituloFormulario-texto">
+      <i class="bi bi-grid"></i>
+      <h2 class="sin-margen">{{ titulo }}</h2>
+    </div>
+    <div class="tituloFormulario-subrallado"></div>
+  </div>
+
+  <div class="mapa-acciones-superior" style="margin-bottom: 1rem;">
+    <div class="dt-buttons mapa-botones-acciones">
+      <button type="button" class="dt-button" title="Regresar a historiales" data-url="{% url 'mapeo_camas_historiales' %}" onclick="window.location.href=this.dataset.url">
+        <i class="bi bi-arrow-left-circle boton-exportacion"></i>
+      </button>
+      <button type="button" class="dt-button" id="btn-copiar-detalle" title="Copiar resumen visible">
+        <i class="bi bi-clipboard boton-exportacion"></i>
+      </button>
+      <button type="button" class="dt-button" id="btn-imprimir-detalle" title="Imprimir detalle">
+        <i class="bi bi-printer boton-exportacion"></i>
+      </button>
+    </div>
+    <div id="detalle-meta" class="detalle-meta"></div>
+  </div>
+
+  <div id="detalle-estructura-contenedor" class="detalle-estructura"></div>
+  <div id="detalle-cards-contenedor" class="historial-cards-grid"></div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'mapeo_camas/scripts/historialesDetalleCamas.js' %}?v=20260417-4"></script>
+<style>
+  .contenedor2 {
+    overflow-x: hidden;
+  }
+
+  .historial-cards-grid {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .historial-card {
+    border: 1px solid #d9d9d9;
+    border-radius: 10px;
+    background: #fff;
+    padding: 0.55rem 0.65rem;
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.05);
+  }
+
+  .historial-card h4 {
+    margin: 0;
+    font-size: 1.02rem;
+    font-weight: 700;
+  }
+
+  .historial-card-subtitulo {
+    margin-top: 0.12rem;
+    font-size: 0.9rem;
+    color: #334155;
+    font-weight: 600;
+  }
+
+  .historial-card-linea {
+    margin-top: 0.22rem;
+    font-size: 0.9rem;
+    line-height: 1.28;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .historial-card-observacion {
+    margin-top: 0.45rem;
+    font-size: 0.88rem;
+    border-left: 3px solid #0d6efd;
+    padding-left: 0.4rem;
+    color: #3d3d3d;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .historial-card-vacia {
+    padding: 1rem;
+    border: 1px dashed #c7c7c7;
+    border-radius: 12px;
+    color: #666;
+    background: #fafafa;
+  }
+
+  .detalle-meta {
+    color: #444;
+    font-weight: 600;
+    background: #f7f9fc;
+    border: 1px solid #dbe4f3;
+    border-radius: 8px;
+    padding: 0.45rem 0.7rem;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .detalle-estructura {
+    margin-bottom: 1rem;
+  }
+
+  .detalle-bloque {
+    border: 1px solid #d9d9d9;
+    border-radius: 10px;
+    background: #fff;
+    margin-bottom: 0.9rem;
+    overflow: hidden;
+  }
+
+  .detalle-bloque-titulo {
+    font-weight: 700;
+    padding: 0.45rem 0.65rem;
+    background: #f3f6fb;
+    border-bottom: 1px solid #d9e3f5;
+    font-size: 0.98rem;
+  }
+
+  .detalle-bloque-contenido {
+    padding: 0.45rem 0.65rem;
+  }
+
+  .detalle-camas-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.6rem;
+    align-items: start;
+    margin-top: 0.25rem;
+  }
+
+  .detalle-cama-item {
+    border: 1px solid #d3deef;
+    border-radius: 10px;
+    padding: 0.5rem 0.6rem;
+    margin-bottom: 0;
+    background: #fff;
+    font-size: 0.9rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  }
+
+  .detalle-cama-item strong {
+    font-size: 1rem;
+  }
+
+  .detalle-cama-linea {
+    margin-top: 0.18rem;
+    line-height: 1.28;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .historial-timeline {
+    display: grid;
+    gap: 0.65rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    position: relative;
+  }
+
+  .historial-card-timeline {
+    border-left: 6px solid currentColor;
+    position: relative;
+  }
+
+  .historial-card-time {
+    font-size: 0.84rem;
+    font-weight: 700;
+    margin-bottom: 0.12rem;
+    opacity: 0.9;
+  }
+
+  @media (max-width: 992px) {
+    .historial-cards-grid,
+    .detalle-camas-grid,
+    .historial-timeline {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .detalle-cama-item.mapa-cama--vacia,
+  .detalle-cama-item.mapa-cama--libre,
+  .historial-card.mapa-cama--vacia,
+  .historial-card.mapa-cama--libre {
+    background: #dcfce7;
+    color: #166534;
+  }
+
+  .detalle-cama-item.mapa-cama--ocupada,
+  .historial-card.mapa-cama--ocupada {
+    background: #fee2e2;
+    color: #991b1b;
+  }
+
+  .detalle-cama-item.mapa-cama--alta,
+  .historial-card.mapa-cama--alta {
+    background: #dbeafe;
+    color: #1e40af;
+  }
+
+  .detalle-cama-item.mapa-cama--fuera-servicio,
+  .detalle-cama-item.mapa-cama--mantenimiento,
+  .historial-card.mapa-cama--fuera-servicio,
+  .historial-card.mapa-cama--mantenimiento {
+    background: #fef3c7;
+    color: #92400e;
+  }
+
+  .detalle-cama-item.mapa-cama--consulta-externa,
+  .historial-card.mapa-cama--consulta-externa {
+    background: #cffafe;
+    color: #155e75;
+  }
+
+  .detalle-cama-item.mapa-cama--sin-asignacion,
+  .historial-card.mapa-cama--sin-asignacion {
+    background: #e2e8f0;
+    color: #334155;
+  }
+</style>
+{% endblock %}

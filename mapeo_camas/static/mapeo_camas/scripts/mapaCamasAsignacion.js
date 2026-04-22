@@ -1,4 +1,8 @@
 document.addEventListener("DOMContentLoaded", function () {
+  // ========================================================================
+  // Configuracion general y referencias DOM
+  // ========================================================================
+
   // Endpoints usados por el mapa para cargar datos, buscar y guardar cambios.
   var API_URLS = {
     estadoMapeo: "/mapeo-camas/api/estado-mapeo/",
@@ -16,7 +20,7 @@ document.addEventListener("DOMContentLoaded", function () {
   var ESTADOS_CAMA = [
     "VACIA",
     "OCUPADA",
-    "ALTA",
+    "PRE_ALTA",
     "FUERA_SERVICIO",
     "CONSULTA_EXTERNA"
   ];
@@ -27,13 +31,75 @@ document.addEventListener("DOMContentLoaded", function () {
   var btnLimpiar = document.getElementById("btn-limpiar-busqueda");
   var btnCopiar = document.getElementById("btn-copiar-camas");
   var btnImprimir = document.getElementById("btn-imprimir-camas");
+  var btnHistoriales = document.getElementById("btn-historiales-camas");
+  var btnSincronizar = document.getElementById("btn-sincronizar-camas");
   var btnIniciarMapeo = document.getElementById("btn-iniciar-mapeo");
   var btnTerminarMapeo = document.getElementById("btn-terminar-mapeo");
   var btnCancelarMapeo = document.getElementById("btn-cancelar-mapeo");
+  var btnTerminarMapeoPie = document.getElementById("btn-terminar-mapeo-pie");
+  var mapapiemapeo = document.getElementById("mapa-pie-mapeo");
   var camasRenderizadas = [];
   var sesionMapeoActivaId = null;
   var camasMapeadasSesion = new Set();
 
+  function insertarBotonAccionRapida(camaEl) {
+    if (!camaEl || camaEl.querySelector(".mapa-cama-accion-rapida")) {
+      return;
+    }
+
+    var botonActualizacionRapida = document.createElement("button");
+    botonActualizacionRapida.type = "button";
+    botonActualizacionRapida.className = "mapa-cama-accion-rapida";
+    botonActualizacionRapida.title = "Confirmar cama sin cambios";
+    botonActualizacionRapida.innerHTML = '<i class="bi bi-arrow-repeat boton-exportacion" aria-hidden="true"></i>';
+    botonActualizacionRapida.setAttribute("aria-label", "Confirmar cama sin cambios");
+    botonActualizacionRapida.style.display = sesionMapeoActivaId ? "inline-flex" : "none";
+    botonActualizacionRapida.addEventListener("click", function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      confirmarCamaSinCambios(camaEl);
+    });
+
+    camaEl.appendChild(botonActualizacionRapida);
+  }
+
+  function actualizarBotonesAccionRapidaVisibilidad() {
+    var visible = Boolean(sesionMapeoActivaId);
+    var botones = document.querySelectorAll(".mapa-cama-accion-rapida");
+    botones.forEach(function (btn) {
+      btn.style.display = visible ? "inline-flex" : "none";
+    });
+  }
+
+  function restaurarBotonesBase() {
+    if (btnIniciarMapeo) {
+      btnIniciarMapeo.style.display = "inline-flex";
+      btnIniciarMapeo.classList.remove("mapa-control-mapeo--oculto");
+    }
+    if (btnCopiar) {
+      btnCopiar.style.display = "inline-flex";
+    }
+    if (btnImprimir) {
+      btnImprimir.style.display = "inline-flex";
+    }
+    if (btnHistoriales) {
+      btnHistoriales.style.display = "inline-flex";
+    }
+    if (btnSincronizar) {
+      btnSincronizar.style.display = "inline-flex";
+    }
+    if (btnTerminarMapeo) {
+      btnTerminarMapeo.style.display = "none";
+    }
+    if (btnCancelarMapeo) {
+      btnCancelarMapeo.style.display = "none";
+    }
+    if (mapapiemapeo) {
+      mapapiemapeo.style.display = "none";
+    }
+  }
+
+  // Controla visibilidad de botones segun exista o no sesion activa de mapeo.
   function establecerModoMapeoActivo(activo) {
     var ocultar = function (el, debeOcultar) {
       if (!el) {
@@ -47,11 +113,71 @@ document.addEventListener("DOMContentLoaded", function () {
       el.style.display = "inline-flex";
     };
 
+    var tituloPrincipal = document.getElementById("mapa-titulo-principal");
+    if (tituloPrincipal) {
+      tituloPrincipal.textContent = activo ? "Mapeo de camas en Proceso" : "Mapa de Camas";
+    }
+
     ocultar(btnIniciarMapeo, activo);
     ocultar(btnCopiar, activo);
     ocultar(btnImprimir, activo);
+    ocultar(btnHistoriales, activo);
+    ocultar(btnSincronizar, activo);
     ocultar(btnTerminarMapeo, !activo);
     ocultar(btnCancelarMapeo, !activo);
+
+    if (mapapiemapeo) {
+      mapapiemapeo.style.display = activo ? "flex" : "none";
+    }
+
+    if (activo) {
+      camasRenderizadas.forEach(function (camaEl) {
+        insertarBotonAccionRapida(camaEl);
+      });
+    }
+    actualizarBotonesAccionRapidaVisibilidad();
+  }
+
+  async function confirmarCamaSinCambios(camaEl) {
+    if (!camaEl || !sesionMapeoActivaId) {
+      return;
+    }
+
+    var numeroCama = camaEl.dataset.numeroCama || "";
+    if (!numeroCama) {
+      return;
+    }
+
+    var payload = new FormData();
+    payload.append("cama_id", numeroCama);
+    payload.append("accion", "CONFIRMAR");
+    payload.append("sesion_mapeo_id", String(sesionMapeoActivaId));
+
+    var boton = camaEl.querySelector(".mapa-cama-accion-rapida");
+    if (boton) {
+      boton.disabled = true;
+    }
+
+    try {
+      var response = await fetch(API_URLS.procesarCamaMapeo, {
+        method: "POST",
+        headers: { "X-CSRFToken": window.CSRF_TOKEN },
+        body: payload,
+      });
+      var data = await response.json();
+      if (!response.ok || !data.ok) {
+        throw new Error(data.error || "No se pudo confirmar la cama.");
+      }
+
+      marcarCamaComoMapeada(camaEl);
+      toastr.success(data.mensaje || "Cama confirmada sin cambios.", "Exito");
+    } catch (error) {
+      toastr.error(error.message || "Error al confirmar cama.", "Error");
+    } finally {
+      if (boton) {
+        boton.disabled = false;
+      }
+    }
   }
 
   function marcarCamaComoMapeada(camaEl) {
@@ -71,6 +197,7 @@ document.addEventListener("DOMContentLoaded", function () {
     camasMapeadasSesion.clear();
   }
 
+  // Reaplica marca visual usando el Set en memoria luego de recargar el mapa.
   function aplicarMarcasSesionEnRender() {
     if (!camasMapeadasSesion.size) {
       return;
@@ -81,6 +208,7 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     });
   }
+    // Consulta backend para recuperar sesion en progreso y restaurar estado de UI.
 
   async function cargarEstadoSesionMapeo() {
     try {
@@ -115,7 +243,7 @@ document.addEventListener("DOMContentLoaded", function () {
     if (estadoVisual === "OCUPADA") {
       return "mapa-cama--ocupada";
     }
-    if (estadoVisual === "ALTA") {
+    if (estadoVisual === "PRE_ALTA" || estadoVisual === "ALTA") {
       return "mapa-cama--alta";
     }
     if (estadoVisual === "FUERA_SERVICIO") {
@@ -136,7 +264,44 @@ document.addEventListener("DOMContentLoaded", function () {
       item.dataset.sala || "",
       item.dataset.servicio || "",
       item.dataset.cubiculo || "",
+      item.dataset.usuarioUltimaActualizacion || "",
     ].join(" ").toLowerCase();
+  }
+
+  function formatearFechaHoraCorta(valor) {
+    if (!valor) {
+      return "Sin registro";
+    }
+    var fecha = new Date(valor);
+    if (isNaN(fecha.getTime())) {
+      return "Sin registro";
+    }
+
+    var hh = String(fecha.getHours()).padStart(2, "0");
+    var min = String(fecha.getMinutes()).padStart(2, "0");
+    var ahora = new Date();
+    var esMismoDia =
+      fecha.getFullYear() === ahora.getFullYear() &&
+      fecha.getMonth() === ahora.getMonth() &&
+      fecha.getDate() === ahora.getDate();
+
+    if (esMismoDia) {
+      return "Hoy " + hh + ":" + min;
+    }
+
+    var dd = String(fecha.getDate()).padStart(2, "0");
+    var mm = String(fecha.getMonth() + 1).padStart(2, "0");
+    var yyyy = String(fecha.getFullYear());
+    return dd + "/" + mm + "/" + yyyy + " " + hh + ":" + min;
+  }
+
+  function escaparHtml(valor) {
+    return String(valor || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/\"/g, "&quot;")
+      .replace(/'/g, "&#39;");
   }
 
   // Filtra las cards renderizadas segun tipo de busqueda y texto escrito.
@@ -174,6 +339,8 @@ document.addEventListener("DOMContentLoaded", function () {
     camaEl.dataset.pacienteDni = camaActualizada.paciente ? (camaActualizada.paciente.dni || "") : "";
     camaEl.dataset.cambiosRealizados = String(camaActualizada.cambios_realizados || 0);
     camaEl.dataset.maxCambios = String(camaActualizada.max_cambios || 5);
+    camaEl.dataset.ultimaActualizacion = camaActualizada.ultima_actualizacion || "";
+    camaEl.dataset.usuarioUltimaActualizacion = camaActualizada.usuario_ultima_actualizacion || "";
 
     var estadoEl = camaEl.querySelector(".mapa-cama-estado");
     var pacienteEl = camaEl.querySelector(".mapa-cama-paciente");
@@ -252,6 +419,30 @@ document.addEventListener("DOMContentLoaded", function () {
     var cambiosRealizados = parseInt(camaEl.dataset.cambiosRealizados || "0", 10);
     var maxCambios = parseInt(camaEl.dataset.maxCambios || "5", 10);
     var limiteTexto = cambiosRealizados + " / " + maxCambios;
+    var ultimaActualizacion = formatearFechaHoraCorta(camaEl.dataset.ultimaActualizacion || "");
+    var usuarioUltimaActualizacion = camaEl.dataset.usuarioUltimaActualizacion || "Sin registro";
+    var estadoActualTexto = estadoActual || "SIN_ASIGNACION";
+    var pacienteActualTexto = pacienteActual || "Sin paciente";
+    var htmlInformacion =
+      '<fieldset class="modalAtencionCampos">' +
+      "  <legend>Informacion</legend>" +
+      '  <div class="formularioCampoModal">' +
+      "    <label>Estado actual</label>" +
+      '    <input type="text" class="formularioCampo-text" readonly value="' + escaparHtml(estadoActualTexto) + '">' +
+      "  </div>" +
+      '  <div class="formularioCampoModal">' +
+      "    <label>Paciente actual</label>" +
+      '    <input type="text" class="formularioCampo-text" readonly value="' + escaparHtml(pacienteActualTexto) + '">' +
+      "  </div>" +
+      '  <div class="formularioCampoModal">' +
+      "    <label>Ultima actualizacion</label>" +
+      '    <input type="text" class="formularioCampo-text" readonly value="' + escaparHtml(ultimaActualizacion) + '">' +
+      "  </div>" +
+      '  <div class="formularioCampoModal">' +
+      "    <label>Actualizado por</label>" +
+      '    <input type="text" class="formularioCampo-text" readonly value="' + escaparHtml(usuarioUltimaActualizacion) + '">' +
+      "  </div>" +
+      "</fieldset>";
 
     // La cama esta OCUPADA cuando el estado visual actual es OCUPADA.
     // Esta bandera define toda la estructura del modal.
@@ -265,6 +456,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }).join("");
 
     var htmlVacia =
+      htmlInformacion +
       '<fieldset class="modalAtencionCampos">' +
       "  <legend>Estado de la cama</legend>" +
       '  <div class="formularioCampoModal">' +
@@ -292,9 +484,10 @@ document.addEventListener("DOMContentLoaded", function () {
       "</fieldset>" +
       '<p class="modal-cama-limite">Cambios realizados: ' + limiteTexto + "</p>";
 
-    // ── HTML para cama OCUPADA ───────────────────────────────────────────────
+    // ── HTML para cama OCUPADA ────────────────────────────────────────────
     // Muestra el paciente actual y permite: cambiar estado O mover a otra cama
     var htmlOcupada =
+      htmlInformacion +
       '<fieldset class="modalAtencionCampos">' +
       "  <legend>Paciente actual de la cama</legend>" +
       '  <div class="formularioCampoModal">' +
@@ -322,12 +515,12 @@ document.addEventListener("DOMContentLoaded", function () {
       "  </div>" +
       "</fieldset>" +
       '<fieldset id="bloque-cambiar-estado" class="modalAtencionCampos">' +
-      "  <legend>Nuevo estado (el paciente quedara sin cama asignada)</legend>" +
+      "  <legend>Nuevo estado </legend>" +
       '  <div class="formularioCampoModal">' +
       '    <label for="modal-mapa-estado">Estado</label>' +
       '    <select id="modal-mapa-estado" class="formularioCampo-select">' +
       '      <option value="VACIA">VACIA (desocupar)</option>' +
-      '      <option value="ALTA">ALTA</option>' +
+      '      <option value="PRE_ALTA">PRE_ALTA</option>' +
       '      <option value="FUERA_SERVICIO">FUERA_SERVICIO</option>' +
       '      <option value="CONSULTA_EXTERNA">CONSULTA_EXTERNA</option>' +
       "    </select>" +
@@ -412,6 +605,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }
       },
       didOpen: function () {
+        // didOpen inicializa listeners y autocompletados dentro del contenido dinamico.
         // Ajuste visual de botones para que use el estilo compacto del sistema.
         var actionsContainer = document.querySelector(".swal2-actions");
         if (actionsContainer) {
@@ -465,6 +659,7 @@ document.addEventListener("DOMContentLoaded", function () {
           var tomCamaDestino = null;
 
           function obtenerCampoBusquedaCama() {
+            // Cambia el campo de busqueda del TomSelect sin tocar las opciones cargadas.
             var tipo = tipoBusquedaCama ? tipoBusquedaCama.value : "numero";
             if (tipo === "numero") {
               return ["numero", "text"];
@@ -487,6 +682,7 @@ document.addEventListener("DOMContentLoaded", function () {
               // Cache local para filtrar en memoria sin pegar al backend por tecla.
               todasCamasDisponibles = data.results || [];
               if (selectCamaDestino && window.TomSelect) {
+                // Select con busqueda integrada para mantener 2 controles visibles.
                 tomCamaDestino = new TomSelect(selectCamaDestino, {
                   valueField: "id",
                   labelField: "text",
@@ -505,6 +701,7 @@ document.addEventListener("DOMContentLoaded", function () {
           if (tipoBusquedaCama) {
             tipoBusquedaCama.addEventListener("change", function () {
               if (tomCamaDestino) {
+                // Reinicia input interno y reevalua con nuevo criterio de busqueda.
                 tomCamaDestino.settings.searchField = obtenerCampoBusquedaCama();
                 tomCamaDestino.clear(true);
                 tomCamaDestino.clearTextbox();
@@ -534,6 +731,7 @@ document.addEventListener("DOMContentLoaded", function () {
           }
 
           function cargarPacientesFallback(query) {
+            // Fallback para navegadores/situaciones sin TomSelect disponible.
             var tipo = (tipoBusquedaPaciente && tipoBusquedaPaciente.value) ? tipoBusquedaPaciente.value : "nombre";
             var params = [];
             if (query) {
@@ -560,6 +758,7 @@ document.addEventListener("DOMContentLoaded", function () {
           }
 
           if (selectPaciente && window.TomSelect) {
+            // Select de paciente con carga remota por texto + tipo de busqueda.
             tomPaciente = new TomSelect(selectPaciente, {
               valueField: "id",
               labelField: "text",
@@ -685,6 +884,10 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   }
 
+  // ========================================================================
+  // Render del mapa (servicio > sala > cubiculo > cama)
+  // ========================================================================
+
   // Pinta toda la jerarquia recibida desde backend: servicio > sala > cubiculo > cama.
   function renderMapa(servicios) {
     contenedor.innerHTML = "";
@@ -736,6 +939,8 @@ document.addEventListener("DOMContentLoaded", function () {
           camaEl.dataset.cubiculo = nombreCubiculo || "";
           camaEl.dataset.cambiosRealizados = String(cama.cambios_realizados || 0);
           camaEl.dataset.maxCambios = String(cama.max_cambios || 5);
+          camaEl.dataset.ultimaActualizacion = cama.ultima_actualizacion || "";
+          camaEl.dataset.usuarioUltimaActualizacion = cama.usuario_ultima_actualizacion || "";
 
           var numero = document.createElement("span");
           numero.className = "mapa-cama-numero";
@@ -752,12 +957,13 @@ document.addEventListener("DOMContentLoaded", function () {
           var dni = document.createElement("span");
           dni.className = "mapa-cama-dni";
           dni.textContent = cama.paciente && cama.paciente.dni ? cama.paciente.dni : "";
-
+          insertarBotonAccionRapida(camaEl);
           camaEl.appendChild(numero);
           camaEl.appendChild(estado);
           camaEl.appendChild(paciente);
           camaEl.appendChild(dni);
           camaEl.addEventListener("click", function () {
+            // Cada card abre un modal contextual sobre su propia cama.
             abrirModalEdicionCama(camaEl);
           });
           camasRenderizadas.push(camaEl);
@@ -810,6 +1016,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // Reaplicar marca visual de camas ya mapeadas cuando se vuelve a renderizar.
     aplicarMarcasSesionEnRender();
+    actualizarBotonesAccionRapidaVisibilidad();
   }
 
   // Carga inicial del mapa y manejo de errores de red/servidor.
@@ -831,6 +1038,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
   inputBusqueda.addEventListener("input", aplicarFiltro);
   tipoBusqueda.addEventListener("change", aplicarFiltro);
+
+  // ========================================================================
+  // Acciones de barra superior (filtros, utilidades y control de sesion)
+  // ========================================================================
 
   // Limpia filtros y devuelve foco al input de busqueda.
   btnLimpiar.addEventListener("click", function () {
@@ -863,12 +1074,25 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
   btnImprimir.addEventListener("click", function () {
+    // La vista ya define estilos @media print para exportar el estado visual actual.
     window.print();
   });
 
   if (btnIniciarMapeo) {
     btnIniciarMapeo.addEventListener("click", async function () {
       try {
+        var confirmarInicio = await Swal.fire({
+          title: "Iniciar mapeo",
+          text: "Se iniciara una nueva sesion de mapeo de camas. Desea continuar?",
+          icon: "question",
+          showCancelButton: true,
+          confirmButtonText: "Si, iniciar",
+          cancelButtonText: "Cancelar",
+        });
+        if (!confirmarInicio.isConfirmed) {
+          return;
+        }
+
         var response = await fetch(API_URLS.iniciarMapeo, {
           method: "POST",
           headers: { "X-CSRFToken": window.CSRF_TOKEN }
@@ -891,12 +1115,42 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 
-  if (btnTerminarMapeo) {
-    btnTerminarMapeo.addEventListener("click", async function () {
+  function _ejecutarTerminarMapeo() {
+    var totalCamasMapa = camasRenderizadas.length;
+    var totalCamasMapeadas = camasMapeadasSesion.size;
+    if (totalCamasMapa > 0 && totalCamasMapeadas < totalCamasMapa) {
+      var faltantes = totalCamasMapa - totalCamasMapeadas;
+      toastr.error(
+        "No puede terminar el mapeo. Faltan " + faltantes + " cama(s) por revisar.",
+        "Mapeo incompleto"
+      );
+      return;
+    }
+
+    Swal.fire({
+      title: "Finalizar mapeo",
+      text: "Puede agregar observaciones antes de cerrar la sesion.",
+      input: "textarea",
+      inputLabel: "Observaciones del mapeo",
+      inputPlaceholder: "Sin Observaciones",
+      inputAttributes: { "aria-label": "Observaciones del mapeo", rows: 4 },
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: "Finalizar",
+      cancelButtonText: "Cancelar",
+    }).then(async function (result) {
+      if (!result.isConfirmed) {
+        return;
+      }
+      var observacion = (result.value || "").trim() || "Sin Observaciones";
       try {
         var response = await fetch(API_URLS.terminarMapeo, {
           method: "POST",
-          headers: { "X-CSRFToken": window.CSRF_TOKEN }
+          headers: {
+            "X-CSRFToken": window.CSRF_TOKEN,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ observacion: observacion }),
         });
         var data = await response.json();
         if (!response.ok || !data.ok) {
@@ -905,6 +1159,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
         sesionMapeoActivaId = null;
         establecerModoMapeoActivo(false);
+        restaurarBotonesBase();
         limpiarMarcasMapeo();
         toastr.success(data.mensaje || "Mapeo finalizado.", "Exito");
       } catch (error) {
@@ -913,9 +1168,34 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 
+  if (btnTerminarMapeo) {
+    btnTerminarMapeo.addEventListener("click", function () {
+      _ejecutarTerminarMapeo();
+    });
+  }
+
+  if (btnTerminarMapeoPie) {
+    btnTerminarMapeoPie.addEventListener("click", function () {
+      _ejecutarTerminarMapeo();
+    });
+  }
+
   if (btnCancelarMapeo) {
     btnCancelarMapeo.addEventListener("click", async function () {
       try {
+        var confirmarCancelacion = await Swal.fire({
+          title: "Cancelar mapeo",
+          text: "La sesion de mapeo actual se cancelara y no podra retomarse. Desea continuar?",
+          icon: "warning",
+          showCancelButton: true,
+          confirmButtonText: "Si, cancelar",
+          cancelButtonText: "Volver",
+          confirmButtonColor: "#b91c1c",
+        });
+        if (!confirmarCancelacion.isConfirmed) {
+          return;
+        }
+
         var response = await fetch(API_URLS.cancelarMapeo, {
           method: "POST",
           headers: { "X-CSRFToken": window.CSRF_TOKEN }
@@ -927,6 +1207,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
         sesionMapeoActivaId = null;
         establecerModoMapeoActivo(false);
+        restaurarBotonesBase();
         limpiarMarcasMapeo();
         toastr.success(data.mensaje || "Mapeo cancelado.", "Exito");
       } catch (error) {

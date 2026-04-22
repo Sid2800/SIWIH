@@ -164,7 +164,7 @@ class MapeoCamasService:
         asignacion_activa.save(update_fields=["estado", "paciente", "fecha_fin", "usuario_cierre"])
 
         # FASE 6: registrar en historial de estado
-        # Cierre: la cama pasa de Ocupada → Alta (libera la cama)
+        # Cierre: la cama pasa de Ocupada -> Vacia (libera la cama)
         MapeoCamasService.registrar_historial_estado_cama(
             cama_id=asignacion_activa.cama_id,
             estado_anterior=HistorialEstadoCama.Estado.OCUPADA,

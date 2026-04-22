@@ -1,0 +1,53 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}{{ titulo }}{% endblock %}
+
+{% block content %}
+<div class="contenedor2 dataTables_wrapper">
+  <div class="tituloFormulario" style="margin-bottom: 1.5rem;">
+    <div class="tituloFormulario-texto">
+      <i class="bi bi-clock-history"></i>
+      <h2 class="sin-margen">{{ titulo }}</h2>
+    </div>
+    <div class="tituloFormulario-subrallado"></div>
+  </div>
+
+    <table id="tabla-historiales" class="dataTable stripe hover row-border">
+      <thead>
+        <tr>
+          <th>Referencia</th>
+          <th>Tipo</th>
+          <th>Estado</th>
+          <th>Fecha</th>
+          <th>Usuario</th>
+        </tr>
+      </thead>
+      <tbody id="tabla-historiales-body"></tbody>
+      <tfoot>
+        <tr>
+          <th>Referencia</th>
+          <th>Tipo</th>
+          <th>Estado</th>
+          <th>Fecha</th>
+          <th>Usuario</th>
+        </tr>
+      </tfoot>
+    </table>
+
+  <p style="margin-top: 0.75rem; color: #555; font-weight: 600;">Doble clic en una linea para abrir el detalle en una vista nueva.</p>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'mapeo_camas/scripts/historialesCamas.js' %}?v=20260417-2"></script>
+<style>
+  #tabla-historiales {
+    width: 100%;
+  }
+
+  #tabla-historiales tbody tr {
+    cursor: pointer;
+  }
+</style>
+{% endblock %}

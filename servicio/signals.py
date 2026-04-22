@@ -8,7 +8,7 @@ from servicio.models import Cama
 ESTADO_ASIGNACION_POR_ESTADO_CAMA = {
     1: AsignacionCamaPaciente.Estado.VACIA,
     2: AsignacionCamaPaciente.Estado.OCUPADA,
-    3: AsignacionCamaPaciente.Estado.ALTA,
+    3: AsignacionCamaPaciente.Estado.PRE_ALTA,
     4: AsignacionCamaPaciente.Estado.FUERA_SERVICIO,
     5: AsignacionCamaPaciente.Estado.CONSULTA_EXTERNA,
 }
