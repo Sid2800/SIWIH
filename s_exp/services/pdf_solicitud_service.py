@@ -98,30 +98,30 @@ def _header_footer_factory(solicitud, fecha_impresion, con_hora_footer):
         except Exception:
             pass
 
-        # Logos a la derecha: HEAC y FUNDAGES2
+        # Texto centrado (Times-Bold) - en línea con las imágenes, entre GOB_SESAL y logos
+        canvas_obj.setFont('Times-Bold', 12)
+        canvas_obj.drawCentredString(
+            ancho / 2, y_top - 1.2 * cm,
+            'FUNDAGES - HOSPITAL DR. ENRIQUE AGUILAR CERRATO'
+        )
+
+        # Logos a la derecha: HEAC y FUNDAGES2 - alineados con GOB_SESAL
         try:
             canvas_obj.drawImage(
-                IMG_HEAC, ancho - 5 * cm, y_top - 2.5 * cm,
+                IMG_HEAC, ancho - 5 * cm, y_top - 2.49 * cm,
                 width=2.2 * cm, height=2.2 * cm, preserveAspectRatio=True, mask='auto'
             )
             canvas_obj.drawImage(
-                IMG_FUNDAGES, ancho - 2.5 * cm, y_top - 2.5 * cm,
+                IMG_FUNDAGES, ancho - 2.5 * cm, y_top - 2.49 * cm,
                 width=2.2 * cm, height=2.2 * cm, preserveAspectRatio=True, mask='auto'
             )
         except Exception:
             pass
 
-        # Texto centrado (Times-Bold) - más abajo, después de las imágenes
-        canvas_obj.setFont('Times-Bold', 13)
-        canvas_obj.drawCentredString(
-            ancho / 2, y_top - 2.8 * cm,
-            'FUNDAGES - HOSPITAL DR. ENRIQUE AGUILAR CERRATO'
-        )
-
         # Línea separadora bajo el encabezado
         canvas_obj.setStrokeColor(colors.HexColor('#008b8b'))
         canvas_obj.setLineWidth(0.7)
-        canvas_obj.line(0.5 * cm, y_top - 3.1 * cm, ancho - 0.5 * cm, y_top - 3.1 * cm)
+        canvas_obj.line(0.5 * cm, y_top - 2.7 * cm, ancho - 0.5 * cm, y_top - 2.7 * cm)
 
         canvas_obj.restoreState()
 
