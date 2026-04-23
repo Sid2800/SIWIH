@@ -384,13 +384,18 @@
 }
 
 /* Lista layout para expedientes en modal */
+#swal-exp-list {
+    background: #000000 !important;
+    border-radius: 6px;
+}
+
 .sexp-exp-lista-item {
     display: flex;
     align-items: center;
     gap: 1rem;
     padding: 0.8rem;
-    border-bottom: 1px solid #e5e7eb;
-    background: #ffffff;
+    border-bottom: 1px solid #333333;
+    background: #000000;
 }
 
 .sexp-exp-lista-item:last-child {
@@ -398,7 +403,8 @@
 }
 
 .sexp-exp-lista-item--rechazado {
-    background: rgba(220, 38, 38, 0.06);
+    background: rgba(220, 38, 38, 0.3);
+    border-bottom-color: rgba(220, 38, 38, 0.5);
 }
 
 .sexp-exp-lista-content {
@@ -410,13 +416,13 @@
 }
 
 .sexp-exp-lista-item .sexp-exp-tag {
-    color: #000000;
+    color: #ffffff;
     font-weight: 600;
 }
 
 .sexp-exp-lista-item .sexp-exp-lista-patient {
     font-size: 1.3rem;
-    color: #000000;
+    color: #e5e7eb;
     word-break: break-word;
     flex: 1;
 }
