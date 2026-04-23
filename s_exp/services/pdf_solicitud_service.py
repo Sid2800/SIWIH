@@ -98,10 +98,10 @@ def _header_footer_factory(solicitud, fecha_impresion, con_hora_footer):
         except Exception:
             pass
 
-        # Texto a la derecha (Times-Bold) - desplazado hacia la derecha, entre logos
+        # Texto centrado (Times-Bold)
         canvas_obj.setFont('Times-Bold', 11)
         canvas_obj.drawCentredString(
-            ancho * 0.65, y_top - 0.75 * cm,
+            ancho / 2, y_top - 0.75 * cm,
             'FUNDAGES - HOSPITAL DR. ENRIQUE AGUILAR CERRATO'
         )
 
@@ -179,8 +179,8 @@ def generar_pdf_solicitud(solicitud):
     page_size = landscape(LETTER)
     ancho_pg, alto_pg = page_size
 
-    # Márgenes: top 2.5cm (header reducido), bottom 2.5cm
-    margen_top = 2.5 * cm
+    # Márgenes: top 2.7cm, bottom 2.5cm
+    margen_top = 2.7 * cm
     margen_bot = 2.5 * cm
     margen_lat = 1.5 * cm
 
@@ -347,7 +347,8 @@ def generar_pdf_solicitud(solicitud):
     # Combinar celdas de "Observaciones entrega" (columna 6) si hay más de una fila
     if len(filas) > 2:  # Más de encabezado + 1 detalle
         tabla_styles.append(('SPAN', (6, 1), (6, len(filas) - 1)))
-        tabla_styles.append(('VALIGN', (6, 1), (6, len(filas) - 1), 'TOP'))
+        tabla_styles.append(('VALIGN', (6, 1), (6, len(filas) - 1), 'MIDDLE'))
+        tabla_styles.append(('ALIGN', (6, 1), (6, len(filas) - 1), 'CENTER'))
 
     tabla_exp.setStyle(TableStyle(tabla_styles))
     elementos.append(tabla_exp)
