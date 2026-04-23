@@ -308,13 +308,6 @@ def aprobar_solicitud_api(request):
             'observaciones': (d.get('observaciones') or '').strip(),
         }
 
-    # Validar que los rechazados tengan observaciones (motivo)
-    for det_id, info in mapa_decisiones.items():
-        if not info['aprobado'] and not info['observaciones']:
-            return JsonResponse({
-                "error": "Todo expediente rechazado debe tener un motivo en sus observaciones"
-            }, status=400)
-
     try:
         solicitud = SolicitudPrestamo.objects.get(id=solicitud_id, estado_flujo_id='SOL_PENDIENTE')
     except SolicitudPrestamo.DoesNotExist:
