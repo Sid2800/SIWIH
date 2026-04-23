@@ -179,8 +179,8 @@ def generar_pdf_solicitud(solicitud):
     page_size = landscape(LETTER)
     ancho_pg, alto_pg = page_size
 
-    # Márgenes: top 2.7cm, bottom 2.5cm
-    margen_top = 2.7 * cm
+    # Márgenes: top 3cm, bottom 2.5cm
+    margen_top = 3 * cm
     margen_bot = 2.5 * cm
     margen_lat = 1.5 * cm
 
@@ -308,8 +308,8 @@ def generar_pdf_solicitud(solicitud):
         identidad = d.paciente_identidad or ''
         paciente = d.paciente_nombre or ''
 
-        # Solo la primera fila lleva el mensaje de observaciones entrega
-        obs_entrega_cell = Paragraph(obs_general, st_tabla_cell) if idx == 0 else Paragraph('', st_tabla_cell)
+        # TODAS las filas llevan el mismo mensaje de observaciones entrega (para replicarse en todas las páginas)
+        obs_entrega_cell = Paragraph(obs_general, st_tabla_cell)
 
         filas.append([
             Paragraph(fecha_salida, st_tabla_cell),
@@ -344,11 +344,9 @@ def generar_pdf_solicitud(solicitud):
         ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f1f5f5')]),
     ]
 
-    # Combinar celdas de "Observaciones entrega" (columna 6) si hay más de una fila
-    if len(filas) > 2:  # Más de encabezado + 1 detalle
-        tabla_styles.append(('SPAN', (6, 1), (6, len(filas) - 1)))
-        tabla_styles.append(('VALIGN', (6, 1), (6, len(filas) - 1), 'MIDDLE'))
-        tabla_styles.append(('ALIGN', (6, 1), (6, len(filas) - 1), 'CENTER'))
+    # Alinear observaciones entrega (columna 6) centrado
+    tabla_styles.append(('VALIGN', (6, 1), (6, -1), 'MIDDLE'))
+    tabla_styles.append(('ALIGN', (6, 1), (6, -1), 'CENTER'))
 
     tabla_exp.setStyle(TableStyle(tabla_styles))
     elementos.append(tabla_exp)
