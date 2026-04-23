@@ -232,6 +232,13 @@ function _mostrarModalAprobacion(id, expedientes) {
             const inputTiempo = document.getElementById('swal-tiempo');
             const hint = document.getElementById('swal-tiempo-hint');
 
+            // Valida si la hora actual está en horario laboral (6 AM - 4 PM)
+            function estaEnHorarioLaboral() {
+                const ahora = new Date();
+                const hora = ahora.getHours();
+                return hora >= 6 && hora < 16;
+            }
+
             // Calcula horas disponibles hasta las 4 PM de hoy
             function horasHastaCuatroPM() {
                 const ahora = new Date();
@@ -243,10 +250,18 @@ function _mostrarModalAprobacion(id, expedientes) {
             function actualizarHintTiempo() {
                 const unidad = selUnidad.value;
                 if (unidad === 'minutos') {
-                    inputTiempo.min = '1';
-                    inputTiempo.max = '';
-                    if (!inputTiempo.value || parseInt(inputTiempo.value) < 1) inputTiempo.value = '5';
-                    hint.textContent = 'Ingrese el tiempo en minutos.';
+                    if (!estaEnHorarioLaboral()) {
+                        hint.textContent = 'Fuera de horario (6:00 AM - 4:00 PM). Use "Días" o vuelva en horario.';
+                        hint.style.color = '#dc2626';
+                        inputTiempo.disabled = true;
+                    } else {
+                        inputTiempo.disabled = false;
+                        hint.style.color = 'inherit';
+                        inputTiempo.min = '1';
+                        inputTiempo.max = '';
+                        if (!inputTiempo.value || parseInt(inputTiempo.value) < 1) inputTiempo.value = '5';
+                        hint.textContent = 'Ingrese el tiempo en minutos.';
+                    }
                 } else if (unidad === 'horas') {
                     const maxH = horasHastaCuatroPM();
                     inputTiempo.min = '1';
@@ -266,6 +281,7 @@ function _mostrarModalAprobacion(id, expedientes) {
                 }
             }
             selUnidad.addEventListener('change', actualizarHintTiempo);
+            actualizarHintTiempo();
 
             // Toggle aprobar/rechazar por expediente
             document.getElementById('swal-exp-list').addEventListener('change', function (e) {
@@ -290,6 +306,12 @@ function _mostrarModalAprobacion(id, expedientes) {
 
             if (isNaN(tiempo) || tiempo < 1) {
                 Swal.showValidationMessage('Ingrese un tiempo válido');
+                return false;
+            }
+
+            // Validación de minutos: solo en horario laboral
+            if (unidad === 'minutos' && !estaEnHorarioLaboral()) {
+                Swal.showValidationMessage('Minutos solo disponible entre 6:00 AM y 4:00 PM. Use "Días" o espere el horario laboral.');
                 return false;
             }
 

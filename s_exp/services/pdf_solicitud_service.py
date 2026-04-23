@@ -9,7 +9,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.utils import timezone
 
-from reportlab.lib.pagesizes import LETTER
+from reportlab.lib.pagesizes import LETTER, landscape
 from reportlab.lib.units import cm
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -176,7 +176,7 @@ def generar_pdf_solicitud(solicitud):
         ya_entregado = False
     con_hora_footer = not ya_entregado
 
-    page_size = LETTER
+    page_size = landscape(LETTER)
     ancho_pg, alto_pg = page_size
 
     # Márgenes: top 3.5cm (incluye 2cm + espacio header), bottom 3cm (incluye 2cm + pie)
@@ -339,9 +339,9 @@ def generar_pdf_solicitud(solicitud):
     fecha_devolucion_firma = _fmt_fecha(fecha_entrega_calc, con_hora=True) if fecha_entrega_calc else ''
 
     def _bloque_firma(encabezado, fecha_txt, nombre_izq, area_izq, nombre_der, area_der, ancho_total):
-        """Construye una Table con el bloque de firma (2 celdas de 5x2 cm + separador 1cm)."""
-        col_ancho = 5 * cm
-        sep_ancho = 1 * cm
+        """Construye una Table con el bloque de firma (2 celdas side-by-side + separador)."""
+        col_ancho = ancho_total * 0.45
+        sep_ancho = ancho_total * 0.1
         titulo_txt = f'<b>{encabezado}</b>'
         if fecha_txt:
             titulo_txt += f'<br/><font size=8>Fecha: {fecha_txt}</font>'
@@ -390,30 +390,32 @@ def generar_pdf_solicitud(solicitud):
 
     # Wrapper que pone los dos bloques lado a lado
     ancho_disp = doc.width
-    ancho_bloque = (ancho_disp - 0.5 * cm) / 2  # 0.5cm de separación entre bloques
+    sep_bloques = 1.5 * cm
+    ancho_bloque = (ancho_disp - sep_bloques) / 2
 
     bloque_entrega = _bloque_firma(
         'Firma Entrega de Expedientes', fecha_entrega_firma,
         admin_nombre, admin_area,
         solicitante_nombre, solicitante_area,
-        ancho_bloque,
+        float(ancho_bloque),
     )
     bloque_devolucion = _bloque_firma(
         'Firma Devolución de Expedientes', fecha_devolucion_firma,
         admin_nombre, admin_area,
         solicitante_nombre, solicitante_area,
-        ancho_bloque,
+        float(ancho_bloque),
     )
 
-    # Las tablas internas tienen ancho fijo (5+1+5 = 11cm). Las meto en un contenedor de 2 cols.
+    # Contenedor de 3 columnas: firma entrega - separador - firma devolución
     contenedor = Table(
-        [[bloque_entrega, bloque_devolucion]],
-        colWidths=[ancho_disp / 2, ancho_disp / 2],
+        [[bloque_entrega, '', bloque_devolucion]],
+        colWidths=[ancho_bloque, sep_bloques, ancho_bloque],
     )
     contenedor.setStyle(TableStyle([
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
         ('LEFTPADDING', (0, 0), (-1, -1), 0),
         ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+        ('ALIGN', (1, 0), (1, 0), 'CENTER'),
     ]))
 
     elementos.append(KeepTogether([contenedor]))
