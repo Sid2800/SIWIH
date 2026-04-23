@@ -89,30 +89,30 @@ def _header_footer_factory(solicitud, fecha_impresion, con_hora_footer):
         ancho, alto = doc.pagesize
         y_top = alto - 0.5 * cm  # 0.5 cm desde arriba
 
-        # GOB_SESAL a la izquierda (10.19 cm ancho x 2.49 cm alto)
+        # GOB_SESAL a la izquierda (reducido: 6 cm ancho x 1.5 cm alto)
         try:
             canvas_obj.drawImage(
-                IMG_GOB_SESAL, 0.5 * cm, y_top - 2.49 * cm,
-                width=10.19 * cm, height=2.49 * cm, preserveAspectRatio=True, mask='auto'
+                IMG_GOB_SESAL, 0.5 * cm, y_top - 1.5 * cm,
+                width=6 * cm, height=1.5 * cm, preserveAspectRatio=True, mask='auto'
             )
         except Exception:
             pass
 
-        # Texto centrado (Times-Bold) - en línea con las imágenes, entre GOB_SESAL y logos
-        canvas_obj.setFont('Times-Bold', 12)
+        # Texto a la derecha (Times-Bold) - desplazado hacia la derecha, entre logos
+        canvas_obj.setFont('Times-Bold', 11)
         canvas_obj.drawCentredString(
-            ancho / 2, y_top - 1.2 * cm,
+            ancho * 0.65, y_top - 0.75 * cm,
             'FUNDAGES - HOSPITAL DR. ENRIQUE AGUILAR CERRATO'
         )
 
-        # Logos a la derecha: HEAC y FUNDAGES2 - alineados con GOB_SESAL
+        # Logos a la derecha: HEAC y FUNDAGES2 - alineados con altura reducida
         try:
             canvas_obj.drawImage(
-                IMG_HEAC, ancho - 5 * cm, y_top - 2.49 * cm,
+                IMG_HEAC, ancho - 5 * cm, y_top - 1.5 * cm,
                 width=2.2 * cm, height=2.2 * cm, preserveAspectRatio=True, mask='auto'
             )
             canvas_obj.drawImage(
-                IMG_FUNDAGES, ancho - 2.5 * cm, y_top - 2.49 * cm,
+                IMG_FUNDAGES, ancho - 2.5 * cm, y_top - 1.5 * cm,
                 width=2.2 * cm, height=2.2 * cm, preserveAspectRatio=True, mask='auto'
             )
         except Exception:
@@ -121,7 +121,7 @@ def _header_footer_factory(solicitud, fecha_impresion, con_hora_footer):
         # Línea separadora bajo el encabezado
         canvas_obj.setStrokeColor(colors.HexColor('#008b8b'))
         canvas_obj.setLineWidth(0.7)
-        canvas_obj.line(0.5 * cm, y_top - 2.7 * cm, ancho - 0.5 * cm, y_top - 2.7 * cm)
+        canvas_obj.line(0.5 * cm, y_top - 1.8 * cm, ancho - 0.5 * cm, y_top - 1.8 * cm)
 
         canvas_obj.restoreState()
 
@@ -179,8 +179,8 @@ def generar_pdf_solicitud(solicitud):
     page_size = landscape(LETTER)
     ancho_pg, alto_pg = page_size
 
-    # Márgenes: top 3.5cm (para dar espacio al header + título), bottom 2.5cm
-    margen_top = 3.5 * cm
+    # Márgenes: top 2.5cm (header reducido), bottom 2.5cm
+    margen_top = 2.5 * cm
     margen_bot = 2.5 * cm
     margen_lat = 1.5 * cm
 
@@ -283,20 +283,33 @@ def generar_pdf_solicitud(solicitud):
     ]
 
     filas = [cabeceras]
-    detalles = solicitud.detalles.select_related('expediente_prestamo__expediente').order_by('id')
-    for d in detalles:
+
+    # Construir mensaje general de observaciones: motivos de rechazo o comentario general
+    obs_general = ''
+    detalles_list = list(solicitud.detalles.select_related('expediente_prestamo__expediente').order_by('id'))
+
+    # Recolectar motivos de rechazo
+    motivos_rechazo = []
+    for d in detalles_list:
+        if not d.aprobado:
+            if d.motivo_rechazo_individual:
+                motivos_rechazo.append(f"#{d.expediente_prestamo.expediente.numero}: {d.motivo_rechazo_individual}")
+            else:
+                motivos_rechazo.append(f"#{d.expediente_prestamo.expediente.numero}: [NO PRESTADO]")
+
+    if motivos_rechazo:
+        obs_general = '\n'.join(motivos_rechazo)
+    else:
+        obs_general = comentarios_generales
+
+    # Agregar filas de detalles
+    for idx, d in enumerate(detalles_list):
         num_exp = d.expediente_prestamo.expediente.numero
         identidad = d.paciente_identidad or ''
         paciente = d.paciente_nombre or ''
 
-        # Observaciones entrega: motivo rechazo para NO PRESTADOS, comentario general para APROBADOS
-        obs_entrega = ''
-        if not d.aprobado:
-            obs_entrega = '[NO PRESTADO]'
-            if d.motivo_rechazo_individual:
-                obs_entrega += f' - {d.motivo_rechazo_individual}'
-        else:
-            obs_entrega = comentarios_generales
+        # Solo la primera fila lleva el mensaje de observaciones entrega
+        obs_entrega_cell = Paragraph(obs_general, st_tabla_cell) if idx == 0 else Paragraph('', st_tabla_cell)
 
         filas.append([
             Paragraph(fecha_salida, st_tabla_cell),
@@ -305,7 +318,7 @@ def generar_pdf_solicitud(solicitud):
             Paragraph(paciente, st_tabla_cell),
             Paragraph(motivo_solicitud, st_tabla_cell),
             Paragraph(fecha_entrega_str if d.aprobado else '—', st_tabla_cell),
-            Paragraph(obs_entrega, st_tabla_cell),
+            obs_entrega_cell,
             Paragraph('', st_tabla_cell),  # Observaciones devolución vacía
         ])
 
@@ -318,7 +331,8 @@ def generar_pdf_solicitud(solicitud):
         ],
         repeatRows=1,
     )
-    tabla_exp.setStyle(TableStyle([
+    # Construir estilos, incluyendo SPAN para la columna de observaciones entrega
+    tabla_styles = [
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#008b8b')),
         ('GRID', (0, 0), (-1, -1), 0.4, colors.HexColor('#444444')),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
@@ -328,7 +342,14 @@ def generar_pdf_solicitud(solicitud):
         ('TOPPADDING', (0, 0), (-1, -1), 3),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
         ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f1f5f5')]),
-    ]))
+    ]
+
+    # Combinar celdas de "Observaciones entrega" (columna 6) si hay más de una fila
+    if len(filas) > 2:  # Más de encabezado + 1 detalle
+        tabla_styles.append(('SPAN', (6, 1), (6, len(filas) - 1)))
+        tabla_styles.append(('VALIGN', (6, 1), (6, len(filas) - 1), 'TOP'))
+
+    tabla_exp.setStyle(TableStyle(tabla_styles))
     elementos.append(tabla_exp)
     elementos.append(Spacer(1, 16))
 
