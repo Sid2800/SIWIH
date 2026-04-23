@@ -263,17 +263,6 @@ def generar_pdf_solicitud(solicitud):
     fecha_entrega_calc = _calcular_fecha_entrega(solicitud, ahora)
     fecha_entrega_str = _fmt_fecha(fecha_entrega_calc, con_hora=not ya_entregado) if fecha_entrega_calc else ''
 
-    # Obtener comentario general del préstamo asociado
-    comentarios_generales = ''
-    try:
-        p = solicitud.prestamo
-        comentarios_generales = p.comentarios or ''
-    except Exception:
-        pass
-
-    # Construir observaciones entrega: comentarios generales o motivos de rechazo
-    observaciones_entrega_general = comentarios_generales
-
     cabeceras = [
         Paragraph('Fecha salida', st_tabla_head),
         Paragraph('Expediente', st_tabla_head),
@@ -292,14 +281,12 @@ def generar_pdf_solicitud(solicitud):
         identidad = d.paciente_identidad or ''
         paciente = d.paciente_nombre or ''
 
-        # Observaciones entrega: si es rechazado mostrar motivo, si no mostrar comentario general
+        # Observaciones entrega: solo para los que NO se prestan
         obs_entrega = ''
         if not d.aprobado:
             obs_entrega = '[NO PRESTADO]'
             if d.motivo_rechazo_individual:
                 obs_entrega += f' - {d.motivo_rechazo_individual}'
-        else:
-            obs_entrega = observaciones_entrega_general
 
         filas.append([
             Paragraph(fecha_salida, st_tabla_cell),
