@@ -105,14 +105,14 @@ def _header_footer_factory(solicitud, fecha_impresion, con_hora_footer):
             'FUNDAGES - HOSPITAL DR. ENRIQUE AGUILAR CERRATO'
         )
 
-        # Logos a la derecha: HEAC y FUNDAGES2 - alineados con FUNDAGES título
+        # Logos a la derecha: HEAC y FUNDAGES2 - más abajo
         try:
             canvas_obj.drawImage(
-                IMG_HEAC, ancho - 5 * cm, y_top - 1.2 * cm,
+                IMG_HEAC, ancho - 5 * cm, y_top - 2.0 * cm,
                 width=2.2 * cm, height=2.2 * cm, preserveAspectRatio=True, mask='auto'
             )
             canvas_obj.drawImage(
-                IMG_FUNDAGES, ancho - 2.5 * cm, y_top - 1.2 * cm,
+                IMG_FUNDAGES, ancho - 2.5 * cm, y_top - 2.0 * cm,
                 width=2.2 * cm, height=2.2 * cm, preserveAspectRatio=True, mask='auto'
             )
         except Exception:
