@@ -3,11 +3,8 @@
  * Consulta periódicamente si hay alertas para el usuario (como expedientes listos).
  */
 $(document).ready(function () {
-    // Primera consulta al cargar
+    // Consulta al cargar
     verificarAlertasGlobales();
-
-    // Consultar cada 60 segundos
-    setInterval(verificarAlertasGlobales, 60000);
 });
 
 function verificarAlertasGlobales() {

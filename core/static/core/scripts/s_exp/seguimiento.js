@@ -10,8 +10,6 @@ let fechaFinActual = '';
 
 $(document).ready(function () {
     cargarMisSolicitudes();
-    // Refresco cada 30 segundos con el filtro actual
-    setInterval(() => cargarMisSolicitudes(filtroActual, fechaInicioActual, fechaFinActual), 30000);
 
     // Manejadores de botones de filtro
     $(document).on('click', '.sexp-filtro-btn[data-filtro]', function () {

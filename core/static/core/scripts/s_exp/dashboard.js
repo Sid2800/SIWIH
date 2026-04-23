@@ -4,8 +4,6 @@
  */
 $(document).ready(function () {
     cargarKPIs();
-    // Refresco automático cada 60 segundos
-    setInterval(cargarKPIs, 60000);
 });
 
 function cargarKPIs() {
