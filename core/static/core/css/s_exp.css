@@ -407,15 +407,14 @@
     align-items: center;
     gap: 0.8rem;
     min-width: 0;
-    color: #000000;
 }
 
-.sexp-exp-tag {
+.sexp-exp-lista-item .sexp-exp-tag {
     color: #000000;
     font-weight: 600;
 }
 
-.sexp-exp-lista-patient {
+.sexp-exp-lista-item .sexp-exp-lista-patient {
     font-size: 1.3rem;
     color: #000000;
     word-break: break-word;
