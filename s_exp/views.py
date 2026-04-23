@@ -299,14 +299,24 @@ def aprobar_solicitud_api(request):
 
     # Mapa de decisiones: {detalle_id: {aprobado, observaciones}}
     mapa_decisiones = {}
+    hay_rechazos = False
     for d in expedientes_decisiones:
         det_id = d.get('detalle_id')
         if det_id is None:
             continue
+        aprobado = d.get('aprobado', True)
+        if not aprobado:
+            hay_rechazos = True
         mapa_decisiones[det_id] = {
-            'aprobado': d.get('aprobado', True),
+            'aprobado': aprobado,
             'observaciones': (d.get('observaciones') or '').strip(),
         }
+
+    # Si hay rechazos, comentarios generales es obligatorio
+    if hay_rechazos and not comentarios.strip():
+        return JsonResponse({
+            "error": "Comentarios generales obligatorios cuando hay expedientes rechazados"
+        }, status=400)
 
     try:
         solicitud = SolicitudPrestamo.objects.get(id=solicitud_id, estado_flujo_id='SOL_PENDIENTE')

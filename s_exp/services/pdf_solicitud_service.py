@@ -87,13 +87,13 @@ def _header_footer_factory(solicitud, fecha_impresion, con_hora_footer):
     def dibujar_header(canvas_obj, doc):
         canvas_obj.saveState()
         ancho, alto = doc.pagesize
-        y_top = alto - 1.2 * cm  # más arriba
+        y_top = alto - 1 * cm  # 1 cm desde arriba
 
-        # GOB_SESAL a la izquierda (más grande: 2.5 cm ancho x 2.5 cm alto)
+        # GOB_SESAL a la izquierda (10.19 cm ancho x 2.49 cm alto)
         try:
             canvas_obj.drawImage(
-                IMG_GOB_SESAL, 1.5 * cm, y_top - 2.5 * cm,
-                width=2.5 * cm, height=2.5 * cm, preserveAspectRatio=True, mask='auto'
+                IMG_GOB_SESAL, 0.5 * cm, y_top - 2.49 * cm,
+                width=10.19 * cm, height=2.49 * cm, preserveAspectRatio=True, mask='auto'
             )
         except Exception:
             pass
@@ -121,7 +121,7 @@ def _header_footer_factory(solicitud, fecha_impresion, con_hora_footer):
         # Línea separadora bajo el encabezado
         canvas_obj.setStrokeColor(colors.HexColor('#008b8b'))
         canvas_obj.setLineWidth(0.7)
-        canvas_obj.line(1.5 * cm, y_top - 2.8 * cm, ancho - 1.5 * cm, y_top - 2.8 * cm)
+        canvas_obj.line(0.5 * cm, y_top - 2.8 * cm, ancho - 0.5 * cm, y_top - 2.8 * cm)
 
         canvas_obj.restoreState()
 
@@ -271,6 +271,9 @@ def generar_pdf_solicitud(solicitud):
     except Exception:
         pass
 
+    # Construir observaciones entrega: comentarios generales o motivos de rechazo
+    observaciones_entrega_general = comentarios_generales
+
     cabeceras = [
         Paragraph('Fecha salida', st_tabla_head),
         Paragraph('Expediente', st_tabla_head),
@@ -279,6 +282,7 @@ def generar_pdf_solicitud(solicitud):
         Paragraph('Motivo', st_tabla_head),
         Paragraph('Fecha entrega', st_tabla_head),
         Paragraph('Observaciones entrega', st_tabla_head),
+        Paragraph('Observaciones devolución', st_tabla_head),
     ]
 
     filas = [cabeceras]
@@ -287,7 +291,16 @@ def generar_pdf_solicitud(solicitud):
         num_exp = d.expediente_prestamo.expediente.numero
         identidad = d.paciente_identidad or ''
         paciente = d.paciente_nombre or ''
-        status = '[NO PRESTADO]' if not d.aprobado else ''
+
+        # Observaciones entrega: si es rechazado mostrar motivo, si no mostrar comentario general
+        obs_entrega = ''
+        if not d.aprobado:
+            obs_entrega = '[NO PRESTADO]'
+            if d.motivo_rechazo_individual:
+                obs_entrega += f' - {d.motivo_rechazo_individual}'
+        else:
+            obs_entrega = observaciones_entrega_general
+
         filas.append([
             Paragraph(fecha_salida, st_tabla_cell),
             Paragraph(f'#{num_exp}', st_tabla_cell),
@@ -295,15 +308,16 @@ def generar_pdf_solicitud(solicitud):
             Paragraph(paciente, st_tabla_cell),
             Paragraph(motivo_solicitud, st_tabla_cell),
             Paragraph(fecha_entrega_str if d.aprobado else '—', st_tabla_cell),
-            Paragraph(status, st_tabla_cell),
+            Paragraph(obs_entrega, st_tabla_cell),
+            Paragraph('', st_tabla_cell),  # Observaciones devolución vacía
         ])
 
     col_w = doc.width
     tabla_exp = Table(
         filas,
         colWidths=[
-            col_w * 0.11, col_w * 0.11, col_w * 0.13, col_w * 0.16,
-            col_w * 0.13, col_w * 0.12, col_w * 0.24,
+            col_w * 0.10, col_w * 0.10, col_w * 0.12, col_w * 0.15,
+            col_w * 0.12, col_w * 0.11, col_w * 0.15, col_w * 0.15,
         ],
         repeatRows=1,
     )
