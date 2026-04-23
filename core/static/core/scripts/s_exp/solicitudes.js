@@ -180,34 +180,37 @@ function aprobarSolicitud(id) {
  */
 function _mostrarModalAprobacion(id, expedientes) {
     const expHtml = expedientes.map(function (exp) {
-        const nombre = exp.paciente_nombre ? `<span class="sexp-exp-dec-nombre">${exp.paciente_nombre}</span>` : '';
+        const nombre = exp.paciente_nombre ? `<small>${exp.paciente_nombre}</small>` : '';
         return `
-        <div class="sexp-exp-dec-row" id="sexp-dec-row-${exp.detalle_id}">
-            <div class="sexp-exp-dec-head">
+        <div class="sexp-exp-dec-grid-item" id="sexp-dec-row-${exp.detalle_id}">
+            <div class="sexp-exp-dec-grid-header">
                 <label class="sexp-exp-dec-check" title="Marcado = aprobado, desmarcado = rechazado">
                     <input type="checkbox" id="exp-check-${exp.detalle_id}" data-detalle="${exp.detalle_id}" checked>
                     <span class="sexp-exp-dec-checkmark"></span>
                 </label>
                 <span class="sexp-exp-tag">#${exp.numero}</span>
-                ${nombre}
                 <span class="sexp-exp-dec-estado" id="exp-estado-${exp.detalle_id}">Aprobado</span>
             </div>
-            <textarea id="exp-obs-${exp.detalle_id}" rows="2" class="sexp-modal-input sexp-exp-dec-obs"
-                placeholder="Observaciones / motivos de rechazo..."></textarea>
+            <div class="sexp-exp-dec-grid-patient">${nombre}</div>
+            <textarea id="exp-obs-${exp.detalle_id}" rows="1" class="sexp-modal-input sexp-exp-dec-obs"
+                placeholder="Motivo..."></textarea>
         </div>`;
     }).join('');
 
     Swal.fire({
         title: 'Aprobar Solicitud #' + id,
-        width: 680,
-        html: `<div style="text-align:left;">
-            <div class="sexp-modal-campo">
-                <label><strong>Expedientes solicitados</strong> <small style="font-weight:normal; opacity:.75;">(desmarca los que NO se prestarán)</small></label>
-                <div id="swal-exp-list">${expHtml}</div>
+        width: 900,
+        html: `<div style="text-align:left; display:grid; grid-template-columns: 1fr 280px; gap: 15px;">
+            <div>
+                <label style="display:block; font-weight:600; margin-bottom:8px;">
+                    Expedientes solicitados
+                    <small style="font-weight:normal; opacity:.75; display:block;">(desmarca los que NO se prestarán)</small>
+                </label>
+                <div id="swal-exp-list" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; margin-bottom:10px;">${expHtml}</div>
             </div>
-            <hr style="margin:10px 0; opacity:.2;">
-            <div class="sexp-modal-campo">
-                <label>Tiempo límite</label>
+            <div style="border-left:1px solid #ccc; padding-left:15px;">
+                <div class="sexp-modal-campo">
+                    <label>Tiempo límite</label>
                 <div class="sexp-modal-tiempo-row">
                     <input type="number" id="swal-tiempo" value="5" min="1" class="sexp-modal-input">
                     <select id="swal-unidad" class="sexp-modal-select">
@@ -217,10 +220,11 @@ function _mostrarModalAprobacion(id, expedientes) {
                     </select>
                 </div>
                 <small id="swal-tiempo-hint" class="sexp-modal-hint">Ingrese el tiempo en minutos.</small>
-            </div>
-            <div class="sexp-modal-campo">
-                <label>Comentarios generales (opcional)</label>
-                <textarea id="swal-comentarios" rows="2" class="sexp-modal-input"></textarea>
+                </div>
+                <div class="sexp-modal-campo">
+                    <label>Comentarios generales (opcional)</label>
+                    <textarea id="swal-comentarios" rows="5" class="sexp-modal-input"></textarea>
+                </div>
             </div>
         </div>`,
         showCancelButton: true,
@@ -290,11 +294,11 @@ function _mostrarModalAprobacion(id, expedientes) {
                 const row = document.getElementById(`sexp-dec-row-${detId}`);
                 const estado = document.getElementById(`exp-estado-${detId}`);
                 if (e.target.checked) {
-                    row.classList.remove('sexp-exp-dec-row--rechazado');
+                    row.classList.remove('sexp-exp-dec-row--rechazado', 'sexp-exp-dec-grid-item--rechazado');
                     estado.textContent = 'Aprobado';
                     estado.className = 'sexp-exp-dec-estado sexp-exp-dec-estado--apr';
                 } else {
-                    row.classList.add('sexp-exp-dec-row--rechazado');
+                    row.classList.add('sexp-exp-dec-row--rechazado', 'sexp-exp-dec-grid-item--rechazado');
                     estado.textContent = 'Rechazado';
                     estado.className = 'sexp-exp-dec-estado sexp-exp-dec-estado--rec';
                 }

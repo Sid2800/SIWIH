@@ -383,6 +383,41 @@
     border-color: #dc2626;
 }
 
+/* Grid layout para expedientes en modal */
+.sexp-exp-dec-grid-item {
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    padding: 0.8rem;
+    background: #f9fafb;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.sexp-exp-dec-grid-item--rechazado {
+    background: rgba(220, 38, 38, 0.08);
+    border-color: rgba(220, 38, 38, 0.3);
+}
+
+.sexp-exp-dec-grid-header {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+
+.sexp-exp-dec-grid-patient {
+    font-size: 1.2rem;
+    color: #666;
+    word-break: break-word;
+}
+
+.sexp-exp-dec-grid-item .sexp-exp-dec-obs {
+    font-size: 1.2rem !important;
+    padding: 0.4rem !important;
+    margin: 0 !important;
+}
+
 .sexp-modal-tiempo-row input {
     flex: 1;
 }

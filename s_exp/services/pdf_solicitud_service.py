@@ -87,33 +87,33 @@ def _header_footer_factory(solicitud, fecha_impresion, con_hora_footer):
     def dibujar_header(canvas_obj, doc):
         canvas_obj.saveState()
         ancho, alto = doc.pagesize
-        y_top = alto - 2 * cm  # 2 cm desde arriba
+        y_top = alto - 1.2 * cm  # más arriba
 
-        # GOB_SESAL a la izquierda (3 cm ancho x 2 cm alto)
+        # GOB_SESAL a la izquierda (más grande: 2.5 cm ancho x 2.5 cm alto)
         try:
             canvas_obj.drawImage(
-                IMG_GOB_SESAL, 2 * cm, y_top - 2 * cm,
-                width=3 * cm, height=2 * cm, preserveAspectRatio=True, mask='auto'
+                IMG_GOB_SESAL, 1.5 * cm, y_top - 2.5 * cm,
+                width=2.5 * cm, height=2.5 * cm, preserveAspectRatio=True, mask='auto'
             )
         except Exception:
             pass
 
         # Texto centrado (Times-Bold)
-        canvas_obj.setFont('Times-Bold', 12)
+        canvas_obj.setFont('Times-Bold', 13)
         canvas_obj.drawCentredString(
-            ancho / 2, y_top - 1 * cm,
+            ancho / 2, y_top - 1.1 * cm,
             'FUNDAGES - HOSPITAL DR. ENRIQUE AGUILAR CERRATO'
         )
 
         # Logos a la derecha: HEAC y FUNDAGES2
         try:
             canvas_obj.drawImage(
-                IMG_HEAC, ancho - 5.2 * cm, y_top - 2 * cm,
-                width=2.2 * cm, height=2 * cm, preserveAspectRatio=True, mask='auto'
+                IMG_HEAC, ancho - 5 * cm, y_top - 2.5 * cm,
+                width=2.2 * cm, height=2.2 * cm, preserveAspectRatio=True, mask='auto'
             )
             canvas_obj.drawImage(
-                IMG_FUNDAGES, ancho - 2.7 * cm, y_top - 2 * cm,
-                width=2.2 * cm, height=2 * cm, preserveAspectRatio=True, mask='auto'
+                IMG_FUNDAGES, ancho - 2.5 * cm, y_top - 2.5 * cm,
+                width=2.2 * cm, height=2.2 * cm, preserveAspectRatio=True, mask='auto'
             )
         except Exception:
             pass
@@ -121,26 +121,26 @@ def _header_footer_factory(solicitud, fecha_impresion, con_hora_footer):
         # Línea separadora bajo el encabezado
         canvas_obj.setStrokeColor(colors.HexColor('#008b8b'))
         canvas_obj.setLineWidth(0.7)
-        canvas_obj.line(2 * cm, y_top - 2.1 * cm, ancho - 2 * cm, y_top - 2.1 * cm)
+        canvas_obj.line(1.5 * cm, y_top - 2.8 * cm, ancho - 1.5 * cm, y_top - 2.8 * cm)
 
         canvas_obj.restoreState()
 
     def dibujar_footer(canvas_obj, total_pages):
         canvas_obj.saveState()
         ancho, alto = canvas_obj._pagesize
-        y_bot = 2 * cm  # 2cm desde abajo
+        y_bot = 1.2 * cm  # más abajo
 
         # Línea superior del pie
         canvas_obj.setStrokeColor(colors.HexColor('#008b8b'))
         canvas_obj.setLineWidth(0.5)
-        canvas_obj.line(2 * cm, y_bot + 0.6 * cm, ancho - 2 * cm, y_bot + 0.6 * cm)
+        canvas_obj.line(1.5 * cm, y_bot + 0.6 * cm, ancho - 1.5 * cm, y_bot + 0.6 * cm)
 
         canvas_obj.setFont('Helvetica', 8)
         canvas_obj.setFillColor(colors.black)
 
         # Izquierda: fecha impresión
         fecha_str = _fmt_fecha(fecha_impresion, con_hora=con_hora_footer)
-        canvas_obj.drawString(2 * cm, y_bot, f'Impreso: {fecha_str}')
+        canvas_obj.drawString(1.5 * cm, y_bot, f'Impreso: {fecha_str}')
 
         # Centro: página X de Y
         page_num = canvas_obj.getPageNumber()
@@ -179,10 +179,10 @@ def generar_pdf_solicitud(solicitud):
     page_size = landscape(LETTER)
     ancho_pg, alto_pg = page_size
 
-    # Márgenes: top 3.5cm (incluye 2cm + espacio header), bottom 3cm (incluye 2cm + pie)
-    margen_top = 3.5 * cm
-    margen_bot = 3 * cm
-    margen_lat = 2 * cm
+    # Márgenes: top 3.2cm (para landscape con header aumentado), bottom 2.5cm (pie más abajo)
+    margen_top = 3.2 * cm
+    margen_bot = 2.5 * cm
+    margen_lat = 1.5 * cm
 
     buf = BytesIO()
 
@@ -300,8 +300,8 @@ def generar_pdf_solicitud(solicitud):
     tabla_exp = Table(
         filas,
         colWidths=[
-            col_w * 0.11, col_w * 0.07, col_w * 0.09, col_w * 0.16,
-            col_w * 0.12, col_w * 0.11, col_w * 0.18, col_w * 0.16,
+            col_w * 0.10, col_w * 0.10, col_w * 0.12, col_w * 0.15,
+            col_w * 0.12, col_w * 0.11, col_w * 0.16, col_w * 0.14,
         ],
         repeatRows=1,
     )
