@@ -105,14 +105,14 @@ def _header_footer_factory(solicitud, fecha_impresion, con_hora_footer):
             'FUNDAGES - HOSPITAL DR. ENRIQUE AGUILAR CERRATO'
         )
 
-        # Logos a la derecha: HEAC y FUNDAGES2 - alineados con altura reducida
+        # Logos a la derecha: HEAC y FUNDAGES2 - más abajo
         try:
             canvas_obj.drawImage(
-                IMG_HEAC, ancho - 5 * cm, y_top - 1.5 * cm,
+                IMG_HEAC, ancho - 5 * cm, y_top - 0.8 * cm,
                 width=2.2 * cm, height=2.2 * cm, preserveAspectRatio=True, mask='auto'
             )
             canvas_obj.drawImage(
-                IMG_FUNDAGES, ancho - 2.5 * cm, y_top - 1.5 * cm,
+                IMG_FUNDAGES, ancho - 2.5 * cm, y_top - 0.8 * cm,
                 width=2.2 * cm, height=2.2 * cm, preserveAspectRatio=True, mask='auto'
             )
         except Exception:
@@ -308,8 +308,8 @@ def generar_pdf_solicitud(solicitud):
         identidad = d.paciente_identidad or ''
         paciente = d.paciente_nombre or ''
 
-        # TODAS las filas llevan el mismo mensaje de observaciones entrega (para replicarse en todas las páginas)
-        obs_entrega_cell = Paragraph(obs_general, st_tabla_cell)
+        # Solo la primera fila lleva el contenido; las demás quedarán vacías para combinar con SPAN
+        obs_entrega_cell = Paragraph(obs_general, st_tabla_cell) if idx == 0 else Paragraph('', st_tabla_cell)
 
         filas.append([
             Paragraph(fecha_salida, st_tabla_cell),
@@ -344,7 +344,9 @@ def generar_pdf_solicitud(solicitud):
         ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f1f5f5')]),
     ]
 
-    # Alinear observaciones entrega (columna 6) centrado
+    # Combinar y centrar observaciones entrega (columna 6)
+    if len(filas) > 2:  # Más de encabezado + 1 detalle
+        tabla_styles.append(('SPAN', (6, 1), (6, len(filas) - 1)))
     tabla_styles.append(('VALIGN', (6, 1), (6, -1), 'MIDDLE'))
     tabla_styles.append(('ALIGN', (6, 1), (6, -1), 'CENTER'))
 
