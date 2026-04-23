@@ -118,22 +118,12 @@ def _header_footer_factory(solicitud, fecha_impresion, con_hora_footer):
         except Exception:
             pass
 
-        # Línea separadora bajo el encabezado
-        canvas_obj.setStrokeColor(colors.HexColor('#008b8b'))
-        canvas_obj.setLineWidth(0.7)
-        canvas_obj.line(0.5 * cm, y_top - 1.8 * cm, ancho - 0.5 * cm, y_top - 1.8 * cm)
-
         canvas_obj.restoreState()
 
     def dibujar_footer(canvas_obj, total_pages):
         canvas_obj.saveState()
         ancho, alto = canvas_obj._pagesize
         y_bot = 1.2 * cm  # más abajo
-
-        # Línea superior del pie
-        canvas_obj.setStrokeColor(colors.HexColor('#008b8b'))
-        canvas_obj.setLineWidth(0.5)
-        canvas_obj.line(1.5 * cm, y_bot + 0.6 * cm, ancho - 1.5 * cm, y_bot + 0.6 * cm)
 
         canvas_obj.setFont('Helvetica', 8)
         canvas_obj.setFillColor(colors.black)
@@ -209,7 +199,8 @@ def generar_pdf_solicitud(solicitud):
     styles = getSampleStyleSheet()
     st_titulo = ParagraphStyle('titulo', parent=styles['Title'],
                                fontName='Times-Bold', fontSize=16,
-                               alignment=TA_CENTER, spaceAfter=6)
+                               alignment=TA_CENTER, spaceAfter=6,
+                               borderBottom=1, borderPadding=4)
     st_dato_lbl = ParagraphStyle('dato_lbl', parent=styles['Normal'],
                                   fontName='Helvetica-Bold', fontSize=10,
                                   textColor=colors.HexColor('#006464'))
