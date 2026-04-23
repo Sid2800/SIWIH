@@ -171,6 +171,25 @@ function aprobarSolicitud(id) {
 }
 
 /**
+ * Valida si la hora actual está en horario laboral (6 AM - 4 PM).
+ */
+function estaEnHorarioLaboral() {
+    const ahora = new Date();
+    const hora = ahora.getHours();
+    return hora >= 6 && hora < 16;
+}
+
+/**
+ * Calcula horas disponibles hasta las 4 PM de hoy.
+ */
+function horasHastaCuatroPM() {
+    const ahora = new Date();
+    const limite = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 16, 0, 0);
+    const diffMs = limite - ahora;
+    return diffMs > 0 ? Math.floor(diffMs / (1000 * 60 * 60)) : 0;
+}
+
+/**
  * Construye y muestra el modal de aprobación con la lista de expedientes.
  * Cada expediente puede aprobarse o rechazarse individualmente.
  * Si alguno se rechaza, el campo de motivo se vuelve obligatorio.
@@ -232,21 +251,6 @@ function _mostrarModalAprobacion(id, expedientes) {
             const selUnidad = document.getElementById('swal-unidad');
             const inputTiempo = document.getElementById('swal-tiempo');
             const hint = document.getElementById('swal-tiempo-hint');
-
-            // Valida si la hora actual está en horario laboral (6 AM - 4 PM)
-            function estaEnHorarioLaboral() {
-                const ahora = new Date();
-                const hora = ahora.getHours();
-                return hora >= 6 && hora < 16;
-            }
-
-            // Calcula horas disponibles hasta las 4 PM de hoy
-            function horasHastaCuatroPM() {
-                const ahora = new Date();
-                const limite = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 16, 0, 0);
-                const diffMs = limite - ahora;
-                return diffMs > 0 ? Math.floor(diffMs / (1000 * 60 * 60)) : 0;
-            }
 
             function actualizarHintTiempo() {
                 const unidad = selUnidad.value;
