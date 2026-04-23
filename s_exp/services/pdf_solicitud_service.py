@@ -87,7 +87,7 @@ def _header_footer_factory(solicitud, fecha_impresion, con_hora_footer):
     def dibujar_header(canvas_obj, doc):
         canvas_obj.saveState()
         ancho, alto = doc.pagesize
-        y_top = alto - 1 * cm  # 1 cm desde arriba
+        y_top = alto - 0.5 * cm  # 0.5 cm desde arriba
 
         # GOB_SESAL a la izquierda (10.19 cm ancho x 2.49 cm alto)
         try:
@@ -97,13 +97,6 @@ def _header_footer_factory(solicitud, fecha_impresion, con_hora_footer):
             )
         except Exception:
             pass
-
-        # Texto centrado (Times-Bold)
-        canvas_obj.setFont('Times-Bold', 13)
-        canvas_obj.drawCentredString(
-            ancho / 2, y_top - 1.1 * cm,
-            'FUNDAGES - HOSPITAL DR. ENRIQUE AGUILAR CERRATO'
-        )
 
         # Logos a la derecha: HEAC y FUNDAGES2
         try:
@@ -118,10 +111,17 @@ def _header_footer_factory(solicitud, fecha_impresion, con_hora_footer):
         except Exception:
             pass
 
+        # Texto centrado (Times-Bold) - más abajo, después de las imágenes
+        canvas_obj.setFont('Times-Bold', 13)
+        canvas_obj.drawCentredString(
+            ancho / 2, y_top - 2.8 * cm,
+            'FUNDAGES - HOSPITAL DR. ENRIQUE AGUILAR CERRATO'
+        )
+
         # Línea separadora bajo el encabezado
         canvas_obj.setStrokeColor(colors.HexColor('#008b8b'))
         canvas_obj.setLineWidth(0.7)
-        canvas_obj.line(0.5 * cm, y_top - 2.8 * cm, ancho - 0.5 * cm, y_top - 2.8 * cm)
+        canvas_obj.line(0.5 * cm, y_top - 3.1 * cm, ancho - 0.5 * cm, y_top - 3.1 * cm)
 
         canvas_obj.restoreState()
 
@@ -179,8 +179,8 @@ def generar_pdf_solicitud(solicitud):
     page_size = landscape(LETTER)
     ancho_pg, alto_pg = page_size
 
-    # Márgenes: top 3.2cm (para landscape con header aumentado), bottom 2.5cm (pie más abajo)
-    margen_top = 3.2 * cm
+    # Márgenes: top 3.5cm (para dar espacio al header + título), bottom 2.5cm
+    margen_top = 3.5 * cm
     margen_bot = 2.5 * cm
     margen_lat = 1.5 * cm
 
@@ -263,6 +263,14 @@ def generar_pdf_solicitud(solicitud):
     fecha_entrega_calc = _calcular_fecha_entrega(solicitud, ahora)
     fecha_entrega_str = _fmt_fecha(fecha_entrega_calc, con_hora=not ya_entregado) if fecha_entrega_calc else ''
 
+    # Obtener comentario general
+    comentarios_generales = ''
+    try:
+        p = solicitud.prestamo
+        comentarios_generales = p.comentarios or ''
+    except Exception:
+        pass
+
     cabeceras = [
         Paragraph('Fecha salida', st_tabla_head),
         Paragraph('Expediente', st_tabla_head),
@@ -281,12 +289,14 @@ def generar_pdf_solicitud(solicitud):
         identidad = d.paciente_identidad or ''
         paciente = d.paciente_nombre or ''
 
-        # Observaciones entrega: solo para los que NO se prestan
+        # Observaciones entrega: motivo rechazo para NO PRESTADOS, comentario general para APROBADOS
         obs_entrega = ''
         if not d.aprobado:
             obs_entrega = '[NO PRESTADO]'
             if d.motivo_rechazo_individual:
                 obs_entrega += f' - {d.motivo_rechazo_individual}'
+        else:
+            obs_entrega = comentarios_generales
 
         filas.append([
             Paragraph(fecha_salida, st_tabla_cell),
