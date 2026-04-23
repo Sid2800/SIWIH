@@ -383,39 +383,37 @@
     border-color: #dc2626;
 }
 
-/* Grid layout para expedientes en modal */
-.sexp-exp-dec-grid-item {
-    border: 1px solid #d1d5db;
-    border-radius: 0.5rem;
-    padding: 0.8rem;
-    background: #f9fafb;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-
-.sexp-exp-dec-grid-item--rechazado {
-    background: rgba(220, 38, 38, 0.08);
-    border-color: rgba(220, 38, 38, 0.3);
-}
-
-.sexp-exp-dec-grid-header {
+/* Lista layout para expedientes en modal */
+.sexp-exp-lista-item {
     display: flex;
     align-items: center;
-    gap: 0.6rem;
-    flex-wrap: wrap;
+    gap: 1rem;
+    padding: 0.8rem;
+    border-bottom: 1px solid #e5e7eb;
+    background: #ffffff;
 }
 
-.sexp-exp-dec-grid-patient {
-    font-size: 1.2rem;
-    color: #666;
+.sexp-exp-lista-item:last-child {
+    border-bottom: none;
+}
+
+.sexp-exp-lista-item--rechazado {
+    background: rgba(220, 38, 38, 0.06);
+}
+
+.sexp-exp-lista-content {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    min-width: 0;
+}
+
+.sexp-exp-lista-patient {
+    font-size: 1.3rem;
+    color: #374151;
     word-break: break-word;
-}
-
-.sexp-exp-dec-grid-item .sexp-exp-dec-obs {
-    font-size: 1.2rem !important;
-    padding: 0.4rem !important;
-    margin: 0 !important;
+    flex: 1;
 }
 
 .sexp-modal-tiempo-row input {

@@ -263,6 +263,14 @@ def generar_pdf_solicitud(solicitud):
     fecha_entrega_calc = _calcular_fecha_entrega(solicitud, ahora)
     fecha_entrega_str = _fmt_fecha(fecha_entrega_calc, con_hora=not ya_entregado) if fecha_entrega_calc else ''
 
+    # Obtener comentario general del préstamo asociado
+    comentarios_generales = ''
+    try:
+        p = solicitud.prestamo
+        comentarios_generales = p.comentarios or ''
+    except Exception:
+        pass
+
     cabeceras = [
         Paragraph('Fecha salida', st_tabla_head),
         Paragraph('Expediente', st_tabla_head),
@@ -270,8 +278,7 @@ def generar_pdf_solicitud(solicitud):
         Paragraph('Paciente', st_tabla_head),
         Paragraph('Motivo', st_tabla_head),
         Paragraph('Fecha entrega', st_tabla_head),
-        Paragraph('Observaciones / Motivos de rechazo', st_tabla_head),
-        Paragraph('Observaciones en devolución', st_tabla_head),
+        Paragraph('Observaciones entrega', st_tabla_head),
     ]
 
     filas = [cabeceras]
@@ -280,11 +287,7 @@ def generar_pdf_solicitud(solicitud):
         num_exp = d.expediente_prestamo.expediente.numero
         identidad = d.paciente_identidad or ''
         paciente = d.paciente_nombre or ''
-        observaciones = d.motivo_rechazo_individual or ''
-        if not d.aprobado and observaciones:
-            observaciones = f'[NO PRESTADO] {observaciones}'
-        elif not d.aprobado:
-            observaciones = '[NO PRESTADO]'
+        status = '[NO PRESTADO]' if not d.aprobado else ''
         filas.append([
             Paragraph(fecha_salida, st_tabla_cell),
             Paragraph(f'#{num_exp}', st_tabla_cell),
@@ -292,16 +295,15 @@ def generar_pdf_solicitud(solicitud):
             Paragraph(paciente, st_tabla_cell),
             Paragraph(motivo_solicitud, st_tabla_cell),
             Paragraph(fecha_entrega_str if d.aprobado else '—', st_tabla_cell),
-            Paragraph(observaciones, st_tabla_cell),
-            Paragraph('', st_tabla_cell),
+            Paragraph(status, st_tabla_cell),
         ])
 
     col_w = doc.width
     tabla_exp = Table(
         filas,
         colWidths=[
-            col_w * 0.10, col_w * 0.10, col_w * 0.12, col_w * 0.15,
-            col_w * 0.12, col_w * 0.11, col_w * 0.16, col_w * 0.14,
+            col_w * 0.11, col_w * 0.11, col_w * 0.13, col_w * 0.16,
+            col_w * 0.13, col_w * 0.12, col_w * 0.24,
         ],
         repeatRows=1,
     )

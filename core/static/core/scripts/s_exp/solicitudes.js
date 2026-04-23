@@ -180,33 +180,30 @@ function aprobarSolicitud(id) {
  */
 function _mostrarModalAprobacion(id, expedientes) {
     const expHtml = expedientes.map(function (exp) {
-        const nombre = exp.paciente_nombre ? `<small>${exp.paciente_nombre}</small>` : '';
+        const nombre = exp.paciente_nombre ? `<span class="sexp-exp-lista-patient">${exp.paciente_nombre}</span>` : '';
         return `
-        <div class="sexp-exp-dec-grid-item" id="sexp-dec-row-${exp.detalle_id}">
-            <div class="sexp-exp-dec-grid-header">
-                <label class="sexp-exp-dec-check" title="Marcado = aprobado, desmarcado = rechazado">
-                    <input type="checkbox" id="exp-check-${exp.detalle_id}" data-detalle="${exp.detalle_id}" checked>
-                    <span class="sexp-exp-dec-checkmark"></span>
-                </label>
+        <div class="sexp-exp-lista-item" id="sexp-dec-row-${exp.detalle_id}">
+            <div class="sexp-exp-lista-content">
                 <span class="sexp-exp-tag">#${exp.numero}</span>
-                <span class="sexp-exp-dec-estado" id="exp-estado-${exp.detalle_id}">Aprobado</span>
+                ${nombre}
             </div>
-            <div class="sexp-exp-dec-grid-patient">${nombre}</div>
-            <textarea id="exp-obs-${exp.detalle_id}" rows="1" class="sexp-modal-input sexp-exp-dec-obs"
-                placeholder="Motivo..."></textarea>
+            <label class="sexp-exp-dec-check" title="Marcado = aprobado, desmarcado = rechazado">
+                <input type="checkbox" id="exp-check-${exp.detalle_id}" data-detalle="${exp.detalle_id}" checked>
+                <span class="sexp-exp-dec-checkmark"></span>
+            </label>
         </div>`;
     }).join('');
 
     Swal.fire({
         title: 'Aprobar Solicitud #' + id,
-        width: 900,
-        html: `<div style="text-align:left; display:grid; grid-template-columns: 1fr 280px; gap: 15px;">
+        width: 950,
+        html: `<div style="text-align:left; display:grid; grid-template-columns: 1.5fr 280px; gap: 15px;">
             <div>
-                <label style="display:block; font-weight:600; margin-bottom:8px;">
-                    Expedientes solicitados
-                    <small style="font-weight:normal; opacity:.75; display:block;">(desmarca los que NO se prestarán)</small>
+                <label style="display:block; font-weight:600; margin-bottom:4px;">
+                    Expedientes solicitados: <strong>${expedientes.length}</strong>
+                    <small style="font-weight:normal; opacity:.75; display:block; font-size:12px;">(desmarca los que NO se prestarán)</small>
                 </label>
-                <div id="swal-exp-list" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; margin-bottom:10px;">${expHtml}</div>
+                <div id="swal-exp-list" style="border: 1px solid #ddd; border-radius: 6px; padding: 10px; max-height: 350px; overflow-y: auto; background:#f9fafb;">${expHtml}</div>
             </div>
             <div style="border-left:1px solid #ccc; padding-left:15px;">
                 <div class="sexp-modal-campo">
@@ -292,15 +289,10 @@ function _mostrarModalAprobacion(id, expedientes) {
                 if (e.target.type !== 'checkbox') return;
                 const detId = e.target.dataset.detalle;
                 const row = document.getElementById(`sexp-dec-row-${detId}`);
-                const estado = document.getElementById(`exp-estado-${detId}`);
                 if (e.target.checked) {
-                    row.classList.remove('sexp-exp-dec-row--rechazado', 'sexp-exp-dec-grid-item--rechazado');
-                    estado.textContent = 'Aprobado';
-                    estado.className = 'sexp-exp-dec-estado sexp-exp-dec-estado--apr';
+                    row.classList.remove('sexp-exp-lista-item--rechazado');
                 } else {
-                    row.classList.add('sexp-exp-dec-row--rechazado', 'sexp-exp-dec-grid-item--rechazado');
-                    estado.textContent = 'Rechazado';
-                    estado.className = 'sexp-exp-dec-estado sexp-exp-dec-estado--rec';
+                    row.classList.add('sexp-exp-lista-item--rechazado');
                 }
             });
         },
@@ -339,20 +331,15 @@ function _mostrarModalAprobacion(id, expedientes) {
                 return false;
             }
 
-            // Recolectar decisiones + observaciones por expediente
+            // Recolectar decisiones por expediente (solo checkbox)
             const decisiones = [];
             for (const exp of expedientes) {
                 const check = document.getElementById(`exp-check-${exp.detalle_id}`);
-                const obs = document.getElementById(`exp-obs-${exp.detalle_id}`).value.trim();
                 const aprobado = check.checked;
-                if (!aprobado && !obs) {
-                    Swal.showValidationMessage(`El expediente #${exp.numero} está rechazado: debe ingresar motivo en observaciones.`);
-                    return false;
-                }
                 decisiones.push({
                     detalle_id: exp.detalle_id,
                     aprobado: aprobado,
-                    observaciones: obs
+                    observaciones: ''
                 });
             }
 
