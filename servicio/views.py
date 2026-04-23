@@ -49,7 +49,7 @@ class ListarSala(View):
         return JsonResponse(zonas, safe=False)
     
 
-class ListarEspecialidadServicio(View):
+class ListarAreaAtencionServicio(View):
     def get(self, request):
         id_servicio = request.GET.get('id_servicio')
 
@@ -63,14 +63,14 @@ class ListarEspecialidadServicio(View):
         except ValueError:
             return JsonResponse({'error': ('El parámetro "id_servicio" debe ser un número entero.')}, status=400)
 
-        # Obtener especialidades activas
-        especialidades = ServicioService.obtener_especialidades_activas_servicio(id_servicio)
+        # Obtener area_atencion activas
+        areas = ServicioService.obtener_areas_atencion_activas_servicio(id_servicio)
 
-        return JsonResponse(especialidades, safe=False)
+        return JsonResponse(areas, safe=False)
     
 
 
-class ListarDependencias(View):
+class ListarUnidadesClinicas(View):
 
     def get(self, request):
         uso_param = request.GET.get("uso")
@@ -86,12 +86,11 @@ class ListarDependencias(View):
             incluir_externo = False
             solo_emergencia = True
 
-
-        dependencias = ServicioService.obtener_dependencias(
+        unidades_clinicas = ServicioService.obtener_unidades_clinicas(
             incluir_externo=incluir_externo,
             solo_emergencia= solo_emergencia
         )
-        return JsonResponse(dependencias, safe=False)
+        return JsonResponse(unidades_clinicas, safe=False)
 
 
 

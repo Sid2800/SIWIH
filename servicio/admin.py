@@ -1,5 +1,5 @@
 from django.contrib import admin
-from servicio.models import Zona, Servicio, Sala, Cama, Especialidad, ServiciosAux, Proveedor_salud, Nivel_complejidad_institucional, Gestor, Institucion_salud, Unidad
+from servicio.models import Zona, Servicio, Sala, Cama, Area_atencion, ServiciosAux, Proveedor_salud, Nivel_complejidad_institucional, Gestor, Institucion_salud, Unidad, Cubiculo, Unidad_clinica
 
 class ZonaAdmin(admin.ModelAdmin):
     list_display = ('codigo','nombre_zona', 'estado')
@@ -17,10 +17,6 @@ class SalaAdmin(admin.ModelAdmin):
     search_fields = ('nombre_sala', 'servicio__nombre_servicio')
     list_filter = ('estado', 'sexo_esperado', 'servicio')
     readonly_fields = ('fecha_creado', 'fecha_modificado')
-
-
-from django.contrib import admin
-from .models import Cubiculo, Cama
 
 
 class CamaInline(admin.TabularInline):
@@ -124,9 +120,9 @@ class CamaAdmin(admin.ModelAdmin):
     list_filter = ('estado','cubiculo', 'sala')
     readonly_fields = ('fecha_creado', 'fecha_modificado')
 
-class EspecialidadAdmin(admin.ModelAdmin):
-    list_display = ('nombre_especialidad', 'servicio_nombre', 'estado')
-    search_fields = ('nombre_especialidad', 'servicio__nombre_servicio')
+class AreaAtencionAdmin(admin.ModelAdmin):
+    list_display = ('nombre_area_atencion', 'servicio_nombre', 'estado')
+    search_fields = ('nombre_area_atencion', 'servicio__nombre_servicio')
     list_filter = ('estado', 'servicio')
 
     def servicio_nombre(self, obj):
@@ -163,6 +159,7 @@ class InstitucionSaludAdmin(admin.ModelAdmin):
         'mostrar_gestor',
         'nivel_atencion',
         'centralizado',
+        'es_unidad_clinica',
         'estado'
     )
     
@@ -200,7 +197,40 @@ class InstitucionSaludAdmin(admin.ModelAdmin):
         obj.modificado_por = request.user
         super().save_model(request, obj, form, change)
 
-        
+
+class UnidadClinicaAdmin(admin.ModelAdmin):
+    list_display = (
+        'id',
+        'tipo_unidad_label',
+        'descripcion_label',
+        'estado'
+    )
+
+    list_filter = ('estado',)
+
+    search_fields = (
+        'area_atencion__nombre',
+        'sala__nombre_sala',
+        'servicio_aux__nombre_servicio_aux',
+        'establecimiento_ext__nombre',
+    )
+
+    autocomplete_fields = [
+        'area_atencion',
+        'sala',
+        'servicio_aux',
+        'establecimiento_ext'
+    ]
+
+    @admin.display(description='Tipo')
+    def tipo_unidad_label(self, obj):
+        return obj.get_tipo_unidad()[1]
+    
+
+    @admin.display(description='Descripción')
+    def descripcion_label(self, obj):
+        return obj.descripcion
+
 # Registro de modelos en la interfaz de administración
 admin.site.register(Servicio, ServicioAdmin)
 admin.site.register(Sala, SalaAdmin)
@@ -208,7 +238,9 @@ admin.site.register(Unidad, UnidadAdmin)
 admin.site.register(Cama, CamaAdmin)
 admin.site.register(Zona,ZonaAdmin)
 admin.site.register(ServiciosAux, ServicioAuxAdmin)
-admin.site.register(Especialidad, EspecialidadAdmin)
+admin.site.register(Area_atencion, AreaAtencionAdmin)
+admin.site.register(Unidad_clinica, UnidadClinicaAdmin)
+
 
 #referenciaa
 

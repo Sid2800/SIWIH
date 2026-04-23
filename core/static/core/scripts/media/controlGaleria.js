@@ -1,7 +1,6 @@
 const ControlGaleria = (function () {
 
     function render(container, imagenes = [], titulo_album) {
-
         if (!container) return;
 
         container.innerHTML = "";

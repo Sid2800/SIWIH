@@ -157,7 +157,7 @@ class EvaluacionRXCreateForm(forms.ModelForm):
                 raise forms.ValidationError(str(e))
 
             cleaned_data['sala'] = None
-            cleaned_data['especialidad'] = None
+            cleaned_data['area_atencion'] = None
             cleaned_data['servicio_auxiliar'] = None
             cleaned_data[campo] = obj
 

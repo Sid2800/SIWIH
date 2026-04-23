@@ -1,6 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
-from core.constants.choices_constants import AlcanceUsuario
+from core.constants.choices_constants import AlcanceUsuario, RolUsuario
 from servicio.models import Unidad as ServicioUnidad 
 
 class Unidad(models.Model):
@@ -9,13 +9,6 @@ class Unidad(models.Model):
     def __str__(self):
         return self.nombre_unidad
 
-ROLES = (
-    ('admin', 'Administrador'),
-    ('digitador', 'Digitador'),
-    ('auditor', 'Auditor'),
-    ('visitante', 'Visitante'),
-    ('exp_solicitante', 'Solicitante'),
-)
 
 class PerfilUnidad(models.Model):
     usuario = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -24,9 +17,8 @@ class PerfilUnidad(models.Model):
         choices=AlcanceUsuario.choices,
         default=AlcanceUsuario.UNIDAD
     )
-    rol = models.CharField(max_length=20, choices=ROLES)
+    rol = models.CharField(max_length=20, choices=RolUsuario.choices)
 
-    
 
     class Meta: # OJOOOO correjir al migrar
         unique_together = ('usuario', 'servicio_unidad', 'alcance')

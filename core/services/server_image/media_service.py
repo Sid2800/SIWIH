@@ -70,6 +70,94 @@ class MediaService:
 
             return estudios, True
 
+    @staticmethod
+    def obtener_imagenes_usuarios(usuarios):
+
+        peticion = {
+            'usuarios_ids': [u['id'] for u in usuarios]
+        }
+
+        try:
+            
+            resultado = RequestService.consultar_media_server_LIST_usuario(peticion)
+
+            imagenes_data = resultado["data"]
+
+            mapa_imgs = {
+                img['usuario_id']: {
+                    'url': f"{settings.IMAGE_SERVER_URL}{img['url']}",
+                }
+                for img in imagenes_data
+            }
+
+            for usuario in usuarios:
+                datos_img = mapa_imgs.get(usuario['id'])
+                if datos_img:
+                    usuario['url_imagen'] = datos_img['url']
+                else:
+                    usuario['url_imagen'] = None
+            
+
+            return usuarios, False
+            
+
+        except Exception as e:
+            log_error(
+                f"[FALLO_MEDIA_LIST_USUARIOS]  detalle={str(e)}",
+                app=LogApp.MEDIA 
+            )
+            
+            for usuario in usuarios:
+                usuario['url_imagen'] = None
+
+
+            return usuarios, True
+        
+    @staticmethod
+    def procesar_imagen_usuario(archivo, usuario_id):
+        """
+        Procesa imagen de usuario
+        """
+
+        if not archivo or not usuario_id:
+            return {
+                "ok": False,
+                "error": "Archivo o usuario_id no proporcionado"
+                }
+
+        try:
+            payload = {
+                "usuario_id": usuario_id,
+                "archivo": archivo,
+            }
+
+            resultado = RequestService.procesar_imagen_usuario(payload)
+
+            if not resultado.get("ok"):
+                raise RuntimeError("Fallo en media server")
+
+            url =  f"{settings.IMAGE_SERVER_URL}{resultado['data']['url']}"
+
+            return {
+                "ok": True,
+                "url": url
+            }
+                                
+
+        except Exception as e:
+            log_error(
+                f"[FALLO_SUBIDA_USUARIO] usuario_id={usuario_id} detalle={str(e)}",
+                app=LogApp.MEDIA
+            )
+
+            return {
+                "ok": False,
+                "error": str(e)
+                }
+            
+
+        
+
 
     @staticmethod
     def agregar_imagenes_evaluacion(estudios, archivos, paciente_tipo, paciente_id, usuario):

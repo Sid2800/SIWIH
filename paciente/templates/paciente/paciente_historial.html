@@ -31,6 +31,82 @@
                 readonly>
         </div>
 
+        <div class="fieldset-falso">
+
+            {% if tabs.ingresos %}
+                <div class="historial-tab-contenido {% if tabActiva == 'ingresos' %}active{% endif %}" id="historialIngresos">
+                    <table id="historialTablaIngresos" class="display">
+                        <thead>
+                            <tr>
+                                <th>#Num</th>
+                                <th>Ingreso</th>
+                                <th>Egreso | Usuario</th>
+                                <th>SDGI | Usuario</th>
+                                <th>Sala | Servicio</th>
+                                <th>Modificado | Usuario</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        </tbody>
+                    </table>
+                </div>
+            {% endif %}
+
+            {% if tabs.atenciones %}
+                <div class="historial-tab-contenido {% if tabActiva == 'atenciones' %}active{% endif %}" id="historialConsultas">
+                    <table id="historialTablaConsultas" class="display">
+                        <thead>
+                            <tr>
+                                <th>#Num</th>
+                                <th>Atencion</th>
+                                <th>Recepcion</th>
+                                <th>Area Atencion | Servicio</th>
+                                <th>Modificado | Usuario</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        </tbody>
+                    </table>
+                </div>
+            {% endif %}
+
+            {% if permiso_dispensacion %}
+                <div class="historial-tab-contenido" id="historialDispensaciones">
+                    <table id="historialTablaDispensaciones" class="display">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Medicamento</th>
+                                <th>Prescrita</th>
+                                <th>Dispen.</th>
+                                <th>Servicio</th>
+                                <th>Medico</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        </tbody>
+                    </table>
+                </div>
+            {% endif %}
+
+            {% if tabs.radiologia %}
+                <div class="historial-tab-contenido {% if tabActiva == 'radiologia' %}active{% endif %}" id="historialEvalucionesRX">
+                    <table id="historialTablaEvaluacionesRx" class="display">
+                        <thead>
+                            <tr>
+                                <th>#Num</th>
+                                <th>Fecha</th>
+                                <th>Dependencia</th>
+                                <th>Maquina</th>
+                                <th>Estudios</th>
+                                <th>Modificado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        </tbody>
+                    </table>
+                </div>
+            {% endif %}
 
         <div class="formularioCampoHistorial">
             <label>Nombre</label>

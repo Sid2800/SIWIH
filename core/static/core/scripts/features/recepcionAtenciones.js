@@ -30,7 +30,7 @@ document.addEventListener('DOMContentLoaded', function () {
         return {
             id: atencion.id,
             nombre: `${atencion.paciente__primer_nombre} ${atencion.paciente__primer_apellido || ''}`.trim(),
-            idServicio: atencion.especialidad__servicio__id,
+            idServicio: atencion.area_atencion__servicio__id,
             dni: atencion.paciente__dni || '',
             exp: atencion.expediente_numero,
             fechaAtencion: atencion.fecha_atencion,  // Puede ser null

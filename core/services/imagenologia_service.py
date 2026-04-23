@@ -441,14 +441,14 @@ class EvaluacionService:
                 total_estudios=Count('detalles', filter=Q(detalles__activo=True)),
                 nombre_dependencia=Case(
                     When(sala__isnull=False, then=F('sala__nombre_sala')),
-                    When(especialidad__isnull=False, then=F('especialidad__nombre_especialidad')),
+                    When(area_atencion__isnull=False, then=F('area_atencion__nombre_area_atencion')),
                     When(servicio_auxiliar__isnull=False, then=F('servicio_auxiliar__nombre_servicio_a')),
                     default=Value('Desconocido'),
                     output_field=CharField()
                 ),
                 tipo_dependencia=Case(
                     When(sala__isnull=False, then=Value('HOSP')),
-                    When(especialidad__isnull=False, then=Value('CEXT')),
+                    When(area_atencion__isnull=False, then=Value('CEXT')),
                     When(servicio_auxiliar__isnull=False, then=Value('SVAUX')),
                     default=Value('DESC'),
                     output_field=CharField()
@@ -493,7 +493,7 @@ class EvaluacionService:
 
                     dependencia_map = {
                         'A': 'servicio_auxiliar_id',
-                        'E': 'especialidad_id',
+                        'E': 'area_atencion_id',
                         'S': 'sala_id',
                     }
 
@@ -519,7 +519,7 @@ class EvaluacionService:
                 qs_dependencia = qs.annotate(
                     dependencia_nombre=Case(
                         When(sala__isnull=False, then=Concat(F('sala__nombre_sala'), Value(' | HOSP'))),
-                        When(especialidad__isnull=False, then=Concat(F('especialidad__nombre_especialidad'), Value(' | CEXT'))),
+                        When(area_atencion__isnull=False, then=Concat(F('area_atencion__nombre_area_atencion'), Value(' | CEXT'))),
                         When(servicio_auxiliar__isnull=False, then=Concat(F('servicio_auxiliar__nombre_servicio_a'), Value(' | SAUX'))),
                         default=Value('Sin asignar'),
                         output_field=CharField()
@@ -602,7 +602,7 @@ class EvaluacionService:
 
                     dependencia_map = {
                         'A': 'evaluacionRx__servicio_auxiliar_id',
-                        'E': 'evaluacionRx__especialidad_id',
+                        'E': 'evaluacionRx__area_atencion_id',
                         'S': 'evaluacionRx__sala_id',
                     }
 
@@ -632,8 +632,8 @@ class EvaluacionService:
                             then=Concat(F('evaluacionRx__sala__nombre_sala'), Value(' | HOSP'))
                         ),
                         When(
-                            evaluacionRx__especialidad__isnull=False,
-                            then=Concat(F('evaluacionRx__especialidad__nombre_especialidad'), Value(' | CEXT'))
+                            evaluacionRx__area_atencion__isnull=False,
+                            then=Concat(F('evaluacionRx__area_atencion__nombre_area_atencion'), Value(' | CEXT'))
                         ),
                         When(
                             evaluacionRx__servicio_auxiliar__isnull=False,
@@ -733,7 +733,7 @@ class EvaluacionService:
                 'evaluacionRx',
                 'estudio',
                 'evaluacionRx__sala',
-                'evaluacionRx__especialidad',
+                'evaluacionRx__area_atencion',
                 'evaluacionRx__servicio_auxiliar'
             )
 
@@ -749,7 +749,7 @@ class EvaluacionService:
                 dia=ExtractDay('evaluacionRx__fecha'),
                 dependencia_nombre=Case(
                     When(evaluacionRx__sala__isnull=False, then=Concat(Value('HOSP | '), F('evaluacionRx__sala__nombre_sala'))),
-                    When(evaluacionRx__especialidad__isnull=False, then=Concat(Value('CEXT | '), F('evaluacionRx__especialidad__nombre_especialidad'))),
+                    When(evaluacionRx__area_atencion__isnull=False, then=Concat(Value('CEXT | '), F('evaluacionRx__area_atencion__nombre_area_atencion'))),
                     When(evaluacionRx__servicio_auxiliar__isnull=False, then=Concat(Value('SAUX | '),F('evaluacionRx__servicio_auxiliar__nombre_servicio_a'))),
                     default=Value('Sin asignar'),
                     output_field=CharField()
@@ -844,7 +844,7 @@ class EvaluacionService:
 
             qs = EvaluacionRx.objects.filter(estado=1).select_related(
                 'sala',
-                'especialidad',
+                'area_atencion',
                 'servicio_auxiliar'
             )
 
@@ -860,7 +860,7 @@ class EvaluacionService:
                 dia=ExtractDay('fecha'),
                 dependencia_nombre=Case(
                     When(sala__isnull=False, then=Concat(Value('HOSP | '), F('sala__nombre_sala'))),
-                    When(especialidad__isnull=False, then=Concat(Value('CEXT | '), F('especialidad__nombre_especialidad'))),
+                    When(area_atencion__isnull=False, then=Concat(Value('CEXT | '), F('area_atencion__nombre_area_atencion'))),
                     When(servicio_auxiliar__isnull=False, then=Concat(Value('SAUX | '),F('servicio_auxiliar__nombre_servicio_a'))),
                     default=Value('Sin asignar'),
                     output_field=CharField()
@@ -958,7 +958,7 @@ class EvaluacionService:
             qs = qs.annotate(
                 dependencia_nombre=Case(
                     When(evaluacionRx__sala__isnull=False, then=Concat(Value('HP-'), F('evaluacionRx__sala__nombre_corto_sala'))),
-                    When(evaluacionRx__especialidad__isnull=False, then=Concat(Value('CE-'), F('evaluacionRx__especialidad__nombre_corto_especialidad'))),
+                    When(evaluacionRx__area_atencion__isnull=False, then=Concat(Value('CE-'), F('evaluacionRx__area_atencion__nombre_corto_area_atencion'))),
                     When(evaluacionRx__servicio_auxiliar__isnull=False, then=Concat(Value('SA-'),F('evaluacionRx__servicio_auxiliar__nombre_corto_servicio_a'))),
                     default=Value('Sin asignar'),
                     output_field=CharField()

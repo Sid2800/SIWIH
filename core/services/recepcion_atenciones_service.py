@@ -68,7 +68,7 @@ class RecepcionAtencionService:
             atencion = Atencion.objects.only("fecha_recepcion").get(
                 id=idAtencion,
                 paciente_id=idPaciente,
-                especialidad__servicio_id=idServicio
+                area_atencion__servicio_id=idServicio
             )
             atencion.fecha_recepcion = timezone.now()
             atencion.modificado_por = usuario
@@ -104,11 +104,11 @@ class RecepcionAtencionService:
         ).order_by('-id').values('expediente__numero')[:1]
 
         detalles = self.recepcion.detalles.select_related(
-            'atencion', 'atencion__paciente', 'atencion__especialidad__servicio'
+            'atencion', 'atencion__paciente', 'atencion__area_atencion__servicio'
         ).annotate(
             expediente_numero=Subquery(expediente_subquery)
         ).order_by(
-        'atencion__especialidad__servicio__nombre_servicio',  
+        'atencion__area_atencion__servicio__nombre_servicio',  
         'expediente_numero' 
         )
 
@@ -120,6 +120,6 @@ class RecepcionAtencionService:
                 'atencion__paciente__segundo_nombre',
                 'atencion__paciente__primer_apellido',
                 'atencion__paciente__segundo_apellido',
-                'atencion__especialidad__servicio__nombre_servicio',
+                'atencion__area_atencion__servicio__nombre_servicio',
                 ))
 

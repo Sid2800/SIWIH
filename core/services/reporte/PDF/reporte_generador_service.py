@@ -511,7 +511,7 @@ class ReporteGeneradorService:
                                 reg["paciente__segundo_apellido"],
                             )[:27])
                         elif col == 'SERVICIO':
-                            fila.append(f"{reg['especialidad__servicio__nombre_corto']}, {reg['especialidad__nombre_especialidad']}"[:20])
+                            fila.append(f"{reg['area_atencion__servicio__nombre_corto']}, {reg['area_atencion__nombre_area_atencion']}"[:20])
                         else:
                             fila.append('')  
                 
@@ -575,10 +575,10 @@ class ReporteGeneradorService:
 
 
                 if modelo == 'atencion':
-                    if campo_agrupacion == 'especialidad__servicio_id':
-                        return reg['especialidad__servicio__nombre_servicio']
-                    if campo_agrupacion == 'especialidad_id':
-                        return f"{reg['especialidad__nombre_especialidad']}, {reg['especialidad__servicio__nombre_corto']}"
+                    if campo_agrupacion == 'area_atencion__servicio_id':
+                        return reg['area_atencion__servicio__nombre_servicio']
+                    if campo_agrupacion == 'area_atencion_id':
+                        return f"{reg['area_atencion__nombre_area_atencion']}, {reg['area_atencion__servicio__nombre_corto']}"
                     if campo_agrupacion == 'paciente__sector__aldea__municipio__departamento_id':
                         return reg['paciente__sector__aldea__municipio__departamento__nombre_departamento'] 
                     

@@ -417,29 +417,7 @@ class PacienteEditView(UpdateView):
 def listarPacientes(request):
     usuario = request.user
 
-    # Si es superusuario, darle acceso completo
-    if usuario.is_superuser:
-        context = {
-            "botones": ["todos"]
-        }
-        return render(request, 'paciente/paciente_list.html', context)
-    
-    permisos_por_unidad = {
-        1: ["crear_paciente", "editar_paciente", "crear_ingreso", "crear_atencion"],  # Admisión
-        2: ["crear_evaluacionrx"],  # Imagenología
-        4: ["editar_paciente"], # directivos
-        6: ["crear_referencia"]  # Imagenología
-
-    }
-
-    perfiles = PerfilUnidad.objects.filter(usuario=usuario).values_list('servicio_unidad_id', flat=True)
-
-    botones = []
-    for unidad_id in perfiles:
-        permisos = permisos_por_unidad.get(unidad_id, [])
-        for p in permisos:
-            if p not in botones:  # Evita duplicados y preserva orden
-                botones.append(p)
+    botones =UsuarioService.obtener_botones_paciente(usuario)
 
     context = {
         "botones": json.dumps(botones)  # Se manda ya en el orden original
@@ -1098,6 +1076,7 @@ def guardarDefuncion(request):
     try:
         id_paciente = validar_entero_positivo(data.get('idPaciente'), "idPaciente")
         id_defuncion = validar_entero_positivo(data.get('idDefuncion'), "idDefuncion") if data.get('idDefuncion') else None
+        id_unidad_clinica = validar_entero_positivo(data.get('unidad_clinica'))
         tipo = validar_entero_positivo(data.get('tipo'), "tipo")
     except ValidationError as e:
         return JsonResponse({'error': e.message_dict}, status=400)
@@ -1105,16 +1084,12 @@ def guardarDefuncion(request):
     fecha = data.get('fecha')
     motivo = data.get('motivo')
 
-    dependencia_raw = data.get('dependencia')
+    unidad_clinica = None
 
-    dependencia = None
-    tipo_dependencia = None
-
-    if dependencia_raw:
-        try:
-            dependencia, tipo_dependencia = ServicioService.obtener_dependencia_y_campo(dependencia_raw)
-        except ValidationError:
-            return JsonResponse({'error': 'La dependencia no es válida'}, status=400)
+    try:
+        unidad_clinica = ServicioService.obtener_unidad_clinica(id_unidad_clinica)
+    except ValidationError:
+        return JsonResponse({'error': 'La unidad clinica no es válida'}, status=400)
     
 
     if not fecha or not id_paciente or not tipo:
@@ -1132,8 +1107,7 @@ def guardarDefuncion(request):
 
     defuncion = SimpleNamespace(
         fecha=fecha,
-        tipo_dependencia=tipo_dependencia,
-        dependencia=dependencia,
+        unidad_clinica=unidad_clinica,
         motivo=motivo,
         paciente_id=int(id_paciente),
         id=int(id_defuncion) if id_defuncion else None,
@@ -1171,6 +1145,7 @@ def guardarObito(request):
     try:
         id_paciente = validar_entero_positivo(data.get('idPaciente'), "idPaciente")
         id_obito = validar_entero_positivo(data.get('idObito'), "idObito") if data.get('idObito') else None
+        id_unidad_clinica = validar_entero_positivo(data.get('unidadClinica'))
         tipo = validar_entero_positivo(data.get('tipo'), "tipo")
     except ValidationError as e:
         return JsonResponse({'error': e.message_dict}, status=400)
@@ -1180,16 +1155,13 @@ def guardarObito(request):
     dni_responsable = data.get('dniResponsable')
     nombre_responsable = data.get('nombreResponsable')
 
-    dependencia_raw = data.get('dependencia')
+    unidad_clinica = None
 
-    dependencia = None
-    tipo_dependencia = None
 
-    if dependencia_raw:
-        try:
-            dependencia, tipo_dependencia = ServicioService.obtener_dependencia_y_campo(dependencia_raw)
-        except ValidationError:
-            return JsonResponse({'error': 'La dependencia no es válida'}, status=400)
+    try:
+        unidad_clinica = ServicioService.obtener_unidad_clinica(id_unidad_clinica)
+    except ValidationError:
+        return JsonResponse({'error': 'La unidad clinica no es válida'}, status=400)
 
 
     # Validación básica
@@ -1207,8 +1179,7 @@ def guardarObito(request):
 
     obito = SimpleNamespace(
         fecha=fecha,
-        tipo_dependencia=tipo_dependencia,
-        dependencia=dependencia,
+        unidad_clinica=unidad_clinica,
         paciente_id= int(id_paciente),  # madre
         id=int(id_obito) if id_obito else None,
         tipo=int(tipo),
@@ -1251,21 +1222,21 @@ def obtener_defuncion_paciente(request):
     if not defuncion:
         return JsonResponse({"mensaje": "no defuncion"}, status=200)
     
-    if defuncion.sala or defuncion.servicio_auxiliar or defuncion.especialidad:
-        info = ServicioService.encontrar_dependencia_en_instance(defuncion)
+    if defuncion.unidad_clinica:
+        info = ServicioService.encontrar_unidad_clinica_en_instance(defuncion)
         if info:
-            dependencia_codigo = info["clave"]
-            dependencia_label = f"{info['nombre']} ({info['tipo']})"
+            unidad_codigo = info["clave"]
+            unidad_label = f"{info['nombre']} ({info['tipo']})"
     else:
-        dependencia_codigo = None
-        dependencia_label = ""
+        unidad_codigo = None
+        unidad_label = ""
 
 
     # Construir la respuesta con los datos del paciente
     return JsonResponse({
         "id": defuncion.id,
-        "dependencia_codigo": dependencia_codigo,
-        "dependencia_label": dependencia_label,
+        "unidad_codigo": unidad_codigo,
+        "unidad_label": unidad_label,
         "fecha_defuncion": defuncion.fecha_defuncion.strftime("%Y-%m-%d"),
         "motivo": defuncion.motivo,
         "fechaAdicion": defuncion.fecha_registro,
@@ -1290,22 +1261,19 @@ def obtener_obito_paciente(request):
         return JsonResponse({"mensaje": "no obito"}, status=200)
 
     # Resolver dependencia
-    if obito.sala or obito.servicio_auxiliar or obito.especialidad:
-        info = ServicioService.encontrar_dependencia_en_instance(obito)
+    if obito.unidad_clinica:
+        info = ServicioService.encontrar_unidad_clinica_en_instance(obito)
         if info:
-            dependencia_codigo = info["clave"]
-            dependencia_label = f"{info['nombre']} ({info['tipo']})"
-        else:
-            dependencia_codigo = None
-            dependencia_label = ""
+            unidad_codigo = info["clave"]
+            unidad_label = f"{info['nombre']} ({info['tipo']})"
     else:
-        dependencia_codigo = None
-        dependencia_label = ""
+        unidad_codigo = None
+        unidad_label = ""
 
     return JsonResponse({
         "id": obito.id,
-        "dependencia_codigo": dependencia_codigo,
-        "dependencia_label": dependencia_label,
+        "unidad_codigo": unidad_codigo,
+        "unidad_label": unidad_label,
         "fecha_obito": obito.fecha_obito.strftime("%Y-%m-%d"),
         "reponsable_nombre": obito.responsable_nombre if obito.responsable_nombre else "",
         "reponsable_dni": obito.responsable_dni if obito.responsable_dni else "",

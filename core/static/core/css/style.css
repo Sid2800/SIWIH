@@ -458,9 +458,10 @@ main {
 }
 
 .bp-inf-usuario__imagen {
-   margin-left: 0.2rem;
+   margin-left: 0rem;
    width: 5.5rem;
-   min-width: 5.54rem;
+   min-width: 6.5rem;
+   height: 7rem;
    border-radius: 50%;
 }
 
@@ -1445,7 +1446,7 @@ table.dataTable.dtr-inline.collapsed > tbody > tr > th.dtr-control:before {
 .frmIngresoCampos,
 .frmPacienteCampos,
 .fieldsetExp,
-.mantenimientoTabla,
+.mantenimiento-contenedor-tabla,
 .frmEvaluacionRxCampos,
 .frmReferenciaCampos{  
    display: flex;
@@ -1464,16 +1465,6 @@ table.dataTable.dtr-inline.collapsed > tbody > tr > th.dtr-control:before {
 }
 
 
-/*lista mantenimeinto*/
-.mantenimientoTabla{ 
-   margin: 0 auto;
-   max-width: 70rem;
-   align-items: center;
-}
-
-#tabla-mantenimiento td > button.formularioBotones-boton {
-   margin: 0  auto;
-}
 
 
 
@@ -1669,8 +1660,18 @@ font-size: 1.6rem;
 }
 
 
-/*tablas estuilos  generales */
-.modal-procesos-tabla {
+/*tablas otros procesos paciente y mantimeintot */
+
+
+/*lista mantenimeinto*/
+.mantenimiento-contenedor-tabla{ 
+   margin: 0 auto;
+   max-width: 70rem;
+   align-items: center;
+}
+
+
+.modal-procesos-tabla, .tabla-mantenimiento {
    width: 100%;
    border-collapse: collapse;
    font-size: 1.2rem;
@@ -1679,7 +1680,13 @@ font-size: 1.6rem;
    padding: .5rem
 }
 
-.modal-procesos-tabla thead th {
+.tabla-mantenimiento {
+   font-size: 1.4rem;
+}
+
+
+.modal-procesos-tabla thead th ,
+.tabla-mantenimiento thead th {
    text-align: left;
    padding: .3rem 0;
    border-bottom: .3rem solid #ccc;
@@ -1688,24 +1695,27 @@ font-size: 1.6rem;
    font-family: var(--fuenteTablaTitulo);
    color: var(--negro);
 }
-.modal-procesos-tabla thead th:last-child {
+
+.modal-procesos-tabla thead th:last-child ,
+.tabla-mantenimiento thead th:last-child {
    text-align: right;
 }
 
-.modal-procesos-tabla tbody {
+.modal-procesos-tabla tbody ,
+.tabla-mantenimiento tbody {
    border-bottom: .3rem solid #ccc;
 }
 
-.modal-procesos-tabla tbody td {
+.modal-procesos-tabla tbody td ,
+.tabla-mantenimiento tbody td {
    font-family: var(--fuenteTablaCuerpo);
    padding: .6rem .4rem;
    border-bottom: .15rem solid #ccc;
    text-transform: uppercase;
 }
 
-
-
-.modal-procesos-tabla tbody tr:last-child td {
+.modal-procesos-tabla tbody tr:last-child td ,
+.tabla-mantenimiento tbody tr:last-child td {
    border-bottom: none;
 }
 
@@ -1727,21 +1737,21 @@ font-size: 1.6rem;
    color: #146c43;
 }
 
-.modal-procesos-tabla tbody tr {
+.modal-procesos-tabla tbody tr ,
+.tabla-mantenimiento tbody tr {
    transition: background-color 0.1s ease;
 }
 
-.modal-procesos-tabla tbody tr:hover {
+.modal-procesos-tabla tbody tr:hover ,
+.tabla-mantenimiento tbody tr:hover {
    background-color: var(--colorTablaceldaBorde);
 }
 
-
-
-
 /*BOTONDE OTROS PROCESSOS DE PACIENTE*/
-.modal-procesos-btn{
+.modal-procesos-btn,
+.tabla-mantenimiento-boton{
    font-size: 1.2rem;
-   font-weight: 500;
+   font-weight: 600;
    display: flex;
    align-items: center;
    justify-content: center;
@@ -1758,21 +1768,28 @@ font-size: 1.6rem;
    transition: background-color 0.15s ease, transform 0.1s ease;
 }
 
-.modal-procesos-btn i{
+.modal-procesos-btn i,
+.tabla-mantenimiento-boton i{
    font-size: 2rem;
 }
 
-
-.modal-procesos-btn:hover {
+.modal-procesos-btn:hover,
+.tabla-mantenimiento-boton:hover{
    background-color: var(--blanco);
    color: var(--negro) !important;
 }
 
 
-.modal-procesos-accion {
+.modal-procesos-accion,
+.tabla-mantenimiento-boton-celda{
    text-align: right; 
 }
 
+.tabla-mantenimiento-celda-cantidad{
+   text-align: center;
+}
+
+.tabla-mantenimiento-boton-celda button,
 .modal-procesos-accion button {
    display: inline-flex;
 }
@@ -3556,6 +3573,16 @@ select[disabled] {
    padding-top: 3rem;
    overflow-x: hidden; 
 }
+
+/*galeria de usaurios*/
+.modal-galeria-contendor-imagenes.usuario{
+   max-height: 40rem;
+   overflow-y: auto;
+}
+
+
+
+
 .modal-galeria-contendor-imagenes .form-subtitulo-fieldset-falso{
    top: .4rem;
    font-size: 1.5rem;

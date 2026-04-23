@@ -83,19 +83,19 @@ class ServicioService:
     
 
     @staticmethod
-    def obtener_especialidades_activas_servicio(idServicio=0):
-        """Obtiene las especialidades activas de un servicio específico."""
+    def obtener_areas_atencion_activas_servicio(idServicio=0):
+        """Obtiene las area_atencion activas de un servicio específico."""
         if idServicio == 0:
-            salas = modelosServicio.Especialidad.objects.filter(estado=1).values(
+            salas = modelosServicio.Area_atencion.objects.filter(estado=1).values(
                 'id',
-                'nombre_especialidad',
+                'nombre_area_atencion',
                 'servicio__nombre_corto'
             )
         else:
             # Filtramos por el servicio específico
-            salas = modelosServicio.Especialidad.objects.filter(estado=1,servicio_id=idServicio).values(
+            salas = modelosServicio.Area_atencion.objects.filter(estado=1,servicio_id=idServicio).values(
             'id',
-            'nombre_especialidad',
+            'nombre_area_atencion',
             'servicio__nombre_corto'
             )  
         
@@ -112,11 +112,11 @@ class ServicioService:
     
 
     @staticmethod
-    def obtener_especialidad_id(idEspecialidad):
+    def obtener_area_atencion_id(idAreaAtencion):
         try:
-            especialidad = modelosServicio.Especialidad.objects.get(estado=1, id=idEspecialidad)
-            return especialidad
-        except modelosServicio.Especialidad.DoesNotExist:
+            area_atencion = modelosServicio.Area_atencion.objects.get(estado=1, id=idAreaAtencion)
+            return area_atencion
+        except modelosServicio.Area_atencion.DoesNotExist:
             return None
     
 
@@ -153,14 +153,14 @@ class ServicioService:
 
         serv_auxiliares_externos = [] if incluir_externo else SERVICIOS_AUX_EXTERNOS
 
-        def _especialidades_por_servicio(servicio_id, tipo):
+        def _areas_atencion_por_servicio(servicio_id, tipo):
             return (
-                modelosServicio.Especialidad.objects
+                modelosServicio.Area_atencion.objects
                 .filter(estado=1, servicio_id=servicio_id)
                 .annotate(
                     tipo=Value(tipo, output_field=CharField()),
-                    nombre=F('nombre_especialidad'),
-                    origen=Value('ESPECIALIDAD', output_field=CharField()),
+                    nombre=F('nombre_area_atencion'),
+                    origen=Value('AREA ATENCION', output_field=CharField()),
                     clave=Concat(Value('E-'), F('id'), output_field=CharField())
                 )
                 .values('clave', 'nombre', 'tipo', 'origen')
@@ -180,17 +180,17 @@ class ServicioService:
             .values('clave', 'nombre', 'tipo', 'origen')
         )
 
-        especialidades = []
+        areas_atencion = []
 
-        # Especialidades emergencia servicio 1000 emercia
-        especialidades.append(_especialidades_por_servicio(1000, 'EMERG'))
+        # area_atencion emergencia servicio 1000 emercia
+        areas_atencion.append(_areas_atencion_por_servicio(1000, 'EMERG'))
 
         if not solo_emergencia:
-            # Especialidades servicio 50 consulta externa
-            especialidades.append(_especialidades_por_servicio(50, 'CEXT'))
+            # area_atencion servicio 50 consulta externa
+            areas_atencion.append(_areas_atencion_por_servicio(50, 'CEXT'))
 
-            # Especialidades emergencia servicio 700 obstetricia
-            especialidades.append(_especialidades_por_servicio(700, 'OBS'))
+            # area_atencion emergencia servicio 700 obstetricia
+            areas_atencion.append(_areas_atencion_por_servicio(700, 'OBS'))
 
         # Servicios auxiliares todos los activos 
         servicios = (modelosServicio.ServiciosAux.objects
@@ -206,11 +206,79 @@ class ServicioService:
         )
 
         # Unir todas las listas
-        especialidades = list(chain(*especialidades))
-        dependencias = list(chain(salas, especialidades, servicios))
+        areas_atencion = list(chain(*areas_atencion))
+        dependencias = list(chain(salas, areas_atencion, servicios))
 
         return dependencias
     
+    @staticmethod
+    def obtener_unidades_clinicas(incluir_externo=True, solo_emergencia=False):
+        qs = modelosServicio.Unidad_clinica.objects.filter(estado=1)
+
+        if not incluir_externo:
+            qs = qs.filter(establecimiento_ext__isnull=True)
+
+        qs = qs.annotate(
+            tipo=Value('', output_field=CharField()),  # lo ajustamos abajo
+            nombre=Value('', output_field=CharField()),
+            origen=Value('', output_field=CharField()),
+        )
+
+        unidades_clinicas = []
+
+
+        for uc in qs.select_related(
+            'area_atencion__servicio',
+            'sala',
+            'servicio_aux',
+            'establecimiento_ext'
+        ):
+
+            if uc.area_atencion:
+                tipo = (
+                    'EMERG' if uc.area_atencion.servicio_id == 1000 else
+                    'OBS' if uc.area_atencion.servicio_id == 700 else
+                    'CEXT' if uc.area_atencion.servicio_id == 50 else ''
+                )
+
+
+                # filtro solo emergencia
+                if solo_emergencia and tipo not in ['EMERG', 'OBS' ]:
+                    continue
+
+                unidades_clinicas.append({
+                    'clave': f"{uc.id}",
+                    'nombre': uc.area_atencion.nombre_area_atencion,
+                    'tipo': tipo,
+                    'origen': 'AREA ATENCION'
+                })
+
+            elif uc.sala:
+                unidades_clinicas.append({
+                    'clave': f"{uc.id}",
+                    'nombre': uc.sala.nombre_sala,
+                    'tipo': 'HOSP',
+                    'origen': 'SALA'
+                })
+
+            elif uc.servicio_aux:
+                unidades_clinicas.append({
+                    'clave': f"{uc.id}",
+                    'nombre': uc.servicio_aux.nombre_servicio_a,
+                    'tipo': 'SAUX',
+                    'origen': 'SERVICIO AUXILIAR'
+                })
+
+            elif uc.establecimiento_ext:
+                unidades_clinicas.append({
+                    'clave': f"{uc.id}",
+                    'nombre': uc.establecimiento_ext.nombre_institucion_salud,
+                    'tipo': 'EXT',
+                    'origen': 'INSTITUCIÓN EXTERNA'
+                })
+
+        return unidades_clinicas
+
 
 
     @staticmethod
@@ -232,10 +300,10 @@ class ServicioService:
             return obj, 'sala'
 
         elif prefijo == 'E':
-            obj = modelosServicio.Especialidad.objects.filter(id=pk, estado=1).first()
+            obj = modelosServicio.Area_atencion.objects.filter(id=pk, estado=1).first()
             if not obj:
-                raise ValidationError("Especialidad no encontrada.")
-            return obj, 'especialidad'
+                raise ValidationError("Area Atencion no encontrada.")
+            return obj, 'area_atencion'
 
         elif prefijo == 'A':
             obj = modelosServicio.ServiciosAux.objects.filter(id=pk, estado=1).first()
@@ -248,6 +316,26 @@ class ServicioService:
         
 
     @staticmethod
+    def obtener_unidad_clinica(id):
+        if not id:
+            raise ValidationError("Clave invalida")
+
+
+        uc = modelosServicio.Unidad_clinica.objects.select_related(
+            'area_atencion',
+            'sala',
+            'servicio_aux',
+            'establecimiento_ext'
+        ).filter(id=id, estado=1).first()
+
+        if not uc:
+            raise ValidationError("Unidad clinica no encontrada.")
+
+    
+        return uc
+
+
+    @staticmethod
     def encontrar_dependencia_en_instance(instance, prefijo=""):
         """
         prefijo = "" → sala
@@ -255,7 +343,7 @@ class ServicioService:
         """
 
         sala = getattr(instance, f"{prefijo}sala", None)
-        especialidad = getattr(instance, f"{prefijo}especialidad", None)
+        area_atencion = getattr(instance, f"{prefijo}area_atencion", None)
         servicio_aux = getattr(instance, f"{prefijo}servicio_auxiliar", None)
 
         if sala:
@@ -265,11 +353,11 @@ class ServicioService:
                 "tipo": "HOSP"
             }
 
-        elif especialidad:
+        elif area_atencion:
             return {
-                "clave": f"E-{especialidad.id}",
-                "nombre": especialidad.nombre_especialidad,
-                "tipo": "CEXT"  # lo dejamos así por ahora ✔️
+                "clave": f"E-{area_atencion.id}",
+                "nombre": area_atencion.nombre_area_atencion,
+                "tipo": "CEXT"  # lo dejamos así por ahora 
             }
 
         elif servicio_aux:
@@ -277,6 +365,45 @@ class ServicioService:
                 "clave": f"A-{servicio_aux.id}",
                 "nombre": servicio_aux.nombre_servicio_a,
                 "tipo": "SAUX"
+            }
+
+        return None
+    
+    @staticmethod
+    def encontrar_unidad_clinica_en_instance(instance):
+        uc = instance.unidad_clinica
+
+        if not uc:
+            return None
+
+        tipo_codigo, _ = uc.get_tipo_unidad()
+
+        if uc.area_atencion:
+            return {
+                "clave": f"{uc.id}",
+                "nombre": uc.area_atencion.nombre_area_atencion,
+                "tipo": tipo_codigo
+            }
+
+        elif uc.sala:
+            return {
+                "clave": f"{uc.id}",
+                "nombre": uc.sala.nombre_sala,
+                "tipo": tipo_codigo
+            }
+
+        elif uc.servicio_aux:
+            return {
+                "clave": f"{uc.id}",
+                "nombre": uc.servicio_aux.nombre_servicio_a,
+                "tipo": tipo_codigo
+            }
+
+        elif uc.establecimiento_ext:
+            return {
+                "clave": f"{uc.id}",
+                "nombre": uc.establecimiento_ext.nombre_institucion_salud,
+                "tipo": tipo_codigo
             }
 
         return None

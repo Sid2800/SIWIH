@@ -138,7 +138,7 @@ document.addEventListener('DOMContentLoaded', function () {
         ...commonOptionsRefDiagnostico,
         buttons: [
             { text: '<i class="bi bi-plus-circle boton-exportacion"></i>', titleAttr: 'Agregar Diagnostico', action: (e, dt, button, config) => AgregarEditarRespuestaDiagnostico(1) },
-            { text: '<i class="bi bi-pencil boton-exportacion"></i>', titleAttr: 'Editar Especialidad', action: (e, dt, button, config) => AgregarEditarRespuestaDiagnostico(2) },
+            { text: '<i class="bi bi-pencil boton-exportacion"></i>', titleAttr: 'Editar Diagnostico', action: (e, dt, button, config) => AgregarEditarRespuestaDiagnostico(2) },
             { text: '<i class="bi bi-eraser-fill boton-exportacion" ></i>', titleAttr: 'Eliminar Diagnostico', action: (e, dt, button, config) => eliminarDiagnosticoSeleccionado(tableResDiagnostico, datosResDiagnostico, refrescarTablaResDiagnostico) },
         ]
     };
@@ -748,7 +748,7 @@ document.addEventListener('DOMContentLoaded', function () {
         // Declaración global de los selects (todas inicializadas en null)
         let respuestaAreaCaptaSelect = null;
         let respuestaAreaRespuestaSelect = null;
-        let respuestaSeguimientoEspecialidadSelect = null;
+        let respuestaSeguimientoAreaAtencionSelect = null;
         let respuestaMotivoSelect = null;
         let respuestaElaboradaPorSelect = null;
         let respuestaAtencionRequeridaSelect = null;
@@ -760,7 +760,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (tipo === 0) {
             respuestaAreaCaptaSelect = initTomSelect("respuesta_area_capta", "ÁREA QUE CAPTA", true);
             respuestaAreaRespuestaSelect = initTomSelect("respuesta_area_responde", "ÁREA QUE RESPONDE", true);
-            respuestaSeguimientoEspecialidadSelect = initTomSelect("respuesta_area_seguimiento_especialidad", "SEGUIMIENTO ESPECIALIDAD", true);
+            respuestaSeguimientoAreaAtencionSelect = initTomSelect("respuesta_area_seguimiento_area_atencion", "SEGUIMIENTO AREA ATENCION", true);
             respuestaSeguimientoReferenciaDestinoSelect = initTomSelect("respuesta_seguimiento_referencia_institucion_destino","INSTITUCION DESTINO", true);
             respuestaSeguimientoReferenciaEspecialidadSelect = initTomSelect("respuesta_seguimiento_referencia_especialidad_destino","ESPECIALIDAD DESTINO", true);
         }
@@ -779,7 +779,7 @@ document.addEventListener('DOMContentLoaded', function () {
             respuestaElaboradaPorSelect,
             respuestaAtencionRequeridaSelect,
             respuestaInstitucionDestinoSelect,
-            respuestaSeguimientoEspecialidadSelect,
+            respuestaSeguimientoAreaAtencionSelect,
             respuestaSeguimientoReferenciaDestinoSelect,
             respuestaSeguimientoReferenciaEspecialidadSelect
         };
@@ -1044,7 +1044,7 @@ document.addEventListener('DOMContentLoaded', function () {
             });
 
             if (typeof tipo !== 'undefined' && tipo === 0) { // referencia recibida
-                selectsRespuesta.respuestaSeguimientoEspecialidadSelect.clear();
+                selectsRespuesta.respuestaSeguimientoAreaAtencionSelect.clear();
                 respuestaFechaCita.value = fechaActualParaInput(conHora=false);
                 selectsRespuesta.respuestaSeguimientoReferenciaDestinoSelect.clear();
                 selectsRespuesta.respuestaSeguimientoReferenciaEspecialidadSelect.clear();
@@ -1063,7 +1063,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             fielsetSeguimiento.classList.add("ajustado");
             if (typeof tipo !== 'undefined' && tipo === 0) { // referencia recibida
-                selectsRespuesta.respuestaSeguimientoEspecialidadSelect.clear();
+                selectsRespuesta.respuestaSeguimientoAreaAtencionSelect.clear();
                 respuestaFechaCita.value = fechaActualParaInput(conHora=false);
                 selectsRespuesta.respuestaInstitucionDestinoSelect.clear();
             }
@@ -1353,7 +1353,8 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!response.ok && response.status === 400) {
                 if (data.errors) {
                     Object.entries(data.errors).forEach(([campo, mensaje]) => {
-                        toastr.error(mensaje, `Error de digitación`);
+                        toastr.error(concatenarLimpio(mensaje,campo), `Error de digitación`);
+
                     });
                 } else {
                     toastr.error("Ocurrió un error de validación.");
@@ -1380,7 +1381,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
 
-           
         } catch (error) {
             console.error("Error", error);
             toastr.error("Se presentó un error inesperado al registrar la referencia");
@@ -1448,8 +1448,8 @@ document.addEventListener('DOMContentLoaded', function () {
             // Validar seguimiento según tipo
             if (seguimientoInstitucional.checked) {
     
-                if (!validarTomSelect(selectsRespuesta.respuestaSeguimientoEspecialidadSelect,
-                    "Debe indicar la especialidad de consulta externa para el seguimiento institucional")) return;
+                if (!validarTomSelect(selectsRespuesta.respuestaSeguimientoAreaAtencionSelect,
+                    "Debe indicar el area de atencion de consulta externa para el seguimiento institucional")) return;
             } else if (seguimientoPrimerNivel.checked) {
 
                 if (!validarTomSelect(selectsRespuesta.respuestaInstitucionDestinoSelect,
@@ -1465,6 +1465,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
         }
+
 
         // --- Envío ---
         botonGuardar.disabled = true;

@@ -2,8 +2,8 @@ from django.db import models
 from core.constants.choices_constants import EstadoRegistro, TipoPersonalNoClinico
 from django.contrib.auth.models import User
 from paciente.models import Paciente
-from servicio.models import Especialidad, Unidad as ServicioUnidad
-from clinico.models import Tipo_personal_salud
+from servicio.models import Unidad as ServicioUnidad
+from clinico.models import Tipo_personal_salud, Especialidad
 
 
 class Empleado(models.Model):
@@ -73,7 +73,7 @@ class PersonalSalud(models.Model):
     empleado = models.OneToOneField(
         Empleado,
         on_delete=models.PROTECT,
-        related_name="personal_salud"
+        related_name="personal_salud_empleado"
     )
     puede_agendar_citas = models.BooleanField(
         default=False,
@@ -82,19 +82,19 @@ class PersonalSalud(models.Model):
     tipo_personal_salud = models.ForeignKey(
         Tipo_personal_salud,
         on_delete=models.PROTECT,
-        related_name="personal_salud"
+        related_name="personal_salud_tipo"
     )
     especialidad = models.ForeignKey(
         Especialidad,
         on_delete=models.PROTECT,
         null=True,
         blank=True,
-        related_name="personal_salud"
+        related_name="personal_salud_especialidad"
     )
     servicio_unidad = models.ForeignKey(
         ServicioUnidad,
         on_delete=models.PROTECT,
-        related_name="personal_salud"
+        related_name="personal_salud_unidad"
     )
     fecha_creado = models.DateTimeField(auto_now_add=True)
     creado_por = models.ForeignKey(
@@ -113,8 +113,8 @@ class PersonalSalud(models.Model):
         return str(self.empleado)
 
     @property
-    def especialidad_nombre(self):
-        return self.especialidad.nombre_especialidad if self.especialidad else ""
+    def area_atencion_nombre(self):
+        return self.area_atencion.nombre_area_atencion if self.area_atencion else ""
 
     class Meta:
         indexes = [
@@ -153,3 +153,5 @@ class PersonalNoClinico(models.Model):
 
     def __str__(self):
         return str(self.empleado)
+    
+

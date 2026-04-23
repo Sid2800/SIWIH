@@ -61,7 +61,7 @@ class ReporteGeneradorView(UnidadRolRequiredMixin, TemplateView):
         ]
 
         informesReferencia = [
-            (1, 'REFERENCIAS A MAYOR COMPLEJIDAD SEGÚN ESPECIALIDAD'),
+            (1, 'REFERENCIAS A MAYOR COMPLEJIDAD SEGÚN AREA ATENCION'),
             (2, 'REFERENCIAS A MAYOR COMPLEJIDAD SEGUN INSTITUCIONES'),
             (3, 'REFERENCIAS A MAYOR COMPLEJIDAD SEGUN MOTIVO'),
             (4, 'SEGUIMIENTO A REFERENCIAS ENVIADAS A MAYOR COMPLEJIDAD'),
@@ -191,8 +191,8 @@ class ObtenerInteraccionFiltroAgrupacion(View):
                     'fecha_modificado': 'Fecha Actualizacion',
                 }
                 agrupaciones = {
-                    'especialidad__servicio_id': 'Servicio',
-                    'especialidad_id': 'Especialidad',
+                    'area_atencion__servicio_id': 'Servicio',
+                    'area_atencion_id': 'Area Atencion',
                     'paciente__sector__aldea__municipio_id': 'Municipio',
                     'paciente__sector__aldea__municipio__departamento_id': 'Departamento',
                     'creado_por_id': 'Usuario de creacion',
@@ -274,7 +274,7 @@ class ObtenerOpcionesFiltro(View):
                     departamentos = [{'id': u['id'], 'valor': u['nombre_departamento']} for u in departamentos]
                     return JsonResponse({'valores': departamentos}, status=200)
 
-            if campo == 'sala__servicio_id' or campo == 'especialidad__servicio_id':
+            if campo == 'sala__servicio_id' or campo == 'area_atencion__servicio_id':
                     servicios = ServicioService.obtener_servicios()
                     servicios = [{'id': u['id'], 'valor': f"{u['nombre_servicio']}"} for u in servicios]
                     return JsonResponse({'valores': servicios}, status=200)
@@ -284,10 +284,10 @@ class ObtenerOpcionesFiltro(View):
                     salas = [{'id': s['id'], 'valor': f"{s['nombre_sala']} | {s['servicio__nombre_corto']}"} for s in salas]
                     return JsonResponse({'valores': salas}, status=200)
             
-            if campo == 'especialidad_id':
-                    especialidades = ServicioService.obtener_especialidades_activas_servicio()
-                    especialidades = [{'id': e['id'], 'valor': f"{e['nombre_especialidad']} | {e['servicio__nombre_corto']}"} for e in especialidades]
-                    return JsonResponse({'valores': especialidades}, status=200)
+            if campo == 'area_atencion_id':
+                    areas = ServicioService.obtener_areas_atencion_activas_servicio()
+                    areas = [{'id': e['id'], 'valor': f"{e['nombre_area_atencion']} | {e['servicio__nombre_corto']}"} for e in areas]
+                    return JsonResponse({'valores': areas}, status=200)
             
             if campo == 'zona_id':
                     zonas = ServicioService.obtener_zonas()
@@ -297,14 +297,14 @@ class ObtenerOpcionesFiltro(View):
 
             if campo == 'dependencia_id':
                     salas = ServicioService.obtener_salas_activas()
-                    especialidades = ServicioService.obtener_especialidades_activas_servicio()
+                    areas = ServicioService.obtener_areas_atencion_activas_servicio()
                     serv_aux = ServicioService.obtener_servicios_aux_activas()
 
                     salas = [{'id': f"S-{s['id']}", 'valor': f"{s['nombre_sala']} | {s['servicio__nombre_corto']}", 'tipo': 'sala'} for s in salas]
-                    especialidades = [{'id': f"E-{e['id']}", 'valor': f"{e['nombre_especialidad']} | {e['servicio__nombre_corto']}", 'tipo': 'especialidad'} for e in especialidades]
+                    areas = [{'id': f"E-{e['id']}", 'valor': f"{e['nombre_area_atencion']} | {e['servicio__nombre_corto']}", 'tipo': 'area_atencion'} for e in areas]
                     serv_aux = [{'id': f"A-{a['id']}", 'valor': f"{a['nombre_servicio_a']} | SERV_AUX", 'tipo': 'servicio_auxiliar'} for a in serv_aux]
                     
-                    valores_combinados = salas + especialidades + serv_aux
+                    valores_combinados = salas + areas + serv_aux
                     return JsonResponse({'valores': valores_combinados}, status=200)
 
 
@@ -715,9 +715,9 @@ class reporte_detalle_recepcion_atenciones(View):
 
 
             for reg in detalles:
-                if reg["atencion__especialidad__servicio__nombre_servicio"] != sala_actual:
+                if reg["atencion__area_atencion__servicio__nombre_servicio"] != sala_actual:
                     data.append(
-                    [f"{reg['atencion__especialidad__servicio__nombre_servicio']}", "", "", ""]) # fila de sala
+                    [f"{reg['atencion__area_atencion__servicio__nombre_servicio']}", "", "", ""]) # fila de sala
                     estiloPagina.append(('SPAN', (0, fila_actual), (-1, fila_actual)))
                     estiloPagina.append(('LINEBELOW', (0, fila_actual), (-1, fila_actual), 0.5, colors.grey))
                     estiloPagina.append(('BACKGROUND', (0, fila_actual), (-1, fila_actual), colors.lightgrey))
@@ -728,10 +728,10 @@ class reporte_detalle_recepcion_atenciones(View):
 
                     estiloPagina.append(('LEFTPADDING', (0, fila_actual), (-1, fila_actual), 35))
                     fila_actual += 1
-                    sala_actual = reg["atencion__especialidad__servicio__nombre_servicio"]
+                    sala_actual = reg["atencion__area_atencion__servicio__nombre_servicio"]
                 
                 #subtotales
-                sala = reg["atencion__especialidad__servicio__nombre_servicio"]
+                sala = reg["atencion__area_atencion__servicio__nombre_servicio"]
                 conteo_por_sala[sala] = conteo_por_sala.get(sala, 0) + 1
                 total_general += 1
                 data.append([

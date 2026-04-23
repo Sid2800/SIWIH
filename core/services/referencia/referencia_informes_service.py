@@ -39,7 +39,7 @@ class RefInformeService:
                 tipo=tipo_ref,
                 **filtro_rango_fecha(campo_fecha, inicio, fin)
             ).select_related(
-                'especialidad_destino',
+                'area_atencion_destino',
                 'institucion_destino__nivel_complejidad_institucional',
                 'motivo'
             )
@@ -60,7 +60,7 @@ class RefInformeService:
             return {"error": "Error consultando datos"}
 
         # ---------------------------------------------------------------------
-        # LÓGICA DEL ÍNDICE (sin try porque no necesita capturar todo)
+        # LoGICA DEL ÍNDICE (sin try porque no necesita capturar todo)
         # ---------------------------------------------------------------------
 
         # Definir mapeo simple de índices → campo + título
@@ -100,7 +100,7 @@ class RefInformeService:
             )
             key_nombre = 'motivo__nombre_motivo_envio'
 
-        elif indice == 5:  # envío según sala/especialidad/aux
+        elif indice == 5:  # envío según sala/area_atencion/aux
             etiqueta = "DEPENDENCIA DE ENVIO"
 
             resumen_raw = (
@@ -110,19 +110,19 @@ class RefInformeService:
                             area_refiere_sala__isnull=False,
                             then=Concat(Value('HOSP | '), F('area_refiere_sala__nombre_sala'))
                         ),
-                        # Especialidades
+                        # area_atencion
                         When(
-                            area_refiere_especialidad__isnull=False,
+                            area_refiere_area_atencion__isnull=False,
                             then=Case(
                                 When(
-                                    area_refiere_especialidad__servicio_id=1000,
-                                    then=Concat(Value('EMER | '), F('area_refiere_especialidad__nombre_especialidad'))
+                                    area_refiere_area_atencion__servicio_id=1000,
+                                    then=Concat(Value('EMER | '), F('area_refiere_area_atencion__nombre_area_atencion'))
                                 ),
                                 When(
-                                    area_refiere_especialidad__servicio_id=700,
-                                    then=Concat(Value('OBST | '), F('area_refiere_especialidad__nombre_especialidad'))
+                                    area_refiere_area_atencion__servicio_id=700,
+                                    then=Concat(Value('OBST | '), F('area_refiere_area_atencion__nombre_area_atencion'))
                                 ),
-                                default=Concat(Value('CEXT | '), F('area_refiere_especialidad__nombre_especialidad')),
+                                default=Concat(Value('CEXT | '), F('area_refiere_area_atencion__nombre_area_atencion')),
                                 output_field=CharField()
                             )
                         ),
@@ -852,12 +852,12 @@ class RefInformeService:
                 .filter( referencia__tipo=0, **filtro_rango_fecha("fecha_atencion", inicio, fin))
                 .select_related(
                     'area_reponde_sala',
-                    'area_reponde_especialidad',
+                    'area_reponde_area_atencion',
                     'area_reponde_servicio_auxiliar',
                     )
                 )
             
-            if indice == 1: #referencias enviadas por especialidad
+            if indice == 1: #referencias enviadas por area_atencion
                 etiqueta = "AREA DA RESPUESTA"
                 resumen_raw = (
                     qs.annotate(
@@ -865,18 +865,18 @@ class RefInformeService:
                             When(area_reponde_sala__isnull=False,
                                 then=Concat(Value('HOSP | '),F('area_reponde_sala__nombre_sala'))
                             ),
-                            #  Especialidades
+                            #  area_atencions
                             When(
-                                area_reponde_especialidad__isnull=False,
+                                area_reponde_area_atencion__isnull=False,
                                 then=Case(
-                                    When(area_reponde_especialidad__servicio_id=1000,
-                                        then=Concat(Value('EMER | '),F('area_reponde_especialidad__nombre_especialidad'))
+                                    When(area_reponde_area_atencion__servicio_id=1000,
+                                        then=Concat(Value('EMER | '),F('area_reponde_area_atencion__nombre_area_atencion'))
                                         ),
-                                    When(area_reponde_especialidad__servicio_id=700,
-                                        then=Concat(Value('OBST | '),F('area_reponde_especialidad__nombre_especialidad'))
+                                    When(area_reponde_area_atencion__servicio_id=700,
+                                        then=Concat(Value('OBST | '),F('area_reponde_area_atencion__nombre_area_atencion'))
                                         ),
                                     default=Concat(
-                                        Value('CEXT | '), F('area_reponde_especialidad__nombre_especialidad')),
+                                        Value('CEXT | '), F('area_reponde_area_atencion__nombre_area_atencion')),
                                     output_field=CharField()
                                 )
                             ),
@@ -1034,6 +1034,8 @@ class RefInformeService:
 
         # ================= RETORNO FINAL =================
         return top3_diagnosticos_referencia
+        
+
         
 
     @staticmethod
@@ -1232,7 +1234,7 @@ class RefInformeService:
             'referencia__institucion_destino__proveedor_salud',
             'referencia__institucion_destino__direccion__aldea__municipio__departamento',
 
-            'area_seguimiento_especialidad',
+            'area_seguimiento_area_atencion',
             'institucion_destino',
             'institucion_destino__nivel_complejidad_institucional',
             'institucion_destino__direccion__aldea__municipio__departamento',
@@ -1377,12 +1379,12 @@ class RefInformeService:
 
 
             # Según el seguimiento mandar data extra
-            # Caso 1: seguimiento por especialidad (no se agrega institución)
+            # Caso 1: seguimiento por area_atencion (no se agrega institución)
             # Caso 2: seguimiento institucional (primer nivel, usar institucion_destino)
             # Caso 3: seguimiento deriva en nueva referencia (usar destino de seguimiento)
 
 
-        if respuesta.area_seguimiento_especialidad:
+        if respuesta.area_seguimiento_area_atencion:
             tipo_seguimiento = 1
         elif respuesta.institucion_destino:
             tipo_seguimiento = 2
@@ -1393,7 +1395,7 @@ class RefInformeService:
 
         if tipo_seguimiento == 1:
             respuesta_data.update({
-                "seguimiento_area": respuesta.area_seguimiento_especialidad.nombre_especialidad,
+                "seguimiento_area": respuesta.area_seguimiento_area_atencion.nombre_area_atencion,
                 "institucion_seg_direccion": f"{inst_or.direccion.aldea.municipio.nombre_municipio}, {inst_or.direccion.aldea.municipio.departamento.nombre_departamento}" if inst_or.direccion else "",
             })
 
@@ -1413,7 +1415,7 @@ class RefInformeService:
                 "institucion_seg_nombre": f"{inst.nivel_complejidad_institucional.siglas}-{inst.nombre_institucion_salud}",
                 "institucion_seg_complejidad": inst.nivel_complejidad_institucional.nivel_complejidad,
                 "institucion_seg_complejidad_nombre": inst.nivel_complejidad_institucional.siglas,
-                "institucion_seg_especialidad": (
+                "institucion_seg_area_atencion": (
                     seg_ref.especialidad_destino.nombre_referencia_especialidad
                     if seg_ref.especialidad_destino else ""
                 ),

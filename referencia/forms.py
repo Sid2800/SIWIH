@@ -4,7 +4,7 @@ from datetime import date
 from django.utils.timezone import localtime, localdate
 from .models import Referencia, Respuesta
 from clinico.models import Diagnostico
-from servicio.models import Institucion_salud, Especialidad
+from servicio.models import Institucion_salud, Area_atencion
 from referencia.models import Referencia_especialidad
 from core.services.paciente_service import PacienteService
 from core.services.servicio_service import ServicioService
@@ -252,7 +252,7 @@ class ReferenciaCreateForm(forms.ModelForm):
 
                 # Limpiar campos de área de respuesta
                 cleaned_data['area_refiere_sala'] = None
-                cleaned_data['area_refiere_especialidad'] = None
+                cleaned_data['area_refiere_area_atencion'] = None
                 cleaned_data['area_refiere_servicio_auxiliar'] = None
 
                 campo = f"area_refiere_{campo}"
@@ -263,7 +263,7 @@ class ReferenciaCreateForm(forms.ModelForm):
         else: #recibida
             cleaned_data['especialidad_destino'] = None
             cleaned_data['area_refiere_sala'] = None
-            cleaned_data['area_refiere_especialidad'] = None
+            cleaned_data['area_refiere_area_atencion'] = None
             cleaned_data['area_refiere_servicio_auxiliar'] = None
 
             try:
@@ -490,7 +490,7 @@ class RespuestaCreateForm(forms.ModelForm):
             'fecha_elaboracion',
             'fecha_recepcion',
             'area_capta',
-            'area_seguimiento_especialidad',
+            'area_seguimiento_area_atencion',
             'institucion_destino',
             'observaciones',
             'motivo',
@@ -506,7 +506,7 @@ class RespuestaCreateForm(forms.ModelForm):
         self.referencia = principal_instance 
 
         dependencias = ServicioService.obtener_dependencias(incluir_externo=False)
-        qs_especilidades_activas = Especialidad.objects.filter(estado=True)
+        qs_areas_atencion_activas = Area_atencion.objects.filter(estado=True)
         qs_instituciones_activa_1erNivel = Institucion_salud.objects.filter(Q(estado=True, nivel_atencion=1) | Q(id=65) # INCLUIMOS AL CERRATO
                                                         )
 
@@ -519,7 +519,7 @@ class RespuestaCreateForm(forms.ModelForm):
             self.fields['idRespuesta'].initial = 0
 
 
-        #Referencia_especialidad.objects.filter(estado=True)
+
         qs_instituciones_activa_mayor_igual_complejidad = Institucion_salud.objects.filter(
             estado=True, 
             nivel_atencion__gte=2
@@ -584,8 +584,8 @@ class RespuestaCreateForm(forms.ModelForm):
             'disabled': True
         })
 
-        self.fields['area_seguimiento_especialidad'].queryset = qs_especilidades_activas
-        self.fields['area_seguimiento_especialidad'].widget.attrs.update({
+        self.fields['area_seguimiento_area_atencion'].queryset = qs_areas_atencion_activas
+        self.fields['area_seguimiento_area_atencion'].widget.attrs.update({
             'class': 'formularioCampo-select',
             'placeholder': 'Area de seguimiento'
         })
@@ -653,7 +653,7 @@ class RespuestaCreateForm(forms.ModelForm):
         area_capta = cleaned_data.get("area_capta")
         area_responde = cleaned_data.get("area_responde")
         seguimiento = int(self.data.get("seguimiento")) if self.data.get("seguimiento") is not None else 1
-        especialidad_seguimiento = cleaned_data.get("area_seguimiento_especialidad")
+        area_atencion_seguimiento = cleaned_data.get("area_seguimiento_area_atencion")
         institucion_destino = cleaned_data.get("institucion_destino")
         # referencia 
  
@@ -679,7 +679,7 @@ class RespuestaCreateForm(forms.ModelForm):
 
                 # Limpiar campos de área de respuesta
                 cleaned_data['area_reponde_sala'] = None
-                cleaned_data['area_reponde_especialidad'] = None
+                cleaned_data['area_reponde_area_atencion'] = None
                 cleaned_data['area_reponde_servicio_auxiliar'] = None
 
                 campo = f"area_reponde_{campo}"
@@ -700,7 +700,7 @@ class RespuestaCreateForm(forms.ModelForm):
                 if seguimiento == 1:  # seguimiento interno
                     cleaned_data['institucion_destino'] = None
                     cleaned_data['seguimiento_referencia'] = None
-                    if especialidad_seguimiento is None:
+                    if area_atencion_seguimiento is None:
                         raise forms.ValidationError("Debe indicar un área de seguimiento.")
                     if fecha_atencion and fecha_cita and fecha_cita < fecha_atencion.date():
                         raise forms.ValidationError("La fecha de cita debe ser posterior a la fecha de atención.")

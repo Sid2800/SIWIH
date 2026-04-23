@@ -203,9 +203,13 @@
          </div>
 
          <div class="bp-inf-usuario">
-
-            <img src="{% static 'core/img/avatar.jpg' %}" alt="imagen de perfil" class="bp-inf-usuario__imagen">
-
+            
+            <img 
+               src="{% if usuario_imagen_url %}{{ usuario_imagen_url }}{% else %}{% static 'core/img/avatar.jpg' %}{% endif %}" 
+               alt="imagen de perfil" 
+               class="bp-inf-usuario__imagen"
+            >
+            
             <div class="bp-inf-usuario__texto">
                {% if request.user.is_authenticated %}
                <span class="bp-inf-usuario-texto__usuario">
@@ -273,17 +277,26 @@
       /* Token CSRF accesible desde JS */
       window.CSRF_TOKEN = "{{ csrf_token }}";
 
-      /* Configuración general del sistema */
-      window.APP_CONFIG = {
-         estudioDefaultImg: "{% static 'core/img/estudio_default.png' %}"
-      };
+   /* Configuración general del sistema */
+   window.APP_CONFIG = {
+      estudioDefaultImg: "{% static 'core/img/estudio_default.png' %}",
+      usuarioDefaultImg: "{% static 'core/img/avatar.jpg' %}"
+
+   };
 
 
       /* URLs DEL SISTEMA (API / VIEWS) */
 
       window.urls = {
 
-         /* ---------------- PACIENTES ---------------- */
+
+      /* ---------------- USAURIO ---------------- */
+
+      procesarImagenUsuario: "{% url 'procesar_imagen_usuario' %}",
+
+
+      
+      /* ---------------- PACIENTES ---------------- */
 
          obtenerPacienteCenso: "{% url 'obtener-paciente-censo' %}",
          listadoPacientes: "{% url 'listar_pacientes_API' %}",
@@ -365,13 +378,17 @@
 
          /* ---------------- UBICACIÓN ---------------- */
 
-         municipioXdepto: "{% url 'municipioXdepartamento' %}",
-         listarZona: "{% url 'listarZona' %}",
-         listarSala: "{% url 'listarSala' %}",
-         listarDiagnostico: "{% url 'listar_diagnostico' %}",
-         listarEspecialidad: "{% url 'listarEspecialidad' %}",
-         cambiarZona: "{% url 'cambiarZona' %}",
-         agregarSector: "{% url 'agregarSector' %}",
+      municipioXdepto: "{% url 'municipioXdepartamento' %}",
+      listarZona: "{% url 'listarZona' %}",
+      listarSala: "{% url 'listarSala' %}",
+      listarDiagnostico: "{% url 'listar_diagnostico' %}",
+      listarAreaAtencion: "{% url 'listarAreaAtencion' %}",
+      listarDependencias: "{% url 'listar_dependencias' %}",
+
+      cambiarZona: "{% url 'cambiarZona' %}",
+      agregarSector: "{% url 'agregarSector' %}",
+
+      
 
 
 
@@ -489,6 +506,9 @@
 
    <script src="{% static 'core\scripts\media\controlGaleria.js' %}"></script>
    <script src="{% static 'core/scripts/s_exp/notificaciones_globales.js' %}"></script>
+
+   <script src="{% static 'core/scripts/modals/usuario_modals.js' %}"></script>
+
 
 
 

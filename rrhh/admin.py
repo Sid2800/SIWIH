@@ -17,7 +17,7 @@ class PersonalSaludAdmin(admin.ModelAdmin):
     list_display = (
         'empleado_nombre',
         'tipo_personal',
-        'especialidad_nombre',
+        'area_atencion_nombre',
         'servicio_unidad_nombre',
         'puede_agendar_citas'
     )
