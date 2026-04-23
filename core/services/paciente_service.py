@@ -300,6 +300,7 @@ class PacienteService:
         except Defuncion.DoesNotExist:
             return None
         
+        
     @staticmethod
     def obtener_obito_id(idObito):
         try:
@@ -309,6 +310,7 @@ class PacienteService:
         except ObitoFetal.DoesNotExist:
             return None
         
+
     @staticmethod
     def obtener_defuncion_id(idDefuncion):
         try:
@@ -332,40 +334,17 @@ class PacienteService:
 
                 tipo = defuncion.tipo
                 
-                nueva_sala = None
-                nueva_area_atencion = None
-                nuevo_aux = None
+                nueva_unidad_c = None
+
 
                 if tipo != 2:
-                    if defuncion.tipo_dependencia == 'sala':
-                        nueva_sala = defuncion.dependencia
-                        nueva_area_atencion = None
-                        nuevo_aux = None
-
-                    elif defuncion.tipo_dependencia == 'area_atencion':
-                        nueva_sala = None
-                        nueva_area_atencion = defuncion.dependencia
-                        nuevo_aux = None
-
-                    elif defuncion.tipo_dependencia == 'servicio_auxiliar':
-                        nueva_sala = None
-                        nueva_area_atencion = None
-                        nuevo_aux = defuncion.dependencia
+                    nueva_unidad_c = defuncion.unidad_clinica
 
 
                 # Comparar cambios
-                if defuncionRegistro.sala != nueva_sala:
-                    defuncionRegistro.sala = nueva_sala
+                if defuncionRegistro.unidad_clinica != nueva_unidad_c:
+                    defuncionRegistro.unidad_clinica = nueva_unidad_c
                     cambios = True
-
-                if defuncionRegistro.area_atencion != nueva_area_atencion:
-                    defuncionRegistro.area_atencion = nueva_area_atencion
-                    cambios = True
-
-                if defuncionRegistro.servicio_auxiliar != nuevo_aux:
-                    defuncionRegistro.servicio_auxiliar = nuevo_aux
-                    cambios = True
-
 
 
                 if defuncionRegistro.tipo_defuncion != tipo:
@@ -404,9 +383,11 @@ class PacienteService:
                 
         # si tiene id se lo vamos a marcalro como defuncion
         elif all([defuncion.fecha, defuncion.paciente_id]):
-            if defuncion.tipo == 1 and not defuncion.dependencia:
-                raise ValueError("Debe indicar una dependencia para defunción intrahospitalaria")
+            if defuncion.tipo == 1 and not defuncion.unidad_clinica:
+                raise ValueError("Debe indicar una unidad clinica para defunción intrahospitalaria")
             
+            if defuncion.tipo == 2 and defuncion.unidad_clinica:
+                raise ValueError("Defunción extrahospitalaria no debe tener unidad clínica")
             
             try:
                 with transaction.atomic():
@@ -416,12 +397,10 @@ class PacienteService:
                         "motivo": defuncion.motivo,
                         "paciente_id": defuncion.paciente_id,
                         "registrado_por_id": defuncion.usuario_id,
+                        "unidad_clinica": defuncion.unidad_clinica if defuncion.tipo == 1 else None
                     }
 
-                    campo = defuncion.tipo_dependencia
-                    if campo:
-                        kwargs[campo] = defuncion.dependencia
-
+    
                     defNueva = Defuncion.objects.create(**kwargs)
 
                     # Cambiar estado del paciente a pasivo
@@ -455,38 +434,14 @@ class PacienteService:
 
                 tipo = obito.tipo
 
-                nueva_sala = None
-                nueva_area_atencion = None
-                nuevo_aux = None
+                nueva_unidad_c = None
 
                 if tipo != 2:
-                    
-                    if obito.tipo_dependencia == 'sala':
-                        nueva_sala = obito.dependencia
-                        nueva_area_atencion = None
-                        nuevo_aux = None
-
-                    elif obito.tipo_dependencia == 'area_atencion':
-                        nueva_sala = None
-                        nueva_area_atencion = obito.dependencia
-                        nuevo_aux = None
-
-                    elif obito.tipo_dependencia == 'servicio_auxiliar':
-                        nueva_sala = None
-                        nueva_area_atencion = None
-                        nuevo_aux = obito.dependencia
+                    nueva_unidad_c = obito.unidad_clinica
 
                 # Comparaciones
-                if obitoRegistro.sala != nueva_sala:
-                    obitoRegistro.sala = nueva_sala
-                    cambios = True
-
-                if obitoRegistro.area_atencion != nueva_area_atencion:
-                    obitoRegistro.area_atencion = nueva_area_atencion
-                    cambios = True
-
-                if obitoRegistro.servicio_auxiliar != nuevo_aux:
-                    obitoRegistro.servicio_auxiliar = nuevo_aux
+                if obitoRegistro.unidad_clinica != nueva_unidad_c:
+                    obitoRegistro.unidad_clinica = nueva_unidad_c
                     cambios = True
 
                 if obitoRegistro.tipo_defuncion != tipo:
@@ -528,11 +483,14 @@ class PacienteService:
 
         #  CREATE
         elif all([obito.fecha, obito.paciente_id]):
-
-            if obito.tipo == 1 and not obito.dependencia:
-                raise ValueError("Debe indicar una dependencia para óbito intrahospitalario")
+            if obito.tipo == 1 and not obito.unidad_clinica:
+                raise ValueError("Debe indicar una unidad clinica para óbito intrahospitalario")
+            
+            if obito.tipo == 2 and obito.unidad_clinica:
+                raise ValueError("Defunción extrahospitalaria no debe tener unidad clínica")
 
             try:
+                
                 with transaction.atomic():
                     kwargs = {
                         "fecha_obito": obito.fecha,
@@ -541,17 +499,16 @@ class PacienteService:
                         "responsable_dni": obito.dni_responsable,
                         "responsable_nombre": obito.nombre_responsable,
                         "registrado_por_id": obito.usuario_id,
+                        "unidad_clinica": obito.unidad_clinica if obito.tipo == 1 else None
                     }
 
-                    campo = obito.tipo_dependencia
-                    if campo:
-                        kwargs[campo] = obito.dependencia
-
+                    print(kwargs)
                     obitoNuevo = ObitoFetal.objects.create(**kwargs)
 
                 return True, obitoNuevo.id
 
             except Exception as e:
+                print(e)
                 log_error(
                     f"[FALLO_CREAR_OBITO] paciente={obito.paciente_id} detalle={str(e)}",
                     app=LogApp.PACIENTE

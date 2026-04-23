@@ -3,7 +3,7 @@ from django.utils.timezone import localtime
 from core.utils.utilidades_fechas import formatear_fecha_simple
 from ubicacion.models import Sector
 from django.contrib.auth.models import User
-from servicio.models import Zona, Sala, ServiciosAux, Area_atencion
+from servicio.models import Zona, Sala, ServiciosAux, Area_atencion, Unidad_clinica
 from core.utils.utilidades_textos import construir_nombre_dinamico
 from django.db import connections
 
@@ -142,6 +142,7 @@ class Defuncion(models.Model):
     sala = models.ForeignKey( Sala, on_delete=models.SET_NULL, null=True , blank=True, related_name="sala")
     area_atencion = models.ForeignKey(Area_atencion, on_delete=models.SET_NULL, null=True, blank=True)
     servicio_auxiliar = models.ForeignKey(ServiciosAux, on_delete=models.SET_NULL, null=True, blank=True)
+    unidad_clinica = models.ForeignKey(Unidad_clinica,on_delete=models.PROTECT, null=True, blank=True)
     motivo = models.CharField(max_length=255, null=True, blank=True, verbose_name="Motivo del fallecimiento")
     fecha_entrega = models.DateField(null=True, blank=True, verbose_name="Fecha de entrega de cadaver")
     reponsable_nombre = models.CharField(max_length=40, null=True, blank=True, verbose_name="reponsable cadaver")
@@ -170,6 +171,7 @@ class ObitoFetal(models.Model):
     sala = models.ForeignKey(Sala, on_delete=models.SET_NULL, null=True, blank=True,related_name="obitos_fetales_sala",verbose_name="Sala")
     area_atencion = models.ForeignKey(Area_atencion, on_delete=models.SET_NULL, null=True, blank=True)
     servicio_auxiliar = models.ForeignKey(ServiciosAux, on_delete=models.SET_NULL, null=True, blank=True)
+    unidad_clinica = models.ForeignKey(Unidad_clinica,on_delete=models.PROTECT, null=True, blank=True)
     motivo = models.CharField(max_length=255, null=True, blank=True, verbose_name="Motivo")
     responsable_dni = models.CharField(max_length=40, null=True, blank=True, verbose_name="DNI responsable")
     responsable_nombre = models.CharField(max_length=40, null=True, blank=True, verbose_name="Responsable")

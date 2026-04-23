@@ -70,7 +70,7 @@ class ListarAreaAtencionServicio(View):
     
 
 
-class ListarDependencias(View):
+class ListarUnidadesClinicas(View):
 
     def get(self, request):
         uso_param = request.GET.get("uso")
@@ -86,12 +86,11 @@ class ListarDependencias(View):
             incluir_externo = False
             solo_emergencia = True
 
-
-        dependencias = ServicioService.obtener_dependencias(
+        unidades_clinicas = ServicioService.obtener_unidades_clinicas(
             incluir_externo=incluir_externo,
             solo_emergencia= solo_emergencia
         )
-        return JsonResponse(dependencias, safe=False)
+        return JsonResponse(unidades_clinicas, safe=False)
 
 
 

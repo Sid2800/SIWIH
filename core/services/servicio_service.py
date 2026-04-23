@@ -211,6 +211,74 @@ class ServicioService:
 
         return dependencias
     
+    @staticmethod
+    def obtener_unidades_clinicas(incluir_externo=True, solo_emergencia=False):
+        qs = modelosServicio.Unidad_clinica.objects.filter(estado=1)
+
+        if not incluir_externo:
+            qs = qs.filter(establecimiento_ext__isnull=True)
+
+        qs = qs.annotate(
+            tipo=Value('', output_field=CharField()),  # lo ajustamos abajo
+            nombre=Value('', output_field=CharField()),
+            origen=Value('', output_field=CharField()),
+        )
+
+        unidades_clinicas = []
+
+
+        for uc in qs.select_related(
+            'area_atencion__servicio',
+            'sala',
+            'servicio_aux',
+            'establecimiento_ext'
+        ):
+
+            if uc.area_atencion:
+                tipo = (
+                    'EMERG' if uc.area_atencion.servicio_id == 1000 else
+                    'OBS' if uc.area_atencion.servicio_id == 700 else
+                    'CEXT' if uc.area_atencion.servicio_id == 50 else ''
+                )
+
+
+                # filtro solo emergencia
+                if solo_emergencia and tipo not in ['EMERG', 'OBS' ]:
+                    continue
+
+                unidades_clinicas.append({
+                    'clave': f"{uc.id}",
+                    'nombre': uc.area_atencion.nombre_area_atencion,
+                    'tipo': tipo,
+                    'origen': 'AREA ATENCION'
+                })
+
+            elif uc.sala:
+                unidades_clinicas.append({
+                    'clave': f"{uc.id}",
+                    'nombre': uc.sala.nombre_sala,
+                    'tipo': 'HOSP',
+                    'origen': 'SALA'
+                })
+
+            elif uc.servicio_aux:
+                unidades_clinicas.append({
+                    'clave': f"{uc.id}",
+                    'nombre': uc.servicio_aux.nombre_servicio_a,
+                    'tipo': 'SAUX',
+                    'origen': 'SERVICIO AUXILIAR'
+                })
+
+            elif uc.establecimiento_ext:
+                unidades_clinicas.append({
+                    'clave': f"{uc.id}",
+                    'nombre': uc.establecimiento_ext.nombre_institucion_salud,
+                    'tipo': 'EXT',
+                    'origen': 'INSTITUCIÓN EXTERNA'
+                })
+
+        return unidades_clinicas
+
 
 
     @staticmethod
@@ -248,6 +316,26 @@ class ServicioService:
         
 
     @staticmethod
+    def obtener_unidad_clinica(id):
+        if not id:
+            raise ValidationError("Clave invalida")
+
+
+        uc = modelosServicio.Unidad_clinica.objects.select_related(
+            'area_atencion',
+            'sala',
+            'servicio_aux',
+            'establecimiento_ext'
+        ).filter(id=id, estado=1).first()
+
+        if not uc:
+            raise ValidationError("Unidad clinica no encontrada.")
+
+    
+        return uc
+
+
+    @staticmethod
     def encontrar_dependencia_en_instance(instance, prefijo=""):
         """
         prefijo = "" → sala
@@ -277,6 +365,45 @@ class ServicioService:
                 "clave": f"A-{servicio_aux.id}",
                 "nombre": servicio_aux.nombre_servicio_a,
                 "tipo": "SAUX"
+            }
+
+        return None
+    
+    @staticmethod
+    def encontrar_unidad_clinica_en_instance(instance):
+        uc = instance.unidad_clinica
+
+        if not uc:
+            return None
+
+        tipo_codigo, _ = uc.get_tipo_unidad()
+
+        if uc.area_atencion:
+            return {
+                "clave": f"{uc.id}",
+                "nombre": uc.area_atencion.nombre_area_atencion,
+                "tipo": tipo_codigo
+            }
+
+        elif uc.sala:
+            return {
+                "clave": f"{uc.id}",
+                "nombre": uc.sala.nombre_sala,
+                "tipo": tipo_codigo
+            }
+
+        elif uc.servicio_aux:
+            return {
+                "clave": f"{uc.id}",
+                "nombre": uc.servicio_aux.nombre_servicio_a,
+                "tipo": tipo_codigo
+            }
+
+        elif uc.establecimiento_ext:
+            return {
+                "clave": f"{uc.id}",
+                "nombre": uc.establecimiento_ext.nombre_institucion_salud,
+                "tipo": tipo_codigo
             }
 
         return None

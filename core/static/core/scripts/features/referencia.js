@@ -1353,7 +1353,8 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!response.ok && response.status === 400) {
                 if (data.errors) {
                     Object.entries(data.errors).forEach(([campo, mensaje]) => {
-                        toastr.error(mensaje, `Error de digitación`);
+                        toastr.error(concatenarLimpio(mensaje,campo), `Error de digitación`);
+
                     });
                 } else {
                     toastr.error("Ocurrió un error de validación.");

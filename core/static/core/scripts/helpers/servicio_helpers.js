@@ -27,7 +27,7 @@ async function cargarSalas(select) {
       }
 }
 
-const DependenciaLoader = (function () {
+const UnidadClinicaLoader = (function () {
 
    async function cargar(select, uso = "general") {
       if (!select) return;
@@ -49,7 +49,7 @@ const DependenciaLoader = (function () {
             data.forEach(item => {
                const texto =   `${item.nombre}  (${item.tipo})` ;
                const option = new Option(
-                  texto,      // texto visible
+                  texto,            // texto visible
                   item.clave        // valor: "S-1", "E-2", "A-3"
                );
 
