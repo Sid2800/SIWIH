@@ -105,14 +105,14 @@ def _header_footer_factory(solicitud, fecha_impresion, con_hora_footer):
             'FUNDAGES - HOSPITAL DR. ENRIQUE AGUILAR CERRATO'
         )
 
-        # Logos a la derecha: HEAC y FUNDAGES2 - más abajo
+        # Logos a la derecha: HEAC y FUNDAGES2 - alineados con FUNDAGES título
         try:
             canvas_obj.drawImage(
-                IMG_HEAC, ancho - 5 * cm, y_top - 0.8 * cm,
+                IMG_HEAC, ancho - 5 * cm, y_top - 1.2 * cm,
                 width=2.2 * cm, height=2.2 * cm, preserveAspectRatio=True, mask='auto'
             )
             canvas_obj.drawImage(
-                IMG_FUNDAGES, ancho - 2.5 * cm, y_top - 0.8 * cm,
+                IMG_FUNDAGES, ancho - 2.5 * cm, y_top - 1.2 * cm,
                 width=2.2 * cm, height=2.2 * cm, preserveAspectRatio=True, mask='auto'
             )
         except Exception:
@@ -283,33 +283,16 @@ def generar_pdf_solicitud(solicitud):
     ]
 
     filas = [cabeceras]
-
-    # Construir mensaje general de observaciones: motivos de rechazo o comentario general
-    obs_general = ''
     detalles_list = list(solicitud.detalles.select_related('expediente_prestamo__expediente').order_by('id'))
 
-    # Recolectar motivos de rechazo
-    motivos_rechazo = []
-    for d in detalles_list:
-        if not d.aprobado:
-            if d.motivo_rechazo_individual:
-                motivos_rechazo.append(f"#{d.expediente_prestamo.expediente.numero}: {d.motivo_rechazo_individual}")
-            else:
-                motivos_rechazo.append(f"#{d.expediente_prestamo.expediente.numero}: [NO PRESTADO]")
-
-    if motivos_rechazo:
-        obs_general = '\n'.join(motivos_rechazo)
-    else:
-        obs_general = comentarios_generales
-
     # Agregar filas de detalles
-    for idx, d in enumerate(detalles_list):
+    for d in detalles_list:
         num_exp = d.expediente_prestamo.expediente.numero
         identidad = d.paciente_identidad or ''
         paciente = d.paciente_nombre or ''
 
-        # Solo la primera fila lleva el contenido; las demás quedarán vacías para combinar con SPAN
-        obs_entrega_cell = Paragraph(obs_general, st_tabla_cell) if idx == 0 else Paragraph('', st_tabla_cell)
+        # Mostrar "[NO PRESTADO]" solo para expedientes rechazados
+        obs_entrega_text = '[NO PRESTADO]' if not d.aprobado else ''
 
         filas.append([
             Paragraph(fecha_salida, st_tabla_cell),
@@ -318,7 +301,7 @@ def generar_pdf_solicitud(solicitud):
             Paragraph(paciente, st_tabla_cell),
             Paragraph(motivo_solicitud, st_tabla_cell),
             Paragraph(fecha_entrega_str if d.aprobado else '—', st_tabla_cell),
-            obs_entrega_cell,
+            Paragraph(obs_entrega_text, st_tabla_cell),
             Paragraph('', st_tabla_cell),  # Observaciones devolución vacía
         ])
 
@@ -331,7 +314,7 @@ def generar_pdf_solicitud(solicitud):
         ],
         repeatRows=1,
     )
-    # Construir estilos, incluyendo SPAN para la columna de observaciones entrega
+    # Construir estilos de la tabla
     tabla_styles = [
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#008b8b')),
         ('GRID', (0, 0), (-1, -1), 0.4, colors.HexColor('#444444')),
@@ -344,15 +327,22 @@ def generar_pdf_solicitud(solicitud):
         ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f1f5f5')]),
     ]
 
-    # Combinar y centrar observaciones entrega (columna 6)
-    if len(filas) > 2:  # Más de encabezado + 1 detalle
-        tabla_styles.append(('SPAN', (6, 1), (6, len(filas) - 1)))
-    tabla_styles.append(('VALIGN', (6, 1), (6, -1), 'MIDDLE'))
-    tabla_styles.append(('ALIGN', (6, 1), (6, -1), 'CENTER'))
-
     tabla_exp.setStyle(TableStyle(tabla_styles))
     elementos.append(tabla_exp)
     elementos.append(Spacer(1, 16))
+
+    # =========================================================
+    # Observaciones General (comentarios)
+    # =========================================================
+    if comentarios_generales:
+        st_obs_general = ParagraphStyle('obs_general', parent=styles['Normal'],
+                                        fontName='Helvetica', fontSize=9,
+                                        textColor=colors.HexColor('#333333'))
+        obs_titulo = Paragraph('<b>Observaciones generales:</b>', st_obs_general)
+        obs_contenido = Paragraph(comentarios_generales, st_obs_general)
+        elementos.append(obs_titulo)
+        elementos.append(obs_contenido)
+        elementos.append(Spacer(1, 12))
 
     # =========================================================
     # Firmas (Entrega + Devolución)
