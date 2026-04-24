@@ -2206,7 +2206,8 @@ def exportar_reporte_pdf(request):
         margen_lat = 1.5 * cm
 
         ahora = timezone.now()
-        fecha_impresion = ahora.strftime('%d/%m/%Y %H:%M')
+        tz = timezone.get_current_timezone()
+        fecha_impresion = ahora.astimezone(tz).strftime('%d/%m/%Y %H:%M')
 
         buf = BytesIO()
 

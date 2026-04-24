@@ -4,7 +4,7 @@ Encabezado (2cm arriba) + Pie (2cm abajo) + contenido + tabla + firmas.
 """
 import os
 from io import BytesIO
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 from django.conf import settings
 from django.utils import timezone
@@ -157,7 +157,8 @@ def generar_pdf_solicitud(solicitud):
     Genera el PDF de la solicitud y retorna bytes.
     solicitud: instancia de SolicitudPrestamo
     """
-    ahora = timezone.now()
+    tz = timezone.get_current_timezone()
+    ahora = timezone.now().astimezone(tz)
     # Si ya fue entregado: pie sin hora
     try:
         p = solicitud.prestamo
