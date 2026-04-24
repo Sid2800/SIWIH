@@ -801,6 +801,24 @@
 }
 .sexp-devolver-btn:hover { opacity: 0.85; transform: translateY(-2px); }
 
+/* Botón específico para entregar faltantes — naranja más vivo que el de devolución */
+.sexp-entregar-faltantes-btn {
+    background-color: #f97316 !important;
+    color: #fff !important;
+    box-shadow: 0 2px 6px rgba(249,115,22,0.35);
+}
+.sexp-entregar-faltantes-btn:hover {
+    background-color: #ea6a0d !important;
+    opacity: 1;
+}
+body.darkmode .sexp-entregar-faltantes-btn {
+    background-color: #fb923c !important;
+    color: #1a1a1a !important;
+}
+body.darkmode .sexp-entregar-faltantes-btn:hover {
+    background-color: #fdba74 !important;
+}
+
 
 /* ============================================================
    GESTIÓN DE SOLICITUDES
@@ -1632,4 +1650,34 @@ body.darkmode .sexp-submit-btn:hover {
     .sexp-sol-card, .sexp-dev-card {
         padding: 1rem;
     }
+
+    /* Botones de acción: ancho completo y tap-target cómodo */
+    .sexp-devolver-btn,
+    .sexp-entregar-faltantes-btn {
+        width: 100%;
+        padding: 1rem 1.2rem;
+        font-size: 1.5rem;
+    }
 }
+
+/* Tablet — breakpoint intermedio */
+@media (max-width: 1024px) and (min-width: 769px) {
+    .sexp-sol-info {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .sexp-kpi-grid {
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    }
+}
+
+/* ============================================================
+   DARK MODE — Tarjetas (Mis Solicitudes / Reportes / KPIs)
+   Color más claro que el fondo para evitar confusión visual
+   ============================================================ */
+body.darkmode .sexp-sol-card,
+body.darkmode .sexp-dev-card,
+body.darkmode .sexp-reporte-card,
+body.darkmode .sexp-kpi-card {
+    background-color: #3f4247;
+}
+

@@ -150,23 +150,25 @@ function renderSolicitudes(data, filtro = '') {
                     html += `<div class="sexp-sol-timer" style="${timerClass}"><i class="bi bi-clock"></i> ${timerText}</div>`;
                 }
 
-                // Botón devolver (solo si no ya está en devolución)
-                if (s.estado_flujo !== 'SOL_EN_DEVOLUCION') {
+                // Botón devolver (solo en préstamo normal; no mostrar si ya está en devolución
+                // o si la solicitud está incompleta, en ese caso solo aplica "Entregar Faltantes")
+                const esIncompleta = s.estado_flujo === 'SOL_INCOMPLETA' || p.estado === 'DevolucionParcial';
+                if (s.estado_flujo !== 'SOL_EN_DEVOLUCION' && !esIncompleta) {
                     html += `<button class="sexp-devolver-btn" onclick="solicitarDevolucion(${s.id})">
                         <i class="bi bi-arrow-return-left"></i> Solicitar Devolución
                     </button>`;
-                } else {
+                } else if (s.estado_flujo === 'SOL_EN_DEVOLUCION') {
                     html += `<div style="margin-top:0.5rem;font-size:1.2rem;opacity:0.7;"><i class="bi bi-hourglass-split"></i> Devolución en proceso de revisión por el administrador.</div>`;
                 }
             }
             // Solicitud incompleta: hay expedientes sin devolver
             if (s.estado_flujo === 'SOL_INCOMPLETA') {
                 html += `<div style="margin-top:0.8rem;padding:0.6rem 1rem;background:rgba(249,115,22,0.1);border-left:3px solid #f97316;border-radius:4px;font-size:1.3rem;">
-                    <i class="bi bi-exclamation-triangle" style="color:#f97316;"></i> 
+                    <i class="bi bi-exclamation-triangle" style="color:#f97316;"></i>
                     <strong>Devolución incompleta</strong>: Aún hay expedientes sin entregar. Pregüntele al administrador o entregue los faltantes.
                 </div>`;
                 if (s.prestamo && s.prestamo.estado === 'DevolucionParcial') {
-                    html += `<button class="sexp-devolver-btn" style="margin-top:0.5rem;background:rgba(249,115,22,0.15);" onclick="solicitarDevolucion(${s.id})">
+                    html += `<button class="sexp-devolver-btn sexp-entregar-faltantes-btn" onclick="solicitarDevolucion(${s.id})">
                         <i class="bi bi-arrow-return-left"></i> Entregar Faltantes
                     </button>`;
                 }
