@@ -522,7 +522,8 @@ def imprimir_solicitud_pdf(request, solicitud_id):
         return JsonResponse({"error": "Error al generar el PDF"}, status=500)
 
     response = HttpResponse(pdf_bytes, content_type='application/pdf')
-    response['Content-Disposition'] = f'inline; filename="solicitud_{solicitud.id}.pdf"'
+    ts = timezone.localtime().strftime('%Y%m%d_%H%M%S')
+    response['Content-Disposition'] = f'inline; filename="solicitud_{solicitud.id}_{ts}.pdf"'
     return response
 
 
@@ -2165,7 +2166,8 @@ def exportar_reporte_excel(request):
             buf.getvalue(),
             content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
-        response['Content-Disposition'] = 'attachment; filename="reporte_expedientes_prestados.xlsx"'
+        ts = timezone.localtime().strftime('%Y%m%d_%H%M%S')
+        response['Content-Disposition'] = f'attachment; filename="reporte_expedientes_prestados_{ts}.xlsx"'
         return response
 
     except Exception as e:
@@ -2421,7 +2423,8 @@ def exportar_reporte_pdf(request):
         buf.close()
 
         response = HttpResponse(pdf_bytes, content_type='application/pdf')
-        response['Content-Disposition'] = 'attachment; filename="reporte_expedientes_prestados.pdf"'
+        ts = timezone.localtime().strftime('%Y%m%d_%H%M%S')
+        response['Content-Disposition'] = f'attachment; filename="reporte_expedientes_prestados_{ts}.pdf"'
         return response
 
     except Exception as e:
