@@ -2290,8 +2290,8 @@ def exportar_reporte_pdf(request):
         st_usuario_val = ParagraphStyle('usr_val', parent=styles['Normal'],
                                         fontName='Helvetica', fontSize=10)
         st_tabla_head = ParagraphStyle('tabla_head', parent=styles['Normal'],
-                                       fontName='Helvetica-Bold', fontSize=10,
-                                       textColor=colors.white, alignment=TA_CENTER, leading=12)
+                                       fontName='Helvetica-Bold', fontSize=8,
+                                       textColor=colors.white, alignment=TA_CENTER, leading=10)
         st_tabla_cell = ParagraphStyle('tabla_cell', parent=styles['Normal'],
                                        fontName='Helvetica', fontSize=10,
                                        alignment=TA_CENTER, leading=12)
@@ -2345,11 +2345,10 @@ def exportar_reporte_pdf(request):
         fila_total.append(Paragraph(str(datos_reporte['total_general']), st_tabla_total))
         filas.append(fila_total)
 
-        # Calcular anchos: primera columna más ancha (áreas), última columna para total
+        # Anchos: Área 4cm, Total 2cm, motivos distribuyen el resto
         num_motivos = len(datos_reporte['motivos'])
-        num_cols = len(encabezados)
-        area_w = doc.width * 0.20
-        total_w = doc.width * 0.10
+        area_w = 4 * cm
+        total_w = 2 * cm
         motivo_w = (doc.width - area_w - total_w) / max(num_motivos, 1)
         col_widths = [area_w] + [motivo_w] * num_motivos + [total_w]
 
@@ -2360,8 +2359,8 @@ def exportar_reporte_pdf(request):
             ('GRID', (0, 0), (-1, -1), 0.4, colors.HexColor('#444444')),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
             ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-            ('LEFTPADDING', (0, 0), (-1, -1), 5),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+            ('LEFTPADDING', (0, 0), (-1, -1), 2),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 2),
             ('TOPPADDING', (0, 0), (-1, -1), 6),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
             ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, colors.HexColor('#f1f5f5')]),
