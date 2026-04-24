@@ -294,7 +294,7 @@ class PacienteService:
     @staticmethod
     def obtener_defuncion(idPaciente):
         try:
-            relaciones = ['sala','servicio_auxiliar','area_atencion', 'registrado_por']
+            relaciones = ['unidad_clinica', 'registrado_por']
             defuncion = Defuncion.objects.select_related(*relaciones).get(paciente__id=idPaciente)
             return defuncion
         except Defuncion.DoesNotExist:
@@ -304,7 +304,7 @@ class PacienteService:
     @staticmethod
     def obtener_obito_id(idObito):
         try:
-            relaciones = ['sala', 'registrado_por']
+            relaciones = ['unidad_clinica', 'registrado_por']
             obito = ObitoFetal.objects.select_related(*relaciones).get(id=idObito)
             return obito
         except ObitoFetal.DoesNotExist:
@@ -314,7 +314,7 @@ class PacienteService:
     @staticmethod
     def obtener_defuncion_id(idDefuncion):
         try:
-            relaciones = ['sala', 'registrado_por','paciente']
+            relaciones = ['unidad_clinica', 'registrado_por','paciente']
             defuncion = Defuncion.objects.select_related(*relaciones).get(id=idDefuncion)
             return defuncion
         except Defuncion.DoesNotExist:
@@ -950,7 +950,7 @@ class PacienteService:
                 "motivo",
                 "responsable_nombre",
                 "responsable_dni",
-                "sala_id"
+                "unidad_clinica_id"
             )
         )
             

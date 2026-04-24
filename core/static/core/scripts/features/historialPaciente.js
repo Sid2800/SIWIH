@@ -223,7 +223,7 @@ document.addEventListener('DOMContentLoaded', function () {
         },
         },
         {
-                text: '<i class="bi bi-pencil boton-exportacion"></i>',
+                text: '<i class="bi bi-eye boton-exportacion"></i>',
                 titleAttr: 'Editar Evalucion',
                 action: function (e, dt, button, config) {
                     verGaleriaEvaluacionRx();
@@ -389,12 +389,11 @@ document.addEventListener('DOMContentLoaded', function () {
             render: function (data) {
                 if (data) {
                     // Obtenemos el nombre de la area_atencion y lo limitamos a 20 caracteres
-                    let dependencia = data.nombre_dependencia	;
+                    let dependencia = data.unidad_clinica_descripcion;
                     dependencia = dependencia.substring(0, 21);
-                    let tipo_dependencia = data.tipo_dependencia;
-                    
+                
                     // Concatenamos la sala truncada con el nombre corto del servicio, usando concatenarLimpio
-                    data = concatenarLimpio(dependencia," | ",tipo_dependencia);
+                    data = dependencia;
                 }
                 return data;
             }
@@ -847,7 +846,7 @@ document.addEventListener('DOMContentLoaded', function () {
             
         datos: {
             "Paciente": document.getElementById('historialNombrePaciente').value,
-            "Sala": selectedRow.nombre_dependencia,
+            "Unidad Clinica": selectedRow.unidad_clinica_descripcion,
             "Fecha": formatearFechaSimple(selectedRow.fecha),
             "Maquina": selectedRow.maquinarx__descripcion_maquina,
             "Usuario": selectedRow.modificado_por__username

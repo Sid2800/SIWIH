@@ -87,8 +87,9 @@ document.addEventListener("DOMContentLoaded", () => {
                     {
                         data: null,
                         render: function (data) {
-                            if (data && data.nombre_dependencia && data.tipo_dependencia) {
-                                return `${data.nombre_dependencia} <small class="text-muted">(${data.tipo_dependencia})</small>`;
+                            
+                            if (data && data.unidad_clinica_descripcion) {
+                                return `${data.unidad_clinica_descripcion} `;
                             }
                             return "---";
                         }

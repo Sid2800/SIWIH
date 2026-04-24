@@ -100,9 +100,13 @@ class EvaluacionRxAddView(UnidadRolRequiredMixin, CreateView):
         paciente = form.cleaned_data.get('paciente') or self.request.POST.get('paciente')
         archivos = self.request.FILES
 
+
+
         try:
             with transaction.atomic():
                 
+
+                form.instance.unidad_clinica = form.cleaned_data.get('unidad_clinica')
                 # ---------- Usuario ----------
                 if usuario:
                     form.instance.creado_por = usuario
@@ -119,14 +123,7 @@ class EvaluacionRxAddView(UnidadRolRequiredMixin, CreateView):
                     )
                     if paciente_externo_obj:
                         form.instance.paciente_externo = paciente_externo_obj
-
-                # ---------- Dependencia ----------
-                for campo in ["sala", "area_atencion", "servicio_auxiliar"]:
-                    valor = form.cleaned_data.get(campo)
-                    if valor:
-                        setattr(form.instance, campo, valor)
-                        break
-
+                
                 # ---------- Guardar evaluación ----------
                 super().form_valid(form)
 
@@ -243,7 +240,6 @@ class EvaluacionRxEditView(UnidadRolRequiredMixin, UpdateView):
         # modo de uso del formulario
         context['MD'] = 2 # modo de uso del formulario, 1 = crear, 2 = editar
         context['titulo'] = 'Editar'
-        # valor inicial de dependencia 
         evaluacion = self.get_object()
 
         # estudios ligados a la evalucion   
@@ -336,16 +332,6 @@ class EvaluacionRxEditView(UnidadRolRequiredMixin, UpdateView):
                 if usuario:
                     form.instance.modificado_por = usuario
 
-                # Limpiar dependencias
-                for campo in ["sala", "area_atencion", "servicio_auxiliar"]:
-                    setattr(form.instance, campo, None)
-
-                # Asignar primera dependencia válida
-                for campo in ["sala", "area_atencion", "servicio_auxiliar"]:
-                    valor = form.cleaned_data.get(campo)
-                    if valor:
-                        setattr(form.instance, campo, valor)
-                        break
 
                 # Guardar evaluación principal
                 super().form_valid(form)
@@ -452,20 +438,47 @@ def listarEvaluacionrxAPI(request):
         fecha__gte=fechaIni,
         fecha__lte=fechaFin,
         estado=1
+    ).select_related(
+        'unidad_clinica__sala',
+        'unidad_clinica__area_atencion',
+        'unidad_clinica__servicio_aux',
+        'unidad_clinica__establecimiento_ext'
     ).annotate(
         total_estudios=Count('detalles', filter=Q(detalles__activo=True)),
-        nombre_dependencia=Case(
-            When(sala__isnull=False, then=F('sala__nombre_sala')),
-            When(area_atencion__isnull=False, then=F('area_atencion__nombre_area_atencion')),
-            When(servicio_auxiliar__isnull=False, then=F('servicio_auxiliar__nombre_servicio_a')),
-            default=Value('Desconocido'),
-            output_field=CharField()
-        ),
-        tipo_dependencia=Case(
-            When(sala__isnull=False, then=Value('HOSP')),
-            When(area_atencion__isnull=False, then=Value('CEXT')),
-            When(servicio_auxiliar__isnull=False, then=Value('SVAUX')),
-            default=Value('DESC'),
+        unidad_clinica_descripcion=Case(
+            When(
+                unidad_clinica__sala__isnull=False,
+                then=Concat(
+                    F('unidad_clinica__sala__nombre_sala'),
+                    Value('- HOSP'),
+                )
+            ),
+            When(
+                unidad_clinica__area_atencion__isnull=False,
+                then=Concat(
+                    F('unidad_clinica__area_atencion__nombre_area_atencion'),
+                    Value('- '),
+                    F('unidad_clinica__area_atencion__servicio__nombre_corto'),
+                )
+            ),
+            When(
+                unidad_clinica__servicio_aux__isnull=False,
+                then=Concat(
+                    F('unidad_clinica__servicio_aux__nombre_servicio_a'),
+                    Value('- AUX'),
+
+                )
+            ),
+            When(
+                unidad_clinica__establecimiento_ext__isnull=False,
+                then=Concat(
+                    F('unidad_clinica__establecimiento_ext__nivel_complejidad_institucional__siglas'),
+                    Value(' '),
+                    F('unidad_clinica__establecimiento_ext__nombre_institucion_salud'),
+                    Value('- EXT'),
+                )
+            ),
+            default=Value('DESC - Desconocido'),
             output_field=CharField()
         )
     )
@@ -539,7 +552,7 @@ def listarEvaluacionrxAPI(request):
     columns = [
         "id",                               # 0
         "fecha",                            # 1
-        "nombre_dependencia",               # 2 depencia no se pondre fecha por poner algo
+        "unidad_clinica",                    # 2 unidad
         "maquinarx__descripcion_maquina",   # 3
         "total_estudios",                   # 4
         "paciente__expediente_numero",      # 5
@@ -578,8 +591,7 @@ def listarEvaluacionrxAPI(request):
     evaluaciones = list(evaluacion_qs[start:start + length].values(
         "id",
         "fecha",
-        "nombre_dependencia",
-        "tipo_dependencia",
+        "unidad_clinica_descripcion",
         "maquinarx__descripcion_maquina",
         "total_estudios",
         "paciente__dni",

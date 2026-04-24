@@ -2,6 +2,7 @@ from servicio import models as modelosServicio
 from servicio.models import Institucion_salud
 from core.constants.domain_constants import HEAC_INSTITUCION_ID
 from core.constants.domain_constants import SALAS_EXCLUIDAS, SERVICIOS_AUX_EXTERNOS
+
 from django.db import transaction
 from django.db.models import Value, F, CharField
 from django.db.models.functions import Concat
@@ -231,7 +232,7 @@ class ServicioService:
             'area_atencion__servicio',
             'sala',
             'servicio_aux',
-            'establecimiento_ext'
+            'establecimiento_ext__nivel_complejidad_institucional'
         ):
 
             if uc.area_atencion:
@@ -272,7 +273,7 @@ class ServicioService:
             elif uc.establecimiento_ext:
                 unidades_clinicas.append({
                     'clave': f"{uc.id}",
-                    'nombre': uc.establecimiento_ext.nombre_institucion_salud,
+                    'nombre': f"{uc.establecimiento_ext.nivel_complejidad_institucional.siglas} | {uc.establecimiento_ext.nombre_institucion_salud}",
                     'tipo': 'EXT',
                     'origen': 'INSTITUCIÓN EXTERNA'
                 })

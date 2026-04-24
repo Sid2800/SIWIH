@@ -42,15 +42,15 @@ class ReporteImagenologiaService:
 
             #mapear los title el nombre del archivo y el tirulo de reporte
             if indice == 1:
-                titulo = f"INFORME DE ESTUDIOS IMPRESOS POR DEPENDENCIA"
+                titulo = f"INFORME DE ESTUDIOS IMPRESOS POR UNIDAD CLINICA"
                 archivo_name = f"Estudios_impresos_dependencia_{mes}_{anio}.pdf"
                 title = f"Estudios impresos por dependencia {str(mes).upper()}"
             elif indice == 2:
-                titulo = f"INFORME DEL GASTO DE MATERIAL POR DEPENDENCIA"
+                titulo = f"INFORME DEL GASTO DE MATERIAL POR UNIDAD CLINICA"
                 archivo_name = f"Gasto_material_dependencia_{mes}_{anio}.pdf"
                 title = f"Gasto de material por dependencia {str(mes).upper()}"
             elif indice == 3:
-                titulo = f"INFORME DE PACIENTES ATENDIDIOS POR DEPENDENCIA"
+                titulo = f"INFORME DE PACIENTES ATENDIDIOS POR UNIDAD CLINICA"
                 archivo_name = f"Informe_paciente_dependencia_{mes}_{anio}.pdf"
                 title = f"Informe de pacientes por dependencia {str(mes).upper()}"
 

@@ -139,9 +139,6 @@ class Clasificacion_diagnostico(models.Model):
 class Defuncion(models.Model):
     paciente = models.OneToOneField("Paciente", on_delete=models.CASCADE, related_name="defuncion")
     fecha_defuncion = models.DateField(verbose_name="Fecha de defunción")
-    sala = models.ForeignKey( Sala, on_delete=models.SET_NULL, null=True , blank=True, related_name="sala")
-    area_atencion = models.ForeignKey(Area_atencion, on_delete=models.SET_NULL, null=True, blank=True)
-    servicio_auxiliar = models.ForeignKey(ServiciosAux, on_delete=models.SET_NULL, null=True, blank=True)
     unidad_clinica = models.ForeignKey(Unidad_clinica,on_delete=models.PROTECT, null=True, blank=True)
     motivo = models.CharField(max_length=255, null=True, blank=True, verbose_name="Motivo del fallecimiento")
     fecha_entrega = models.DateField(null=True, blank=True, verbose_name="Fecha de entrega de cadaver")
@@ -158,7 +155,7 @@ class Defuncion(models.Model):
     class Meta:
         verbose_name = "Defuncion"
         verbose_name_plural = "Defunciones"
-        ordering = ["fecha_defuncion", "sala"]
+        ordering = ["fecha_defuncion"]
 
     def __str__(self):
         return f"{self.paciente} - {self.fecha_defuncion}"
@@ -168,9 +165,6 @@ class Defuncion(models.Model):
 class ObitoFetal(models.Model):
     paciente = models.ForeignKey("Paciente", on_delete=models.PROTECT, related_name="obitos_fetales", verbose_name="Paciente (madre)")
     fecha_obito = models.DateField( verbose_name="Fecha de óbito fetal")
-    sala = models.ForeignKey(Sala, on_delete=models.SET_NULL, null=True, blank=True,related_name="obitos_fetales_sala",verbose_name="Sala")
-    area_atencion = models.ForeignKey(Area_atencion, on_delete=models.SET_NULL, null=True, blank=True)
-    servicio_auxiliar = models.ForeignKey(ServiciosAux, on_delete=models.SET_NULL, null=True, blank=True)
     unidad_clinica = models.ForeignKey(Unidad_clinica,on_delete=models.PROTECT, null=True, blank=True)
     motivo = models.CharField(max_length=255, null=True, blank=True, verbose_name="Motivo")
     responsable_dni = models.CharField(max_length=40, null=True, blank=True, verbose_name="DNI responsable")

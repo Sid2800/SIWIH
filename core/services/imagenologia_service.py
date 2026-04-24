@@ -6,7 +6,7 @@ from django.core.exceptions import ValidationError
 from core.exceptions import EvaluacionDominioError
 from django.db import transaction
 from django.db.models import Q, F, Case, When, Value, CharField, Count, Sum, IntegerField
-from django.db.models.functions import Concat, ExtractDay
+from django.db.models.functions import Concat, ExtractDay, Substr
 from datetime import date,datetime
 from django.utils import timezone
 import calendar
@@ -434,32 +434,54 @@ class EvaluacionService:
     @staticmethod
     def listar_evaluaciones_por_paciente(id_paciente):
         try:
-            evaluaciones_qs = EvaluacionRx.objects.filter(
+            evaluaciones = EvaluacionRx.objects.filter(
                 paciente_id=id_paciente,
                 estado=1
+            ).select_related(
+                'unidad_clinica__sala',
+                'unidad_clinica__area_atencion',
+                'unidad_clinica__servicio_aux',
+                'unidad_clinica__establecimiento_ext'
             ).annotate(
                 total_estudios=Count('detalles', filter=Q(detalles__activo=True)),
-                nombre_dependencia=Case(
-                    When(sala__isnull=False, then=F('sala__nombre_sala')),
-                    When(area_atencion__isnull=False, then=F('area_atencion__nombre_area_atencion')),
-                    When(servicio_auxiliar__isnull=False, then=F('servicio_auxiliar__nombre_servicio_a')),
-                    default=Value('Desconocido'),
-                    output_field=CharField()
-                ),
-                tipo_dependencia=Case(
-                    When(sala__isnull=False, then=Value('HOSP')),
-                    When(area_atencion__isnull=False, then=Value('CEXT')),
-                    When(servicio_auxiliar__isnull=False, then=Value('SVAUX')),
-                    default=Value('DESC'),
+                unidad_clinica_descripcion=Case(
+                    When(
+                        unidad_clinica__sala__isnull=False,
+                        then=Concat(
+                            Value('HOSP- '),
+                            F('unidad_clinica__sala__nombre_sala')
+                        )
+                    ),
+                    When(
+                        unidad_clinica__area_atencion__isnull=False,
+                        then=Concat(
+                            Value('AREA- '),
+                            F('unidad_clinica__area_atencion__nombre_area_atencion')
+                        )
+                    ),
+                    When(
+                        unidad_clinica__servicio_aux__isnull=False,
+                        then=Concat(
+                            Value('AUX- '),
+                            F('unidad_clinica__servicio_aux__nombre_servicio_a')
+                        )
+                    ),
+                    When(
+                        unidad_clinica__establecimiento_ext__isnull=False,
+                        then=Concat(
+                            Value('EXT- '),
+                            F('unidad_clinica__establecimiento_ext__nombre_institucion_salud')
+                        )
+                    ),
+                    default=Value('DESC - Desconocido'),
                     output_field=CharField()
                 )
             )
 
-            evaluaciones = list(evaluaciones_qs.values(
+            evaluaciones = list(evaluaciones.values(
                 "id",
                 "fecha",
-                "nombre_dependencia",
-                "tipo_dependencia",
+                "unidad_clinica_descripcion",
                 "maquinarx__descripcion_maquina",
                 "total_estudios",
                 "modificado_por__username",
@@ -485,23 +507,15 @@ class EvaluacionService:
 
             # Filtro por campo específico
             if 'campoFiltro' in reporte_criterios and 'valorFiltro' in reporte_criterios:
-                campo_original = reporte_criterios['campoFiltro']
-                valor_original = str(reporte_criterios['valorFiltro'])
+                campo = reporte_criterios['campoFiltro']
+                valor = str(reporte_criterios['valorFiltro'])
 
-                if campo_original == 'dependencia_id' and '-' in valor_original:
-                    indicador, valor_id = valor_original.split('-', 1)
+                if campo == 'unidad_clinica_id':
+                    qs = qs.filter(unidad_clinica_id=valor)
 
-                    dependencia_map = {
-                        'A': 'servicio_auxiliar_id',
-                        'E': 'area_atencion_id',
-                        'S': 'sala_id',
-                    }
-
-                    campo = dependencia_map.get(indicador)
-                    if campo:
-                        qs = qs.filter(**{campo: valor_id})
-                elif campo_original != 'ninguno':
-                    qs = qs.filter(**{campo_original: valor_original})
+  
+                elif campo != 'ninguno':
+                    qs = qs.filter(**{campo: valor})
                 
 
             # Filtro por fecha de inicio
@@ -515,22 +529,50 @@ class EvaluacionService:
                 qs = qs.filter(**{f"{campo_fecha}__lte": reporte_criterios['fechaFin']})
 
 
-            if reporte_criterios.get('agrupacion') == 'dependencia_id':
-                qs_dependencia = qs.annotate(
-                    dependencia_nombre=Case(
-                        When(sala__isnull=False, then=Concat(F('sala__nombre_sala'), Value(' | HOSP'))),
-                        When(area_atencion__isnull=False, then=Concat(F('area_atencion__nombre_area_atencion'), Value(' | CEXT'))),
-                        When(servicio_auxiliar__isnull=False, then=Concat(F('servicio_auxiliar__nombre_servicio_a'), Value(' | SAUX'))),
+            if reporte_criterios.get('agrupacion') == 'unidad_clinica_id':
+                qs_unidad_clinica = qs.annotate(
+                    unidad_clinica_descripcion=Case(
+                        When(
+                            unidad_clinica__sala__isnull=False,
+                            then=Concat(
+                                F('unidad_clinica__sala__nombre_sala'),
+                                Value(' | HOSP')
+                            )
+                        ),
+                        When(
+                            unidad_clinica__area_atencion__isnull=False,
+                            then=Concat(
+                                F('unidad_clinica__area_atencion__nombre_area_atencion'),
+                                Value(' | AREA')
+                            )
+                        ),
+                        When(
+                            unidad_clinica__servicio_aux__isnull=False,
+                            then=Concat(
+                                F('unidad_clinica__servicio_aux__nombre_servicio_a'),
+                                Value(' | AUX')
+                            )
+                        ),
+                        When(
+                            unidad_clinica__establecimiento_ext__isnull=False,
+                            then=Concat(
+                                F('unidad_clinica__establecimiento_ext__nivel_complejidad_institucional__siglas'),
+                                Value(' '),
+                                F('unidad_clinica__establecimiento_ext__nombre_institucion_salud'),
+                                Value(' | EXT')
+                            )
+                        ),
                         default=Value('Sin asignar'),
                         output_field=CharField()
                     )
                 )
-                resumen_raw = qs_dependencia.values('dependencia_nombre').annotate(
+
+                resumen_raw = qs_unidad_clinica.values('unidad_clinica_descripcion').annotate(
                     total=Count('id')
                 ).order_by('-total')
 
-                nombre_amigable = "Dependencia"
-                campo_agrupado = 'dependencia_nombre'
+                nombre_amigable = "Unidad Clinica"
+                campo_agrupado = 'unidad_clinica_descripcion'
             else:
                 # Diccionario con campos posibles para agrupación
                 agrupacion_campos = {
@@ -591,27 +633,17 @@ class EvaluacionService:
             qs = EvaluacionRxDetalle.objects.all()
             qs = qs.filter(activo=1)
 
-            
             # Filtro por campo específico
             if 'campoFiltro' in reporte_criterios and 'valorFiltro' in reporte_criterios:
-                campo_original = reporte_criterios['campoFiltro']
-                valor_original = str(reporte_criterios['valorFiltro'])
+                campo = reporte_criterios['campoFiltro']
+                valor = str(reporte_criterios['valorFiltro'])
 
-                if campo_original == 'dependencia_id' and '-' in valor_original:
-                    indicador, valor_id = valor_original.split('-', 1)
+                if campo == 'unidad_clinica_id':
+                    qs = qs.filter(unidad_clinica_id=valor)
 
-                    dependencia_map = {
-                        'A': 'evaluacionRx__servicio_auxiliar_id',
-                        'E': 'evaluacionRx__area_atencion_id',
-                        'S': 'evaluacionRx__sala_id',
-                    }
 
-                    campo = dependencia_map.get(indicador)
-                    if campo:
-                        qs = qs.filter(**{campo: valor_id})
-                elif campo_original != 'ninguno':
-                    qs = qs.filter(**{campo_original: valor_original})
-                
+                elif campo != 'ninguno':
+                    qs = qs.filter(**{campo: valor})
 
             # Filtro por fecha de inicio
             if 'fechaIni' in reporte_criterios and reporte_criterios['fechaIni']:
@@ -624,38 +656,57 @@ class EvaluacionService:
                 qs = qs.filter(**{f"{campo_fecha}__lte": reporte_criterios['fechaFin']})
 
 
-            if reporte_criterios.get('agrupacion') == 'dependencia_id':
-                qs_dependencia = qs.annotate(
-                    dependencia_nombre=Case(
+            if reporte_criterios.get('agrupacion') == 'unidad_clinica_id':
+                qs_unidad_clinica = qs.annotate(
+                    unidad_clinica_descripcion=Case(
                         When(
-                            evaluacionRx__sala__isnull=False,
-                            then=Concat(F('evaluacionRx__sala__nombre_sala'), Value(' | HOSP'))
+                            evaluacionRx__unidad_clinica__sala__isnull=False,
+                            then=Concat(
+                                F('evaluacionRx__unidad_clinica__sala__nombre_sala'),
+                                Value(' | HOSP')
+                            )
                         ),
                         When(
-                            evaluacionRx__area_atencion__isnull=False,
-                            then=Concat(F('evaluacionRx__area_atencion__nombre_area_atencion'), Value(' | CEXT'))
+                            evaluacionRx__unidad_clinica__area_atencion__isnull=False,
+                            then=Concat(
+                                F('evaluacionRx__unidad_clinica__area_atencion__nombre_area_atencion'),
+                                Value(' | AREA')
+                            )
                         ),
                         When(
-                            evaluacionRx__servicio_auxiliar__isnull=False,
-                            then=Concat(F('evaluacionRx__servicio_auxiliar__nombre_servicio_a'), Value(' | SAUX'))
+                            evaluacionRx__unidad_clinica__servicio_aux__isnull=False,
+                            then=Concat(
+                                F('evaluacionRx__unidad_clinica__servicio_aux__nombre_servicio_a'),
+                                Value(' | AUX')
+                            )
+                        ),
+                        When(
+                            evaluacionRx__unidad_clinica__establecimiento_ext__isnull=False,
+                            then=Concat(
+                                F('evaluacionRx__unidad_clinica__establecimiento_ext__nivel_complejidad_institucional__siglas'),
+                                Value(' '),
+                                F('evaluacionRx__unidad_clinica__establecimiento_ext__nombre_institucion_salud'),
+                                Value(' | EXT')
+                            )
                         ),
                         default=Value('Sin asignar'),
                         output_field=CharField()
                     )
                 )
 
-                resumen_raw = qs_dependencia.values('dependencia_nombre').annotate(
+                resumen_raw = qs_unidad_clinica.values('unidad_clinica_descripcion').annotate(
                     total=Count('id')
                 ).order_by('-total')
 
-                nombre_amigable = "Dependencia"
-                campo_agrupado = 'dependencia_nombre'
+                nombre_amigable = "Unidad Clinica"
+                campo_agrupado = 'unidad_clinica_descripcion'
+
             elif reporte_criterios.get('agrupacion') == 'evaluacion':
-                qs_dependencia = qs.annotate(
+                qs_unidad = qs.annotate(
                     evaluacion_paciente = Concat(F('evaluacionRx__paciente__dni'), Value(' | '), F('evaluacionRx__paciente__primer_nombre'), Value(' '),F('evaluacionRx__paciente__primer_apellido'),)
                 )
 
-                resumen_raw = qs_dependencia.values('evaluacion_paciente').annotate(
+                resumen_raw = qs_unidad.values('evaluacion_paciente').annotate(
                     total=Count('id')
                 ).order_by('-total')
 
@@ -732,9 +783,11 @@ class EvaluacionService:
             qs = EvaluacionRxDetalle.objects.filter(activo=1,impreso=1).select_related(
                 'evaluacionRx',
                 'estudio',
-                'evaluacionRx__sala',
-                'evaluacionRx__area_atencion',
-                'evaluacionRx__servicio_auxiliar'
+                'evaluacionRx__unidad_clinica__sala',
+                'evaluacionRx__unidad_clinica__area_atencion',
+                'evaluacionRx__unidad_clinica__servicio_auxiliar'
+                'evaluacionRx__unidad_clinica__establecimiento_ext'
+
             )
 
             #filtro
@@ -744,27 +797,56 @@ class EvaluacionService:
                     evaluacionRx__fecha__month =mes,
                 )
 
-            # Anotar dependencia y día
+            # Anotar unidad y día
             qs = qs.annotate(
                 dia=ExtractDay('evaluacionRx__fecha'),
-                dependencia_nombre=Case(
-                    When(evaluacionRx__sala__isnull=False, then=Concat(Value('HOSP | '), F('evaluacionRx__sala__nombre_sala'))),
-                    When(evaluacionRx__area_atencion__isnull=False, then=Concat(Value('CEXT | '), F('evaluacionRx__area_atencion__nombre_area_atencion'))),
-                    When(evaluacionRx__servicio_auxiliar__isnull=False, then=Concat(Value('SAUX | '),F('evaluacionRx__servicio_auxiliar__nombre_servicio_a'))),
+                unidad_nombre=Case(
+                                    When(
+                        evaluacionRx__unidad_clinica__sala__isnull=False,
+                        then=Concat(
+                            Value('HOSP | '),
+                            F('evaluacionRx__unidad_clinica__sala__nombre_sala')
+                        )
+                    ),
+                    When(
+                        evaluacionRx__unidad_clinica__area_atencion__isnull=False,
+                        then=Concat(
+                            Value('CEXT | '),
+                            F('evaluacionRx__unidad_clinica__area_atencion__nombre_area_atencion')
+                        )
+                    ),
+                    When(
+                        evaluacionRx__unidad_clinica__servicio_aux__isnull=False,
+                        then=Concat(
+                            Value('AUX | '),
+                            F('evaluacionRx__unidad_clinica__servicio_aux__nombre_servicio_a')
+                        )
+                    ),
+                    When(
+                        evaluacionRx__unidad_clinica__establecimiento_ext__isnull=False,
+                        then=Concat(
+                            Value('EXTE | '),
+                            F('evaluacionRx__unidad_clinica__establecimiento_ext__nivel_complejidad_institucional__siglas'),
+                            Value(' '),
+                            F('evaluacionRx__unidad_clinica__establecimiento_ext__nombre_institucion_salud')
+                        )
+                    ),
                     default=Value('Sin asignar'),
                     output_field=CharField()
                 )
+                    
             )
+            
 
-            # Agrupar por dependencia y día
+            # Agrupar por unidad_nombre y día
             if indice == 1:
-                resumen_raw = qs.values('dependencia_nombre', 'dia').annotate(
+                resumen_raw = qs.values('unidad_nombre', 'dia').annotate(
                     conteo=Count('id')
-                ).order_by('dia','dependencia_nombre')
+                ).order_by('dia','unidad_nombre')
             elif indice == 2:
-                resumen_raw = qs.values('dependencia_nombre', 'dia').annotate(
+                resumen_raw = qs.values('unidad_nombre', 'dia').annotate(
                     conteo=Sum('estudio__coste_impresion')
-                ).order_by('dia','dependencia_nombre')
+                ).order_by('dia','unidad_nombre')
                 
 
             # Conteo total (opcional)
@@ -775,14 +857,14 @@ class EvaluacionService:
 
             # recorremos cada registro de resumen_raw
             for item in resumen_raw:
-                dependencia = item['dependencia_nombre'][:38]    # nombre de la dependencia
-                if dependencia == 'CEXT | EMERGENCIA GENERAL':
-                    dependencia = 'EMER | EMERGENCIA GENERAL'
+                unidad_clinica = item['unidad_nombre'][:38]    # nombre de la unidad
+                if unidad_clinica == 'CEXT | EMERGENCIA GENERAL':
+                    unidad_clinica = 'EMER | EMERGENCIA GENERAL'
                 dia = item['dia']                           # número del día
                 conteo = item['conteo']                     # cantidad de registros
 
                 # llenamos el diccionario: si no existe la clave, se crea automáticamente
-                tabla[dependencia][dia] = conteo
+                tabla[unidad_clinica][dia] = conteo
 
             # Calcular último día del mes dinámicamente
             ultimo_dia = calendar.monthrange(anio, mes)[1]
@@ -791,9 +873,9 @@ class EvaluacionService:
             #tabla final
             tabla_final = []
             
-            for dependencia in sorted(tabla.keys()):
-                dias_data = tabla[dependencia]
-                fila = [dependencia]  # primera columna: nombre de la dependencia
+            for uc in sorted(tabla.keys()):
+                dias_data = tabla[uc]
+                fila = [uc]  # primera columna: nombre de la unida
                 total_fila = 0 
 
                 for dia in dias_mes:
@@ -843,9 +925,10 @@ class EvaluacionService:
                 anio = date.today().year
 
             qs = EvaluacionRx.objects.filter(estado=1).select_related(
-                'sala',
-                'area_atencion',
-                'servicio_auxiliar'
+                'unidad_clinica__sala',
+                'unidad_clinica__area_atencion',
+                'unidad_clinica__servicio_auxiliar'
+                'unidad_clinica__establecimiento_ext'
             )
 
             #filtro
@@ -855,22 +938,49 @@ class EvaluacionService:
                     fecha__month = mes,
                 )
 
-            # Anotar dependencia y día
+            # Anotar unidad y día
             qs = qs.annotate(
                 dia=ExtractDay('fecha'),
-                dependencia_nombre=Case(
-                    When(sala__isnull=False, then=Concat(Value('HOSP | '), F('sala__nombre_sala'))),
-                    When(area_atencion__isnull=False, then=Concat(Value('CEXT | '), F('area_atencion__nombre_area_atencion'))),
-                    When(servicio_auxiliar__isnull=False, then=Concat(Value('SAUX | '),F('servicio_auxiliar__nombre_servicio_a'))),
+                unidad_nombre=Case(
+                                    When(
+                        unidad_clinica__sala__isnull=False,
+                        then=Concat(
+                            Value('HOSP | '),
+                            F('unidad_clinica__sala__nombre_sala')
+                        )
+                    ),
+                    When(
+                        unidad_clinica__area_atencion__isnull=False,
+                        then=Concat(
+                            Value('CEXT | '),
+                            F('unidad_clinica__area_atencion__nombre_area_atencion')
+                        )
+                    ),
+                    When(
+                        unidad_clinica__servicio_aux__isnull=False,
+                        then=Concat(
+                            Value('AUX | '),
+                            F('unidad_clinica__servicio_aux__nombre_servicio_a')
+                        )
+                    ),
+                    When(
+                        unidad_clinica__establecimiento_ext__isnull=False,
+                        then=Concat(
+                            Value('EXTE | '),
+                            F('unidad_clinica__establecimiento_ext__nivel_complejidad_institucional__siglas'),
+                            Value(' '),
+                            F('unidad_clinica__establecimiento_ext__nombre_institucion_salud')
+                        )
+                    ),
                     default=Value('Sin asignar'),
                     output_field=CharField()
                 )
             )
 
-            # Agrupar por dependencia y día
-            resumen_raw = qs.values('dependencia_nombre', 'dia').annotate(
+            # Agrupar por unidad clinica y día
+            resumen_raw = qs.values('unidad_nombre', 'dia').annotate(
                 conteo=Count('id')
-            ).order_by('dia','dependencia_nombre')
+            ).order_by('dia','unidad_nombre')
 
                 
             # Conteo total (opcional)
@@ -881,14 +991,14 @@ class EvaluacionService:
 
             # recorremos cada registro de resumen_raw
             for item in resumen_raw:
-                dependencia = item['dependencia_nombre'][:38]    # nombre de la dependencia
-                if dependencia == 'CEXT | EMERGENCIA GENERAL':
-                    dependencia = 'EMER | EMERGENCIA GENERAL'          
+                unidad_clinica = item['unidad_nombre'][:38]    # nombre de la unidad
+                if unidad_clinica == 'CEXT | EMERGENCIA GENERAL':
+                    unidad_clinica = 'EMER | EMERGENCIA GENERAL'          
                 dia = item['dia']                           # número del día
                 conteo = item['conteo']                     # cantidad de registros
 
                 # llenamos el diccionario: si no existe la clave, se crea automáticamente
-                tabla[dependencia][dia] = conteo
+                tabla[unidad_clinica][dia] = conteo
 
             # Calcular último día del mes dinámicamente
             ultimo_dia = calendar.monthrange(anio, mes)[1]
@@ -897,9 +1007,9 @@ class EvaluacionService:
             #tabla final
             tabla_final = []
             
-            for dependencia in sorted(tabla.keys()):
-                dias_data = tabla[dependencia]
-                fila = [dependencia]  # primera columna: nombre de la dependencia
+            for unidad_clinica in sorted(tabla.keys()):
+                dias_data = tabla[unidad_clinica]
+                fila = [unidad_clinica]  # primera columna: nombre de la unidad
                 total_fila = 0 
 
                 for dia in dias_mes:
@@ -944,7 +1054,15 @@ class EvaluacionService:
             if anio is None:
                 anio = date.today().year
 
-            qs = EvaluacionRxDetalle.objects.filter(activo=1)
+            qs = EvaluacionRxDetalle.objects.filter(activo=1).select_related(
+                'evaluacionRx',
+                'estudio',
+                'evaluacionRx__unidad_clinica__sala',
+                'evaluacionRx__unidad_clinica__area_atencion',
+                'evaluacionRx__unidad_clinica__servicio_auxiliar'
+                'evaluacionRx__unidad_clinica__establecimiento_ext'
+
+            )
 
             #filtro
             if mes and anio:
@@ -954,13 +1072,44 @@ class EvaluacionService:
 
                 )
 
-            # Anotar dependencia y día intercambiar el truo flase de impreso
+            
+            # Anotar unidad y día intercambiar el truo flase de impreso
             qs = qs.annotate(
-                dependencia_nombre=Case(
-                    When(evaluacionRx__sala__isnull=False, then=Concat(Value('HP-'), F('evaluacionRx__sala__nombre_corto_sala'))),
-                    When(evaluacionRx__area_atencion__isnull=False, then=Concat(Value('CE-'), F('evaluacionRx__area_atencion__nombre_corto_area_atencion'))),
-                    When(evaluacionRx__servicio_auxiliar__isnull=False, then=Concat(Value('SA-'),F('evaluacionRx__servicio_auxiliar__nombre_corto_servicio_a'))),
-                    default=Value('Sin asignar'),
+                unidad_clinica_descripcion=Case(
+                    When(
+                        evaluacionRx__unidad_clinica__sala__isnull=False,
+                        then=Concat(
+                            Value('HP-'),
+                            F('evaluacionRx__unidad_clinica__sala__nombre_corto_sala')
+                        )
+                    ),
+                    When(
+                        evaluacionRx__unidad_clinica__area_atencion__isnull=False,
+                        then=Concat(
+                            Value('CE-'),
+                            F('evaluacionRx__unidad_clinica__area_atencion__nombre_corto_area_atencion')
+                        )
+                    ),
+                    When(
+                        evaluacionRx__unidad_clinica__servicio_aux__isnull=False,
+                        then=Concat(
+                            Value('AU-'),
+                            F('evaluacionRx__unidad_clinica__servicio_aux__nombre_corto_servicio_a')
+                        )
+                    ),
+                    When(
+                        evaluacionRx__unidad_clinica__establecimiento_ext__isnull=False,
+                        then=Concat(
+                            Value('EX-'),
+                            F('evaluacionRx__unidad_clinica__establecimiento_ext__nivel_complejidad_institucional__siglas'),
+                            Value(' '),
+                            Substr(
+                                F('evaluacionRx__unidad_clinica__establecimiento_ext__nombre_institucion_salud'),
+                                1, 10
+                            )
+                        )
+                    ),
+                    default=Value('DESC - Desconocido'),
                     output_field=CharField()
                 ),
                 impreso_int=Case(
@@ -970,13 +1119,11 @@ class EvaluacionService:
                 )
             )
 
-            # Agrupar por dependencia y día
-            resumen_raw = qs.values('dependencia_nombre','estudio__descripcion_estudio').annotate(
+            # Agrupar por unidad y día
+            resumen_raw = qs.values('unidad_clinica_descripcion','estudio__descripcion_estudio').annotate(
                 conteo=Count('id'),
                 impresas=Sum('impreso_int')
-            ).order_by('dependencia_nombre')
-
-            
+            ).order_by('unidad_clinica_descripcion')
 
             # Conteo total (opcional)
             total = qs.count()
@@ -989,41 +1136,43 @@ class EvaluacionService:
 
             for item in resumen_raw:
                 estudio = item['estudio__descripcion_estudio'][:23]
-                dependencia = item['dependencia_nombre'][:12]
-                if dependencia == 'CE-EME-GEN':
-                    dependencia = '-EMER-GEN' 
+                unidad_c = item['unidad_clinica_descripcion'][:14]
+                if unidad_c == 'CE-EME-GEN':
+                    unidad_c = '-EMER-GEN' 
                 conteo = item['conteo']
-                tabla[estudio][dependencia] = conteo
-                tabla_impresas[estudio][dependencia] = int(item['impresas'] or 0)  
+                tabla[estudio][unidad_c] = conteo
+                tabla_impresas[estudio][unidad_c] = int(item['impresas'] or 0)  
+            
 
-            # Encabezados: "ESTUDIO" + dependencias + "TOTAL"
-            dependencias_set = set()
+
+
+            # Encabezados: "ESTUDIO" + unidades + "TOTAL"
+            unidad_set = set()
             for item in resumen_raw:
-                dependencia = item['dependencia_nombre'][:12]  # recortamos
-                if dependencia == 'CE-EME-GEN':
-                    dependencia = '-EMER-GEN'  # reemplazo específico
-                dependencias_set.add(dependencia)
+                unidad_c = item['unidad_clinica_descripcion'][:14]  # recortamos
+                if unidad_c == 'CE-EME-GEN':
+                    unidad_c = '-EMER-GEN'  # reemplazo específico
+                unidad_set.add(unidad_c)
+
 
             # Luego ordenar
-            dependencias = sorted(dependencias_set)
+            unidades = sorted(unidad_set)
 
-            tabla_final = [["ESTUDIO"] + dependencias + ["TOTAL"]]
-            total_columnas = len(dependencias) 
+            tabla_final = [["ESTUDIO"] + unidades + ["TOTAL"]]
+            total_columnas = len(unidades) 
             # Llenar filas por estudio
             for estudio in sorted(tabla.keys()):
                 fila = [estudio]
                 total_fila = 0
-                for dep in dependencias:
+                for dep in unidades:
                     conteo = tabla[estudio].get(dep, 0)
                     fila.append(conteo)
                     total_fila += conteo
                 fila.append(total_fila)
                 tabla_final.append(fila)
-
-
             
             # Inicializamos la fila de totales
-            totales_columnas = ["TOTAL"] + [0] * (len(dependencias) + 1)  # +1 para la columna TOTAL
+            totales_columnas = ["TOTAL"] + [0] * (len(unidades) + 1)  # +1 para la columna TOTAL
 
             # Recorremos las filas de datos (omitimos la primera fila que es encabezado de fila)
             for fila in tabla_final[1:]:
@@ -1035,7 +1184,7 @@ class EvaluacionService:
 
             # Fila de impresas por columna
             fila_impresas = ["IMPRESAS"]
-            for dep in dependencias:
+            for dep in unidades:
                 suma_impresas = sum(tabla_impresas[estudio].get(dep, 0) for estudio in tabla_impresas)
                 fila_impresas.append(suma_impresas)
             fila_impresas.append(sum(fila_impresas[1:]))  # total general de impresas
@@ -1051,7 +1200,7 @@ class EvaluacionService:
 
         except Exception as e:
             log_error(
-                f"[FALLO_REPORTE_ESTUDIO_DEPENDENCIA] mes={mes} anio={anio} detalle={str(e)}",
+                f"[FALLO_REPORTE_ESTUDIO_UNIDAD_CLINICA] mes={mes} anio={anio} detalle={str(e)}",
                 app=LogApp.RX
             )
             return None

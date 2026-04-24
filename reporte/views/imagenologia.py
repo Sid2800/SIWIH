@@ -76,6 +76,7 @@ class InformesImagenologia(View):
                 'data': data.get('tabla'),
                 'total': data.get('total'),
                 'columnas': data.get('columnas'),
+                
             })
             return ReporteImagenologiaService.generarInformeEstudioDependecia(reporte_criterios)
 
