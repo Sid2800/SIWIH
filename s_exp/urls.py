@@ -34,6 +34,8 @@ urlpatterns = [
     path('api/prestamos-devolucion/', views.prestamos_para_devolucion_api, name='s_exp_prestamos_devolucion_api'),
     path('api/procesar-devolucion/', views.procesar_devolucion_api, name='s_exp_procesar_devolucion_api'),
     path('api/reportes-data/', views.reportes_data_api, name='s_exp_reportes_data_api'),
+    path('api/exportar-excel/', views.exportar_reporte_excel, name='s_exp_exportar_excel'),
+    path('api/exportar-pdf/', views.exportar_reporte_pdf, name='s_exp_exportar_pdf'),
     path('api/historial/', views.historial_solicitudes_api, name='s_exp_historial_api'),
     path('api/historial/<int:solicitud_id>/', views.historial_solicitud_detalle_api, name='s_exp_historial_detalle_api'),
 
