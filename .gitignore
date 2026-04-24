@@ -26,3 +26,20 @@ Thumbs.db
 
 # temporales
 temp_*.png
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Documentos generados (reportes, análisis)
+*.docx
+*.xlsx
+*.pdf
+Informe_*.docx
+s_exp_datos.sql
+
+# Claude
+.claude/
+.claude-worktrees/
+scratch/generar_reporte_word.py
