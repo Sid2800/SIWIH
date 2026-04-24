@@ -1,19 +1,12 @@
 from django.db import models
 from paciente.models import Paciente
-from servicio.models import Institucion_salud, Sala, Area_atencion, ServiciosAux, Servicio
+from servicio.models import Institucion_salud, Sala, Area_atencion, ServiciosAux, Unidad_clinica
 from clinico.models import Tipo_personal_salud, Diagnostico, Condicion_paciente
-
+from core.constants.choices_constants import AtencionRequerida, MetodoSeguimiento, FuenteSeguimiento
 from django.contrib.auth.models import User
 from django.utils import timezone
 
 # Create your models here.
-ATENCION_REQUERIDA_CHOICES = [
-                (1, "EMERGENCIA OBSTETRICA"),
-                (2, "EMERGENCIA GENERAL"),
-                (3, "CONSULTA EXTERNA"),
-                (4, "HOSPITALIZACION"),
-                (5, "OTROS")
-                ]
 
 class Motivo_envio(models.Model):
     nombre_motivo_envio = models.CharField(max_length=100, unique=True)
@@ -41,23 +34,21 @@ class Referencia_especialidad(models.Model):
         return self.nombre_referencia_especialidad
 
 
-
 class Respuesta_Area_Capta(models.Model):
     nombre_area = models.CharField(
         max_length=100, 
         unique=True, 
-        verbose_name="Área que capta"
+        verbose_name="Area que capta"
     )
     estado = models.BooleanField(default=True, verbose_name="Estado")
 
     class Meta:
-        verbose_name = "Área que capta"
-        verbose_name_plural = "Áreas que captan"
+        verbose_name = "Area que capta"
+        verbose_name_plural = "Areas que captan"
         ordering = ['nombre_area']
     
     def __str__(self):
         return self.nombre_area
-
 
 
 class Referencia(models.Model):
@@ -95,7 +86,7 @@ class Referencia(models.Model):
 
     atencion_requerida = models.SmallIntegerField(
         verbose_name="Atencion requerida",
-        choices=ATENCION_REQUERIDA_CHOICES,
+        choices=AtencionRequerida.choices,
         null=True,
         blank=True,
     )
@@ -109,6 +100,7 @@ class Referencia(models.Model):
     )
 
     # Área que refiere (solo para referencias tipo enviada)
+    unidad_clinica_refiere = models.ForeignKey(Unidad_clinica, on_delete=models.PROTECT, null=True, blank=True, related_name="referencias_enviadas")
     area_refiere_sala = models.ForeignKey(
         Sala,
         null=True,
@@ -221,31 +213,15 @@ class Referencia_diagnostico(models.Model):
 
 class SeguimientoTic(models.Model):
 
-    METODOS = [
-        (1, "LLAMADA TELEFONICA"),
-        (2, "WHATSAPP"),
-        (3, "VISITA DOMICILIARIA"),
-        (4, "CORREO ELECTRONICO"),
-        (5, "OTRO METODO"),
-    ]
-
-    FUENTE = [
-        (1, "PACIENTE"),
-        (2, "FAMILIAR"),
-        (3, "AMIGO"),
-        (4, "PROFESIONAL DE SALUD"),
-        (5, "OTRO FUENTE"),
-    ]
-
     referencia = models.OneToOneField(
         Referencia,
         on_delete=models.CASCADE,
         related_name='seguimiento_tic'
     )
-    metodo_comunicacion = models.PositiveSmallIntegerField(choices=METODOS, verbose_name="Metodo de comunicacion", null=False, blank=False)
+    metodo_comunicacion = models.PositiveSmallIntegerField(choices=MetodoSeguimiento.choices, verbose_name="Metodo de comunicacion", null=False, blank=False)
     establece_comunicacion = models.BooleanField(default=False, verbose_name="Establece Comunicacion", help_text="Indica si se logró establecer comunicación con el paciente" )
     asistio_referencia = models.BooleanField(default=False, null=True, blank=True)
-    fuente_info = models.PositiveSmallIntegerField(choices=FUENTE, null=True, blank=True , verbose_name="Fuente de información")
+    fuente_info = models.PositiveSmallIntegerField(choices=FuenteSeguimiento.choices, null=True, blank=True , verbose_name="Fuente de información")
     condicion_paciente = models.ForeignKey(Condicion_paciente, verbose_name="Condicion del paciente", on_delete=models.PROTECT, null=True, blank=True)
     observaciones = models.TextField(verbose_name="Observaciones", null=True, blank=True)
     fecha_registro = models.DateTimeField(auto_now_add=True)
@@ -280,6 +256,7 @@ class Respuesta(models.Model):
     )
 
     # Área que da la respuesta
+    unidad_clinica_responde = models.ForeignKey(Unidad_clinica, on_delete=models.PROTECT, null=True, blank=True, related_name="respuestas_emitidas")
     area_reponde_sala = models.ForeignKey(
         Sala, null=True, blank=True, on_delete=models.PROTECT,
         related_name="respuestas_reponde_sala"
@@ -337,7 +314,7 @@ class Respuesta(models.Model):
     motivo_detalle = models.TextField(verbose_name="Detalle del envio", null=True, blank=True)
     atencion_requerida = models.SmallIntegerField(
         verbose_name="Atencion requerida",
-        choices=ATENCION_REQUERIDA_CHOICES,
+        choices=AtencionRequerida.choices,
         null=True,
         blank=True,
     )
