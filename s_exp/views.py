@@ -2144,24 +2144,21 @@ def exportar_reporte_pdf(request):
         return JsonResponse({"error": "Sin permisos"}, status=403)
 
     try:
-        from .services.pdf_solicitud_service import _header_footer_factory
-
         fecha_inicio = request.GET.get('fecha_inicio', '')
         fecha_fin = request.GET.get('fecha_fin', '')
 
-        # Obtener datos
+        # Obtener datos desde la BD
         datos_reporte = _obtener_datos_reporte_areas_motivos(fecha_inicio, fecha_fin)
 
         # Crear PDF
         page_size = landscape(LETTER)
-        ancho_pg, alto_pg = page_size
         margen_top = 3 * cm
         margen_bot = 2.5 * cm
         margen_lat = 1.5 * cm
 
         buf = BytesIO()
 
-        # Usar la clase _NumberedCanvas de pdf_solicitud_service para encabezado/pie
+        # Canvas personalizado para encabezado/pie
         class _PdfCanvas(rl_canvas.Canvas):
             def __init__(self, *args, draw_footer=None, **kwargs):
                 super().__init__(*args, **kwargs)
@@ -2189,25 +2186,18 @@ def exportar_reporte_pdf(request):
             title='Reporte Expedientes Prestados',
         )
 
-        frame = Frame(
-            doc.leftMargin, doc.bottomMargin,
-            doc.width, doc.height,
-            id='contenido'
-        )
+        frame = Frame(doc.leftMargin, doc.bottomMargin, doc.width, doc.height, id='contenido')
 
-        # Crear header/footer
-        ahora = timezone.now()
+        # Header
         def dibujar_header(canvas_obj, doc):
             canvas_obj.saveState()
             ancho, alto = doc.pagesize
             y_top = alto - 0.5 * cm
             canvas_obj.setFont('Times-Bold', 11)
-            canvas_obj.drawCentredString(
-                ancho / 2, y_top - 0.75 * cm,
-                'REPORTE EXPEDIENTES PRESTADOS'
-            )
+            canvas_obj.drawCentredString(ancho / 2, y_top - 0.75 * cm, 'REPORTE EXPEDIENTES PRESTADOS')
             canvas_obj.restoreState()
 
+        # Footer
         def dibujar_footer(canvas_obj, total_pages):
             canvas_obj.saveState()
             ancho, alto = canvas_obj._pagesize
@@ -2222,56 +2212,46 @@ def exportar_reporte_pdf(request):
 
         # Estilos
         styles = getSampleStyleSheet()
-        st_titulo = ParagraphStyle('titulo', parent=styles['Title'],
-                                   fontName='Times-Bold', fontSize=14,
-                                   alignment=TA_CENTER, spaceAfter=6)
-        st_fecha = ParagraphStyle('fecha', parent=styles['Normal'],
-                                  fontName='Helvetica', fontSize=10,
-                                  alignment=TA_CENTER, spaceAfter=12)
-        st_tabla_head = ParagraphStyle('tabla_head', parent=styles['Normal'],
-                                       fontName='Helvetica-Bold', fontSize=9,
-                                       textColor=colors.white, alignment=TA_CENTER)
-        st_tabla_cell = ParagraphStyle('tabla_cell', parent=styles['Normal'],
-                                       fontName='Helvetica', fontSize=8)
+        st_titulo = ParagraphStyle('titulo', parent=styles['Title'], fontName='Times-Bold', fontSize=14, alignment=TA_CENTER, spaceAfter=6)
+        st_fecha = ParagraphStyle('fecha', parent=styles['Normal'], fontName='Helvetica', fontSize=10, alignment=TA_CENTER, spaceAfter=12)
+        st_tabla_head = ParagraphStyle('tabla_head', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=9, textColor=colors.white, alignment=TA_CENTER)
+        st_tabla_cell = ParagraphStyle('tabla_cell', parent=styles['Normal'], fontName='Helvetica', fontSize=8, alignment=TA_CENTER)
 
         elementos = []
 
-        # Título
+        # Título y período
         elementos.append(Paragraph('REPORTE EXPEDIENTES PRESTADOS', st_titulo))
-
-        # Rango de fechas
-        fecha_texto = f"Período: {fecha_inicio or 'Inicio'} a {fecha_fin or 'Hoy'}"
-        if not fecha_inicio and not fecha_fin:
-            fecha_texto = "Período: Todos los registros"
+        fecha_texto = f"Período: {fecha_inicio or 'Todos'} a {fecha_fin or 'Hoy'}"
         elementos.append(Paragraph(fecha_texto, st_fecha))
         elementos.append(Spacer(1, 10))
 
-        # Tabla de datos
-        encabezados = [Paragraph('Área', st_tabla_head)] + \
-                      [Paragraph(m, st_tabla_head) for m in datos_reporte['motivos']] + \
-                      [Paragraph('TOTAL', st_tabla_head)]
-
-        filas = [encabezados]
+        # Construir tabla: Áreas x Motivos
+        # Encabezados: ['Área', 'Motivo1', 'Motivo2', ..., 'TOTAL']
+        encabezados = ['Área'] + datos_reporte['motivos'] + ['TOTAL']
+        filas = [[Paragraph(str(h), st_tabla_head) for h in encabezados]]
 
         # Filas de datos
         for idx, area in enumerate(datos_reporte['areas']):
-            fila = [Paragraph(area, st_tabla_cell)] + \
-                   [Paragraph(str(datos_reporte['datos'][idx][i]), st_tabla_cell)
-                    for i in range(len(datos_reporte['motivos']))] + \
-                   [Paragraph(str(datos_reporte['totales_filas'][idx]), st_tabla_cell)]
+            fila = [Paragraph(str(area), st_tabla_cell)]
+            # Agregar conteos por motivo
+            for col_idx in range(len(datos_reporte['motivos'])):
+                count = datos_reporte['datos'][idx][col_idx]
+                fila.append(Paragraph(str(count), st_tabla_cell))
+            # Total de la fila
+            fila.append(Paragraph(str(datos_reporte['totales_filas'][idx]), st_tabla_cell))
             filas.append(fila)
 
         # Fila de totales
-        totales_fila = [Paragraph('TOTAL', st_tabla_cell)] + \
-                       [Paragraph(str(datos_reporte['totales_columnas'][i]), st_tabla_cell)
-                        for i in range(len(datos_reporte['motivos']))] + \
-                       [Paragraph(str(datos_reporte['total_general']), st_tabla_cell)]
-        filas.append(totales_fila)
+        fila_total = [Paragraph('TOTAL', st_tabla_cell)]
+        for total_col in datos_reporte['totales_columnas']:
+            fila_total.append(Paragraph(str(total_col), st_tabla_cell))
+        fila_total.append(Paragraph(str(datos_reporte['total_general']), st_tabla_cell))
+        filas.append(fila_total)
 
-        # Calcular ancho de columnas
-        col_w = doc.width
-        col_width = col_w / len(encabezados)
-        tabla = Table(filas, colWidths=[col_width] * len(encabezados), repeatRows=1)
+        # Crear tabla
+        num_cols = len(encabezados)
+        col_width = doc.width / num_cols
+        tabla = Table(filas, colWidths=[col_width] * num_cols, repeatRows=1)
 
         tabla_styles = [
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#008b8b')),
@@ -2285,13 +2265,13 @@ def exportar_reporte_pdf(request):
         tabla.setStyle(TableStyle(tabla_styles))
         elementos.append(tabla)
 
-        # Build
+        # Build PDF
         def make_canvas(*args, **kwargs):
             return _PdfCanvas(*args, draw_footer=dibujar_footer, **kwargs)
 
         doc.build(elementos, canvasmaker=make_canvas)
 
-        # Retornar como descarga
+        # Retornar descarga
         pdf_bytes = buf.getvalue()
         buf.close()
 
@@ -2301,4 +2281,4 @@ def exportar_reporte_pdf(request):
 
     except Exception as e:
         logger.error(f"Error en exportar_reporte_pdf: {e}", exc_info=True)
-        return JsonResponse({"error": "Error al generar PDF"}, status=500)
+        return JsonResponse({"error": f"Error al generar PDF: {str(e)}"}, status=500)
