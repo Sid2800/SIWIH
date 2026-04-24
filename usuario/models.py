@@ -10,6 +10,7 @@ class Unidad(models.Model):
         return self.nombre_unidad
 
 
+
 class PerfilUnidad(models.Model):
     usuario = models.ForeignKey(User, on_delete=models.CASCADE)
     servicio_unidad = models.ForeignKey(ServicioUnidad , null=True, blank=True, on_delete=models.PROTECT)

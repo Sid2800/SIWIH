@@ -27,7 +27,7 @@ from core.services.paciente_service import PacienteService
 from core.services.reporte.PDF.reporte_generador_service import ReporteGeneradorService
 from core.services.reporte.EXCEL.reporte_service_excel import ServiceExcel
 from core.constants.stored_procedures import SP_CATALOGO_REFERENCIAS_RECIBIDAS, SP_CATALOGO_REFERENCIAS_ENVIADAS
-from core.constants.permisos import CORE_EDITOR_ROLES
+from core.constants.permisos import ROLES_GLOBALES
 from core.services.usuario_service import UsuarioService
 from core.services.ubicacion_service import UbicacionService
 from core.services.servicio_service import ServicioService
@@ -81,7 +81,7 @@ class ReporteGeneradorView(UnidadRolRequiredMixin, TemplateView):
 
         # SUPERUSUARIO o DIRECTIVOS => tienen acceso completo
         if self.request.user.is_superuser or \
-        self.request.user.perfilunidad_set.filter(rol__in=['admin', 'directivo'], alcance=2).exists():
+        self.request.user.perfilunidad_set.filter(rol__in=ROLES_GLOBALES,alcance=2).exists():
 
             modelos.extend([
                 ('paciente', 'Paciente'),

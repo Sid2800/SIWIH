@@ -6,29 +6,121 @@
 {% block content %}
 
 
-<div class="contenedor2 pacienteHistorial">
-    <div class="tituloFormulario">
-        <div class="tituloFormulario-texto">
-            <i class="bi bi-journal-medical"></i>
-            <h2 class="sin-margen">Historial - <strong>{{info_paciente.nombreCompleto}}</strong></h2>
-        </div>
-        <div class="tituloFormulario-subrallado"></div>
-    </div>
-
-    <fieldset class="HistorialPacienteCampos">
-        <legend>Datos paciente</legend>
-
-        <div class="formularioCampoHistorial">
-            <label>DNI </label>
-            <input type="text" class="formularioCampo-text" value="{{ info_paciente.dni }}" readonly>
+<div class="contenedor2 pacienteHistorial"> 
+        <div class="tituloFormulario">
+            <div class="tituloFormulario-texto"> 
+                <i class="bi bi-journal-medical"></i>
+                <h2 class="sin-margen">Historial - <strong>{{info_paciente.nombreCompleto}}</strong></h2>
+            </div>
+            <div class="tituloFormulario-subrallado"></div>
         </div>
 
+        <fieldset class="HistorialPacienteCampos">
+            <legend>Datos paciente</legend>
 
-        <div class="formularioCampoHistorial">
-            <label>Expediente N</label>
-            <input type="text" class="formularioCampo-text"
-                value="{% if info_expediente.numero %}{{ info_expediente.numero }} -|- {{ info_expediente.ubicacion }}{% else %}-------{% endif %}"
-                readonly>
+            <div class="formularioCampoHistorial">
+                <label>DNI </label>
+                <input type="text" class="formularioCampo-text" value="{{ info_paciente.dni }}" readonly>
+            </div>
+
+            
+            <div class="formularioCampoHistorial">    
+                <label>Expediente N</label>
+                <input type="text" class="formularioCampo-text"
+                    value="{% if info_expediente.numero %}{{ info_expediente.numero }} -|- {{ info_expediente.ubicacion }}{% else %}-------{% endif %}"
+                    readonly>
+            </div>
+
+
+            <div class="formularioCampoHistorial">
+                <label>Nombre</label>
+                <input type="text" id="historialNombrePaciente" class="formularioCampo-text" value="{{ info_paciente.nombreCompleto }}" readonly>                
+            </div>
+            
+            <div class="formularioCampoHistorial">
+                <label >Fecha de Nac:</label>
+                <input type="text" class="formularioCampo-text" value="{{ paciente.fecha_nacimiento }}" readonly>                
+            </div>
+
+            <div class="formularioCampoHistorial">
+                <label for="fecha_nacimiento">Edad</label>
+                <input type="text" class="formularioCampo-text" value="{{ info_paciente.edad }}" readonly>                
+            </div>
+            
+            <div class="formularioCampoHistorial">
+                <label>Sexo</label>
+                <input type="text" class="formularioCampo-text" value="{{ info_paciente.sexo }}" readonly>                
+            </div>
+
+            <div class="formularioCampoHistorial">
+                <label>Teléfono</label>
+                <input type="text" class="formularioCampo-text" value="{{ info_paciente.telefono }}" readonly>                
+            </div>
+
+            <div class="formularioCampoHistorial">
+                <label>Domicilio</label>
+                <input type="text" class="formularioCampo-text" value="{{ info_paciente.domicilio }}" readonly>                
+            </div>
+
+            <div class="formularioCampoHistorial">
+                <label>Madre</label>
+                <input type="text" class="formularioCampo-text" 
+                    value="{% if info_madre.nombre_completo %}{{ info_madre.nombre_completo }}{% else %}-------{% endif %}" 
+                    readonly>
+            </div>
+
+            <div class="formularioCampoHistorial">
+                <label>Ultima Visita</label>
+                <input type="text" class="formularioCampo-text" value="{{ ultima_atencion }}" readonly>                
+            </div>
+            
+            {% if  info_defuncion %}
+                <div class="formularioCampoHistorial">
+                    <label>Defuncion</label>
+                    <input type="text" class="formularioCampo-text" value="{{ info_defuncion.fecha }} -|- {{ info_defuncion.sala }}" readonly>                
+                </div>
+            {% endif %}
+
+            {% if  paciente.fecha_sai %}
+                <div class="formularioCampoHistorial">
+                    <label>SAI</label>
+                    <input type="text" class="formularioCampo-text" value="{{ paciente.fecha_sai }}" readonly>                
+                </div>
+            {% endif %}
+
+
+        </fieldset>
+
+        <div class="historialTabs">
+
+            {% if tabs.ingresos %}
+                <button class="historialTabsBoton {% if tabActiva == 'ingresos' %}active{% endif %}" data-tab="historialIngresos">
+                    <i class="bi bi-activity historialTabsBoton__logo"></i>
+                    <span class="historialTabsBoton__texto">INGRESOS</span>
+                </button>
+            {% endif %}
+
+            {% if tabs.atenciones %}
+                <button class="historialTabsBoton {% if tabActiva == 'atenciones' %}active{% endif %}" data-tab="historialConsultas">
+                    <i class="bi-thermometer-half historialTabsBoton__logo"></i>
+                    <span class="historialTabsBoton__texto">ATENCIONES</span>
+                </button>
+            {% endif %}
+
+            {% if permiso_dispensacion %}
+                <button class="historialTabsBoton" id="historialTabsBotonDispensaciones" data-tab="historialDispensaciones">
+                    <i class="bi bi-capsule-pill historialTabsBoton__logo"></i>
+                    <span class="historialTabsBoton__texto">DISPENSACIONES</span>
+                </button>
+            {% endif %}
+
+            {% if tabs.radiologia %}
+                <button class="historialTabsBoton {% if tabActiva == 'radiologia' %}active{% endif %}" data-tab="historialEvalucionesRX">
+                    <i class="bi-radioactive historialTabsBoton__logo"></i>
+                    <span class="historialTabsBoton__texto">RADIOLOGÍA</span>
+                </button>
+            {% endif %}
+
         </div>
 
         <div class="fieldset-falso">
@@ -108,190 +200,15 @@
                 </div>
             {% endif %}
 
-        <div class="formularioCampoHistorial">
-            <label>Nombre</label>
-            <input type="text" id="historialNombrePaciente" class="formularioCampo-text"
-                value="{{ info_paciente.nombreCompleto }}" readonly>
         </div>
-
-        <div class="formularioCampoHistorial">
-            <label>Fecha de Nac:</label>
-            <input type="text" class="formularioCampo-text" value="{{ paciente.fecha_nacimiento }}" readonly>
-        </div>
-
-        <div class="formularioCampoHistorial">
-            <label for="fecha_nacimiento">Edad</label>
-            <input type="text" class="formularioCampo-text" value="{{ info_paciente.edad }}" readonly>
-        </div>
-
-        <div class="formularioCampoHistorial">
-            <label>Sexo</label>
-            <input type="text" class="formularioCampo-text" value="{{ info_paciente.sexo }}" readonly>
-        </div>
-
-        <div class="formularioCampoHistorial">
-            <label>Teléfono</label>
-            <input type="text" class="formularioCampo-text" value="{{ info_paciente.telefono }}" readonly>
-        </div>
-
-        <div class="formularioCampoHistorial">
-            <label>Domicilio</label>
-            <input type="text" class="formularioCampo-text" value="{{ info_paciente.domicilio }}" readonly>
-        </div>
-
-        <div class="formularioCampoHistorial">
-            <label>Madre</label>
-            <input type="text" class="formularioCampo-text"
-                value="{% if info_madre.nombre_completo %}{{ info_madre.nombre_completo }}{% else %}-------{% endif %}"
-                readonly>
-        </div>
-
-        <div class="formularioCampoHistorial">
-            <label>Ultima Visita</label>
-            <input type="text" class="formularioCampo-text" value="{{ ultima_atencion }}" readonly>
-        </div>
-
-        {% if info_defuncion %}
-        <div class="formularioCampoHistorial">
-            <label>Defuncion</label>
-            <input type="text" class="formularioCampo-text"
-                value="{{ info_defuncion.fecha }} -|- {{ info_defuncion.sala }}" readonly>
-        </div>
-        {% endif %}
-
-        {% if paciente.fecha_sai %}
-        <div class="formularioCampoHistorial">
-            <label>SAI</label>
-            <input type="text" class="formularioCampo-text" value="{{ paciente.fecha_sai }}" readonly>
-        </div>
-        {% endif %}
-
-
-    </fieldset>
-
-    <div class="historialTabs">
-
-        {% if tabs.ingresos %}
-        <button class="historialTabsBoton {% if tabActiva == 'ingresos' %}active{% endif %}"
-            data-tab="historialIngresos">
-            <i class="bi bi-activity historialTabsBoton__logo"></i>
-            <span class="historialTabsBoton__texto">INGRESOS</span>
-        </button>
-        {% endif %}
-
-        {% if tabs.atenciones %}
-        <button class="historialTabsBoton {% if tabActiva == 'atenciones' %}active{% endif %}"
-            data-tab="historialConsultas">
-            <i class="bi-thermometer-half historialTabsBoton__logo"></i>
-            <span class="historialTabsBoton__texto">ATENCIONES</span>
-        </button>
-        {% endif %}
-
-        {% if permiso_dispensacion %}
-        <button class="historialTabsBoton" id="historialTabsBotonDispensaciones" data-tab="historialDispensaciones">
-            <i class="bi bi-capsule-pill historialTabsBoton__logo"></i>
-            <span class="historialTabsBoton__texto">DISPENSACIONES</span>
-        </button>
-        {% endif %}
-
-        {% if tabs.radiologia %}
-        <button class="historialTabsBoton {% if tabActiva == 'radiologia' %}active{% endif %}"
-            data-tab="historialEvalucionesRX">
-            <i class="bi-radioactive historialTabsBoton__logo"></i>
-            <span class="historialTabsBoton__texto">RADIOLOGÍA</span>
-        </button>
-        {% endif %}
-
-
-    </div>
-
-    <div class="fieldset-falso">
-
-        {% if tabs.ingresos %}
-        <div class="historial-tab-contenido {% if tabActiva == 'ingresos' %}active{% endif %}" id="historialIngresos">
-            <table id="historialTablaIngresos" class="display">
-                <thead>
-                    <tr>
-                        <th>#Num</th>
-                        <th>Ingreso</th>
-                        <th>Egreso | Usuario</th>
-                        <th>SDGI | Usuario</th>
-                        <th>Sala | Servicio</th>
-                        <th>Modificado | Usuario</th>
-                    </tr>
-                </thead>
-                <tbody>
-                </tbody>
-            </table>
-        </div>
-        {% endif %}
-
-        {% if tabs.atenciones %}
-        <div class="historial-tab-contenido {% if tabActiva == 'atenciones' %}active{% endif %}"
-            id="historialConsultas">
-            <table id="historialTablaConsultas" class="display">
-                <thead>
-                    <tr>
-                        <th>#Num</th>
-                        <th>Atencion</th>
-                        <th>Recepcion</th>
-                        <th>Especialidad | Servicio</th>
-                        <th>Modificado | Usuario</th>
-                    </tr>
-                </thead>
-                <tbody>
-                </tbody>
-            </table>
-        </div>
-        {% endif %}
-
-        {% if permiso_dispensacion %}
-        <div class="historial-tab-contenido" id="historialDispensaciones">
-            <table id="historialTablaDispensaciones" class="display">
-                <thead>
-                    <tr>
-                        <th>Fecha</th>
-                        <th>Medicamento</th>
-                        <th>Prescrita</th>
-                        <th>Dispen.</th>
-                        <th>Servicio</th>
-                        <th>Medico</th>
-                    </tr>
-                </thead>
-                <tbody>
-                </tbody>
-            </table>
-        </div>
-        {% endif %}
-
-        {% if tabs.radiologia %}
-        <div class="historial-tab-contenido {% if tabActiva == 'radiologia' %}active{% endif %}"
-            id="historialEvalucionesRX">
-            <table id="historialTablaEvaluacionesRx" class="display">
-                <thead>
-                    <tr>
-                        <th>#Num</th>
-                        <th>Fecha</th>
-                        <th>Dependencia</th>
-                        <th>Maquina</th>
-                        <th>Estudios</th>
-                        <th>Modificado</th>
-                    </tr>
-                </thead>
-                <tbody>
-                </tbody>
-            </table>
-        </div>
-        {% endif %}
-
-
-    </div>
-
-
-    <a href="javascript:history.back()" class="formularioBotones-boton" style="width: fit-content; margin: 10px auto;">
-        <i class="bi bi-arrow-left-circle formularioBotones-icono"></i>
-        <span>Volver</span>
-    </a>
+        
+        
+        <a href="javascript:history.back()" 
+        class="formularioBotones-boton" 
+        style="width: fit-content; margin: 10px auto;">
+            <i class="bi bi-arrow-left-circle formularioBotones-icono"></i>
+            <span>Volver</span>
+        </a>
 
 </div>
 
@@ -303,15 +220,15 @@
 
 
 {% block media_js %}
-<script>
-    let idPaciente = "{{ paciente.id }}";
-    let nombrePaciente = "{{ info_paciente.nombreCompleto }}"
-</script>
+    <script>
+        let idPaciente = "{{ paciente.id }}";
+        let nombrePaciente = "{{ info_paciente.nombreCompleto }}"
+    </script>
 
 
-<script src="{% static 'core/scripts/features/historialPaciente.js' %}"></script>
-
-<script src="{% static 'core/scripts/modals/galeria_modal.js' %}"></script>
+    <script src="{% static 'core/scripts/features/historialPaciente.js' %}"></script>
+    
+    <script src="{% static 'core/scripts/modals/galeria_modal.js' %}"></script>
 
 
 {% endblock media_js %}

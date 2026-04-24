@@ -600,7 +600,6 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
 
-
     inicializarTablaHistorialIngresos();
     inicializarTablaHistorialAtenciones();
     inicializarTablaHistorialDispensaciones();

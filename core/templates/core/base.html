@@ -83,9 +83,9 @@
             </li>
 
 
-            {% if request.user|tiene_unidad:"Admision:DIRECTIVOS:Sala" %}
+            {% if request.user|tiene_unidad:"Admision:Sala" %}
 
-            {% if request.user|tiene_unidad:"Admision:DIRECTIVOS" %}
+            {% if request.user|tiene_unidad:"Admision:" %}
             <li>
                <a href="{% url 'listar_expedientes' %}" class="bn-navegacion__enlace" title="Expediente">
                   <i class="bi bi-clipboard2-heart bn-navegacion-enlace__logo"></i>

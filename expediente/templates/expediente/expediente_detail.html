@@ -54,23 +54,10 @@
     
     </fieldset>
 
-    <div class="historialTabs">
-        <button class="historialTabsBoton active" data-tab="historialPropietarios">
-            <i class="bi bi-people historialTabsBoton__logo"></i>
-            <span class="historialTabsBoton__texto">HISTORIAL PROPIETARIOS</span>
-        </button>
+    <div class="fieldsetExp">
+        <legend>Historial Propietarios</legend>
 
-        {% if tabs.prestamos %}
-        <button class="historialTabsBoton" data-tab="historialPrestamos">
-            <i class="bi bi-folder-symlink historialTabsBoton__logo"></i>
-            <span class="historialTabsBoton__texto">PRÉSTAMOS</span>
-        </button>
-        {% endif %}
-    </div>
-
-    <div class="fieldset-falso">
-        <div class="historial-tab-contenido active" id="historialPropietarios">
-             <table id="data_table_expediente_propietarios" class="dataTable stripe hover row-border" style="width: 100%;">
+            <table id="data_table_expediente_propietarios" class="dataTable stripe hover row-border">
                 <thead>
                     <tr>
                         <th>DNI</th>
@@ -84,29 +71,28 @@
                 </thead>
                 <tbody></tbody>
             </table>
-        </div>
-
-        {% if tabs.prestamos %}
-        <div class="historial-tab-contenido" id="historialPrestamos">
-            <div id="prestamos-estado-badge" style="margin-bottom:0.8rem;"></div>
-            <table id="historialTablaPrestamos" class="display" style="width: 100%;">
-                <thead>
-                    <tr>
-                        <th>N° Exp</th>
-                        <th>Fecha Solicitud</th>
-                        <th>Motivo</th>
-                        <th>Solicitante</th>
-                        <th>Destino</th>
-                        <th>Estado</th>
-                        <th>Devuelto</th>
-                    </tr>
-                </thead>
-                <tbody>
-                </tbody>
-            </table>
-        </div>
-        {% endif %}
     </div>
+
+    {% if tabs.prestamos %}
+    <div class="fieldsetExp">
+        <legend>Historial de Préstamos</legend>
+        <div id="prestamos-estado-badge" style="margin-bottom:0.8rem;"></div>
+        <table id="historialTablaPrestamos" class="dataTable stripe hover row-border" style="width: 100%;">
+            <thead>
+                <tr>
+                    <th>N° Exp</th>
+                    <th>Fecha Solicitud</th>
+                    <th>Motivo</th>
+                    <th>Solicitante</th>
+                    <th>Destino</th>
+                    <th>Estado</th>
+                    <th>Devuelto</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+    {% endif %}
 
     <div class="formularioBotones">
         <a href="{% url 'listar_expedientes' %}" class="formularioBotones-boton">

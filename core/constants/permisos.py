@@ -82,8 +82,15 @@ REFERENCIA_EDITOR_UNIDADES = ['Referencia']
 
 
 # Acceso de solo visualización / edición parcial (Edit, Listar)
-REFERENCIA_VISUALIZACION_ROLES = ["admin", "digitador", "auditor"]
-REFERENCIA_VISUALIZACION_UNIDADES = ["Referencia", "DIRECTIVOS"]
+REFERENCIA_VISUALIZACION_ROLES = ["admin", "digitador", "directivo"]
+REFERENCIA_VISUALIZACION_UNIDADES = ["Referencia"]
+
+
+
+
+# los usauro de alcance gglbal pueden ser
+
+ROLES_GLOBALES = ['directivo', 'admin']
 
 
 # -----------------------------

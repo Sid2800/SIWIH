@@ -243,24 +243,6 @@ $(document).ready(function () {
 
     inicializarTablaHistorialPrestamos();
 
-    // Lógica del tab
-    document.querySelectorAll('.historialTabsBoton').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.querySelectorAll('.historialTabsBoton').forEach(b => b.classList.remove('active'));
-            document.querySelectorAll('.historial-tab-contenido').forEach(c => c.classList.remove('active'));
-            
-            btn.classList.add('active');
-            const tabId = btn.dataset.tab;
-            const tabContenido = document.getElementById(tabId);
-            if(tabContenido) tabContenido.classList.add('active');
-
-            // Forzar ajuste de columnas de DataTables visibles
-            setTimeout(() => {
-                $($.fn.dataTable.tables(true)).DataTable().columns.adjust().draw();
-            }, 100);
-        });
-    });
-
 });
 
 
