@@ -2325,8 +2325,8 @@ def exportar_reporte_pdf(request):
                                        fontName='Helvetica', fontSize=10,
                                        alignment=TA_CENTER, leading=12)
         st_tabla_area = ParagraphStyle('tabla_area', parent=styles['Normal'],
-                                       fontName='Helvetica-Bold', fontSize=10,
-                                       alignment=TA_LEFT, leading=12)
+                                       fontName='Helvetica-Bold', fontSize=8,
+                                       alignment=TA_LEFT, leading=10)
         st_tabla_total = ParagraphStyle('tabla_total', parent=styles['Normal'],
                                         fontName='Helvetica-Bold', fontSize=10,
                                         alignment=TA_CENTER, leading=12)
@@ -2375,11 +2375,23 @@ def exportar_reporte_pdf(request):
         filas.append(fila_total)
 
         # Anchos: Área 3cm, Total 2cm, motivos distribuyen el resto
+        # Motivos con nombres largos (COMPLICACIONES..., INVESTIGACION) reciben
+        # mayor peso para que la primera palabra quepa completa.
         num_motivos = len(datos_reporte['motivos'])
         area_w = 3 * cm
         total_w = 2 * cm
-        motivo_w = (doc.width - area_w - total_w) / max(num_motivos, 1)
-        col_widths = [area_w] + [motivo_w] * num_motivos + [total_w]
+        disponible = doc.width - area_w - total_w
+
+        def _peso_motivo(nombre):
+            n = (nombre or '').upper()
+            if 'COMPLICACION' in n or 'INVESTIGACI' in n:
+                return 1.35
+            return 1.0
+
+        pesos = [_peso_motivo(m) for m in datos_reporte['motivos']]
+        suma_pesos = sum(pesos) or 1
+        motivo_widths = [disponible * (p / suma_pesos) for p in pesos]
+        col_widths = [area_w] + motivo_widths + [total_w]
 
         tabla = Table(filas, colWidths=col_widths, repeatRows=1)
 
