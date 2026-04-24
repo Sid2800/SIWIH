@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
    <meta charset="UTF-8">
    <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,7 +9,7 @@
    {% load permisos_unidad %}
 
 
-
+   
    <link rel="icon" href="{% static 'core/favicon.ico' %}" type="image/x-icon">
    <!-- Fuentes locales (Google Fonts descargadas) -->
    <link rel="stylesheet" href="{% static 'core/fonts/css/googlefonts.css' %}">
@@ -49,7 +48,6 @@
 
    <title>{% block title %}{% endblock title %} | SIWI</title>
 </head>
-
 <body class="cuerpo">
 
    <button class="ocultar-mostrar-barra-navegacion">
@@ -80,34 +78,34 @@
                   <i class="bi bi-person bn-navegacion-enlace__logo"></i>
                   <span class="bn-navegacion-enlace__texto">Paciente</span>
                </a>
-            </li>
+            </li> 
 
-
+         
             {% if request.user|tiene_unidad:"Admision:Sala" %}
 
-            {% if request.user|tiene_unidad:"Admision:" %}
-            <li>
-               <a href="{% url 'listar_expedientes' %}" class="bn-navegacion__enlace" title="Expediente">
-                  <i class="bi bi-clipboard2-heart bn-navegacion-enlace__logo"></i>
-                  <span class="bn-navegacion-enlace__texto ocultar">Expediente</span>
-               </a>
-            </li>
-            {% endif %}
+               {% if request.user|tiene_unidad:"Admision:" %}
+               <li>
+                  <a href="{% url 'listar_expedientes' %}" class="bn-navegacion__enlace" title="Expediente">
+                     <i class="bi bi-clipboard2-heart bn-navegacion-enlace__logo"></i>
+                     <span class="bn-navegacion-enlace__texto ocultar">Expediente</span>
+                  </a>
+               </li>
+               {% endif %}
 
-            <li>
-               <a href="{% url 'listar_ingresos' %}" class="bn-navegacion__enlace">
-                  <i class="bi bi-activity bn-navegacion-enlace__logo"></i>
-                  <span class="bn-navegacion-enlace__texto">Ingreso</span>
-               </a>
-            </li>
+               <li>
+                  <a href="{% url 'listar_ingresos' %}" class="bn-navegacion__enlace">
+                     <i class="bi bi-activity bn-navegacion-enlace__logo"></i>
+                     <span class="bn-navegacion-enlace__texto">Ingreso</span>
+                  </a>
+               </li>
 
-
-            <li>
-               <a href="{% url 'listar_atenciones' %}" class="bn-navegacion__enlace">
-                  <i class="bi-thermometer-half bn-navegacion-enlace__logo"></i>
-                  <span class="bn-navegacion-enlace__texto">Atencion</span>
-               </a>
-            </li>
+         
+               <li>  
+                  <a href="{% url 'listar_atenciones' %}" class="bn-navegacion__enlace">
+                     <i class="bi-thermometer-half bn-navegacion-enlace__logo"></i>
+                     <span class="bn-navegacion-enlace__texto">Atencion</span>
+                  </a>
+               </li>
             {% endif %}
             <!--
             <li>
@@ -117,37 +115,38 @@
                </a>
             </li>
             -->
+            
 
-
-
-            {% if request.user|tiene_unidad:"Imagenologia:DIRECTIVOS:Sala" %}
-            <li>
-               <a href="{% url 'listar_evalucionesrx' %}" class="bn-navegacion__enlace">
-                  <i class="bi  bi-radioactive bn-navegacion-enlace__logo"></i>
-                  <span class="bn-navegacion-enlace__texto">Evaluacion RX</span>
-               </a>
-            </li>
+            
+            {% if  request.user|tiene_unidad:"Imagenologia:DIRECTIVOS:Sala" %}
+               <li>  
+                  <a href="{% url 'listar_evalucionesrx' %}" class="bn-navegacion__enlace">
+                     <i class="bi  bi-radioactive bn-navegacion-enlace__logo"></i>
+                     <span class="bn-navegacion-enlace__texto">Evaluacion RX</span>
+                  </a>
+               </li>
             {% endif %}
 
 
-            {% if request.user|tiene_unidad:"Referencia:DIRECTIVOS" %}
-            <li>
-               <a href="{% url 'listar_referencias' %}" class="bn-navegacion__enlace">
-                  <i class="bi bi-link-45deg bn-navegacion-enlace__logo"></i>
-                  <span class="bn-navegacion-enlace__texto">Referencia</span>
-               </a>
-            </li>
+            {% if  request.user|tiene_unidad:"Referencia:DIRECTIVOS" %}
+               <li>
+                  <a href="{% url 'listar_referencias' %}" class="bn-navegacion__enlace">
+                     <i class="bi bi-link-45deg bn-navegacion-enlace__logo"></i>
+                     <span class="bn-navegacion-enlace__texto">Referencia</span>
+                  </a>
+               </li>
             {% endif %}
 
 
             {% if request.user|tiene_unidad:"Estadistica:Sala:Admision" %}
-            <li>
-               <a href="{% url 's_exp_buscador' %}" class="bn-navegacion__enlace">
-                  <i class="bi bi-folder2-open bn-navegacion-enlace__logo"></i>
-                  <span class="bn-navegacion-enlace__texto">Exp. Préstamo</span>
-               </a>
-            </li>
+               <li>
+                  <a href="{% url 's_exp_buscador' %}" class="bn-navegacion__enlace">
+                     <i class="bi bi-folder-symlink bn-navegacion-enlace__logo"></i>
+                     <span class="bn-navegacion-enlace__texto">Préstamos Exp.</span>
+                  </a>
+               </li>
             {% endif %}
+
 
             <li>
                <a href="{% url 'generador_reporte' %}" class="bn-navegacion__enlace">
@@ -155,8 +154,8 @@
                   <span class="bn-navegacion-enlace__texto">Reporte</span>
                </a>
             </li>
-
-            {% if request.user|tiene_rol:"ADMIN:Admision" %}
+         
+            {% if  request.user|tiene_rol:"ADMIN:Admision"  %}
 
             <li>
                <a href="{% url 'mantenimiento' %}" class="bn-navegacion__enlace">
@@ -178,7 +177,7 @@
                </a>
             </li>
             {% endif %}
-
+            
          </ul>
 
       </nav>
@@ -191,51 +190,57 @@
          <div class="bp-modo-oscuro">
             <div class="bp-modo-oscuro__info">
                <i class="bi bi-moon-stars bp-modo-oscuro__ico"></i>
-               <span class="bp-modo-oscuro__texto">Modo Oscuro</span>
+               <span class="bp-modo-oscuro__texto">Modo Oscuro</span>   
             </div>
 
             <div class="bp-modo-oscuro__switch" id="switch">
                <div class="bp-modo-oscuro-switch__base">
                   <div class="bp-modo-oscuro-switch__bolita" id="bolita"></div>
                </div>
-
+               
             </div>
          </div>
 
          <div class="bp-inf-usuario">
-
-            <img
-               src="{% if usuario_imagen_url %}{{ usuario_imagen_url }}{% else %}{% static 'core/img/avatar.jpg' %}{% endif %}"
-               alt="imagen de perfil" class="bp-inf-usuario__imagen">
-
+            
+            <img 
+               src="{% if usuario_imagen_url %}{{ usuario_imagen_url }}{% else %}{% static 'core/img/avatar.jpg' %}{% endif %}" 
+               alt="imagen de perfil" 
+               class="bp-inf-usuario__imagen"
+            >
+            
             <div class="bp-inf-usuario__texto">
                {% if request.user.is_authenticated %}
-               <span class="bp-inf-usuario-texto__usuario">
-                  {{ request.user.username }}
-               </span>
-               <span class="bp-inf-usuario-texto__grupo">
-                  {% if request.user.is_superuser %}
-                  Superusuario
-                  {% else %}
-                  {% with request.user.perfilunidad_set.first as perfil %}
-                  {{ perfil.get_rol_display|upper }} - {{ perfil.unidad.nombre_unidad|upper|slice:":6" }}
-                  {% endwith %}
-                  {% endif %}
-               </span>
-               <span class="bp-inf-usuario-texto__grupo" id="bp-base-zona">
-                  {{ request.session.zona_nombre_zona|default:"No seleccionada" }}
-               </span>
-
-
+                  <span class="bp-inf-usuario-texto__usuario">
+                     {{ request.user.username }}
+                  </span>
+                  <span class="bp-inf-usuario-texto__grupo">
+                     {% if request.user.is_superuser %}
+                        Superusuario
+                     {% else %}
+                        {% with request.user.perfilunidad_set.first as perfil %}
+                           {{ perfil.rol|upper }} 
+                           {% if perfil.servicio_unidad %}
+                           - {{ perfil.servicio_unidad.nombre_corto_unidad|upper }}
+                           {% else %}
+                           - INST
+                           {% endif %}
+                        {% endwith %}
+                     {% endif %}
+                  </span>
+                  <span class="bp-inf-usuario-texto__grupo" id="bp-base-zona">
+                     {{ request.session.zona_nombre_zona|default:"No seleccionada" }}
+                  </span>
+                  
+                  
                {% else %}
-               <span class="bp-inf-usuario-texto__usuario">Usuario no autenticado</span>
+                  <span class="bp-inf-usuario-texto__usuario">Usuario no autenticado</span>
                {% endif %}
             </div>
 
             <form action="{% url 'logout' %}" method="POST" id="bp-cerrar-usuario__boton" title="Cerrar Sesion">
                {% csrf_token %}
-               <button type="button" id="cerrar-sesion-btn"
-                  class="formularioBotones-boton bp-cerrar-usuario__botonAccion">
+               <button type="button" id="cerrar-sesion-btn"  class="formularioBotones-boton bp-cerrar-usuario__botonAccion">
                   <i class="bi bi-lock-fill"></i>
                </button>
             </form>
@@ -248,222 +253,223 @@
    </aside>
 
    <main>
-
+      
       <section class="contenedor">
          {% block content %}
-
+      
          {% endblock content %}
       </section>
 
 
-
+      
       {% if messages %}
       {% for message in messages %}
-      <input type="hidden" class="toast-message" data-type="{{ message.tags }}" value="{{ message }}" />
+         <input type="hidden" class="toast-message" data-type="{{ message.tags }}" value="{{ message }}" />
       {% endfor %}
       {% endif %}
 
-
+      
    </main>
 
-   <!-- CONFIGURACIÓN GLOBAL FRONTEND -->
-   <script>
+<!-- CONFIGURACIÓN GLOBAL FRONTEND -->
+<script>
 
-      /* Zona del usuario */
-      let zona = '{{ request.session.zona_codigo|default:"0"|escapejs }}';
+   /* Zona del usuario */
+   let zona = "{{ request.session.zona_codigo|default:"0"|escapejs }}";
 
-      /* Token CSRF accesible desde JS */
-      window.CSRF_TOKEN = "{{ csrf_token }}";
+   /* Token CSRF accesible desde JS */
+   window.CSRF_TOKEN = "{{ csrf_token }}";
 
-      /* Configuración general del sistema */
-      window.APP_CONFIG = {
-         estudioDefaultImg: "{% static 'core/img/estudio_default.png' %}",
-         usuarioDefaultImg: "{% static 'core/img/avatar.jpg' %}"
+   /* Configuración general del sistema */
+   window.APP_CONFIG = {
+      estudioDefaultImg: "{% static 'core/img/estudio_default.png' %}",
+      usuarioDefaultImg: "{% static 'core/img/avatar.jpg' %}"
 
-      };
+   };
 
 
-      /* URLs DEL SISTEMA (API / VIEWS) */
+   /* URLs DEL SISTEMA (API / VIEWS) */
 
-      window.urls = {
+   window.urls = {
 
 
-         /* ---------------- USAURIO ---------------- */
+      /* ---------------- USAURIO ---------------- */
 
-         procesarImagenUsuario: "{% url 'procesar_imagen_usuario' %}",
+      procesarImagenUsuario: "{% url 'procesar_imagen_usuario' %}",
 
 
+      
+      /* ---------------- PACIENTES ---------------- */
 
-         /* ---------------- PACIENTES ---------------- */
+      obtenerPacienteCenso: "{% url 'obtener-paciente-censo' %}",
+      listadoPacientes: "{% url 'listar_pacientes_API' %}",
+      agregarPaciente: "{% url 'paciente_agregar' %}",
+      editarPaciente: "{% url 'paciente_editar' pk=0 slug='slug' %}",
+      busquedaPaciente: "{% url 'busqueda-paciente' %}",
+      obtenerPacienteIngresoExpediente: "{% url 'obtener_paciente_ingreso_expediente' %}",
+      obtenerPacienteIngresoDNI: "{% url 'obtener_paciente_ingreso_dni' %}",
+      verificarPacienteSimilar: "{% url 'verificar_paciente_similar'%}",
 
-         obtenerPacienteCenso: "{% url 'obtener-paciente-censo' %}",
-         listadoPacientes: "{% url 'listar_pacientes_API' %}",
-         agregarPaciente: "{% url 'paciente_agregar' %}",
-         editarPaciente: "{% url 'paciente_editar' pk=0 slug='slug' %}",
-         busquedaPaciente: "{% url 'busqueda-paciente' %}",
-         obtenerPacienteIngresoExpediente: "{% url 'obtener_paciente_ingreso_expediente' %}",
-         obtenerPacienteIngresoDNI: "{% url 'obtener_paciente_ingreso_dni' %}",
-         verificarPacienteSimilar: "{% url 'verificar_paciente_similar'%}",
+      obtenerPacienteRegistroDNI: "{% url 'obtener_paciente_registro_dni' %}",
+      obtenerPacienteRegistroExpediente: "{% url 'obtener_paciente_registro_expediente' %}",
 
-         obtenerPacienteRegistroDNI: "{% url 'obtener_paciente_registro_dni' %}",
-         obtenerPacienteRegistroExpediente: "{% url 'obtener_paciente_registro_expediente' %}",
+      obtenerPadre: "{% url 'obtener-padre' %}",
+      detallesDomicilio: "{% url 'obtenerDetallesDomicilio' %}",
+      listadoDispensacionPaciente: "{% url 'dispensaciones_paciente' %}",
 
-         obtenerPadre: "{% url 'obtener-padre' %}",
-         detallesDomicilio: "{% url 'obtenerDetallesDomicilio' %}",
-         listadoDispensacionPaciente: "{% url 'dispensaciones_paciente' %}",
+      listarObitosPaciente: "{% url 'listar_obitos_paciente' %}",
 
-         listarObitosPaciente: "{% url 'listar_obitos_paciente' %}",
 
+      /* ---------------- EVALUACION RX ---------------- */
 
-         /* ---------------- EVALUACION RX ---------------- */
+      obtenerPacienteExternoDni: "{% url 'obtener_paciente_externo_dni' %}",
+      listarEvalucionesrxAPI: "{% url 'listar_evalucionesrx_API' %}",
+      listadoEvaluacionesPaciente: "{% url 'listar_evalucionesrx_paciente_API' %}",
+      listarEvalucionesrx: "{% url 'listar_evalucionesrx' %}",
+      agregarEvaluacionrx: "{% url 'evaluacionrx_agregar' pk=0 slug='slug' %}",
+      editarEvaluacionrx: "{% url 'evaluacionrx_editar' pk=0 slug='slug' %}",
+      inactivarEvaluacionrx: "{% url 'inactivar_evalucion_rx' %}",
+      verificarPacienteInactivo: "{% url 'verificar_paciente_inactivo' %}",
 
-         obtenerPacienteExternoDni: "{% url 'obtener_paciente_externo_dni' %}",
-         listarEvalucionesrxAPI: "{% url 'listar_evalucionesrx_API' %}",
-         listadoEvaluacionesPaciente: "{% url 'listar_evalucionesrx_paciente_API' %}",
-         listarEvalucionesrx: "{% url 'listar_evalucionesrx' %}",
-         agregarEvaluacionrx: "{% url 'evaluacionrx_agregar' pk=0 slug='slug' %}",
-         editarEvaluacionrx: "{% url 'evaluacionrx_editar' pk=0 slug='slug' %}",
-         inactivarEvaluacionrx: "{% url 'inactivar_evalucion_rx' %}",
-         verificarPacienteInactivo: "{% url 'verificar_paciente_inactivo' %}",
 
+      /* ---------------- INGRESOS ---------------- */
 
-         /* ---------------- INGRESOS ---------------- */
+      listadoIngresos: "{% url 'listar_ingresos_API' %}",
+      listarIngresos: "{% url 'listar_ingresos' %}",
+      listadoIngresosPaciente: "{% url 'listar-ingresos-paciente-API' %}",
+      agregarIngreso: "{% url 'ingreso_agregar' pk=0 slug='slug' %}",
+      editarIngreso: "{% url 'ingreso_editar' pk=0 slug='slug' %}",
+      inactivarIngreso: "{% url 'inactivar_ingreso' %}",
+      validarIngresoActivo: "{% url 'validar-ingreso-activo' %}",
+      registrarRecepcionIngresos: "{% url 'registrar-recepcion-ingresos-sala' %}",
+      registrarRecepcionIngresosSDGI: "{% url 'registrar-recepcion-ingresos-sdgi' %}",
 
-         listadoIngresos: "{% url 'listar_ingresos_API' %}",
-         listarIngresos: "{% url 'listar_ingresos' %}",
-         listadoIngresosPaciente: "{% url 'listar-ingresos-paciente-API' %}",
-         agregarIngreso: "{% url 'ingreso_agregar' pk=0 slug='slug' %}",
-         editarIngreso: "{% url 'ingreso_editar' pk=0 slug='slug' %}",
-         inactivarIngreso: "{% url 'inactivar_ingreso' %}",
-         validarIngresoActivo: "{% url 'validar-ingreso-activo' %}",
-         registrarRecepcionIngresos: "{% url 'registrar-recepcion-ingresos-sala' %}",
-         registrarRecepcionIngresosSDGI: "{% url 'registrar-recepcion-ingresos-sdgi' %}",
 
+      /* ---------------- REPORTES ---------------- */
 
-         /* ---------------- REPORTES ---------------- */
+      ReporteHojaHospitalizacion: "{% url 'reporte_hospitalizacion_26' ingreso_id=0 %}",
+      ReporteFormatoReferencia: "{% url 'formato_referencia_SINAR' referencia_id=0 %}",
+      ReporteFormatoRespuesta: "{% url 'formato_respuesta_SINAR' respuesta_id=0 %}",
 
-         ReporteHojaHospitalizacion: "{% url 'reporte_hospitalizacion_26' ingreso_id=0 %}",
-         ReporteFormatoReferencia: "{% url 'formato_referencia_SINAR' referencia_id=0 %}",
-         ReporteFormatoRespuesta: "{% url 'formato_respuesta_SINAR' respuesta_id=0 %}",
 
+      /* ---------------- RECEPCIÓN INGRESOS ---------------- */
 
-         /* ---------------- RECEPCIÓN INGRESOS ---------------- */
+      recibirIngresosSala: "{% url 'recibir-ingresos-sala' %}",
+      recibirIngresosSDGI: "{% url 'recibir-ingresos-sdgi' %}",
 
-         recibirIngresosSala: "{% url 'recibir-ingresos-sala' %}",
-         recibirIngresosSDGI: "{% url 'recibir-ingresos-sdgi' %}",
 
+      /* ---------------- EXPEDIENTES ---------------- */
 
-         /* ---------------- EXPEDIENTES ---------------- */
+      listadoExpedientes: "{% url 'listar_expedientes_API' %}",
+      expedienteVer: "{% url 'expediente_ver' pk=0 %}",
+      listarExpedientesPropietariosAPI: "{% url 'listar_expedientes_propietarios_API' %}",
+      expedienteLibre: "{% url 'expediente-libre' %}",
 
-         listadoExpedientes: "{% url 'listar_expedientes_API' %}",
-         expedienteVer: "{% url 'expediente_ver' pk=0 %}",
-         listarExpedientesPropietariosAPI: "{% url 'listar_expedientes_propietarios_API' %}",
-         expedienteLibre: "{% url 'expediente-libre' %}",
 
+      /* ---------------- BÚSQUEDAS ---------------- */
 
-         /* ---------------- BÚSQUEDAS ---------------- */
+      busquedaCenso: "{% url 'busqueda-censo' %}",
+      busquedaAvanzada: "{% url 'busqueda_avanzada' %}",
+      busquedaAcompaniante: "{% url 'obtener-acompaniante' %}",
 
-         busquedaCenso: "{% url 'busqueda-censo' %}",
-         busquedaAvanzada: "{% url 'busqueda_avanzada' %}",
-         busquedaAcompaniante: "{% url 'obtener-acompaniante' %}",
 
+      /* ---------------- AUTOCOMPLETADOS ---------------- */
 
-         /* ---------------- AUTOCOMPLETADOS ---------------- */
+      sectorAutocomplete: "{% url 'sectorAutocomplete' %}",
+      aldeaAutocomplete: "{% url 'aldeaAutocomplete' %}",
 
-         sectorAutocomplete: "{% url 'sectorAutocomplete' %}",
-         aldeaAutocomplete: "{% url 'aldeaAutocomplete' %}",
 
+      /* ---------------- UBICACIÓN ---------------- */
 
-         /* ---------------- UBICACIÓN ---------------- */
+      municipioXdepto: "{% url 'municipioXdepartamento' %}",
+      listarZona: "{% url 'listarZona' %}",
+      listarSala: "{% url 'listarSala' %}",
+      listarDiagnostico: "{% url 'listar_diagnostico' %}",
+      listarAreaAtencion: "{% url 'listarAreaAtencion' %}",
+      listarDependencias: "{% url 'listar_dependencias' %}",
 
-         municipioXdepto: "{% url 'municipioXdepartamento' %}",
-         listarZona: "{% url 'listarZona' %}",
-         listarSala: "{% url 'listarSala' %}",
-         listarDiagnostico: "{% url 'listar_diagnostico' %}",
-         listarAreaAtencion: "{% url 'listarAreaAtencion' %}",
-         listarDependencias: "{% url 'listar_dependencias' %}",
+      cambiarZona: "{% url 'cambiarZona' %}",
+      agregarSector: "{% url 'agregarSector' %}",
 
-         cambiarZona: "{% url 'cambiarZona' %}",
-         agregarSector: "{% url 'agregarSector' %}",
+      
 
 
+      /* ---------------- DEFUNCIÓN ---------------- */
 
+      obtenerDefuncion: "{% url 'obtener_defuncion' %}",
+      obtenerObito: "{% url 'obtener_obito' %}",
 
+      guardarDefuncion: "{% url 'paciente_guardar_defuncion' %}",
+      guardarObito: "{% url 'paciente_guardar_obito' %}",
 
+      
+      verificarDefuncion: "{% url 'verificar_defuncion' %}",
+      procesarCadaver: "{% url 'registrar_entrega_cadaver' %}",
 
-         /* ---------------- DEFUNCIÓN ---------------- */
 
-         obtenerDefuncion: "{% url 'obtener_defuncion' %}",
-         guardarDefuncion: "{% url 'paciente_guardar_defuncion' %}",
-         verificarDefuncion: "{% url 'verificar_defuncion' %}",
-         procesarCadaver: "{% url 'registrar_entrega_cadaver' %}",
+      /* ---------------- ATENCIÓN ---------------- */
 
+      obtenerAtencion: "{% url 'obtener_atencion' %}",
+      guardarAtencion: "{% url 'atencion_guardar' %}",
+      listadoAtencion: "{% url 'listar_atenciones_API' %}",
+      recibirAtencion: "{% url 'recibir-atenciones' %}",
+      listadoAtencionesPaciente: "{% url 'listar-atenciones-paciente-API' %}",
+      verificarAtencionReciente: "{% url 'verificar_atencion_reciente' %}",
+      registrarRecepcionAtenciones: "{% url 'registrar-recepcion-atenciones' %}",
 
-         /* ---------------- ATENCIÓN ---------------- */
 
-         obtenerAtencion: "{% url 'obtener_atencion' %}",
-         guardarAtencion: "{% url 'atencion_guardar' %}",
-         listadoAtencion: "{% url 'listar_atenciones_API' %}",
-         recibirAtencion: "{% url 'recibir-atenciones' %}",
-         listadoAtencionesPaciente: "{% url 'listar-atenciones-paciente-API' %}",
-         verificarAtencionReciente: "{% url 'verificar_atencion_reciente' %}",
-         registrarRecepcionAtenciones: "{% url 'registrar-recepcion-atenciones' %}",
+      /* ---------------- REFERENCIAS ---------------- */
 
+      agregarReferencia: "{% url 'referencia_agregar' pk=0 slug='slug' %}",
+      editarReferencia: "{% url 'referencia_editar' pk=0 slug='slug' %}",
+      listarCondiciones: "{% url 'listar_condiciones' %}",
+      seguimientoAgregarEditar: "{% url 'seguimiento_agregar_editar' %}",
+      seguimientoTicObtener: "{% url 'seguimiento_tic_obtener' %}",
+      listarReferenciasAPI: "{% url 'listar_referencias_API' %}",
 
-         /* ---------------- REFERENCIAS ---------------- */
 
-         agregarReferencia: "{% url 'referencia_agregar' pk=0 slug='slug' %}",
-         editarReferencia: "{% url 'referencia_editar' pk=0 slug='slug' %}",
-         listarCondiciones: "{% url 'listar_condiciones' %}",
-         seguimientoAgregarEditar: "{% url 'seguimiento_agregar_editar' %}",
-         seguimientoTicObtener: "{% url 'seguimiento_tic_obtener' %}",
-         listarReferenciasAPI: "{% url 'listar_referencias_API' %}",
+      /* ---------------- DISPENSACIÓN ---------------- */
+      obtenerImagenesEvaluacion: "{% url 'dispensaciones_paciente' %}",
 
+      /* ---------------- MEDIA ---------------- */
+      obtenerImagenesEvaluacion: "{% url 'obtener_imagenes_evaluacion'%}",
 
-         /* ---------------- DISPENSACIÓN ---------------- */
-         obtenerImagenesEvaluacion: "{% url 'dispensaciones_paciente' %}",
+      /* ---------------- S_EXP (Préstamos de Expedientes) ---------------- */
+      s_exp_dashboard: "{% url 's_exp_dashboard' %}",
+      s_exp_buscador: "{% url 's_exp_buscador' %}",
+      s_exp_seguimiento: "{% url 's_exp_seguimiento' %}",
+      s_exp_dashboard_stats_api: "{% url 's_exp_dashboard_stats_api' %}",
+      s_exp_listar_solicitudes_api: "{% url 's_exp_listar_solicitudes_api' %}",
+      s_exp_aprobar_solicitud_api: "{% url 's_exp_aprobar_solicitud_api' %}",
+      s_exp_expedientes_solicitud_api: "{% url 's_exp_expedientes_solicitud_api' solicitud_id=0 %}".replace('/0/', '/'),
+      s_exp_imprimir_solicitud_pdf: "{% url 's_exp_imprimir_solicitud_pdf' solicitud_id=0 %}".replace('/0/', '/'),
+      s_exp_marcar_listo_api: "{% url 's_exp_marcar_listo_api' %}",
+      s_exp_rechazar_solicitud_api: "{% url 's_exp_rechazar_solicitud_api' %}",
+      s_exp_prestamos_activos_api: "{% url 's_exp_prestamos_activos_api' %}",
+      s_exp_marcar_entregado_api: "{% url 's_exp_marcar_entregado_api' %}",
+      s_exp_prestamos_devolucion_api: "{% url 's_exp_prestamos_devolucion_api' %}",
+      s_exp_procesar_devolucion_api: "{% url 's_exp_procesar_devolucion_api' %}",
+      s_exp_reportes_data_api: "{% url 's_exp_reportes_data_api' %}",
+      s_exp_exportar_excel: "{% url 's_exp_exportar_excel' %}",
+      s_exp_exportar_pdf: "{% url 's_exp_exportar_pdf' %}",
+      s_exp_buscar_expedientes_api: "{% url 's_exp_buscar_expedientes_api' %}",
+      s_exp_crear_solicitud_api: "{% url 's_exp_crear_solicitud_api' %}",
+      s_exp_mis_solicitudes_api: "{% url 's_exp_mis_solicitudes_api' %}",
+      s_exp_solicitar_devolucion_api: "{% url 's_exp_solicitar_devolucion_api' %}",
+      s_exp_alertas_api: "{% url 's_exp_alertas_api' %}",
+      s_exp_motivos_api: "{% url 's_exp_motivos_api' %}",
+      s_exp_info_usuario_api: "{% url 's_exp_info_usuario_api' %}",
+      s_exp_historial_api: "{% url 's_exp_historial_api' %}",
+      s_exp_historial_detalle_api: "{% url 's_exp_historial_detalle_api' solicitud_id=0 %}".replace('/0/', '/'),
+      s_exp_notificado_listo_api: "{% url 's_exp_notificado_listo_api' %}",
+      s_exp_vencimiento_leido_api: "{% url 's_exp_vencimiento_leido_api' %}"
 
-         /* ---------------- MEDIA ---------------- */
-         obtenerImagenesEvaluacion: "{% url 'obtener_imagenes_evaluacion'%}",
+   };
 
 
-         /* ---------------- S_EXP (PRÉSTAMO EXPEDIENTES) ---------------- */
+</script>
 
-         s_exp_dashboard: "{% url 's_exp_dashboard' %}",
-         s_exp_buscador: "{% url 's_exp_buscador' %}",
-         s_exp_seguimiento: "{% url 's_exp_seguimiento' %}",
-         s_exp_dashboard_stats_api: "{% url 's_exp_dashboard_stats_api' %}",
-         s_exp_listar_solicitudes_api: "{% url 's_exp_listar_solicitudes_api' %}",
-         s_exp_aprobar_solicitud_api: "{% url 's_exp_aprobar_solicitud_api' %}",
-         s_exp_expedientes_solicitud_api: "{% url 's_exp_expedientes_solicitud_api' solicitud_id=0 %}".replace('/0/', '/'),
-         s_exp_imprimir_solicitud_pdf: "{% url 's_exp_imprimir_solicitud_pdf' solicitud_id=0 %}".replace('/0/', '/'),
-         s_exp_marcar_listo_api: "{% url 's_exp_marcar_listo_api' %}",
-         s_exp_rechazar_solicitud_api: "{% url 's_exp_rechazar_solicitud_api' %}",
-         s_exp_prestamos_activos_api: "{% url 's_exp_prestamos_activos_api' %}",
-         s_exp_marcar_entregado_api: "{% url 's_exp_marcar_entregado_api' %}",
-         s_exp_prestamos_devolucion_api: "{% url 's_exp_prestamos_devolucion_api' %}",
-         s_exp_procesar_devolucion_api: "{% url 's_exp_procesar_devolucion_api' %}",
-         s_exp_reportes_data_api: "{% url 's_exp_reportes_data_api' %}",
-         s_exp_exportar_excel: "{% url 's_exp_exportar_excel' %}",
-         s_exp_exportar_pdf: "{% url 's_exp_exportar_pdf' %}",
-         s_exp_buscar_expedientes_api: "{% url 's_exp_buscar_expedientes_api' %}",
-         s_exp_crear_solicitud_api: "{% url 's_exp_crear_solicitud_api' %}",
-         s_exp_mis_solicitudes_api: "{% url 's_exp_mis_solicitudes_api' %}",
-         s_exp_solicitar_devolucion_api: "{% url 's_exp_solicitar_devolucion_api' %}",
-         s_exp_alertas_api: "{% url 's_exp_alertas_api' %}",
-         s_exp_motivos_api: "{% url 's_exp_motivos_api' %}",
-         s_exp_info_usuario_api: "{% url 's_exp_info_usuario_api' %}",
-         s_exp_historial_api: "{% url 's_exp_historial_api' %}",
-         s_exp_historial_detalle_api: "{% url 's_exp_historial_detalle_api' solicitud_id=0 %}".replace('/0/', '/'),
-         s_exp_notificado_listo_api: "{% url 's_exp_notificado_listo_api' %}",
-         s_exp_vencimiento_leido_api: "{% url 's_exp_vencimiento_leido_api' %}",
-
-      };
-
-
-   </script>
-
-   <!-- LIBRERÍAS JS -->
+<!-- LIBRERÍAS JS -->
 
    <script src="{% static 'core/jquery/jquery-3.7.1.min.js' %}"></script>
 
@@ -480,7 +486,7 @@
    <script src="{% static 'core/datatables/jszip/jszip.min.js' %}"></script>
 
    <script src="{% static 'core/select2/js/select2.min.js' %}"></script>
-
+    
    <script src="{% static 'core/inputmask/inputmask.js' %}"></script>
 
    <script src="{% static 'core/tom-select/js/tom-select.complete.min.js' %}"></script>
@@ -505,7 +511,6 @@
    <script src="{% static 'core/scripts/core/main.js' %}"></script>
 
    <script src="{% static 'core\scripts\media\controlGaleria.js' %}"></script>
-   <script src="{% static 'core/scripts/s_exp/notificaciones_globales.js' %}"></script>
 
    <script src="{% static 'core/scripts/modals/usuario_modals.js' %}"></script>
 
@@ -518,5 +523,6 @@
 
 
 </body>
-
 </html>
+
+
