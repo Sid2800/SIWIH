@@ -54,10 +54,10 @@ class ReporteGeneradorView(UnidadRolRequiredMixin, TemplateView):
         modelos = []
 
         informesRx = [
-            (1,'ESTUDIOS IMPRESOS POR DEPENDENCIA'),
-            (2,'GASTO DE MATERIAL POR DEPENDENCIA'),
-            (3,'Pacientes atendidos diariamente por dependencia'),
-            (4,'Estudios realizados por dependencia'),
+            (1,'ESTUDIOS IMPRESOS POR UNIDAD DE ATENCION'),
+            (2,'GASTO DE MATERIAL POR UNIDAD DE ATENCION'),
+            (3,'Pacientes atendidos diariamente por UNIDAD DE ATENCION'),
+            (4,'Estudios realizados por UNIDAD DE ATENCION'),
         ]
 
         informesReferencia = [
@@ -208,7 +208,7 @@ class ObtenerInteraccionFiltroAgrupacion(View):
                     'fecha_modificado': 'Fecha Actualizacion',
                 }
                 agrupaciones = {
-                    'dependencia_id': 'Dependencia',
+                    'unidad_clinica_id': 'Unidad Clinica',
                     'maquinarx_id': 'Maquina RX',
                     'paciente__sector__aldea__municipio__departamento_id': 'Departamento',
                     'creado_por_id': 'Usuario de creacion',
@@ -222,7 +222,7 @@ class ObtenerInteraccionFiltroAgrupacion(View):
                     'evaluacionRx__fecha': 'Fecha Evaluacion'
                 }
                 agrupaciones = {
-                    'dependencia_id': 'Dependencia',
+                    'unidad_clinica_id': 'Unidad Clinica',
                     'evaluacionRx__maquinarx_id': 'Maquina RX',
                     'evaluacionRx__paciente__sector__aldea__municipio__departamento_id': 'Departamento',
                     'estudio_id': 'Estudio',
@@ -295,17 +295,14 @@ class ObtenerOpcionesFiltro(View):
                     return JsonResponse({'valores': zonas}, status=200)
 
 
-            if campo == 'dependencia_id':
-                    salas = ServicioService.obtener_salas_activas()
-                    areas = ServicioService.obtener_areas_atencion_activas_servicio()
-                    serv_aux = ServicioService.obtener_servicios_aux_activas()
+            if campo == 'unidad_clinica_id':
+                    unidades_clinicas = ServicioService.obtener_unidades_clinicas(incluir_externo=True)
+                    print(unidades_clinicas)
+                    unidades_clinicas = [{'id': f"{uc['clave']}", 'valor': f"{uc['nombre']}", 'tipo': uc['tipo']} for uc in unidades_clinicas]
 
-                    salas = [{'id': f"S-{s['id']}", 'valor': f"{s['nombre_sala']} | {s['servicio__nombre_corto']}", 'tipo': 'sala'} for s in salas]
-                    areas = [{'id': f"E-{e['id']}", 'valor': f"{e['nombre_area_atencion']} | {e['servicio__nombre_corto']}", 'tipo': 'area_atencion'} for e in areas]
-                    serv_aux = [{'id': f"A-{a['id']}", 'valor': f"{a['nombre_servicio_a']} | SERV_AUX", 'tipo': 'servicio_auxiliar'} for a in serv_aux]
-                    
-                    valores_combinados = salas + areas + serv_aux
-                    return JsonResponse({'valores': valores_combinados}, status=200)
+                    print(unidades_clinicas)
+
+                    return JsonResponse({'valores': unidades_clinicas}, status=200)
 
 
             if campo == 'maquinarx_id' or campo == 'evaluacionRx__maquinarx_id':
@@ -930,8 +927,9 @@ class InformesCatalogo(View):
                 sp = SP_CATALOGO_REFERENCIAS_ENVIADAS
             else:
                 sp = SP_CATALOGO_REFERENCIAS_RECIBIDAS
-
+                
             titulos, data = ServiceExcel.obtener_data_catalogo(sp, fecha_ini, fecha_fin)
+
 
             if len(data) == 0:
                 return JsonResponse({'error': 'No hay datos disponibles para generar el informe.'}, status=404)

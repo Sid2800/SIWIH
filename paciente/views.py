@@ -1076,8 +1076,8 @@ def guardarDefuncion(request):
     try:
         id_paciente = validar_entero_positivo(data.get('idPaciente'), "idPaciente")
         id_defuncion = validar_entero_positivo(data.get('idDefuncion'), "idDefuncion") if data.get('idDefuncion') else None
-        id_unidad_clinica = validar_entero_positivo(data.get('unidad_clinica'))
         tipo = validar_entero_positivo(data.get('tipo'), "tipo")
+
     except ValidationError as e:
         return JsonResponse({'error': e.message_dict}, status=400)
     
@@ -1085,12 +1085,12 @@ def guardarDefuncion(request):
     motivo = data.get('motivo')
 
     unidad_clinica = None
-
-    try:
-        unidad_clinica = ServicioService.obtener_unidad_clinica(id_unidad_clinica)
-    except ValidationError:
-        return JsonResponse({'error': 'La unidad clinica no es válida'}, status=400)
-    
+    if tipo == 1:
+        try:
+            unidad_clinica = ServicioService.obtener_unidad_clinica(data.get('unidad_clinica'))
+        except ValidationError:
+            return JsonResponse({'error': 'La unidad clinica no es válida'}, status=400)
+        
 
     if not fecha or not id_paciente or not tipo:
         return JsonResponse({'error': 'Datos incompletos'}, status=400)
@@ -1145,7 +1145,6 @@ def guardarObito(request):
     try:
         id_paciente = validar_entero_positivo(data.get('idPaciente'), "idPaciente")
         id_obito = validar_entero_positivo(data.get('idObito'), "idObito") if data.get('idObito') else None
-        id_unidad_clinica = validar_entero_positivo(data.get('unidadClinica'))
         tipo = validar_entero_positivo(data.get('tipo'), "tipo")
     except ValidationError as e:
         return JsonResponse({'error': e.message_dict}, status=400)
@@ -1156,12 +1155,11 @@ def guardarObito(request):
     nombre_responsable = data.get('nombreResponsable')
 
     unidad_clinica = None
-
-
-    try:
-        unidad_clinica = ServicioService.obtener_unidad_clinica(id_unidad_clinica)
-    except ValidationError:
-        return JsonResponse({'error': 'La unidad clinica no es válida'}, status=400)
+    if tipo == 1:
+        try:
+            unidad_clinica = ServicioService.obtener_unidad_clinica(data.get('unidadClinica'))
+        except ValidationError:
+            return JsonResponse({'error': 'La unidad clinica no es válida'}, status=400)
 
 
     # Validación básica

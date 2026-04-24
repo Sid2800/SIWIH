@@ -21,7 +21,7 @@ fecha_hoy = timezone.localdate()
 
 
 class EvaluacionRXCreateForm(forms.ModelForm):
-    # Campos auxiliares (paciente y dependencia)
+    # Campos auxiliares (paciente y unidad clinca)
     idPaciente = forms.CharField(required=False)
     dniPaciente = forms.CharField(required=False)
     numeroExpediente = forms.CharField(required=False)
@@ -32,11 +32,7 @@ class EvaluacionRXCreateForm(forms.ModelForm):
     telefonoPaciente = forms.CharField(required=False)
     direccionPaciente = forms.CharField(required=False)
 
-    dependencia = forms.ChoiceField(
-        required=True,
-        label="Dependencia",
-        widget=forms.Select(attrs={"class": "formularioCampo-select", "id": "id_dependencia"})
-    )
+
 
     fecha = forms.DateField(
         initial=date.today, 
@@ -56,7 +52,7 @@ class EvaluacionRXCreateForm(forms.ModelForm):
 
     class Meta:
         model = EvaluacionRx
-        fields = ["fecha", "observaciones", "maquinarx", "dependencia"]
+        fields = ["fecha", "observaciones", "maquinarx", "unidad_clinica"]
 
     def asignar_propiedades_campos_paciente(self):
         """Asigna estilos a los campos auxiliares del paciente (sólo lectura)."""
@@ -68,7 +64,7 @@ class EvaluacionRXCreateForm(forms.ModelForm):
             'edadPaciente',
             'sexoPaciente',
             'telefonoPaciente',
-            'direccionPaciente'
+            'direccionPaciente',
         ]
 
         for campo in campos:
@@ -82,20 +78,26 @@ class EvaluacionRXCreateForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        dependencias = ServicioService.obtener_dependencias(incluir_externo=True)
+        
+        unidad_clinica = ServicioService.obtener_unidades_clinicas(incluir_externo=True)
 
-        dependencias = [
+        unidad_clinica = [
             (d['clave'], f"{d['nombre']} ({d['tipo']})")
-            for d in dependencias
+            for d in unidad_clinica
         ]
 
-        self.fields['dependencia'].choices = dependencias
+        self.fields['unidad_clinica'].choices = unidad_clinica
         if not self.instance.pk:  # solo si es creación
-            self.fields['dependencia'].initial = "E-1"
+            self.fields['unidad_clinica'].initial = "1"
 
         self.fields['observaciones'].widget.attrs.update({
             'class': 'formularioCampo-select',
             'placeholder': 'Observaciones'
+        })
+
+        self.fields['unidad_clinica'].widget.attrs.update({
+            'class': 'formularioCampo-select',
+            'placeholder': 'Unidad Clinica'
         })
 
         self.fields['maquinarx'].widget.attrs.update({
@@ -115,7 +117,7 @@ class EvaluacionRXCreateForm(forms.ModelForm):
     def clean(self):
         cleaned_data = super().clean()
         id_paciente = cleaned_data.get('idPaciente')
-        dependencia = cleaned_data.get('dependencia')
+        unidad_clinica = cleaned_data.get('unidad_clinica')
         estudios_json = self.data.get("estudios_json")
 
         # trabajamos con paciente y paciente interno
@@ -149,17 +151,10 @@ class EvaluacionRXCreateForm(forms.ModelForm):
             self.externo = p_externo
             cleaned_data['paciente'] = None
 
-        # Procesar dependencia
-        if dependencia:
-            try:
-                obj, campo =    ServicioService.obtener_dependencia_y_campo(dependencia)
-            except ValidationError as e:
-                raise forms.ValidationError(str(e))
+        # Procesar unida_clinica
+        if unidad_clinica.estado != 1:
+            raise forms.ValidationError("Unidad clínica inactiva")
 
-            cleaned_data['sala'] = None
-            cleaned_data['area_atencion'] = None
-            cleaned_data['servicio_auxiliar'] = None
-            cleaned_data[campo] = obj
 
         # Validar que estudios_json no esté vacío y sea string válido
         if not estudios_json or not isinstance(estudios_json, str):
@@ -285,7 +280,7 @@ class EvaluacionRXEditForm(EvaluacionRXCreateForm):
 
 
         #agregar la sala aunque no este activa o este oculta
-        info = ServicioService.encontrar_dependencia_en_instance(self.instance)
+        info = ServicioService.encontrar_unidad_clinica_en_instance(self.instance)
 
         if info:
             clave_actual = info["clave"]
@@ -293,8 +288,8 @@ class EvaluacionRXEditForm(EvaluacionRXCreateForm):
             
 
             # Revisar si ya está en choices
-            if clave_actual not in dict(self.fields['dependencia'].choices):
+            if clave_actual not in dict(self.fields['unidad_clinica'].choices):
                 # Agregarlo al principio
-                self.fields['dependencia'].choices = [(clave_actual, f"{label})")] + list(self.fields['dependencia'].choices)
+                self.fields['unidad_clinica'].choices = [(clave_actual, f"{label})")] + list(self.fields['unidad_clinica'].choices)
 
-            self.fields['dependencia'].initial = clave_actual
+            self.fields['unidad_clinica'].initial = clave_actual
