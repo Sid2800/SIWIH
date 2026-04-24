@@ -735,7 +735,7 @@ def marcar_entregado_api(request):
     try:
         ahora = timezone.now()
         prestamo.fecha_entrega = ahora
-        
+
         # Lógica de vencimiento flexible (Pruebas vs Producción)
         if prestamo.es_minutos:
             # Si el préstamo se configuró en minutos (para pruebas)
@@ -743,7 +743,7 @@ def marcar_entregado_api(request):
         else:
             # Configuración estándar en horas
             prestamo.fecha_limite = ahora + timedelta(hours=prestamo.tiempo_limite_horas)
-            
+
         prestamo.estado = 'Entregado'
         prestamo.save()
 
@@ -772,9 +772,10 @@ def marcar_entregado_api(request):
         )
 
         logger.info(f"Préstamo #{prestamo.id} entregado por {request.user.username}")
+        tz = timezone.get_current_timezone()
         return JsonResponse({
             "success": True,
-            "fecha_entrega": ahora.strftime("%d/%m/%Y %H:%M"),
+            "fecha_entrega": ahora.astimezone(tz).strftime("%d/%m/%Y %H:%M"),
             "fecha_limite": prestamo.fecha_limite.isoformat(),
         })
 
