@@ -1543,12 +1543,30 @@ def reportes_data_api(request):
         fecha_inicio = request.GET.get('fecha_inicio', '')
         fecha_fin = request.GET.get('fecha_fin', '')
 
+        # Convertir a datetimes tz-aware para evitar RuntimeWarning
+        from datetime import datetime, time as _dtime
+        dt_ini = dt_fin = None
+        if fecha_inicio:
+            try:
+                dt_ini = timezone.make_aware(
+                    datetime.combine(datetime.strptime(fecha_inicio, '%Y-%m-%d').date(), _dtime.min)
+                )
+            except (ValueError, TypeError):
+                dt_ini = None
+        if fecha_fin:
+            try:
+                dt_fin = timezone.make_aware(
+                    datetime.combine(datetime.strptime(fecha_fin, '%Y-%m-%d').date(), _dtime.max)
+                )
+            except (ValueError, TypeError):
+                dt_fin = None
+
         # Filtros base sobre SolicitudPrestamo.fecha_creacion
         sol_filtros = {}
-        if fecha_inicio:
-            sol_filtros['fecha_creacion__gte'] = fecha_inicio
-        if fecha_fin:
-            sol_filtros['fecha_creacion__lte'] = fecha_fin + ' 23:59:59'
+        if dt_ini:
+            sol_filtros['fecha_creacion__gte'] = dt_ini
+        if dt_fin:
+            sol_filtros['fecha_creacion__lte'] = dt_fin
 
         qs_solicitudes = SolicitudPrestamo.objects.filter(**sol_filtros)
 
@@ -1627,10 +1645,10 @@ def reportes_data_api(request):
         # --- MOROSIDAD (préstamos vencidos activos) ---
         ahora = timezone.now()
         filtros_prestamo = {}
-        if fecha_inicio:
-            filtros_prestamo['fecha_aprobacion__gte'] = fecha_inicio
-        if fecha_fin:
-            filtros_prestamo['fecha_aprobacion__lte'] = fecha_fin + ' 23:59:59'
+        if dt_ini:
+            filtros_prestamo['fecha_aprobacion__gte'] = dt_ini
+        if dt_fin:
+            filtros_prestamo['fecha_aprobacion__lte'] = dt_fin
 
         morosos = Prestamo.objects.filter(
             estado__in=['Entregado', 'Vencido'],
@@ -1972,12 +1990,23 @@ def _obtener_datos_reporte_areas_motivos(fecha_inicio='', fecha_fin=''):
         'total_general': int
     }
     """
-    # Filtrar solicitudes por rango de fechas
+    # Filtrar solicitudes por rango de fechas (timezone-aware)
+    from datetime import datetime, time as _dtime
     sol_filtros = {}
     if fecha_inicio:
-        sol_filtros['fecha_creacion__gte'] = fecha_inicio
+        try:
+            d_ini = datetime.strptime(fecha_inicio, '%Y-%m-%d').date()
+            dt_ini = timezone.make_aware(datetime.combine(d_ini, _dtime.min))
+            sol_filtros['fecha_creacion__gte'] = dt_ini
+        except (ValueError, TypeError):
+            pass
     if fecha_fin:
-        sol_filtros['fecha_creacion__lte'] = fecha_fin + ' 23:59:59'
+        try:
+            d_fin = datetime.strptime(fecha_fin, '%Y-%m-%d').date()
+            dt_fin = timezone.make_aware(datetime.combine(d_fin, _dtime.max))
+            sol_filtros['fecha_creacion__lte'] = dt_fin
+        except (ValueError, TypeError):
+            pass
 
     qs_solicitudes = SolicitudPrestamo.objects.filter(**sol_filtros).select_related('motivo')
 
@@ -2290,8 +2319,8 @@ def exportar_reporte_pdf(request):
         st_usuario_val = ParagraphStyle('usr_val', parent=styles['Normal'],
                                         fontName='Helvetica', fontSize=10)
         st_tabla_head = ParagraphStyle('tabla_head', parent=styles['Normal'],
-                                       fontName='Helvetica-Bold', fontSize=8,
-                                       textColor=colors.white, alignment=TA_CENTER, leading=10)
+                                       fontName='Helvetica-Bold', fontSize=7,
+                                       textColor=colors.white, alignment=TA_CENTER, leading=9)
         st_tabla_cell = ParagraphStyle('tabla_cell', parent=styles['Normal'],
                                        fontName='Helvetica', fontSize=10,
                                        alignment=TA_CENTER, leading=12)
@@ -2325,13 +2354,13 @@ def exportar_reporte_pdf(request):
         elementos.append(t_usuario)
         elementos.append(Spacer(1, 14))
 
-        # Construir tabla: Áreas x Motivos
-        encabezados = ['Área'] + datos_reporte['motivos'] + ['TOTAL']
+        # Construir tabla: Áreas x Motivos (motivos en mayúsculas)
+        encabezados = ['ÁREA'] + [str(m).upper() for m in datos_reporte['motivos']] + ['TOTAL']
         filas = [[Paragraph(str(h), st_tabla_head) for h in encabezados]]
 
         # Filas de datos
         for idx, area in enumerate(datos_reporte['areas']):
-            fila = [Paragraph(str(area), st_tabla_area)]
+            fila = [Paragraph(str(area).upper(), st_tabla_area)]
             for col_idx in range(len(datos_reporte['motivos'])):
                 count = datos_reporte['datos'][idx][col_idx]
                 fila.append(Paragraph(str(count), st_tabla_cell))
@@ -2345,9 +2374,9 @@ def exportar_reporte_pdf(request):
         fila_total.append(Paragraph(str(datos_reporte['total_general']), st_tabla_total))
         filas.append(fila_total)
 
-        # Anchos: Área 4cm, Total 2cm, motivos distribuyen el resto
+        # Anchos: Área 3cm, Total 2cm, motivos distribuyen el resto
         num_motivos = len(datos_reporte['motivos'])
-        area_w = 4 * cm
+        area_w = 3 * cm
         total_w = 2 * cm
         motivo_w = (doc.width - area_w - total_w) / max(num_motivos, 1)
         col_widths = [area_w] + [motivo_w] * num_motivos + [total_w]
