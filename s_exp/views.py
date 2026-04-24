@@ -1981,26 +1981,32 @@ def _obtener_datos_reporte_areas_motivos(fecha_inicio='', fecha_fin=''):
 
     qs_solicitudes = SolicitudPrestamo.objects.filter(**sol_filtros).select_related('motivo')
 
-    # Obtener todas las áreas y motivos únicos
-    areas = sorted(set(
-        s.area_destino or 'Sin Área'
-        for s in qs_solicitudes.values_list('area_destino', flat=True).distinct()
-    ))
+    # Obtener todas las áreas únicas (strings directos, no objetos)
+    areas_raw = qs_solicitudes.values_list('area_destino', flat=True).distinct()
+    areas = sorted(set(a or 'Sin Área' for a in areas_raw))
 
-    motivos = sorted(set(
-        s.motivo.nombre if s.motivo else 'Sin Motivo'
-        for s in qs_solicitudes
-    ))
+    # Obtener todos los motivos únicos
+    motivos_raw = qs_solicitudes.values_list('motivo__nombre', flat=True).distinct()
+    motivos = sorted(set(m or 'Sin Motivo' for m in motivos_raw))
 
     # Construir matriz de conteos
     datos = {}
     for area in areas:
         datos[area] = {}
         for motivo in motivos:
-            count = qs_solicitudes.filter(
-                area_destino=area if area != 'Sin Área' else '',
-                motivo__nombre=motivo if motivo != 'Sin Motivo' else None
-            ).count()
+            # Construir filtros de forma segura
+            filtros = {}
+            if area == 'Sin Área':
+                filtros['area_destino__in'] = ['', None]
+            else:
+                filtros['area_destino'] = area
+
+            if motivo == 'Sin Motivo':
+                filtros['motivo__isnull'] = True
+            else:
+                filtros['motivo__nombre'] = motivo
+
+            count = qs_solicitudes.filter(**filtros).count()
             datos[area][motivo] = count
 
     # Construir filas de datos y calcular totales
