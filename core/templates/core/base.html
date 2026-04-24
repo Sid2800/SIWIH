@@ -140,7 +140,7 @@
             {% endif %}
 
 
-            {% if request.user|tiene_unidad:"Estadistica:Sala" %}
+            {% if request.user|tiene_unidad:"Estadistica:Sala:Admision" %}
             <li>
                <a href="{% url 's_exp_buscador' %}" class="bn-navegacion__enlace">
                   <i class="bi bi-folder2-open bn-navegacion-enlace__logo"></i>
@@ -203,13 +203,11 @@
          </div>
 
          <div class="bp-inf-usuario">
-            
-            <img 
-               src="{% if usuario_imagen_url %}{{ usuario_imagen_url }}{% else %}{% static 'core/img/avatar.jpg' %}{% endif %}" 
-               alt="imagen de perfil" 
-               class="bp-inf-usuario__imagen"
-            >
-            
+
+            <img
+               src="{% if usuario_imagen_url %}{{ usuario_imagen_url }}{% else %}{% static 'core/img/avatar.jpg' %}{% endif %}"
+               alt="imagen de perfil" class="bp-inf-usuario__imagen">
+
             <div class="bp-inf-usuario__texto">
                {% if request.user.is_authenticated %}
                <span class="bp-inf-usuario-texto__usuario">
@@ -277,12 +275,12 @@
       /* Token CSRF accesible desde JS */
       window.CSRF_TOKEN = "{{ csrf_token }}";
 
-   /* Configuración general del sistema */
-   window.APP_CONFIG = {
-      estudioDefaultImg: "{% static 'core/img/estudio_default.png' %}",
-      usuarioDefaultImg: "{% static 'core/img/avatar.jpg' %}"
+      /* Configuración general del sistema */
+      window.APP_CONFIG = {
+         estudioDefaultImg: "{% static 'core/img/estudio_default.png' %}",
+         usuarioDefaultImg: "{% static 'core/img/avatar.jpg' %}"
 
-   };
+      };
 
 
       /* URLs DEL SISTEMA (API / VIEWS) */
@@ -290,13 +288,13 @@
       window.urls = {
 
 
-      /* ---------------- USAURIO ---------------- */
+         /* ---------------- USAURIO ---------------- */
 
-      procesarImagenUsuario: "{% url 'procesar_imagen_usuario' %}",
+         procesarImagenUsuario: "{% url 'procesar_imagen_usuario' %}",
 
 
-      
-      /* ---------------- PACIENTES ---------------- */
+
+         /* ---------------- PACIENTES ---------------- */
 
          obtenerPacienteCenso: "{% url 'obtener-paciente-censo' %}",
          listadoPacientes: "{% url 'listar_pacientes_API' %}",
@@ -378,17 +376,17 @@
 
          /* ---------------- UBICACIÓN ---------------- */
 
-      municipioXdepto: "{% url 'municipioXdepartamento' %}",
-      listarZona: "{% url 'listarZona' %}",
-      listarSala: "{% url 'listarSala' %}",
-      listarDiagnostico: "{% url 'listar_diagnostico' %}",
-      listarAreaAtencion: "{% url 'listarAreaAtencion' %}",
-      listarDependencias: "{% url 'listar_dependencias' %}",
+         municipioXdepto: "{% url 'municipioXdepartamento' %}",
+         listarZona: "{% url 'listarZona' %}",
+         listarSala: "{% url 'listarSala' %}",
+         listarDiagnostico: "{% url 'listar_diagnostico' %}",
+         listarAreaAtencion: "{% url 'listarAreaAtencion' %}",
+         listarDependencias: "{% url 'listar_dependencias' %}",
 
-      cambiarZona: "{% url 'cambiarZona' %}",
-      agregarSector: "{% url 'agregarSector' %}",
+         cambiarZona: "{% url 'cambiarZona' %}",
+         agregarSector: "{% url 'agregarSector' %}",
 
-      
+
 
 
 
@@ -446,6 +444,8 @@
          s_exp_prestamos_devolucion_api: "{% url 's_exp_prestamos_devolucion_api' %}",
          s_exp_procesar_devolucion_api: "{% url 's_exp_procesar_devolucion_api' %}",
          s_exp_reportes_data_api: "{% url 's_exp_reportes_data_api' %}",
+         s_exp_exportar_excel: "{% url 's_exp_exportar_excel' %}",
+         s_exp_exportar_pdf: "{% url 's_exp_exportar_pdf' %}",
          s_exp_buscar_expedientes_api: "{% url 's_exp_buscar_expedientes_api' %}",
          s_exp_crear_solicitud_api: "{% url 's_exp_crear_solicitud_api' %}",
          s_exp_mis_solicitudes_api: "{% url 's_exp_mis_solicitudes_api' %}",
