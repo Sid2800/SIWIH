@@ -55,16 +55,17 @@ def _registrar_log(usuario, accion, descripcion, objeto_tipo=None, objeto_id=Non
 def _es_exp_admin(user):
     """
     Verifica si un usuario tiene permisos administrativos sobre el módulo de expedientes.
-    Se basa en el rol 'ADMIN:Admision' definido en el sistema SIWI.
-    """
-    """True si el usuario es admin del módulo.
-    Condiciones: rol 'admin' en PerfilUnidad, grupo 'administradores', staff o superuser.
+    Roles permitidos: Administrador, Digitador, Directivo.
     """
     if user.is_superuser or user.is_staff:
         return True
     if user.groups.filter(name='administradores').exists():
         return True
-    return PerfilUnidad.objects.filter(usuario=user, rol='admin').exists()
+    # Permitir acceso a usuarios con roles: admin, digitador, directivo
+    return PerfilUnidad.objects.filter(
+        usuario=user,
+        rol__in=['admin', 'digitador', 'directivo']
+    ).exists()
 
 
 def _es_exp_solicitante(user):
