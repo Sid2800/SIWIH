@@ -152,6 +152,9 @@ class EvaluacionRXCreateForm(forms.ModelForm):
             cleaned_data['paciente'] = None
 
         # Procesar unida_clinica
+        if not unidad_clinica:
+            raise forms.ValidationError("Debe indicar una unidad clinica que solicita la evaluacion.")
+            
         if unidad_clinica.estado != 1:
             raise forms.ValidationError("Unidad clínica inactiva")
 

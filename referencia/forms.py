@@ -59,23 +59,11 @@ class ReferenciaCreateForm(forms.ModelForm):
         validators=[validar_fecha] 
     )
 
-    area_refiere = forms.ChoiceField(
-        required=False,
-        choices=[],
-        widget=forms.Select(
-            attrs={
-                'class': 'formularioCampo-select',
-                'id': 'id_area_refiere',
-                'name': 'area_responde'
-            }
-        ),
-        label='Area que refiere'
-    ) 
 
 
     class Meta:
         model = Referencia
-        fields = ["fecha_elaboracion", "fecha_recepcion", "tipo","institucion_origen", "institucion_destino", "atencion_requerida", "motivo","motivo_detalle","elaborada_por","oportuna","justificada","observaciones","especialidad_destino","area_refiere","motivo_no_atencion"]
+        fields = ["fecha_elaboracion", "fecha_recepcion", "tipo","institucion_origen", "institucion_destino", "atencion_requerida", "motivo","motivo_detalle","elaborada_por","oportuna","justificada","observaciones","especialidad_destino","unidad_clinica_refiere","motivo_no_atencion"]
 
 
     def asignar_propiedades_campos_paciente(self):
@@ -106,14 +94,18 @@ class ReferenciaCreateForm(forms.ModelForm):
         # Solo instituciones activas
         qs_activas = Institucion_salud.objects.filter(estado=True)
         qs_especialidad = Referencia_especialidad.objects.filter(estado=True)
-        qs_dependencias = ServicioService.obtener_dependencias(incluir_externo=False)
+        qs_unidades_clinicas = ServicioService.obtener_unidades_clinicas(incluir_externo=False)
 
         areas_refieren = [
             (d['clave'], f"{d['nombre']} ({d['tipo']})")
-            for d in qs_dependencias
+            for d in qs_unidades_clinicas
         ]
 
-        self.fields['area_refiere'].choices = areas_refieren
+        self.fields['unidad_clinica_refiere'].choices = areas_refieren
+        self.fields['unidad_clinica_refiere'].widget.attrs.update({
+            'class': 'formularioCampo-select',
+            'placeholder': 'Institucion Origen'
+        })
         self.fields['motivo_no_atencion'].widget = forms.HiddenInput()
 
 
@@ -209,9 +201,8 @@ class ReferenciaCreateForm(forms.ModelForm):
         observaciones = cleaned_data.get('observaciones')
         fecha_elaboracion = cleaned_data.get("fecha_elaboracion")
         fecha_recepcion = cleaned_data.get("fecha_recepcion")
-        area_refiere = cleaned_data.get("area_refiere")
         especialidad_destino = cleaned_data.get("especialidad_destino")
-
+        unidad_clinica = cleaned_data.get('unidad_clinica_refiere')
         atencion_requerida = self.cleaned_data.get("atencion_requerida")
         if atencion_requerida is None:
             raise forms.ValidationError("Debe indicar la atencion requerida")
@@ -242,29 +233,17 @@ class ReferenciaCreateForm(forms.ModelForm):
             cleaned_data['motivo_no_atencion'] = None
 
             if not especialidad_destino:
-                raise forms.ValidationError("Debe indicar el área a la que el paciente es referido")
+                raise forms.ValidationError("Debe indicar la especialidad a la que el paciente es referido")
 
-            if area_refiere:
-                try:
-                    obj, campo = ServicioService.obtener_dependencia_y_campo(area_refiere)
-                except forms.ValidationError as e:
-                    raise forms.ValidationError(str(e))
-
-                # Limpiar campos de área de respuesta
-                cleaned_data['area_refiere_sala'] = None
-                cleaned_data['area_refiere_area_atencion'] = None
-                cleaned_data['area_refiere_servicio_auxiliar'] = None
-
-                campo = f"area_refiere_{campo}"
-                cleaned_data[campo] = obj
+            if unidad_clinica:
+                if unidad_clinica.estado != 1:
+                    raise forms.ValidationError("Unidad clínica inactiva")
             else:
                 raise forms.ValidationError("Debe indicar el área que refiere")
 
         else: #recibida
             cleaned_data['especialidad_destino'] = None
-            cleaned_data['area_refiere_sala'] = None
-            cleaned_data['area_refiere_area_atencion'] = None
-            cleaned_data['area_refiere_servicio_auxiliar'] = None
+            cleaned_data['unidad_clinica_refiere'] = None
 
             try:
                 justificada = int(self.data.get('justificada', 0))
@@ -302,7 +281,6 @@ class ReferenciaEditForm(ReferenciaCreateForm):
 
         # Obtener solo las activas
         qs_activas = Institucion_salud.objects.filter(estado=True)
-        dependencias = ServicioService.obtener_dependencias(incluir_externo=False)
 
         # Si hay una instancia en edición
         if self.instance and self.instance.pk:
@@ -314,19 +292,6 @@ class ReferenciaEditForm(ReferenciaCreateForm):
             if self.instance.institucion_destino:
                 qs_activas = qs_activas | Institucion_salud.objects.filter(pk=self.instance.institucion_destino.pk)
 
-            #agregar la sala aunque no este activa o este oculta
-            info = ServicioService.encontrar_dependencia_en_instance(self.instance,prefijo="area_refiere_")
-
-            if info:
-                clave_actual = info["clave"]
-                label = f"{info['nombre']} ({info['tipo']})"
-            
-                # Revisar si ya está en choices
-                if clave_actual not in dict(self.fields['area_refiere'].choices):
-                    # Agregarlo al principio
-                    self.fields['area_refiere'].choices = [(clave_actual, f"{label})")] + list(self.fields['area_refiere'].choices)
-
-                self.fields['area_refiere'].initial = clave_actual
 
         self.fields['institucion_origen'].queryset = qs_activas.distinct()
         self.fields['institucion_origen'].widget.attrs.update({
@@ -446,18 +411,6 @@ class RespuestaCreateForm(forms.ModelForm):
     
     institucion_responde = forms.CharField(required=False)
 
-    area_responde = forms.ChoiceField(
-        required=False,
-        choices=[],
-        widget=forms.Select(
-            attrs={
-                'class': 'formularioCampo-select',
-                'id': 'id_area_responde',
-                'name': 'area_responde'
-            }
-        ),
-        label='Area que responde'
-    )
 
     idRespuesta = forms.CharField(widget=forms.HiddenInput(), required=False)
 
@@ -491,6 +444,7 @@ class RespuestaCreateForm(forms.ModelForm):
             'fecha_recepcion',
             'area_capta',
             'area_seguimiento_area_atencion',
+            'unidad_clinica_responde',
             'institucion_destino',
             'observaciones',
             'motivo',
@@ -505,7 +459,7 @@ class RespuestaCreateForm(forms.ModelForm):
         self.principal_instance = principal_instance
         self.referencia = principal_instance 
 
-        dependencias = ServicioService.obtener_dependencias(incluir_externo=False)
+        unidades_clinicas = ServicioService.obtener_unidades_clinicas(incluir_externo=False)
         qs_areas_atencion_activas = Area_atencion.objects.filter(estado=True)
         qs_instituciones_activa_1erNivel = Institucion_salud.objects.filter(Q(estado=True, nivel_atencion=1) | Q(id=65) # INCLUIMOS AL CERRATO
                                                         )
@@ -560,16 +514,19 @@ class RespuestaCreateForm(forms.ModelForm):
             self.fields['seguimiento_referencia_institucion_destino'].widget.attrs['readonly'] = True
             self.fields['seguimiento_referencia_especialidad_destino'].widget.attrs['readonly'] = True
 
-
+        
         areas_responden = [
             (d['clave'], f"{d['nombre']} ({d['tipo']})")
-            for d in dependencias
+            for d in unidades_clinicas
         ]
-
-        self.fields['area_responde'].choices = areas_responden
+        
+        self.fields['unidad_clinica_responde'].choices = areas_responden
+        self.fields['unidad_clinica_responde'].widget.attrs.update({
+            'class': 'formularioCampo-select',
+            'placeholder': 'Area que reponde a la referencia',
+        })
         if not self.instance.pk:  # solo si es creación
-            self.fields['area_responde'].initial = "S-710" #obstetricia
-        #self.fields['area_responde'].initial = "S-710"
+            self.fields['unidad_clinica_responde'].initial = "23" #obstetricia
 
 
         self.fields['area_capta'].widget.attrs.update({
@@ -651,7 +608,7 @@ class RespuestaCreateForm(forms.ModelForm):
 
         # Áreas y seguimiento
         area_capta = cleaned_data.get("area_capta")
-        area_responde = cleaned_data.get("area_responde")
+        unidad_clinica_responde = cleaned_data.get("unidad_clinica_responde")
         seguimiento = int(self.data.get("seguimiento")) if self.data.get("seguimiento") is not None else 1
         area_atencion_seguimiento = cleaned_data.get("area_seguimiento_area_atencion")
         institucion_destino = cleaned_data.get("institucion_destino")
@@ -671,21 +628,11 @@ class RespuestaCreateForm(forms.ModelForm):
             if not area_capta:
                 raise forms.ValidationError("El área que capta la referencia es obligatoria.")
             
-            if area_responde:
-                try:
-                    obj, campo = ServicioService.obtener_dependencia_y_campo(area_responde)
-                except forms.ValidationError as e:
-                    raise forms.ValidationError(str(e))
-
-                # Limpiar campos de área de respuesta
-                cleaned_data['area_reponde_sala'] = None
-                cleaned_data['area_reponde_area_atencion'] = None
-                cleaned_data['area_reponde_servicio_auxiliar'] = None
-
-                campo = f"area_reponde_{campo}"
-                cleaned_data[campo] = obj
-            else:
-                raise forms.ValidationError("Debe indicar un área de respuesta para la referencia.")
+            if not unidad_clinica_responde:
+                raise forms.ValidationError("Debe indicar un área de respuesta para la respuesta.")
+            
+            if unidad_clinica_responde.estado != 1:
+                raise forms.ValidationError("Unidad clínica inactiva")
 
 
             # BLOQUEO DE CAMBIO SI YA EXISTE UNA REFERENCIA ENVIADA
@@ -799,6 +746,8 @@ class RespuestaEditForm(RespuestaCreateForm):
         #agregar la sala aunque no este activa o este oculta
         info = ServicioService.encontrar_dependencia_en_instance(self.instance,prefijo="area_reponde_")
 
+
+        """
         if info:
             clave_actual = info["clave"]
             label = f"{info['nombre']} ({info['tipo']})"
@@ -808,4 +757,4 @@ class RespuestaEditForm(RespuestaCreateForm):
                 # Agregarlo al principio
                 self.fields['area_responde'].choices = [(clave_actual, f"{label})")] + list(self.fields['area_responde'].choices)
 
-            self.fields['area_responde'].initial = clave_actual
+            self.fields['area_responde'].initial = clave_actual"""

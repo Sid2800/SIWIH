@@ -88,8 +88,7 @@ document.addEventListener('DOMContentLoaded', function () {
         placeholder: 'ESPECIALIDAD DESTINO',
         maxOptions: 4
     });
-    
-    const areaRefiereSelect = new TomSelect("#id_area_refiere", {
+    const unidadClinicaRefiereSelect = new TomSelect("#id_unidad_clinica_refiere", {
         valueField: "id",
         dropdownParent: 'body',
         labelField: "text",
@@ -503,7 +502,7 @@ document.addEventListener('DOMContentLoaded', function () {
         contenedorInteractivo.classList.add("oculto");
         //limpiamos los select de ref enviada
         especialidadDestinoSelect.clear();
-        areaRefiereSelect.clear();
+        unidadClinicaRefiereSelect.clear();
 
         fechaRecepcion.disabled = false;
     }
@@ -747,7 +746,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // Declaración global de los selects (todas inicializadas en null)
         let respuestaAreaCaptaSelect = null;
-        let respuestaAreaRespuestaSelect = null;
+        let respuestaUnidaClinicaRespondeSelect = null;
         let respuestaSeguimientoAreaAtencionSelect = null;
         let respuestaMotivoSelect = null;
         let respuestaElaboradaPorSelect = null;
@@ -759,7 +758,7 @@ document.addEventListener('DOMContentLoaded', function () {
         // Si el tipo es 0 (recibida), inicializamos campos exclusivos
         if (tipo === 0) {
             respuestaAreaCaptaSelect = initTomSelect("respuesta_area_capta", "ÁREA QUE CAPTA", true);
-            respuestaAreaRespuestaSelect = initTomSelect("respuesta_area_responde", "ÁREA QUE RESPONDE", true);
+            respuestaUnidaClinicaRespondeSelect = initTomSelect("respuesta_unidad_clinica_responde", "ÁREA QUE RESPONDE", true);
             respuestaSeguimientoAreaAtencionSelect = initTomSelect("respuesta_area_seguimiento_area_atencion", "SEGUIMIENTO AREA ATENCION", true);
             respuestaSeguimientoReferenciaDestinoSelect = initTomSelect("respuesta_seguimiento_referencia_institucion_destino","INSTITUCION DESTINO", true);
             respuestaSeguimientoReferenciaEspecialidadSelect = initTomSelect("respuesta_seguimiento_referencia_especialidad_destino","ESPECIALIDAD DESTINO", true);
@@ -767,14 +766,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // Inicializamos los campos comunes
         respuestaMotivoSelect = initTomSelect("respuesta_motivo", "MOTIVO");
-        respuestaElaboradaPorSelect = initTomSelect("respuesta_elaborada_por", "ELABORADO POR"); // ✅ corregido (antes usabas idObjetoMotivo)
+        respuestaElaboradaPorSelect = initTomSelect("respuesta_elaborada_por", "ELABORADO POR"); 
         respuestaAtencionRequeridaSelect = initTomSelect("respuesta_atencion_requerida", "ATENCIÓN REQUERIDA");
         respuestaInstitucionDestinoSelect = initTomSelect("respuesta_institucion_destino", "INSTITUCIÓN DESTINO",true);
 
-        // Retornar todos los objetos por si necesitás manipularlos luego
+        // Retornar todos los objetos 
         return {
             respuestaAreaCaptaSelect,
-            respuestaAreaRespuestaSelect,
+            respuestaUnidaClinicaRespondeSelect: respuestaUnidaClinicaRespondeSelect,
             respuestaMotivoSelect,
             respuestaElaboradaPorSelect,
             respuestaAtencionRequeridaSelect,
@@ -1194,7 +1193,7 @@ document.addEventListener('DOMContentLoaded', function () {
             Recibida.checked = true;
             Recibida.dispatchEvent(new Event('change'));
         }
-        areaRefiereSelect.clear();
+        unidadClinicaRefiereSelect.clear();
     } else if (modoUso === 2) { // Modo edicion de reerencia puede 
     // // ser modo add o edicion respuesta
         
@@ -1283,14 +1282,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const formData = new FormData(formReferencia);
 
-
         // --- Validaciones previas ---
         if (!verificarPaciente()) return;
         formData.append("idPaciente", idPaciente.value);
 
-
         let valorSeleccionado;
-
         // Tipo de referencia e institución
         if (Recibida.checked) {
             valorSeleccionado = institucionOrigenSelect.getValue();
@@ -1307,8 +1303,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
             // ademas la data de destnio/*
-
-
         } else {
             toastr.error("Recuerda indicar el tipo de referencia.");
             return;
@@ -1334,7 +1328,6 @@ document.addEventListener('DOMContentLoaded', function () {
             formData.append("MotivoNoAtencion", idMotivoNoAtencion.value ? idMotivoNoAtencion.value : 0 );
         }
         
-
         // --- Envío ---
         botonGuardar.disabled = true;
         botonGuardar.innerHTML = `<span class="spinner"></span> Guardando...`;
@@ -1439,7 +1432,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (typeof tipo !== 'undefined' && tipo === 0){
             if (
                 !validarTomSelect(selectsRespuesta.respuestaAreaCaptaSelect, "Seleccione el área que captó la referencia") ||
-                !validarTomSelect(selectsRespuesta.respuestaAreaRespuestaSelect, "Seleccione el área que brindó la respuesta") ||
+                !validarTomSelect(selectsRespuesta.respuestaUnidaClinicaRespondeSelect, "Seleccione la unidad clinica que brindó la respuesta") ||
                 !validarTomSelect(selectsRespuesta.respuestaElaboradaPorSelect, "Seleccione el tipo de personal que escribió la respuesta")
             ) {
                 return;
