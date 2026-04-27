@@ -61,7 +61,7 @@ class ReporteGeneradorView(UnidadRolRequiredMixin, TemplateView):
         ]
 
         informesReferencia = [
-            (1, 'REFERENCIAS A MAYOR COMPLEJIDAD SEGÚN AREA ATENCION'),
+            (1, 'REFERENCIAS A MAYOR COMPLEJIDAD ESPECIALIDAD DESTINO'),
             (2, 'REFERENCIAS A MAYOR COMPLEJIDAD SEGUN INSTITUCIONES'),
             (3, 'REFERENCIAS A MAYOR COMPLEJIDAD SEGUN MOTIVO'),
             (4, 'SEGUIMIENTO A REFERENCIAS ENVIADAS A MAYOR COMPLEJIDAD'),
