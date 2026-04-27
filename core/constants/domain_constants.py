@@ -14,7 +14,7 @@ class AccionEstudio(str, Enum):
     KEEP = "KEEP"
     DELETE = "DELETE"
 
-class UsoDependencia(str, Enum):
+class UsoUnidadC(str, Enum):
     GENERAL = "general"
     DEFUNCION = "defuncion"
     OBITO = "obito"

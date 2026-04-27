@@ -1258,7 +1258,7 @@ def obtener_obito_paciente(request):
     if not obito:
         return JsonResponse({"mensaje": "no obito"}, status=200)
 
-    # Resolver dependencia
+    # Resolver unidad clinica
     if obito.unidad_clinica:
         info = ServicioService.encontrar_unidad_clinica_en_instance(obito)
         if info:

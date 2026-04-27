@@ -43,16 +43,16 @@ class ReporteImagenologiaService:
             #mapear los title el nombre del archivo y el tirulo de reporte
             if indice == 1:
                 titulo = f"INFORME DE ESTUDIOS IMPRESOS POR UNIDAD CLINICA"
-                archivo_name = f"Estudios_impresos_dependencia_{mes}_{anio}.pdf"
-                title = f"Estudios impresos por dependencia {str(mes).upper()}"
+                archivo_name = f"Estudios_impresos_unidad_clinica_{mes}_{anio}.pdf"
+                title = f"Estudios impresos por unidad clinica {str(mes).upper()}"
             elif indice == 2:
                 titulo = f"INFORME DEL GASTO DE MATERIAL POR UNIDAD CLINICA"
-                archivo_name = f"Gasto_material_dependencia_{mes}_{anio}.pdf"
-                title = f"Gasto de material por dependencia {str(mes).upper()}"
+                archivo_name = f"Gasto_material_unidad_clinica_{mes}_{anio}.pdf"
+                title = f"Gasto de material por unidad clinica {str(mes).upper()}"
             elif indice == 3:
                 titulo = f"INFORME DE PACIENTES ATENDIDIOS POR UNIDAD CLINICA"
-                archivo_name = f"Informe_paciente_dependencia_{mes}_{anio}.pdf"
-                title = f"Informe de pacientes por dependencia {str(mes).upper()}"
+                archivo_name = f"Informe_paciente_unidad_clinica_{mes}_{anio}.pdf"
+                title = f"Informe de pacientes por unidad clinica {str(mes).upper()}"
 
 
 
@@ -124,7 +124,7 @@ class ReporteImagenologiaService:
                 ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
                 ('VALIGN', (0, 0), (-1, 0), 'MIDDLE'),
 
-                # Primera columna (dependencias): negrita, alineada a la izquierda
+                # Primera columna (unidades): negrita, alineada a la izquierda
                 ('ALIGN', (0, 0), (0, -1), 'LEFT'),
                 ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
 
@@ -156,7 +156,7 @@ class ReporteImagenologiaService:
             ]
 
             # --- Preparar encabezados y columnas ---
-            encabezado = ['DEPENDENCIA']
+            encabezado = ['UNIDAD CLINICA']
             anchos_column = [80 * mm]
 
             # Decidir tamaño base según cantidad de días
@@ -236,7 +236,7 @@ class ReporteImagenologiaService:
             # --- Validar parámetros de entrada ---
             if not reporte_criterios:
                 log_warning(
-                    "Intento de generar informe estudio dependencia sin criterios",
+                    "Intento de generar informe estudio unidad clinica sin criterios",
                     app=LogApp.REPORTE
                 )
                 raise ValueError("Criterios requeridos")
@@ -248,9 +248,9 @@ class ReporteImagenologiaService:
             columnas = reporte_criterios['columnas']
 
             # --- Configuración general del reporte ---
-            titulo = "INFORME CONTROL DE ESTUDIOS RADIOGRAFICOS POR DEPENDENCIA"
-            archivo_name = f"Estudios_control_dependencia_{mes}_{anio}.pdf"
-            title = f"Estudios control dependencia {str(mes).upper()}"
+            titulo = "INFORME CONTROL DE ESTUDIOS RADIOGRAFICOS POR UNIDAD CLINICA"
+            archivo_name = f"Estudios_control_unidad_clinica_{mes}_{anio}.pdf"
+            title = f"Estudios control unidad clinica {str(mes).upper()}"
 
             # Respuesta como PDF
             response = HttpResponse(content_type='application/pdf')
@@ -441,7 +441,7 @@ class ReporteImagenologiaService:
 
         except Exception:
             log_error(
-                f"Error generando informe estudios dependencia mes={mes} anio={anio}",
+                f"Error generando informe estudios por unidad clinica mes={mes} anio={anio}",
                 app=LogApp.REPORTE
             )
             raise

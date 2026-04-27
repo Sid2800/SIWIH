@@ -238,9 +238,7 @@
     const modoUso = "{{ MD }}";
     const Pexterno = "{{ Pexterno }}";
     {% if MD == 2 %} 
-        {% if dependencia_actual %} 
-            const dependenciaActual = {{ dependencia_actual|safe }};
-        {% endif %}
+
         {% if estudios_actuales %}
             // Convertimos los estudios actuales a un array de objetos 
             const estudiosActuales = {{ estudios_actuales|safe }};

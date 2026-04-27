@@ -15,7 +15,7 @@ from django.db.models import Q
 
 
 class ReferenciaCreateForm(forms.ModelForm):
-    # Campos auxiliares (paciente y dependencia)
+    # Campos auxiliares (paciente y unidad)
     idPaciente = forms.CharField(required=False)
     dniPaciente = forms.CharField(required=False)
     numeroExpediente = forms.CharField(required=False)
@@ -743,18 +743,3 @@ class RespuestaEditForm(RespuestaCreateForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)   
 
-        #agregar la sala aunque no este activa o este oculta
-        info = ServicioService.encontrar_dependencia_en_instance(self.instance,prefijo="area_reponde_")
-
-
-        """
-        if info:
-            clave_actual = info["clave"]
-            label = f"{info['nombre']} ({info['tipo']})"
-        
-            # Revisar si ya está en choices
-            if clave_actual not in dict(self.fields['area_responde'].choices):
-                # Agregarlo al principio
-                self.fields['area_responde'].choices = [(clave_actual, f"{label})")] + list(self.fields['area_responde'].choices)
-
-            self.fields['area_responde'].initial = clave_actual"""

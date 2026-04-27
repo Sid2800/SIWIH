@@ -389,11 +389,11 @@ document.addEventListener('DOMContentLoaded', function () {
             render: function (data) {
                 if (data) {
                     // Obtenemos el nombre de la area_atencion y lo limitamos a 20 caracteres
-                    let dependencia = data.unidad_clinica_descripcion;
-                    dependencia = dependencia.substring(0, 21);
+                    let unidadC = data.unidad_clinica_descripcion;
+                    unidadC = unidadC.substring(0, 21);
                 
                     // Concatenamos la sala truncada con el nombre corto del servicio, usando concatenarLimpio
-                    data = dependencia;
+                    data = unidadC;
                 }
                 return data;
             }

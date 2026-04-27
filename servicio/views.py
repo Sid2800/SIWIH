@@ -2,7 +2,7 @@ from django.shortcuts import render
 from dal import autocomplete
 from django.http import JsonResponse
 from core.services.servicio_service import ServicioService
-from core.constants.domain_constants import UsoDependencia
+from core.constants.domain_constants import UsoUnidadC
 from django.db.models import Q
 from django.views.decorators.csrf import csrf_exempt
 from django.views import View
@@ -75,14 +75,14 @@ class ListarUnidadesClinicas(View):
     def get(self, request):
         uso_param = request.GET.get("uso")
         try:
-            uso = UsoDependencia(uso_param) if uso_param else UsoDependencia.GENERAL
+            uso = UsoUnidadC(uso_param) if uso_param else UsoUnidadC.GENERAL
         except ValueError:
-            uso = UsoDependencia.GENERAL  
+            uso = UsoUnidadC.GENERAL  
 
         incluir_externo = True
         solo_emergencia = False
 
-        if uso == UsoDependencia.DEFUNCION or UsoDependencia.OBITO:
+        if uso == UsoUnidadC.DEFUNCION or UsoUnidadC.OBITO:
             incluir_externo = False
             solo_emergencia = True
 
