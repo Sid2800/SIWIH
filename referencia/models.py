@@ -101,27 +101,7 @@ class Referencia(models.Model):
 
     # Área que refiere (solo para referencias tipo enviada)
     unidad_clinica_refiere = models.ForeignKey(Unidad_clinica, on_delete=models.PROTECT, null=True, blank=True, related_name="referencias_enviadas")
-    area_refiere_sala = models.ForeignKey(
-        Sala,
-        null=True,
-        blank=True,
-        on_delete=models.PROTECT,
-        related_name="referencias_enviadas_sala"
-    )
-    area_refiere_area_atencion = models.ForeignKey(
-        Area_atencion,
-        null=True,
-        blank=True,
-        on_delete=models.PROTECT,
-        related_name="referencias_enviadas_area_atencion"
-    )
-    area_refiere_servicio_auxiliar = models.ForeignKey(
-        ServiciosAux,
-        null=True,
-        blank=True,
-        on_delete=models.PROTECT,
-        related_name="referencias_enviadas_servicio_auxiliar"
-    )
+    
         
     especialidad_destino = models.ForeignKey(
         Referencia_especialidad,
@@ -257,18 +237,6 @@ class Respuesta(models.Model):
 
     # Área que da la respuesta
     unidad_clinica_responde = models.ForeignKey(Unidad_clinica, on_delete=models.PROTECT, null=True, blank=True, related_name="respuestas_emitidas")
-    area_reponde_sala = models.ForeignKey(
-        Sala, null=True, blank=True, on_delete=models.PROTECT,
-        related_name="respuestas_reponde_sala"
-    )
-    area_reponde_area_atencion = models.ForeignKey(
-        Area_atencion, null=True, blank=True, on_delete=models.PROTECT,
-        related_name="respuestas_reponde_area_atencion"
-    )
-    area_reponde_servicio_auxiliar = models.ForeignKey(
-        ServiciosAux, null=True, blank=True, on_delete=models.PROTECT,
-        related_name="respuestas_reponde_servicio_auxiliar"
-    )
 
     # Área de seguimiento (null indica que el seguimiento no lo damos nosotros)
     area_seguimiento_area_atencion = models.ForeignKey(
