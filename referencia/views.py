@@ -323,9 +323,7 @@ class RespuestaCreateUpdateView(View):
                         "atencion_requerida": instance.atencion_requerida,
                         "elaborada_por": instance.elaborada_por,
                         #area que refiere paso el campo como tal para podemos mapear
-                        "area_refiere_sala": instance.area_reponde_sala,
-                        "area_refiere_area_atencion": instance.area_reponde_area_atencion,
-                        "area_refiere_servicio_auxiliar": instance.area_reponde_servicio_auxiliar,
+                        "unidad_clinica_refiere": instance.unidad_clinica_responde,
                         "especialidad_destino": form.cleaned_data.get('seguimiento_referencia_especialidad_destino'),
                         "observaciones": instance.observaciones                    
                         },diagnosticos, usuario)
