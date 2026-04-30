@@ -320,12 +320,12 @@ async function enviarSolicitud() {
         return;
     }
 
-    // Listado de todos los expedientes — se mostrará en grid de columnas en el modal
+    // Listado de todos los expedientes — grid responsivo de columnas con tipografía uniforme
     const itemsHtml = carrito
         .map(c => `<div class="sexp-modal-item">
-            <strong>${c.paciente_dni || 'S/ID'}</strong>
-            <span>${c.paciente_nombre || 'N/A'}</span>
-            <small>Expediente #${c.numero_expediente}</small>
+            <span class="sexp-modal-item-id">${c.paciente_dni || 'S/ID'}</span>
+            <span class="sexp-modal-item-nombre">${c.paciente_nombre || 'N/A'}</span>
+            <span class="sexp-modal-item-exp">Expediente #${c.numero_expediente}</span>
         </div>`)
         .join('');
 
@@ -339,11 +339,12 @@ async function enviarSolicitud() {
             <p class="sexp-modal-resumen">¿Desea continuar?</p>
         </div>`;
 
-    // Reutilizar el modal estándar de helpers.js
+    // Reutilizar el modal estándar de helpers.js (mismo flujo que cerrar sesión)
+    // Textos de botones cortos para que quepan en una sola línea
     const confirmado = await confirmarAccion(
         'Confirmar Solicitud',
         mensaje,
-        'Enviar solicitud',
+        'Aceptar',
         'Cancelar'
     );
 
