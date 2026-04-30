@@ -102,12 +102,24 @@ function initTabla() {
                         return `
                             <div class="sexp-action-group">
                                 ${btnImprimir}
+                                <button class="sexp-action-btn sexp-action-btn--revisar" onclick="revisarEntrega(${data.id})">
+                                    <i class="bi bi-clipboard-check"></i> Revisión de Entrega
+                                </button>
                                 <button class="sexp-action-btn sexp-action-btn--listo" onclick="marcarListo(${data.id})">
-                                    <i class="bi bi-box-seam"></i> Marcar Listo
+                                    <i class="bi bi-bell"></i> Listo para entregar
                                 </button>
                             </div>`;
                     }
-                    const estadosImprimibles = ['SOL_LISTO_RECOGER', 'SOL_EN_PRESTAMO', 'SOL_EN_DEVOLUCION', 'SOL_FINALIZADA', 'SOL_INCOMPLETA'];
+                    if (data.estado_flujo === 'SOL_LISTO_RECOGER') {
+                        return `
+                            <div class="sexp-action-group">
+                                ${btnImprimir}
+                                <button class="sexp-action-btn sexp-action-btn--entregar" onclick="entregarPrestamoDesdeGestion(${data.prestamo_id || 0}, ${data.id})">
+                                    <i class="bi bi-box-arrow-up-right"></i> Entregar
+                                </button>
+                            </div>`;
+                    }
+                    const estadosImprimibles = ['SOL_EN_PRESTAMO', 'SOL_EN_DEVOLUCION', 'SOL_FINALIZADA', 'SOL_INCOMPLETA'];
                     if (estadosImprimibles.includes(data.estado_flujo)) {
                         return btnImprimir;
                     }
@@ -476,11 +488,11 @@ function imprimirSolicitud(id) {
  */
 function marcarListo(id) {
     Swal.fire({
-        title: '¿Confirmar que están listos?',
-        text: 'La solicitud #' + id + ' pasará a "Listo para recoger".',
+        title: '¿Listo para entregar?',
+        text: 'La solicitud #' + id + ' pasará a "Listo para entregar" y se notificará al usuario para que pase a recoger los expedientes.',
         icon: 'question',
         showCancelButton: true,
-        confirmButtonText: 'Sí, confirmar',
+        confirmButtonText: 'Sí, notificar',
         cancelButtonText: 'Cancelar',
         confirmButtonColor: '#059669'
     }).then((result) => {
@@ -493,7 +505,7 @@ function marcarListo(id) {
                 data: JSON.stringify({ solicitud_id: id }),
                 success: function (resp) {
                     if (resp.success) {
-                        toastr.success('Solicitud marcada como lista');
+                        toastr.success('Solicitud marcada como lista. Usuario notificado.');
                         tablaSolicitudes.ajax.reload();
                     }
                 },
@@ -503,5 +515,168 @@ function marcarListo(id) {
                 }
             });
         }
+    });
+}
+
+
+/**
+ * Modal de Revisión de Entrega:
+ * El admin verifica físicamente cada expediente antes de marcar listo.
+ * Permite desmarcar expedientes no encontrados y registrar comentario por expediente.
+ */
+function revisarEntrega(id) {
+    Swal.fire({
+        title: 'Cargando expedientes...',
+        allowOutsideClick: false,
+        didOpen: () => { Swal.showLoading(); }
+    });
+
+    $.ajax({
+        url: window.urls.s_exp_expedientes_revision_api + id + '/',
+        method: 'GET',
+        success: function (resp) {
+            Swal.close();
+            _mostrarModalRevision(id, resp.expedientes || []);
+        },
+        error: function (xhr) {
+            Swal.close();
+            const err = xhr.responseJSON ? xhr.responseJSON.error : 'No se pudieron cargar los expedientes';
+            toastr.error(err);
+        }
+    });
+}
+
+
+function _mostrarModalRevision(id, expedientes) {
+    if (!expedientes.length) {
+        toastr.warning('No hay expedientes aprobados para revisar');
+        return;
+    }
+    const filasHtml = expedientes.map(function (exp) {
+        const identidad = exp.paciente_identidad || exp.identidad || '';
+        const nombre = exp.paciente_nombre || exp.nombre || '';
+        return `
+        <div class="sexp-revision-row" id="rev-row-${exp.detalle_id}">
+            <label class="sexp-exp-dec-check" title="Marcado = encontrado, desmarcado = NO encontrado">
+                <input type="checkbox" class="sexp-revision-check" data-detalle="${exp.detalle_id}" checked>
+                <span class="sexp-exp-dec-checkmark"></span>
+            </label>
+            <div class="sexp-revision-info">
+                <span class="sexp-exp-tag">#${exp.numero}</span>
+                <span class="sexp-revision-id">${identidad || 'S/ID'}</span>
+                <span class="sexp-revision-nombre">${nombre || 'N/A'}</span>
+            </div>
+            <input type="text" class="sexp-revision-comentario" data-detalle="${exp.detalle_id}"
+                   placeholder="Comentario (obligatorio si se desmarca)" maxlength="200">
+        </div>`;
+    }).join('');
+
+    Swal.fire({
+        title: 'Revisión de Entrega — Solicitud #' + id,
+        width: 900,
+        html: `
+            <div class="sexp-revision-modal">
+                <p class="sexp-revision-help">
+                    <i class="bi bi-info-circle"></i>
+                    Marque los que encontró físicamente. Desmarque los que <strong>NO</strong> se encontraron y agregue un comentario.
+                </p>
+                <div class="sexp-revision-list">${filasHtml}</div>
+            </div>`,
+        showCancelButton: true,
+        confirmButtonText: '<i class="bi bi-save"></i> Guardar Revisión',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#059669',
+        didOpen: () => {
+            document.querySelectorAll('.sexp-revision-check').forEach(chk => {
+                chk.addEventListener('change', function () {
+                    const det = this.dataset.detalle;
+                    const row = document.getElementById('rev-row-' + det);
+                    if (this.checked) {
+                        row.classList.remove('sexp-revision-row--rechazado');
+                    } else {
+                        row.classList.add('sexp-revision-row--rechazado');
+                    }
+                });
+            });
+        },
+        preConfirm: () => {
+            const decisiones = [];
+            const desmarcadosSinComentario = [];
+            document.querySelectorAll('.sexp-revision-check').forEach(chk => {
+                const det = parseInt(chk.dataset.detalle, 10);
+                const encontrado = chk.checked;
+                const com = (document.querySelector(`.sexp-revision-comentario[data-detalle="${det}"]`).value || '').trim();
+                if (!encontrado && !com) desmarcadosSinComentario.push(det);
+                decisiones.push({ detalle_id: det, encontrado: encontrado, comentario: com });
+            });
+            if (desmarcadosSinComentario.length) {
+                Swal.showValidationMessage('Agregue un comentario para cada expediente desmarcado.');
+                return false;
+            }
+            return { decisiones };
+        }
+    }).then(function (result) {
+        if (!result.isConfirmed) return;
+        $.ajax({
+            url: window.urls.s_exp_revisar_entrega_api,
+            method: 'POST',
+            headers: { 'X-CSRFToken': window.CSRF_TOKEN },
+            contentType: 'application/json',
+            data: JSON.stringify({ solicitud_id: id, decisiones: result.value.decisiones }),
+            success: function (resp) {
+                if (resp.success) {
+                    if (resp.todos_rechazados) {
+                        toastr.warning('Todos los expedientes fueron rechazados. Solicitud cerrada.');
+                    } else {
+                        toastr.success(`Revisión guardada (${resp.cambios} cambio${resp.cambios === 1 ? '' : 's'}).`);
+                    }
+                    tablaSolicitudes.ajax.reload();
+                }
+            },
+            error: function (xhr) {
+                const err = xhr.responseJSON ? xhr.responseJSON.error : 'Error desconocido';
+                toastr.error(err);
+            }
+        });
+    });
+}
+
+
+/**
+ * Confirmar y entregar el préstamo desde la vista de Gestión.
+ * Usa la API existente de marcar_entregado_api (window.urls.s_exp_marcar_entregado_api).
+ */
+function entregarPrestamoDesdeGestion(prestamoId, solicitudId) {
+    if (!prestamoId) {
+        toastr.error('No se encontró el préstamo asociado a la solicitud');
+        return;
+    }
+    Swal.fire({
+        title: '¿Entregar expedientes?',
+        text: `Al confirmar, se inicia el conteo del tiempo límite para la solicitud #${solicitudId}.`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: '<i class="bi bi-box-arrow-up-right"></i> Sí, entregar',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#0d9488'
+    }).then(function (result) {
+        if (!result.isConfirmed) return;
+        $.ajax({
+            url: window.urls.s_exp_marcar_entregado_api,
+            method: 'POST',
+            headers: { 'X-CSRFToken': window.CSRF_TOKEN },
+            contentType: 'application/json',
+            data: JSON.stringify({ prestamo_id: prestamoId }),
+            success: function (resp) {
+                if (resp.success) {
+                    toastr.success('Préstamo entregado. Cronómetro iniciado.');
+                    tablaSolicitudes.ajax.reload();
+                }
+            },
+            error: function (xhr) {
+                const err = xhr.responseJSON ? xhr.responseJSON.error : 'Error desconocido';
+                toastr.error(err);
+            }
+        });
     });
 }

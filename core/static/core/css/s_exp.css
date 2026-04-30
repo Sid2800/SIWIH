@@ -109,11 +109,24 @@
 }
 
 .sexp-exp-tag--rechazado {
-    background: rgba(107, 114, 128, 0.12);
-    color: #6b7280;
-    border: 1px solid rgba(107, 114, 128, 0.3);
-    text-decoration: line-through;
-    opacity: 0.75;
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    font-weight: 700;
+}
+
+/* AMARILLO: expediente aprobado pero pendiente de devolver */
+.sexp-exp-tag--pendiente {
+    background: rgba(234, 179, 8, 0.18);
+    color: #b45309;
+    border: 1px solid rgba(234, 179, 8, 0.5);
+    font-weight: 700;
+}
+
+body.darkmode .sexp-exp-tag--pendiente {
+    color: #fbbf24;
+    background: rgba(234, 179, 8, 0.22);
+    border-color: rgba(234, 179, 8, 0.55);
 }
 
 
@@ -218,6 +231,18 @@
     background: rgba(0, 139, 139, 0.2);
     color: #008b8b;
     border: 1px solid rgba(0, 139, 139, 0.4);
+}
+
+.sexp-action-btn--revisar {
+    background: rgba(99, 102, 241, 0.2);
+    color: #4f46e5;
+    border: 1px solid rgba(99, 102, 241, 0.4);
+}
+
+.sexp-action-btn--entregar {
+    background: rgba(13, 148, 136, 0.2);
+    color: #0d9488;
+    border: 1px solid rgba(13, 148, 136, 0.4);
 }
 
 
@@ -730,11 +755,12 @@
 .sexp-sol-card {
     background-color: var(--blanco);
     border-radius: 1.2rem;
-    padding: 1.6rem;
+    padding: 1.8rem;
     border-left: 5px solid var(--colorBoton);
     transition: all .3s;
     color: var(--colorTablacelda);
     box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    font-size: 1.5rem;
 }
 .sexp-sol-card--pendiente   { border-left-color: #6366f1; }
 .sexp-sol-card--aprobado    { border-left-color: #22c55e; }
@@ -752,7 +778,7 @@
     flex-wrap: wrap;
     gap: 0.5rem;
 }
-.sexp-sol-header h3 { margin: 0; font-size: 1.8rem; font-weight: 700; }
+.sexp-sol-header h3 { margin: 0; font-size: 2rem; font-weight: 700; }
 
 .sexp-sol-badge {
     padding: 0.25rem 1.4rem;
@@ -773,9 +799,9 @@
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: 1rem;
     margin-bottom: 1.5rem;
-    font-size: 1.4rem;
+    font-size: 1.5rem;
 }
-.sexp-sol-info label { opacity: 0.6; font-size: 1.3rem; display: block; margin-bottom: 0.2rem; }
+.sexp-sol-info label { opacity: 0.6; font-size: 1.4rem; display: block; margin-bottom: 0.2rem; }
 
 .sexp-sol-exps { display: flex; gap: 0.3rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
 
@@ -903,13 +929,23 @@ body.darkmode .sexp-entregar-faltantes-btn:hover {
     font-weight: 700;
 }
 
-/* Icono de colapso - solo visible si se habilita */
+/* Icono de colapso - visible siempre en tarjetas marcadas como colapsables */
 .sexp-card-toggle {
-    display: none;
+    display: inline-block;
     font-size: 1.8rem;
     transition: transform 0.3s;
+    cursor: pointer;
+    opacity: 0.7;
 }
+.sexp-card-collapsible .sexp-card-toggle { display: inline-block; }
 .sexp-collapsed .sexp-card-toggle { transform: rotate(-180deg); }
+.sexp-card-collapsible .sexp-sol-header,
+.sexp-card-collapsible .sexp-dev-header {
+    cursor: pointer;
+}
+.sexp-card-collapsible.sexp-collapsed .sexp-card-body {
+    display: none !important;
+}
 
 .sexp-dev-info {
     display: grid;
@@ -2120,5 +2156,104 @@ body.darkmode .sexp-sugerir-tiempo {
     color: #fbbf24;
     flex: 0 0 auto;
     margin-top: 0.1rem;
+}
+
+
+/* ============================================================
+   MODAL REVISION DE ENTREGA
+   ============================================================ */
+.sexp-revision-modal {
+    text-align: left;
+}
+
+.sexp-revision-help {
+    margin: 0 0 1rem 0;
+    padding: 0.7rem 0.9rem;
+    background: rgba(99, 102, 241, 0.18);
+    border-radius: 0.6rem;
+    font-size: 1.4rem !important;
+    color: #FFFFFF;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+}
+
+.sexp-revision-help i {
+    color: #818cf8;
+    font-size: 1.5rem;
+    margin-top: 0.1rem;
+}
+
+.sexp-revision-list {
+    max-height: 400px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.sexp-revision-row {
+    display: grid;
+    grid-template-columns: auto 1fr 1.2fr;
+    gap: 0.8rem;
+    align-items: center;
+    padding: 0.7rem 0.9rem;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 0.6rem;
+    transition: background 0.2s, border-color 0.2s;
+}
+
+.sexp-revision-row--rechazado {
+    background: rgba(252, 165, 165, 0.95);
+    border-color: #dc2626;
+}
+
+.sexp-revision-row--rechazado .sexp-revision-id,
+.sexp-revision-row--rechazado .sexp-revision-nombre,
+.sexp-revision-row--rechazado .sexp-exp-tag {
+    color: #7f1d1d !important;
+}
+
+.sexp-revision-info {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    min-width: 0;
+}
+
+.sexp-revision-id {
+    font-weight: 700;
+    color: #FFFFFF;
+    font-size: 1.4rem;
+}
+
+.sexp-revision-nombre {
+    color: #e5e7eb;
+    font-size: 1.3rem;
+    word-break: break-word;
+}
+
+.sexp-revision-comentario {
+    width: 100%;
+    padding: 0.5rem 0.7rem !important;
+    border-radius: 0.5rem;
+    border: 1px solid #CCCCCC !important;
+    background: #FFFFFF !important;
+    color: #000000 !important;
+    font-size: 1.3rem !important;
+}
+
+.sexp-revision-row--rechazado .sexp-revision-comentario {
+    border-color: #dc2626 !important;
+    background: #FFFFFF !important;
+}
+
+@media (max-width: 768px) {
+    .sexp-revision-row {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+    }
 }
 

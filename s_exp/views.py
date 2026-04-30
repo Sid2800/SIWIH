@@ -259,10 +259,18 @@ def listar_solicitudes_api(request):
                     "fuera_de_tiempo": d.fuera_de_tiempo,
                     "aprobado": d.aprobado,
                     "motivo_rechazo_individual": d.motivo_rechazo_individual or "",
+                    "comentario_devolucion": d.comentario_devolucion or "",
                 })
+
+            prestamo_id = None
+            try:
+                prestamo_id = s.prestamo.id
+            except Exception:
+                prestamo_id = None
 
             data.append({
                 "id": s.id,
+                "prestamo_id": prestamo_id,
                 "usuario": s.usuario.username,
                 "usuario_nombre": f"{s.usuario.first_name} {s.usuario.last_name}".strip() or s.usuario.username,
                 "fecha_creacion": s.fecha_creacion.strftime("%d/%m/%Y %H:%M"),
@@ -273,6 +281,7 @@ def listar_solicitudes_api(request):
                 "area_destino": s.area_destino or "",
                 "cant_expedientes": s.cant_expedientes,
                 "expedientes": detalles_info,
+                "tiempo_sugerido_horas": s.tiempo_sugerido_horas,
             })
 
         return JsonResponse({
@@ -456,6 +465,30 @@ def aprobar_solicitud_api(request):
 
 
 @require_GET
+def expedientes_revision_api(request, solicitud_id):
+    """Retorna los expedientes APROBADOS de una solicitud en revisión (estado SOL_APROBADA_ORGANIZANDO)."""
+    if not _es_exp_admin(request.user):
+        return JsonResponse({"error": "Sin permisos"}, status=403)
+
+    try:
+        solicitud = SolicitudPrestamo.objects.get(
+            id=solicitud_id, estado_flujo_id='SOL_APROBADA_ORGANIZANDO'
+        )
+    except SolicitudPrestamo.DoesNotExist:
+        return JsonResponse({"error": "Solicitud no encontrada o no está en revisión"}, status=404)
+
+    expedientes = []
+    for d in solicitud.detalles.select_related('expediente_prestamo__expediente').filter(aprobado=True):
+        expedientes.append({
+            "detalle_id": d.id,
+            "numero": d.expediente_prestamo.expediente.numero,
+            "paciente_nombre": d.paciente_nombre or "",
+            "paciente_identidad": d.paciente_identidad or "",
+        })
+    return JsonResponse({"expedientes": expedientes})
+
+
+@require_GET
 def expedientes_solicitud_api(request, solicitud_id):
     """Retorna los expedientes de una solicitud pendiente para el modal de aprobación."""
     if not _es_exp_admin(request.user):
@@ -522,6 +555,97 @@ def imprimir_solicitud_pdf(request, solicitud_id):
 
 
 @csrf_protect
+@csrf_protect
+@require_POST
+def revisar_entrega_api(request):
+    """
+    Revisión de Entrega — el admin verifica físicamente cada expediente antes de marcar listo.
+    Permite desmarcar expedientes que no se encontraron físicamente y registrar comentario por expediente.
+    Los desmarcados pasan a EXP_DISPONIBLE y quedan con aprobado=False + motivo_rechazo_individual.
+    No cambia el estado de la solicitud (sigue en SOL_APROBADA_ORGANIZANDO).
+    """
+    if not _es_exp_admin(request.user):
+        return JsonResponse({"error": "Sin permisos"}, status=403)
+
+    try:
+        body = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Datos inválidos"}, status=400)
+
+    solicitud_id = body.get('solicitud_id')
+    decisiones = body.get('decisiones', [])
+
+    try:
+        solicitud = SolicitudPrestamo.objects.get(
+            id=solicitud_id, estado_flujo_id='SOL_APROBADA_ORGANIZANDO'
+        )
+    except SolicitudPrestamo.DoesNotExist:
+        return JsonResponse({"error": "Solicitud no encontrada o no está en revisión"}, status=404)
+
+    try:
+        from .models import ExpedienteEstadoLog
+        mapa = {d.get('detalle_id'): d for d in decisiones if d.get('detalle_id') is not None}
+        cambios = 0
+        for d in solicitud.detalles.select_related('expediente_prestamo__expediente'):
+            info = mapa.get(d.id)
+            if info is None:
+                continue
+            encontrado = bool(info.get('encontrado', True))
+            comentario = (info.get('comentario') or '').strip()
+
+            if not encontrado and d.aprobado:
+                # Marcado como no encontrado físicamente
+                d.aprobado = False
+                d.motivo_rechazo_individual = comentario or 'No encontrado físicamente'
+                d.save()
+
+                ep = d.expediente_prestamo
+                estado_ant = ep.estado
+                ep.estado_id = 'EXP_DISPONIBLE'
+                ep.save()
+                ExpedienteEstadoLog.objects.create(
+                    expediente=ep.expediente,
+                    estado_anterior=estado_ant,
+                    estado_nuevo_id='EXP_DISPONIBLE',
+                    usuario=request.user,
+                    solicitud=solicitud,
+                    observacion=f"Revisión de entrega: {d.motivo_rechazo_individual}"
+                )
+                cambios += 1
+            elif encontrado and comentario and comentario != (d.motivo_rechazo_individual or ''):
+                # Sólo actualizar comentario sin cambiar aprobación
+                d.motivo_rechazo_individual = comentario
+                d.save()
+                cambios += 1
+
+        # Si todos los expedientes quedaron rechazados, cerrar la solicitud
+        aprobados_restantes = solicitud.detalles.filter(aprobado=True).count()
+        if aprobados_restantes == 0:
+            solicitud.estado_flujo_id = 'SOL_RECHAZADA'
+            solicitud.save()
+            try:
+                p = solicitud.prestamo
+                p.estado = 'Cerrado'
+                p.save()
+            except Exception:
+                pass
+
+        _registrar_log(
+            request.user, 'REVISION_ENTREGA',
+            f'Revisión de entrega para solicitud #{solicitud.id}: {cambios} cambio(s).',
+            'SolicitudPrestamo', solicitud.id
+        )
+        return JsonResponse({
+            "success": True,
+            "cambios": cambios,
+            "todos_rechazados": aprobados_restantes == 0,
+        })
+    except Exception as e:
+        logger.error(f"Error en revisar_entrega_api: {e}", exc_info=True)
+        return JsonResponse({"error": "Error interno del servidor"}, status=500)
+
+
+@csrf_protect
 @require_POST
 def marcar_listo_recojer_api(request):
     """Admin marca que los expedientes ya están organizados físicamente y listos en ventanilla."""
@@ -531,9 +655,13 @@ def marcar_listo_recojer_api(request):
     try:
         body = json.loads(request.body)
         solicitud_id = body.get('solicitud_id')
-        
+
         solicitud = SolicitudPrestamo.objects.get(id=solicitud_id, estado_flujo_id='SOL_APROBADA_ORGANIZANDO')
+        # Validar que al menos un expediente siga aprobado
+        if solicitud.detalles.filter(aprobado=True).count() == 0:
+            return JsonResponse({"error": "No hay expedientes aprobados para entregar"}, status=400)
         solicitud.estado_flujo_id = 'SOL_LISTO_RECOGER'
+        solicitud.notificado_listo = False  # Reset para que el sistema dispare la alerta al usuario
         solicitud.save()
 
         _registrar_log(
@@ -869,16 +997,22 @@ def procesar_devolucion_api(request):
     try:
         body = json.loads(request.body)
         prestamo_id = body.get('prestamo_id')
-        detalles_recibidos = body.get('detalles_recibidos', []) 
-        detalles_perdidos = body.get('detalles_perdidos', [])   
-        detalles_no_recibidos = body.get('detalles_no_recibidos', []) 
+        detalles_recibidos = body.get('detalles_recibidos', [])
+        detalles_perdidos = body.get('detalles_perdidos', [])
+        detalles_no_recibidos = body.get('detalles_no_recibidos', [])
+        # Comentarios por expediente: { detalle_id: "comentario" }
+        comentarios_por_detalle = body.get('comentarios_por_detalle', {}) or {}
         notas = body.get('notas', '')
+
+        def _comentario(det_id):
+            v = comentarios_por_detalle.get(str(det_id)) or comentarios_por_detalle.get(det_id)
+            return (v or '').strip() or None
 
         prestamo = Prestamo.objects.get(id=prestamo_id)
         solicitud = prestamo.solicitud
-        
+
         from .models import ExpedienteEstadoLog
-        
+
         # 1. Procesar los que llegaron (Disponibles)
         esta_vencido = prestamo.esta_vencido
         unidad_usuario = _get_unidad_usuario(request.user)
@@ -889,6 +1023,7 @@ def procesar_devolucion_api(request):
                 detalle.devuelto = True
                 if esta_vencido:
                     detalle.fuera_de_tiempo = True
+                detalle.comentario_devolucion = _comentario(det_id)
                 detalle.save()
                 
                 ep = detalle.expediente_prestamo
@@ -910,7 +1045,8 @@ def procesar_devolucion_api(request):
         for det_id in detalles_perdidos:
             detalle = SolicitudExpedienteDetalle.objects.get(id=det_id, solicitud=solicitud)
             if not detalle.devuelto:
-                detalle.devuelto = True # Se marca como procesado
+                detalle.devuelto = True  # Se marca como procesado
+                detalle.comentario_devolucion = _comentario(det_id) or 'Marcado como perdido'
                 detalle.save()
                 
                 ep = detalle.expediente_prestamo
@@ -1342,6 +1478,7 @@ def mis_solicitudes_api(request):
                     "fuera_de_tiempo": d.fuera_de_tiempo,
                     "aprobado": d.aprobado,
                     "motivo_rechazo_individual": d.motivo_rechazo_individual or "",
+                    "comentario_devolucion": d.comentario_devolucion or "",
                 })
 
             prestamo_info = None
@@ -1406,6 +1543,28 @@ def alertas_usuario_api(request):
                     "tipo": "danger",
                     "titulo": "Préstamo Vencido",
                     "mensaje": f"El préstamo #{p.id} ha superado el límite de tiempo. Devuelva los expedientes de inmediato.",
+                    "prestamo_id": p.id,
+                })
+                continue
+
+            # Minutos restantes para alertas de 10 / 5 min
+            min_restantes = None
+            if p.fecha_limite:
+                min_restantes = int((p.fecha_limite - timezone.now()).total_seconds() // 60)
+
+            if min_restantes is not None and 0 < min_restantes <= 5:
+                alertas.append({
+                    "tipo": "danger",
+                    "titulo": "¡5 minutos para vencer!",
+                    "mensaje": f"El préstamo #{p.id} vence en {min_restantes} minuto(s). Devuelva los expedientes ahora.",
+                    "prestamo_id": p.id,
+                    "sticky": True,
+                })
+            elif min_restantes is not None and 5 < min_restantes <= 10:
+                alertas.append({
+                    "tipo": "warning",
+                    "titulo": "10 minutos para vencer",
+                    "mensaje": f"El préstamo #{p.id} vence en {min_restantes} minuto(s). Prepare la devolución.",
                     "prestamo_id": p.id,
                 })
             elif p.porcentaje_tiempo_usado >= 90:

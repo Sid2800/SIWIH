@@ -153,15 +153,22 @@ function iniciarCronometro(prestamoId, fechaLimiteISO, porcentaje) {
             return;
         }
 
-        const horas = Math.floor(diff / 3600000);
-        const minutos = Math.floor((diff % 3600000) / 60000);
-        const segundos = Math.floor((diff % 60000) / 1000);
-        timerEl.textContent = `${String(horas).padStart(2, '0')}:${String(minutos).padStart(2, '0')}:${String(segundos).padStart(2, '0')}`;
+        // Formato sin segundos: "X horas restantes" o "X minutos restantes"
+        const totalMin = Math.ceil(diff / 60000);
+        const horas = Math.floor(totalMin / 60);
+        const minutos = totalMin % 60;
+        let texto;
+        if (horas >= 1) {
+            texto = `${horas} h ${String(minutos).padStart(2, '0')} min restantes`;
+        } else {
+            texto = `${minutos} minuto${minutos === 1 ? '' : 's'} restantes`;
+        }
+        timerEl.textContent = texto;
 
-        if (porcentaje >= 90) {
+        if (porcentaje >= 90 || totalMin <= 10) {
             timerEl.className = 'sexp-timer sexp-timer--danger';
             if (progressEl) progressEl.className = 'sexp-progress-fill sexp-progress-fill--danger';
-        } else if (porcentaje >= 70) {
+        } else if (porcentaje >= 70 || totalMin <= 30) {
             timerEl.className = 'sexp-timer sexp-timer--warn';
             if (progressEl) progressEl.className = 'sexp-progress-fill sexp-progress-fill--warn';
         } else {
@@ -171,7 +178,8 @@ function iniciarCronometro(prestamoId, fechaLimiteISO, porcentaje) {
     }
 
     actualizar();
-    timerIntervals[prestamoId] = setInterval(actualizar, 1000);
+    // Refresco cada 60s — la vista se actualiza por completo cada 10 minutos via reload
+    timerIntervals[prestamoId] = setInterval(actualizar, 60000);
 }
 
 function marcarEntregado(prestamoId) {

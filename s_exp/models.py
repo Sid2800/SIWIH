@@ -231,6 +231,11 @@ class SolicitudExpedienteDetalle(models.Model):
         default=False,
         verbose_name='Entregado fuera de tiempo'
     )
+    comentario_devolucion = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name='Comentario de devolución del expediente'
+    )
 
     class Meta:
         db_table = 's_exp_solicituddetalle'

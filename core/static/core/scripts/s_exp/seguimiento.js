@@ -103,10 +103,26 @@ function renderSolicitudes(data, filtro = '') {
         };
 
         const exps = s.expedientes.map(e => {
-            const claseExtra = e.fuera_de_tiempo ? 'sexp-exp-tag--late' : '';
-            const title = e.fuera_de_tiempo ? 'Entregado fuera de tiempo' : '';
             const num = typeof e === 'object' ? e.numero : e;
-            return `<span class="sexp-exp-tag ${claseExtra}" title="${title}">#${num}</span>`;
+            if (typeof e !== 'object') {
+                return `<span class="sexp-exp-tag">#${num}</span>`;
+            }
+            const sanitize = (txt) => (txt || '').replace(/"/g, '&quot;');
+            // ROJO: expediente no prestado (rechazado o no encontrado)
+            if (e.aprobado === false) {
+                const motivo = e.motivo_rechazo_individual || 'No se prestó este expediente';
+                return `<span class="sexp-exp-tag sexp-exp-tag--rechazado" title="${sanitize(motivo)}">#${num}</span>`;
+            }
+            // AMARILLO: expediente aprobado pero pendiente de devolver (en préstamo activo)
+            if (e.aprobado === true && e.devuelto === false) {
+                return `<span class="sexp-exp-tag sexp-exp-tag--pendiente" title="Pendiente de devolver">#${num}</span>`;
+            }
+            // ESTANDAR: devuelto correctamente; si fue fuera de tiempo, mantener clase --late
+            if (e.fuera_de_tiempo) {
+                return `<span class="sexp-exp-tag sexp-exp-tag--late" title="Entregado fuera de tiempo${e.comentario_devolucion ? ' — ' + sanitize(e.comentario_devolucion) : ''}">#${num}</span>`;
+            }
+            const tooltip = e.comentario_devolucion ? sanitize(e.comentario_devolucion) : 'Devuelto correctamente';
+            return `<span class="sexp-exp-tag" title="${tooltip}">#${num}</span>`;
         }).join(' ');
         const badgeEstilo = badgeEstilos[claseEstado] || '';
         const borderColor = borderColors[claseEstado] || '#6366f1';
@@ -221,8 +237,7 @@ function solicitarDevolucion(solicitudId) {
  * @param {HTMLElement} headerEl - El elemento header que recibió el click.
  */
 function toggleCard(headerEl) {
-    if (window.innerWidth <= 768) {
-        const card = $(headerEl).closest('.sexp-card-collapsible');
-        card.toggleClass('sexp-collapsed');
-    }
+    // Colapso disponible en todos los tamaños de pantalla
+    const card = $(headerEl).closest('.sexp-card-collapsible');
+    card.toggleClass('sexp-collapsed');
 }
