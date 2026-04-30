@@ -1596,6 +1596,44 @@ body.darkmode .sexp-exp-tag {
     color: #ffffff;
     border-color: rgba(255,255,255,0.1);
 }
+
+/* ============================================================
+   COLORES POR ESTADO (sobrescriben las reglas base anteriores)
+   - ROJO: rechazados / no encontrados (no se prestaron)
+   - AMARILLO: aprobados pendientes de devolver
+   - LATE: entregados fuera de tiempo
+   ============================================================ */
+.sexp-exp-tag.sexp-exp-tag--rechazado,
+body.darkmode .sexp-exp-tag.sexp-exp-tag--rechazado {
+    background: rgba(239, 68, 68, 0.18) !important;
+    color: #dc2626 !important;
+    border: 1px solid rgba(239, 68, 68, 0.5) !important;
+    font-weight: 700 !important;
+}
+body.darkmode .sexp-exp-tag.sexp-exp-tag--rechazado {
+    color: #fca5a5 !important;
+    background: rgba(239, 68, 68, 0.22) !important;
+    border-color: rgba(239, 68, 68, 0.55) !important;
+}
+
+.sexp-exp-tag.sexp-exp-tag--pendiente {
+    background: rgba(234, 179, 8, 0.22) !important;
+    color: #92400e !important;
+    border: 1px solid rgba(234, 179, 8, 0.6) !important;
+    font-weight: 700 !important;
+}
+body.darkmode .sexp-exp-tag.sexp-exp-tag--pendiente {
+    color: #fbbf24 !important;
+    background: rgba(234, 179, 8, 0.25) !important;
+    border-color: rgba(234, 179, 8, 0.6) !important;
+}
+
+.sexp-exp-tag.sexp-exp-tag--late {
+    background: rgba(239, 68, 68, 0.15) !important;
+    color: #ef4444 !important;
+    border: 1px solid rgba(239, 68, 68, 0.3) !important;
+}
+
 /* Forzar colores de modo claro para Combobox y Textbox dentro del Carrito */
 .sexp-carrito-form select,
 .sexp-carrito-form textarea,

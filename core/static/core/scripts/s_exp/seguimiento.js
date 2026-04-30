@@ -104,7 +104,7 @@ function renderSolicitudes(data, filtro = '') {
 
         const sanitize = (txt) => (txt || '').replace(/"/g, '&quot;');
         // Estados en los que ya hay un préstamo activo y aplica el AMARILLO de "pendiente"
-        const enPrestamo = ['SOL_EN_PRESTAMO', 'SOL_EN_DEVOLUCION', 'SOL_INCOMPLETA'].includes(s.estado_flujo);
+        const enPrestamo = ['SOL_LISTO_RECOGER', 'SOL_EN_PRESTAMO', 'SOL_EN_DEVOLUCION', 'SOL_INCOMPLETA'].includes(s.estado_flujo);
         const exps = s.expedientes.map(e => {
             const num = typeof e === 'object' ? e.numero : e;
             if (typeof e !== 'object') {

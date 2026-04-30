@@ -47,7 +47,7 @@ function initTabla() {
             {
                 data: null,
                 render: function (row) {
-                    const enPrestamo = ['SOL_EN_PRESTAMO', 'SOL_EN_DEVOLUCION', 'SOL_INCOMPLETA'].includes(row.estado_flujo);
+                    const enPrestamo = ['SOL_LISTO_RECOGER', 'SOL_EN_PRESTAMO', 'SOL_EN_DEVOLUCION', 'SOL_INCOMPLETA'].includes(row.estado_flujo);
                     return (row.expedientes || []).map(e => {
                         const num = typeof e === 'object' ? e.numero : e;
                         const noAprobado = e.aprobado === false;
