@@ -1681,3 +1681,184 @@ body.darkmode .sexp-kpi-card {
     background-color: #3f4247;
 }
 
+/* ============================================================
+   BUSCADOR — Layout vertical con grid responsivo de 3 columnas
+   ============================================================ */
+.sexp-buscador-vertical {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+/* Caja de búsqueda en la parte superior */
+.sexp-search-box--top {
+    background-color: var(--blanco);
+    padding: 1rem 1.5rem;
+    border-radius: 1rem;
+    border: 1px solid var(--colorLinea);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+    margin-bottom: 0;
+}
+
+.sexp-buscador-resultados-wrap {
+    background-color: var(--blanco);
+    padding: 1.5rem;
+    border-radius: 1rem;
+    border: 1px solid var(--colorLinea);
+    color: var(--colorTablacelda);
+}
+
+.sexp-buscador-resultados-titulo {
+    margin: 0 0 1rem 0;
+    font-size: 1.7rem;
+    font-weight: 700;
+    color: var(--colorTablacelda);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Grid responsivo: 3 columnas en pantallas grandes */
+.sexp-resultados-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+}
+
+.sexp-grid-empty {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 2rem;
+    opacity: 0.6;
+    font-size: 1.5rem;
+}
+
+/* Tarjeta de resultado en grid */
+.sexp-resultado--card {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.6rem;
+    padding: 1.2rem 1.4rem;
+    margin-bottom: 0;
+    min-height: 130px;
+}
+
+.sexp-resultado-id-nombre {
+    margin: 0 0 0.3rem 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1.3;
+    word-break: break-word;
+}
+
+.sexp-resultado-id-nombre .sexp-id {
+    color: var(--colorBoton);
+    font-weight: 700;
+}
+
+.sexp-resultado-id-nombre .sexp-sep {
+    margin: 0 0.3rem;
+    opacity: 0.5;
+}
+
+.sexp-resultado-id-nombre .sexp-nombre {
+    font-weight: 600;
+}
+
+.sexp-resultado-exp,
+.sexp-resultado-ubic {
+    margin: 0 !important;
+    font-size: 1.3rem;
+    opacity: 0.8;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.sexp-resultado-acciones {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    padding-top: 0.6rem;
+    border-top: 1px dashed var(--colorLinea);
+}
+
+/* Carrito en parte inferior */
+.sexp-carrito--bottom {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.sexp-carrito-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.sexp-info-unidad {
+    font-size: 1.4rem;
+    opacity: 0.7;
+    margin: 0.2rem 0 0.5rem 0;
+}
+
+/* Modal de confirmación */
+.sexp-modal-confirm {
+    text-align: left;
+    font-size: 1.4rem;
+}
+
+.sexp-modal-lista {
+    margin: 0.6rem 0;
+    padding-left: 1.6rem;
+    max-height: 180px;
+    overflow-y: auto;
+    font-size: 1.3rem;
+}
+
+.sexp-modal-lista li {
+    margin-bottom: 0.3rem;
+}
+
+/* ============================================================
+   BUSCADOR — Responsive
+   ============================================================ */
+
+/* Tablet: 2 columnas */
+@media (max-width: 1024px) {
+    .sexp-resultados-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .sexp-carrito-form-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Móvil: 1 columna */
+@media (max-width: 640px) {
+    .sexp-resultados-grid {
+        grid-template-columns: 1fr;
+        gap: 0.8rem;
+    }
+    .sexp-search-box--top {
+        flex-direction: column;
+        padding: 0.8rem 1rem;
+    }
+    .sexp-search-box--top .sexp-search-select,
+    .sexp-search-box--top .sexp-search-input,
+    .sexp-search-box--top .sexp-search-btn {
+        width: 100%;
+    }
+    .sexp-resultado-id-nombre {
+        font-size: 1.4rem;
+    }
+}
+
+/* Dark mode para el nuevo layout */
+body.darkmode .sexp-search-box--top,
+body.darkmode .sexp-buscador-resultados-wrap {
+    background-color: #3f4247;
+}
+

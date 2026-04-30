@@ -19,7 +19,6 @@
     </div>
 
     <!-- Navegación sub-módulos -->
-
     <div class="sexp-nav-modulos">
         <a href="{% url 's_exp_buscador' %}" class="sexp-nav-link sexp-nav-link--active">
             <i class="bi bi-search"></i> Solicitar Expedientes
@@ -43,56 +42,71 @@
         {% endif %}
     </div>
 
-    <div class="sexp-buscador-layout">
-        <!-- Panel izquierdo: Búsqueda -->
-        <div>
-            <div class="sexp-search-box">
-                <select id="tipo-busqueda" class="sexp-search-select">
-                    <option value="expediente">N° Expediente</option>
-                    <option value="identidad">Identidad</option>
-                    <option value="nombre">Nombre</option>
-                </select>
-                <input type="text" id="busqueda-input" class="sexp-search-input" placeholder="Buscar expediente...">
-                <button id="btn-buscar" class="sexp-search-btn">
-                    <i class="bi bi-search"></i> Buscar
+    <!-- Layout vertical: búsqueda arriba, resultados en grid abajo -->
+    <div class="sexp-buscador-vertical">
+
+        <!-- Sección 1: Caja de búsqueda -->
+        <div class="sexp-search-box sexp-search-box--top">
+            <select id="tipo-busqueda" class="sexp-search-select">
+                <option value="identidad" selected>Identidad</option>
+                <option value="nombre">Nombre</option>
+                <option value="expediente">N° Expediente</option>
+            </select>
+            <input type="text" id="busqueda-input" class="sexp-search-input"
+                   placeholder="Ingrese identidad: ____-____-_____" autocomplete="off">
+            <button id="btn-buscar" class="sexp-search-btn">
+                <i class="bi bi-search"></i> Buscar
+            </button>
+        </div>
+
+        <!-- Sección 2: Resultados en grid responsivo de 3 columnas -->
+        <div class="sexp-buscador-resultados-wrap">
+            <h3 class="sexp-buscador-resultados-titulo">
+                <i class="bi bi-collection"></i> Expedientes encontrados
+            </h3>
+            <div id="resultados-busqueda" class="sexp-resultados-grid">
+                <p class="sexp-opacity-5 sexp-text-center sexp-grid-empty">
+                    Ingrese un criterio de búsqueda para encontrar expedientes disponibles.
+                </p>
+            </div>
+        </div>
+
+        <!-- Sección 3: Carrito de selección -->
+        <div class="sexp-carrito sexp-carrito--bottom">
+            <h3>
+                <i class="bi bi-folder-check"></i> Lista de expedientes
+                <span class="sexp-carrito-count" id="carrito-count">0</span>
+            </h3>
+            <div id="carrito-items">
+                <div class="sexp-carrito-empty">
+                    <i class="bi bi-folder-x" style="font-size:1.4rem;"></i><br>
+                    No hay expedientes seleccionados
+                </div>
+            </div>
+
+            <div class="sexp-carrito-form" id="carrito-form" style="display:none;">
+                <div class="sexp-carrito-form-grid">
+                    <div>
+                        <label>Motivo *</label>
+                        <select id="solicitud-motivo">
+                            <option value="">-- Cargando motivos --</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Observaciones</label>
+                        <textarea id="solicitud-observaciones" rows="2"
+                            placeholder="Detalles adicionales o área diferente a su unidad..."></textarea>
+                    </div>
+                </div>
+
+                <p id="info-unidad" class="sexp-info-unidad"></p>
+
+                <button class="sexp-submit-btn" id="btn-enviar-solicitud" disabled>
+                    <i class="bi bi-send"></i> Enviar Solicitud
                 </button>
             </div>
-
-            <div id="resultados-busqueda">
-                <p class="sexp-opacity-5 sexp-text-center">Ingrese un criterio de búsqueda para encontrar expedientes
-                    disponibles.</p>
-            </div>
         </div>
 
-        <!-- Panel derecho: Carrito -->
-        <div>
-            <div class="sexp-carrito">
-                <h3><i class="bi bi-folder-check"></i> Lista de expedientes <span class="sexp-carrito-count"
-                        id="carrito-count">0</span>
-                </h3>
-                <div id="carrito-items">
-                    <div class="sexp-carrito-empty"><i class="bi bi-folder-x" style="font-size:1.4rem;"></i><br>No hay
-                        expedientes seleccionados</div>
-                </div>
-
-                <div class="sexp-carrito-form" id="carrito-form" style="display:none;">
-                    <label>Motivo *</label>
-                    <select id="solicitud-motivo">
-                        <option value="">-- Cargando motivos --</option>
-                    </select>
-
-                    <p id="info-unidad" style="font-size:1.4rem; opacity:0.7; margin:0 0 0.5rem;"></p>
-
-                    <label>Observaciones</label>
-                    <textarea id="solicitud-observaciones" rows="2"
-                        placeholder="Detalles adicionales o área diferente a su unidad..."></textarea>
-
-                    <button class="sexp-submit-btn" id="btn-enviar-solicitud" disabled>
-                        <i class="bi bi-send"></i> Enviar Solicitud
-                    </button>
-                </div>
-            </div>
-        </div>
     </div>
 </div>
 {% endblock content %}
