@@ -102,26 +102,28 @@ function renderSolicitudes(data, filtro = '') {
             'sol_en_devolucion': '#8b5cf6'
         };
 
+        const sanitize = (txt) => (txt || '').replace(/"/g, '&quot;');
+        // Estados en los que ya hay un préstamo activo y aplica el AMARILLO de "pendiente"
+        const enPrestamo = ['SOL_EN_PRESTAMO', 'SOL_EN_DEVOLUCION', 'SOL_INCOMPLETA'].includes(s.estado_flujo);
         const exps = s.expedientes.map(e => {
             const num = typeof e === 'object' ? e.numero : e;
             if (typeof e !== 'object') {
                 return `<span class="sexp-exp-tag">#${num}</span>`;
             }
-            const sanitize = (txt) => (txt || '').replace(/"/g, '&quot;');
-            // ROJO: expediente no prestado (rechazado o no encontrado)
+            // ROJO: no se prestó (rechazado / no encontrado)
             if (e.aprobado === false) {
                 const motivo = e.motivo_rechazo_individual || 'No se prestó este expediente';
                 return `<span class="sexp-exp-tag sexp-exp-tag--rechazado" title="${sanitize(motivo)}">#${num}</span>`;
             }
-            // AMARILLO: expediente aprobado pero pendiente de devolver (en préstamo activo)
-            if (e.aprobado === true && e.devuelto === false) {
+            // AMARILLO: en préstamo activo y aún no devuelto
+            if (enPrestamo && e.devuelto === false) {
                 return `<span class="sexp-exp-tag sexp-exp-tag--pendiente" title="Pendiente de devolver">#${num}</span>`;
             }
-            // ESTANDAR: devuelto correctamente; si fue fuera de tiempo, mantener clase --late
+            // ESTANDAR (con fuera de tiempo si aplica)
             if (e.fuera_de_tiempo) {
                 return `<span class="sexp-exp-tag sexp-exp-tag--late" title="Entregado fuera de tiempo${e.comentario_devolucion ? ' — ' + sanitize(e.comentario_devolucion) : ''}">#${num}</span>`;
             }
-            const tooltip = e.comentario_devolucion ? sanitize(e.comentario_devolucion) : 'Devuelto correctamente';
+            const tooltip = e.devuelto ? (e.comentario_devolucion ? sanitize(e.comentario_devolucion) : 'Devuelto correctamente') : '';
             return `<span class="sexp-exp-tag" title="${tooltip}">#${num}</span>`;
         }).join(' ');
         const badgeEstilo = badgeEstilos[claseEstado] || '';

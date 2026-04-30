@@ -1148,11 +1148,13 @@ def buscar_expedientes_api(request):
             ExpedientePrestamo.objects.exclude(estado_id='EXP_DISPONIBLE')
             .values_list('expediente_id', flat=True)
         )
-        # También las solicitudes activas que podrían no haber actualizado el estado físico aún
+        # También las solicitudes activas que podrían no haber actualizado el estado físico aún.
+        # IMPORTANTE: solo cuentan los detalles APROBADOS — los rechazados ya no apartan al expediente.
         en_proceso = set(
             SolicitudExpedienteDetalle.objects.filter(
                 solicitud__estado_flujo_id__in=['SOL_PENDIENTE', 'SOL_APROBADA_ORGANIZANDO', 'SOL_LISTO_RECOGER', 'SOL_EN_PRESTAMO', 'SOL_EN_DEVOLUCION', 'SOL_INCOMPLETA'],
-                devuelto=False
+                devuelto=False,
+                aprobado=True,
             ).values_list('expediente_prestamo__expediente_id', flat=True)
         )
         expedientes_prestados_ids = expedientes_no_disponibles | en_proceso
@@ -1316,7 +1318,8 @@ def crear_solicitud_api(request):
         )
         en_proceso = set(
             SolicitudExpedienteDetalle.objects.filter(
-                solicitud__estado_flujo_id__in=['SOL_PENDIENTE', 'SOL_APROBADA_ORGANIZANDO']
+                solicitud__estado_flujo_id__in=['SOL_PENDIENTE', 'SOL_APROBADA_ORGANIZANDO'],
+                aprobado=True,
             ).values_list('expediente_prestamo__expediente_id', flat=True)
         )
         expedientes_prestados_ids = prestados | en_proceso

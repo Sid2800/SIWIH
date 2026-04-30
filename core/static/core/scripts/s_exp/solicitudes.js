@@ -45,22 +45,27 @@ function initTabla() {
             },
             { data: 'fecha_creacion' },
             {
-                data: 'expedientes',
-                render: function (data) {
-                    return data.map(e => {
+                data: null,
+                render: function (row) {
+                    const enPrestamo = ['SOL_EN_PRESTAMO', 'SOL_EN_DEVOLUCION', 'SOL_INCOMPLETA'].includes(row.estado_flujo);
+                    return (row.expedientes || []).map(e => {
                         const num = typeof e === 'object' ? e.numero : e;
                         const noAprobado = e.aprobado === false;
                         const esFuera = e.fuera_de_tiempo;
+                        const sanitize = (t) => (t || '').replace(/"/g, '&quot;');
                         let cls = 'sexp-exp-tag';
                         let title = '';
                         if (noAprobado) {
                             cls = 'sexp-exp-tag sexp-exp-tag--rechazado';
                             title = e.motivo_rechazo_individual ? `No prestado: ${e.motivo_rechazo_individual}` : 'No prestado';
+                        } else if (enPrestamo && e.devuelto === false) {
+                            cls = 'sexp-exp-tag sexp-exp-tag--pendiente';
+                            title = 'Pendiente de devolver';
                         } else if (esFuera) {
                             cls = 'sexp-exp-tag sexp-exp-tag--late';
                             title = 'Entregado fuera de tiempo';
                         }
-                        return `<span class="${cls}" title="${title}">#${num}</span>`;
+                        return `<span class="${cls}" title="${sanitize(title)}">#${num}</span>`;
                     }).join(' ');
                 }
             },
@@ -214,64 +219,57 @@ function horasHastaCuatroPM() {
  */
 function _mostrarModalAprobacion(id, expedientes, meta) {
     meta = meta || {};
+    // Solo nombres + identidad — sin checkboxes (la decisión por expediente se hace en Revisión de Entrega)
     const expHtml = expedientes.map(function (exp) {
-        const nombre = exp.paciente_nombre ? `<span class="sexp-exp-lista-patient">${exp.paciente_nombre}</span>` : '';
-        return `
-        <div class="sexp-exp-lista-item" id="sexp-dec-row-${exp.detalle_id}">
-            <div class="sexp-exp-lista-content">
-                <span class="sexp-exp-tag">#${exp.numero}</span>
-                ${nombre}
-            </div>
-            <label class="sexp-exp-dec-check" title="Marcado = aprobado, desmarcado = rechazado">
-                <input type="checkbox" id="exp-check-${exp.detalle_id}" data-detalle="${exp.detalle_id}" checked>
-                <span class="sexp-exp-dec-checkmark"></span>
-            </label>
-        </div>`;
+        const nombre = exp.paciente_nombre || '—';
+        const ident = exp.paciente_identidad ? `<span class="sexp-modal-aprob-id">${exp.paciente_identidad}</span>` : '';
+        return `<div class="sexp-modal-aprob-item">${ident}<span class="sexp-modal-aprob-nombre">${nombre}</span></div>`;
     }).join('');
 
-    // Texto del tiempo sugerido por el solicitante (si existe)
+    // Tiempo sugerido por el solicitante: pre-cargar como valor por defecto
+    let prefillValor = 1;
+    let prefillUnidad = 'dias';
     let sugeridoBlock = '';
     if (meta.tiempo_sugerido_horas && meta.tiempo_sugerido_horas > 0) {
         const h = meta.tiempo_sugerido_horas;
-        let txt;
         if (h % 24 === 0) {
-            const d = h / 24;
-            txt = `${d} día${d === 1 ? '' : 's'} (${h}h)`;
+            prefillUnidad = 'dias';
+            prefillValor = h / 24;
         } else {
-            txt = `${h} hora${h === 1 ? '' : 's'}`;
+            prefillUnidad = 'horas';
+            prefillValor = h;
         }
+        const txt = prefillUnidad === 'dias'
+            ? `${prefillValor} día${prefillValor === 1 ? '' : 's'} (${h}h)`
+            : `${h} hora${h === 1 ? '' : 's'}`;
         sugeridoBlock = `
             <div class="sexp-modal-sugerido">
                 <i class="bi bi-lightbulb"></i>
-                <span><strong>Tiempo sugerido por el solicitante:</strong> ${txt}</span>
+                <span><strong>Tiempo sugerido por el solicitante:</strong> ${txt}. Acepta o cambia el valor.</span>
             </div>`;
     }
 
     Swal.fire({
         title: 'Aprobar Solicitud #' + id,
-        width: 950,
-        html: `<div style="text-align:left; display:grid; grid-template-columns: 1.5fr 280px; gap: 15px;">
-            <div>
-                <label style="display:block; font-weight:600; margin-bottom:4px;">
-                    Total de expedientes: <strong>${expedientes.length}</strong>
-                    <small style="font-weight:normal; opacity:.75; display:block; font-size:12px;">(desmarca los que NO se prestarán)</small>
-                </label>
-                <div id="swal-exp-list" style="border: 1px solid #ddd; border-radius: 6px; padding: 10px; max-height: 350px; overflow-y: auto; background:#f9fafb;">${expHtml}</div>
-            </div>
-            <div style="border-left:1px solid #ccc; padding-left:15px;">
-                ${sugeridoBlock}
-                <div class="sexp-modal-campo">
-                    <label>Tiempo de entrega</label>
+        width: 800,
+        html: `<div style="text-align:left;">
+            <p class="sexp-modal-aprob-resumen">
+                <i class="bi bi-folder2-open"></i>
+                Total de expedientes solicitados: <strong>${expedientes.length}</strong>
+            </p>
+            <div class="sexp-modal-aprob-lista">${expHtml}</div>
+            ${sugeridoBlock}
+            <div class="sexp-modal-campo">
+                <label>Tiempo de entrega (puede ajustarlo)</label>
                 <div class="sexp-modal-tiempo-row">
-                    <input type="number" id="swal-tiempo" value="1" min="1" class="sexp-modal-input">
+                    <input type="number" id="swal-tiempo" value="${prefillValor}" min="1" class="sexp-modal-input">
                     <select id="swal-unidad" class="sexp-modal-select">
-                        <option value="dias" selected>Días</option>
-                        <option value="horas">Horas</option>
+                        <option value="dias"${prefillUnidad === 'dias' ? ' selected' : ''}>Días</option>
+                        <option value="horas"${prefillUnidad === 'horas' ? ' selected' : ''}>Horas</option>
                         <option value="minutos">Minutos</option>
                     </select>
                 </div>
                 <small id="swal-tiempo-hint" class="sexp-modal-hint">De 1 a 3 días. Vencimiento a las 4:00 PM del último día.</small>
-                </div>
             </div>
         </div>`,
         showCancelButton: true,
@@ -317,19 +315,7 @@ function _mostrarModalAprobacion(id, expedientes, meta) {
                 }
             }
             selUnidad.addEventListener('change', actualizarHintTiempo);
-            actualizarHintTiempo();
-
-            // Toggle aprobar/rechazar por expediente
-            document.getElementById('swal-exp-list').addEventListener('change', function (e) {
-                if (e.target.type !== 'checkbox') return;
-                const detId = e.target.dataset.detalle;
-                const row = document.getElementById(`sexp-dec-row-${detId}`);
-                if (e.target.checked) {
-                    row.classList.remove('sexp-exp-lista-item--rechazado');
-                } else {
-                    row.classList.add('sexp-exp-lista-item--rechazado');
-                }
-            });
+            // No reset del valor pre-cargado en didOpen (respeta el sugerido)
         },
         preConfirm: () => {
             const tiempo = parseInt(document.getElementById('swal-tiempo').value);
@@ -366,17 +352,12 @@ function _mostrarModalAprobacion(id, expedientes, meta) {
                 return false;
             }
 
-            // Recolectar decisiones por expediente (solo checkbox)
-            const decisiones = [];
-            for (const exp of expedientes) {
-                const check = document.getElementById(`exp-check-${exp.detalle_id}`);
-                const aprobado = check.checked;
-                decisiones.push({
-                    detalle_id: exp.detalle_id,
-                    aprobado: aprobado,
-                    observaciones: ''
-                });
-            }
+            // Aprobar la solicitud completa — la decisión por expediente se hace en Revisión de Entrega.
+            const decisiones = expedientes.map(exp => ({
+                detalle_id: exp.detalle_id,
+                aprobado: true,
+                observaciones: ''
+            }));
 
             // Convertir valor a horas si se eligieron días
             const tiempoHoras = (unidad === 'dias') ? tiempo * 24 : tiempo;

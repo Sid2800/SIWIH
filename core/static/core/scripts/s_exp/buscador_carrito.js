@@ -84,7 +84,8 @@ function actualizarLimitesTiempo() {
 
     if (cuando === 'hoy') {
         // Mismo día → siempre en horas, máximo hasta las 4 PM
-        $unidadSel.val('horas').prop('disabled', true);
+        if ($unidadSel.val() !== 'horas') $unidadSel.val('horas');
+        $unidadSel.prop('disabled', true);
         const maxH = _horasHastaCuatroPM();
         $valor.attr('min', 1);
         $valor.attr('max', Math.max(maxH, 1));
@@ -98,10 +99,17 @@ function actualizarLimitesTiempo() {
             $hint.html(`Mismo día: máximo <strong>${maxH} hora(s)</strong> disponibles hasta las 4:00 PM. Es solo una sugerencia; el administrador define el tiempo final.`);
         }
     } else {
-        // Días posteriores → permitir horas (hasta 72) o días (1-3)
+        // Días posteriores → forzar unidad "Días" por defecto cuando se selecciona esta opción
         $unidadSel.prop('disabled', false);
         $valor.prop('disabled', false);
-        if (unidad === 'dias') {
+        // Si venimos de "hoy" la unidad estaba forzada a "horas"; al pasar a "dias" cambiamos a Días automáticamente.
+        const veniaDeHoy = $unidadSel.data('prev-cuando') !== 'dias';
+        if (veniaDeHoy) {
+            $unidadSel.val('dias');
+        }
+        $unidadSel.data('prev-cuando', 'dias');
+        const unidadActual = $unidadSel.val();
+        if (unidadActual === 'dias') {
             $valor.attr('min', 1);
             $valor.attr('max', 3);
             const valorActual = parseInt($valor.val(), 10);

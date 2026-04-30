@@ -3,7 +3,6 @@
  * Utiliza DataTables con procesamiento en servidor y cronómetros dinámicos.
  */
 let tablaPrestamos;
-let timerIntervals = {};
 let estadoFiltro = '';
 
 $(document).ready(function () {
@@ -109,10 +108,7 @@ function initTabla() {
             zeroRecords: "No se encontraron resultados"
         },
         drawCallback: function () {
-            // Reiniciar todos los cronómetros después de cada redibujado de la tabla
-            Object.values(timerIntervals).forEach(clearInterval);
-            timerIntervals = {};
-
+            // Recalcular tiempo restante una sola vez por cada fila renderizada
             $('.sexp-timer[data-limite]').each(function () {
                 const id = $(this).attr('id').replace('timer-', '');
                 const limite = $(this).data('limite');
@@ -132,54 +128,54 @@ function initFiltros() {
     });
 }
 
+/**
+ * Renderiza el "tiempo restante" como texto estático — SIN cronómetro.
+ * Formato: "1 día restante", "23 horas restantes", "10 minutos restantes", "VENCIDO".
+ * El valor se calcula al cargar la tabla; el reload del DataTable refresca todo.
+ */
 function iniciarCronometro(prestamoId, fechaLimiteISO, porcentaje) {
     const timerEl = document.getElementById('timer-' + prestamoId);
     const progressEl = document.getElementById('progress-' + prestamoId);
     if (!timerEl) return;
 
     const fechaLimite = new Date(fechaLimiteISO);
+    const ahora = new Date();
+    const diff = fechaLimite - ahora;
 
-    function actualizar() {
-        const ahora = new Date();
-        const diff = fechaLimite - ahora;
-
-        if (diff <= 0) {
-            timerEl.textContent = 'VENCIDO';
-            timerEl.className = 'sexp-timer sexp-timer--expired';
-            if (progressEl) {
-                progressEl.style.width = '100%';
-                progressEl.className = 'sexp-progress-fill sexp-progress-fill--danger';
-            }
-            return;
+    if (diff <= 0) {
+        timerEl.textContent = 'VENCIDO';
+        timerEl.className = 'sexp-timer sexp-timer--expired';
+        if (progressEl) {
+            progressEl.style.width = '100%';
+            progressEl.className = 'sexp-progress-fill sexp-progress-fill--danger';
         }
-
-        // Formato sin segundos: "X horas restantes" o "X minutos restantes"
-        const totalMin = Math.ceil(diff / 60000);
-        const horas = Math.floor(totalMin / 60);
-        const minutos = totalMin % 60;
-        let texto;
-        if (horas >= 1) {
-            texto = `${horas} h ${String(minutos).padStart(2, '0')} min restantes`;
-        } else {
-            texto = `${minutos} minuto${minutos === 1 ? '' : 's'} restantes`;
-        }
-        timerEl.textContent = texto;
-
-        if (porcentaje >= 90 || totalMin <= 10) {
-            timerEl.className = 'sexp-timer sexp-timer--danger';
-            if (progressEl) progressEl.className = 'sexp-progress-fill sexp-progress-fill--danger';
-        } else if (porcentaje >= 70 || totalMin <= 30) {
-            timerEl.className = 'sexp-timer sexp-timer--warn';
-            if (progressEl) progressEl.className = 'sexp-progress-fill sexp-progress-fill--warn';
-        } else {
-            timerEl.className = 'sexp-timer sexp-timer--ok';
-            if (progressEl) progressEl.className = 'sexp-progress-fill sexp-progress-fill--ok';
-        }
+        return;
     }
 
-    actualizar();
-    // Refresco cada 60s — la vista se actualiza por completo cada 10 minutos via reload
-    timerIntervals[prestamoId] = setInterval(actualizar, 60000);
+    const totalMin = Math.ceil(diff / 60000);
+    const totalHoras = Math.floor(totalMin / 60);
+    const totalDias = Math.floor(totalHoras / 24);
+
+    let texto;
+    if (totalDias >= 1) {
+        texto = `${totalDias} día${totalDias === 1 ? '' : 's'} restante${totalDias === 1 ? '' : 's'}`;
+    } else if (totalHoras >= 1) {
+        texto = `${totalHoras} hora${totalHoras === 1 ? '' : 's'} restante${totalHoras === 1 ? '' : 's'}`;
+    } else {
+        texto = `${totalMin} minuto${totalMin === 1 ? '' : 's'} restante${totalMin === 1 ? '' : 's'}`;
+    }
+    timerEl.textContent = texto;
+
+    if (porcentaje >= 90 || totalMin <= 10) {
+        timerEl.className = 'sexp-timer sexp-timer--danger';
+        if (progressEl) progressEl.className = 'sexp-progress-fill sexp-progress-fill--danger';
+    } else if (porcentaje >= 70 || totalMin <= 30) {
+        timerEl.className = 'sexp-timer sexp-timer--warn';
+        if (progressEl) progressEl.className = 'sexp-progress-fill sexp-progress-fill--warn';
+    } else {
+        timerEl.className = 'sexp-timer sexp-timer--ok';
+        if (progressEl) progressEl.className = 'sexp-progress-fill sexp-progress-fill--ok';
+    }
 }
 
 function marcarEntregado(prestamoId) {

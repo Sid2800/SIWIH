@@ -1164,6 +1164,11 @@ body.darkmode .sexp-entregar-faltantes-btn:hover {
 .sexp-flex-between { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; }
 .sexp-flex-end { display: flex; justify-content: flex-end; align-items: center; gap: 1rem; flex-wrap: wrap; }
 .sexp-flex-gap-1 { display: flex; gap: 1rem; flex-wrap: wrap; }
+.sexp-flex-gap-1 .sexp-filtro-btn {
+    font-size: 1.5rem;
+    padding: 0.7rem 1.4rem;
+    font-weight: 600;
+}
 
 .sexp-btn-refresh {
     background: var(--colorBoton) !important;
@@ -2156,6 +2161,51 @@ body.darkmode .sexp-sugerir-tiempo {
     color: #fbbf24;
     flex: 0 0 auto;
     margin-top: 0.1rem;
+}
+
+/* Modal aprobación — lista simple (total + nombres) */
+.sexp-modal-aprob-resumen {
+    margin: 0 0 0.8rem 0 !important;
+    padding: 0.7rem 1rem;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 0.6rem;
+    color: #FFFFFF;
+    font-size: 1.55rem !important;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+.sexp-modal-aprob-resumen i { color: #fbbf24; font-size: 1.7rem; }
+
+.sexp-modal-aprob-lista {
+    max-height: 260px;
+    overflow-y: auto;
+    margin-bottom: 1rem;
+    background: rgba(0, 0, 0, 0.18);
+    border-radius: 0.6rem;
+    padding: 0.5rem;
+}
+
+.sexp-modal-aprob-item {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    padding: 0.55rem 0.8rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 1.45rem !important;
+    color: #FFFFFF;
+}
+.sexp-modal-aprob-item:last-child { border-bottom: none; }
+
+.sexp-modal-aprob-id {
+    font-weight: 700;
+    color: #FFD700;
+    flex: 0 0 auto;
+}
+
+.sexp-modal-aprob-nombre {
+    flex: 1;
+    word-break: break-word;
 }
 
 
