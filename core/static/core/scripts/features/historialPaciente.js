@@ -392,7 +392,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     let unidadC = data.unidad_clinica_descripcion;
                     unidadC = unidadC.substring(0, 21);
                 
-                    // Concatenamos la sala truncada con el nombre corto del servicio, usando concatenarLimpio
+                    // Concatenamos la unidadC truncada con el nombre corto del servicio, usando concatenarLimpio
                     data = unidadC;
                 }
                 return data;

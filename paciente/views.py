@@ -33,23 +33,19 @@ from core.constants.permisos import (
     PACIENTE_DISPENSACION_ROLES,
     PACIENTE_DISPENSACION_UNIDADES,
 )
+from core.constants.choices_constants import TipoDefuncion
 from core.constants.domain_constants import LogApp
 from core.utils.utilidades_logging import *
-
-
-from usuario.models import PerfilUnidad
 from dal import autocomplete
 from types import SimpleNamespace
 
 import json
-from pprint import pprint
+
 from django.urls import reverse_lazy, reverse
-from django.contrib import messages
+
 from django.db import connections, transaction
 from django.http.response import JsonResponse
-from django import forms
 from datetime import datetime
-from django.db.utils import OperationalError
 from django.db.models import Q, F, Value, OuterRef, Subquery, CharField,Case, When, BooleanField
 from django.db.models.functions import Coalesce, Concat
 from django.shortcuts import get_object_or_404, redirect
@@ -1453,12 +1449,14 @@ class HistorialPaciente(DetailView):
         #comprueba informacino si es SAI o DEFUNCION
         defuncion = PacienteService.obtener_defuncion(paciente.id)
         if defuncion:
+
+            lugar = defuncion.unidad_clinica if defuncion.tipo_defuncion == TipoDefuncion.INTRAHOSPITALARIA  else "EXTRAHOSPITALARIA"
             info_defuncion = {
                 'id': defuncion.id,
                 'fecha': defuncion.fecha_defuncion,
                 'motivo': defuncion.motivo,
                 'fecha_registro':defuncion.fecha_registro,
-                'sala': defuncion.sala
+                'unidad_clinica': lugar
             }
             context['info_defuncion'] = info_defuncion
 

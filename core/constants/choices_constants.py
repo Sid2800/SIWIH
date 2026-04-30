@@ -66,3 +66,8 @@ class FuenteSeguimiento(models.IntegerChoices):
     AMIGO = 3, "AMIGO"
     PROFESIONAL_SALUD = 4, "PROFESIONAL DE SALUD"
     OTRO = 5, "OTRO"
+
+
+class TipoDefuncion(models.IntegerChoices):
+    INTRAHOSPITALARIA = 1, "Intrahospitalaria"
+    EXTRAHOSPITALARIA = 2, "Extrahospitalaria"
