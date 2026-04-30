@@ -17,9 +17,12 @@ $(document).ready(function () {
         if (e.key === 'Enter' || e.which === 13) {
             e.preventDefault();
             e.stopPropagation();
-            // Limpiar espacios y placeholders de máscara
-            const valorActual = $(this).val().replace(/_/g, '').trim();
-            $(this).val(valorActual);
+            const tipo = $('#tipo-busqueda').val();
+            // Solo limpiar placeholders de máscara cuando es identidad
+            if (tipo === 'identidad') {
+                const valorActual = $(this).val().replace(/_/g, '').trim();
+                $(this).val(valorActual);
+            }
             buscarExpedientes();
         }
     });
@@ -41,21 +44,33 @@ $(document).ready(function () {
 
 /**
  * Aplica la máscara correcta al input según el tipo de búsqueda seleccionado.
- * Identidad usa el formato estándar de SIWI (regexIdentidad de helpers.js).
+ * SOLO se aplica máscara cuando el tipo es "identidad".
+ * Para "nombre" y "expediente" el input es libre.
  */
 function actualizarMascaraInput() {
     const tipo = $('#tipo-busqueda').val();
     const $input = $('#busqueda-input');
+    const inputDom = $input[0];
 
-    // Remover máscara anterior si existe
+    // Remover SIEMPRE cualquier máscara residual antes de aplicar la nueva
+    try {
+        if (typeof Inputmask !== 'undefined' && Inputmask.remove) {
+            Inputmask.remove(inputDom);
+        }
+    } catch (e) {}
     if (mascaraIdentidadInstance) {
         try { mascaraIdentidadInstance.remove(); } catch (e) {}
         mascaraIdentidadInstance = null;
     }
+    // Limpiar atributos residuales
+    inputDom.removeAttribute('data-inputmask');
+    inputDom.removeAttribute('data-inputmask-regex');
+    inputDom.removeAttribute('data-inputmask-placeholder');
+    inputDom.removeAttribute('readonly');
     $input.val('');
 
     if (tipo === 'identidad') {
-        // Misma máscara que el módulo Editar Pacientes
+        // Solo aquí se aplica la máscara — misma del módulo Editar Pacientes
         mascaraIdentidadInstance = Inputmask({
             regex: typeof regexIdentidad !== 'undefined'
                 ? regexIdentidad
@@ -65,11 +80,13 @@ function actualizarMascaraInput() {
                 : "____-____-_____",
             showMaskOnHover: false,
         });
-        mascaraIdentidadInstance.mask($input[0]);
+        mascaraIdentidadInstance.mask(inputDom);
         $input.attr('placeholder', 'Ingrese identidad: ____-____-_____');
     } else if (tipo === 'nombre') {
+        // Input libre, sin máscara
         $input.attr('placeholder', 'Ingrese nombre o apellido del paciente...');
     } else {
+        // Input libre, sin máscara
         $input.attr('placeholder', 'Ingrese N° de expediente...');
     }
 }
@@ -110,8 +127,12 @@ function buscarExpedientes() {
     let query = $('#busqueda-input').val();
     const tipo = $('#tipo-busqueda').val();
 
-    // Limpiar placeholders de máscara y espacios extra
-    query = query.replace(/_/g, '').trim();
+    // Solo en identidad limpiar placeholders de máscara
+    if (tipo === 'identidad') {
+        query = query.replace(/_/g, '').trim();
+    } else {
+        query = query.trim();
+    }
 
     if (!query) {
         toastr.warning('Ingrese un criterio de búsqueda');
@@ -217,7 +238,9 @@ function agregarAlCarrito(item) {
     carrito.push(item);
     renderCarrito();
     // Refrescar para actualizar badges sin perder la búsqueda
-    const queryActual = $('#busqueda-input').val().replace(/_/g, '').trim();
+    const tipoActual = $('#tipo-busqueda').val();
+    let queryActual = $('#busqueda-input').val();
+    queryActual = (tipoActual === 'identidad' ? queryActual.replace(/_/g, '') : queryActual).trim();
     if (queryActual) buscarExpedientes();
 
     toastr.success(`Expediente agregado: ${item.paciente_dni || ''} - ${item.paciente_nombre || ''}`);
@@ -227,7 +250,9 @@ function agregarAlCarrito(item) {
 function removerDelCarrito(expediente_id) {
     carrito = carrito.filter(c => c.expediente_id !== expediente_id);
     renderCarrito();
-    const queryActual = $('#busqueda-input').val().replace(/_/g, '').trim();
+    const tipoActual = $('#tipo-busqueda').val();
+    let queryActual = $('#busqueda-input').val();
+    queryActual = (tipoActual === 'identidad' ? queryActual.replace(/_/g, '') : queryActual).trim();
     if (queryActual) buscarExpedientes();
 }
 
@@ -240,10 +265,14 @@ function renderCarrito() {
     count.text(carrito.length);
 
     if (!carrito.length) {
+        container.removeClass('sexp-carrito-grid');
         container.html('<div class="sexp-carrito-empty"><i class="bi bi-folder-x" style="font-size:1.4rem;"></i><br>No hay expedientes seleccionados</div>');
         form.hide();
         return;
     }
+
+    // Aplicar grid responsivo de 3 columnas al contenedor
+    container.addClass('sexp-carrito-grid');
 
     let html = '';
     carrito.forEach(function (item) {
@@ -251,10 +280,10 @@ function renderCarrito() {
         const nombre = item.paciente_nombre || 'N/A';
         html += `
         <div class="sexp-carrito-item">
-            <div>
-                <strong>${identidad}</strong>
-                <span class="sexp-carrito-item-nombre"> — ${nombre}</span>
-                <span class="sexp-carrito-item-exp"> (#${item.numero_expediente})</span>
+            <div class="sexp-carrito-item-info">
+                <strong class="sexp-carrito-item-id">${identidad}</strong>
+                <span class="sexp-carrito-item-nombre">${nombre}</span>
+                <span class="sexp-carrito-item-exp">Expediente #${item.numero_expediente}</span>
             </div>
             <button class="sexp-remove-btn" onclick="removerDelCarrito(${item.expediente_id})" title="Quitar">
                 <i class="bi bi-x-circle"></i>
@@ -291,19 +320,23 @@ async function enviarSolicitud() {
         return;
     }
 
-    // Listado breve para el modal
-    const lista = carrito
-        .slice(0, 5)
-        .map(c => `<li><strong>${c.paciente_dni || 'S/ID'}</strong> — ${c.paciente_nombre || 'N/A'}</li>`)
+    // Listado de todos los expedientes — se mostrará en grid de columnas en el modal
+    const itemsHtml = carrito
+        .map(c => `<div class="sexp-modal-item">
+            <strong>${c.paciente_dni || 'S/ID'}</strong>
+            <span>${c.paciente_nombre || 'N/A'}</span>
+            <small>Expediente #${c.numero_expediente}</small>
+        </div>`)
         .join('');
-    const resto = carrito.length > 5 ? `<li><em>...y ${carrito.length - 5} más</em></li>` : '';
 
     const mensaje = `
         <div class="sexp-modal-confirm">
-            <p>Está a punto de solicitar <strong>${carrito.length}</strong> expediente(s).</p>
-            <p><strong>Motivo:</strong> ${motivoText}</p>
-            <ul class="sexp-modal-lista">${lista}${resto}</ul>
-            <p>¿Desea continuar?</p>
+            <p class="sexp-modal-resumen">
+                Está a punto de solicitar <strong>${carrito.length}</strong> expediente(s).
+            </p>
+            <p class="sexp-modal-resumen"><strong>Motivo:</strong> ${motivoText}</p>
+            <div class="sexp-modal-lista-grid">${itemsHtml}</div>
+            <p class="sexp-modal-resumen">¿Desea continuar?</p>
         </div>`;
 
     // Reutilizar el modal estándar de helpers.js

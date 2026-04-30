@@ -15,7 +15,7 @@
 }
 
 .sexp-nav-link {
-    padding: 0.6rem 1.2rem;
+    padding: 0.8rem 1.5rem;
     border-radius: 1rem;
     background-color: var(--blanco);
     border: 1px solid var(--colorLinea);
@@ -23,10 +23,15 @@
     color: var(--colorTablacelda);
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    font-size: 1.4rem;
+    gap: 0.6rem;
+    font-size: 1.7rem;
+    font-weight: 600;
     font-family: var(--fuenteCuerpo);
     transition: background-color .2s, transform .2s, border-color .2s;
+}
+
+.sexp-nav-link i {
+    font-size: 1.8rem;
 }
 
 .sexp-nav-link:hover {
@@ -1167,12 +1172,12 @@ body.darkmode .sexp-entregar-faltantes-btn:hover {
     }
 
     .sexp-nav-link {
-        padding: 0.5rem 0.8rem;
-        font-size: 1.2rem;
+        padding: 0.6rem 1rem;
+        font-size: 1.4rem;
     }
 
     .sexp-nav-link i {
-        font-size: 1.4rem;
+        font-size: 1.6rem;
     }
 
     /* Ocultar texto largo en nav, solo iconos */
@@ -1244,8 +1249,8 @@ body.darkmode .sexp-entregar-faltantes-btn:hover {
     }
 
     .sexp-nav-link {
-        padding: 0.4rem 0.6rem;
-        font-size: 1.1rem;
+        padding: 0.5rem 0.8rem;
+        font-size: 1.3rem;
         gap: 0.3rem;
     }
 
@@ -1804,22 +1809,108 @@ body.darkmode .sexp-kpi-card {
     margin: 0.2rem 0 0.5rem 0;
 }
 
-/* Modal de confirmación */
+/* Modal de confirmación — usa colores del sistema (no custom) */
 .sexp-modal-confirm {
     text-align: left;
+    font-size: 1.7rem;
+    line-height: 1.5;
+}
+
+.sexp-modal-confirm .sexp-modal-resumen {
+    font-size: 1.7rem;
+    margin: 0.5rem 0;
+}
+
+/* Lista de expedientes en grid responsivo dentro del modal */
+.sexp-modal-lista-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.6rem;
+    margin: 0.8rem 0;
+    max-height: 280px;
+    overflow-y: auto;
+    padding: 0.4rem;
+}
+
+.sexp-modal-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    padding: 0.6rem 0.8rem;
+    border: 1px solid var(--colorLinea);
+    border-radius: 0.6rem;
     font-size: 1.4rem;
 }
 
-.sexp-modal-lista {
-    margin: 0.6rem 0;
-    padding-left: 1.6rem;
-    max-height: 180px;
-    overflow-y: auto;
-    font-size: 1.3rem;
+.sexp-modal-item strong {
+    font-size: 1.5rem;
+    font-weight: 700;
 }
 
-.sexp-modal-lista li {
-    margin-bottom: 0.3rem;
+.sexp-modal-item span {
+    font-size: 1.4rem;
+}
+
+.sexp-modal-item small {
+    font-size: 1.2rem;
+    opacity: 0.7;
+}
+
+@media (max-width: 1024px) {
+    .sexp-modal-lista-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 640px) {
+    .sexp-modal-lista-grid { grid-template-columns: 1fr; }
+}
+
+/* ============================================================
+   CARRITO — Grid responsivo de 3 columnas
+   ============================================================ */
+.sexp-carrito-grid {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.8rem;
+    margin-top: 0.5rem;
+}
+
+.sexp-carrito-grid .sexp-carrito-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.8rem 1rem;
+    border: 1px solid var(--colorLinea);
+    border-radius: 0.6rem;
+}
+
+.sexp-carrito-item-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    flex: 1;
+    min-width: 0;
+}
+
+.sexp-carrito-item-id {
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.sexp-carrito-item-nombre {
+    font-size: 1.4rem;
+    word-break: break-word;
+}
+
+.sexp-carrito-item-exp {
+    font-size: 1.2rem;
+    opacity: 0.7;
+}
+
+@media (max-width: 1024px) {
+    .sexp-carrito-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 640px) {
+    .sexp-carrito-grid { grid-template-columns: 1fr; }
 }
 
 /* ============================================================
