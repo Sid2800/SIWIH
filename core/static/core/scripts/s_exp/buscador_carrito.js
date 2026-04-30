@@ -33,6 +33,12 @@ $(document).ready(function () {
     $('#btn-enviar-solicitud').on('click', enviarSolicitud);
     $('#solicitud-motivo').on('change', validarFormulario);
 
+    // Sugerir tiempo de entrega
+    $('#solicitud-sugerir-tiempo').on('change', toggleSugerirTiempo);
+    $('#solicitud-tiempo-cuando').on('change', actualizarLimitesTiempo);
+    $('#solicitud-tiempo-unidad').on('change', actualizarLimitesTiempo);
+    $('#solicitud-tiempo-valor').on('input', validarValorTiempo);
+
     // Aplicar máscara inicial (Identidad por defecto)
     actualizarMascaraInput();
 
@@ -40,6 +46,125 @@ $(document).ready(function () {
     cargarMotivos();
     cargarInfoUsuario();
 });
+
+
+/**
+ * Habilita/deshabilita el panel de sugerencia de tiempo según el checkbox.
+ */
+function toggleSugerirTiempo() {
+    const activo = $('#solicitud-sugerir-tiempo').is(':checked');
+    $('#sugerir-tiempo-panel').toggle(activo);
+    if (activo) {
+        actualizarLimitesTiempo();
+    }
+}
+
+
+/**
+ * Calcula horas desde ahora hasta las 4:00 PM del mismo día.
+ */
+function _horasHastaCuatroPM() {
+    const ahora = new Date();
+    const limite = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 16, 0, 0);
+    const diffMs = limite - ahora;
+    return diffMs > 0 ? Math.floor(diffMs / (1000 * 60 * 60)) : 0;
+}
+
+
+/**
+ * Actualiza límites min/max y texto informativo según
+ * "cuando" (hoy / días posteriores) y "unidad" (horas / días).
+ */
+function actualizarLimitesTiempo() {
+    const cuando = $('#solicitud-tiempo-cuando').val();
+    const unidad = $('#solicitud-tiempo-unidad').val();
+    const $valor = $('#solicitud-tiempo-valor');
+    const $unidadSel = $('#solicitud-tiempo-unidad');
+    const $hint = $('#sugerir-tiempo-hint span');
+
+    if (cuando === 'hoy') {
+        // Mismo día → siempre en horas, máximo hasta las 4 PM
+        $unidadSel.val('horas').prop('disabled', true);
+        const maxH = _horasHastaCuatroPM();
+        $valor.attr('min', 1);
+        $valor.attr('max', Math.max(maxH, 1));
+        if (maxH <= 0) {
+            $valor.val('').prop('disabled', true);
+            $hint.html('<strong>Ya pasó la hora límite (4:00 PM).</strong> Use "Días posteriores" o solicite sin sugerir tiempo.');
+        } else {
+            $valor.prop('disabled', false);
+            const valorActual = parseInt($valor.val(), 10);
+            if (!valorActual || valorActual > maxH) $valor.val(maxH);
+            $hint.html(`Mismo día: máximo <strong>${maxH} hora(s)</strong> disponibles hasta las 4:00 PM. Es solo una sugerencia; el administrador define el tiempo final.`);
+        }
+    } else {
+        // Días posteriores → permitir horas (hasta 72) o días (1-3)
+        $unidadSel.prop('disabled', false);
+        $valor.prop('disabled', false);
+        if (unidad === 'dias') {
+            $valor.attr('min', 1);
+            $valor.attr('max', 3);
+            const valorActual = parseInt($valor.val(), 10);
+            if (!valorActual || valorActual > 3) $valor.val(1);
+            $hint.html('Días posteriores: <strong>de 1 a 3 días</strong> (máximo 72 horas). Es solo una sugerencia; el administrador define el tiempo final.');
+        } else {
+            $valor.attr('min', 1);
+            $valor.attr('max', 72);
+            const valorActual = parseInt($valor.val(), 10);
+            if (!valorActual || valorActual > 72) $valor.val(24);
+            $hint.html('Días posteriores: <strong>máximo 72 horas</strong>. Es solo una sugerencia; el administrador define el tiempo final.');
+        }
+    }
+}
+
+
+/**
+ * Saneamiento al teclear: clamp al rango actual.
+ */
+function validarValorTiempo() {
+    const $valor = $('#solicitud-tiempo-valor');
+    const min = parseInt($valor.attr('min'), 10) || 1;
+    const max = parseInt($valor.attr('max'), 10);
+    const v = parseInt($valor.val(), 10);
+    if (isNaN(v)) return;
+    if (v < min) $valor.val(min);
+    if (max && v > max) $valor.val(max);
+}
+
+
+/**
+ * Devuelve el tiempo sugerido en horas, o null si el checkbox está desactivado.
+ * Lanza Error con mensaje legible si los datos son inválidos.
+ */
+function _obtenerTiempoSugeridoHoras() {
+    if (!$('#solicitud-sugerir-tiempo').is(':checked')) return null;
+
+    const cuando = $('#solicitud-tiempo-cuando').val();
+    const unidad = $('#solicitud-tiempo-unidad').val();
+    const valor = parseInt($('#solicitud-tiempo-valor').val(), 10);
+
+    if (isNaN(valor) || valor < 1) {
+        throw new Error('Ingrese un tiempo sugerido válido');
+    }
+
+    if (cuando === 'hoy') {
+        const maxH = _horasHastaCuatroPM();
+        if (maxH <= 0) {
+            throw new Error('Ya pasó la hora límite (4:00 PM). Use "Días posteriores" o desactive la sugerencia.');
+        }
+        if (valor > maxH) {
+            throw new Error(`Para el mismo día, el máximo son ${maxH} hora(s) hasta las 4:00 PM.`);
+        }
+        return valor;
+    }
+
+    if (unidad === 'dias') {
+        if (valor > 3) throw new Error('Para días posteriores, el máximo son 3 días (72 horas).');
+        return valor * 24;
+    }
+    if (valor > 72) throw new Error('Para días posteriores, el máximo son 72 horas.');
+    return valor;
+}
 
 
 /**
@@ -320,6 +445,28 @@ async function enviarSolicitud() {
         return;
     }
 
+    // Validar y obtener el tiempo sugerido (si aplica)
+    let tiempoSugeridoHoras = null;
+    try {
+        tiempoSugeridoHoras = _obtenerTiempoSugeridoHoras();
+    } catch (err) {
+        toastr.warning(err.message);
+        return;
+    }
+
+    // Texto legible del tiempo sugerido para el modal
+    let tiempoSugeridoTexto = '';
+    if (tiempoSugeridoHoras !== null) {
+        const cuando = $('#solicitud-tiempo-cuando').val();
+        const unidad = $('#solicitud-tiempo-unidad').val();
+        const valor = parseInt($('#solicitud-tiempo-valor').val(), 10);
+        const unidadTxt = (cuando === 'hoy' || unidad === 'horas')
+            ? (valor === 1 ? 'hora' : 'horas')
+            : (valor === 1 ? 'día' : 'días');
+        const cuandoTxt = cuando === 'hoy' ? 'mismo día' : 'días posteriores';
+        tiempoSugeridoTexto = `<p class="sexp-modal-resumen"><strong>Tiempo sugerido:</strong> ${valor} ${unidadTxt} (${cuandoTxt})</p>`;
+    }
+
     // Listado de todos los expedientes — grid responsivo de columnas con tipografía uniforme
     const itemsHtml = carrito
         .map(c => `<div class="sexp-modal-item">
@@ -335,6 +482,7 @@ async function enviarSolicitud() {
                 Está a punto de solicitar <strong>${carrito.length}</strong> expediente(s).
             </p>
             <p class="sexp-modal-resumen"><strong>Motivo:</strong> ${motivoText}</p>
+            ${tiempoSugeridoTexto}
             <div class="sexp-modal-lista-grid">${itemsHtml}</div>
             <p class="sexp-modal-resumen">¿Desea continuar?</p>
         </div>`;
@@ -358,7 +506,8 @@ async function enviarSolicitud() {
         data: JSON.stringify({
             expedientes: carrito.map(c => c.expediente_id),
             motivo_id: parseInt(motivoId),
-            observaciones: obs || ''
+            observaciones: obs || '',
+            tiempo_sugerido_horas: tiempoSugeridoHoras
         }),
         success: function (resp) {
             toastr.success(resp.mensaje || 'Solicitud enviada correctamente');
@@ -366,6 +515,8 @@ async function enviarSolicitud() {
             renderCarrito();
             $('#solicitud-motivo').val('');
             $('#solicitud-observaciones').val('');
+            $('#solicitud-sugerir-tiempo').prop('checked', false);
+            $('#sugerir-tiempo-panel').hide();
             $('#busqueda-input').val('');
             $('#resultados-busqueda').html(
                 '<p class="sexp-grid-empty">Ingrese un criterio de búsqueda para encontrar expedientes.</p>'

@@ -1994,3 +1994,131 @@ body.darkmode .sexp-buscador-resultados-wrap {
     background-color: #3f4247;
 }
 
+
+/* ============================================================
+   SUGERIR TIEMPO DE ENTREGA — Panel opcional en el carrito
+   ============================================================ */
+.sexp-sugerir-tiempo {
+    margin: 0.4rem 0 1.1rem 0;
+    padding: 0.8rem 1rem;
+    border: 1px dashed var(--colorLinea);
+    border-radius: 0.8rem;
+    background-color: rgba(99, 102, 241, 0.04);
+}
+
+.sexp-sugerir-tiempo-check {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    cursor: pointer;
+    font-size: 1.55rem;
+    font-weight: 600;
+    color: var(--colorTablacelda);
+    user-select: none;
+    margin: 0 !important;
+}
+
+.sexp-sugerir-tiempo-check input[type="checkbox"] {
+    width: 1.8rem;
+    height: 1.8rem;
+    cursor: pointer;
+    accent-color: var(--colorBoton);
+    margin: 0 !important;
+}
+
+.sexp-sugerir-tiempo-check i {
+    font-size: 1.7rem;
+    color: var(--colorBoton);
+}
+
+.sexp-sugerir-tiempo-panel {
+    margin-top: 0.9rem;
+    padding-top: 0.9rem;
+    border-top: 1px solid var(--colorLinea);
+}
+
+.sexp-sugerir-tiempo-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 0.6rem;
+}
+
+.sexp-sugerir-tiempo-grid label {
+    font-size: 1.5rem !important;
+    font-weight: 600;
+    margin-bottom: 0.4rem !important;
+    color: var(--colorTablacelda);
+    display: block;
+}
+
+.sexp-sugerir-tiempo-row {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.sexp-sugerir-tiempo-row input[type="number"] {
+    flex: 1;
+    min-width: 0;
+}
+
+.sexp-sugerir-tiempo-row select {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 9rem;
+}
+
+.sexp-sugerir-tiempo-hint {
+    margin: 0.4rem 0 0 0 !important;
+    font-size: 1.35rem !important;
+    line-height: 1.45;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    color: var(--colorTablacelda);
+    opacity: 0.85;
+}
+
+.sexp-sugerir-tiempo-hint i {
+    flex: 0 0 auto;
+    margin-top: 0.2rem;
+    color: var(--colorBoton);
+    font-size: 1.5rem;
+}
+
+body.darkmode .sexp-sugerir-tiempo {
+    background-color: rgba(255, 255, 255, 0.04);
+    border-color: #5a5f66;
+}
+
+@media (max-width: 640px) {
+    .sexp-sugerir-tiempo-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+
+/* ============================================================
+   MODAL ADMIN — Tiempo sugerido por el solicitante
+   ============================================================ */
+.sexp-modal-sugerido {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    padding: 0.7rem 0.9rem;
+    margin-bottom: 1rem;
+    background-color: rgba(245, 158, 11, 0.18);
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    border-radius: 0.6rem;
+    color: #FFFFFF;
+    font-size: 1.4rem !important;
+    line-height: 1.4;
+}
+
+.sexp-modal-sugerido i {
+    font-size: 1.7rem;
+    color: #fbbf24;
+    flex: 0 0 auto;
+    margin-top: 0.1rem;
+}
+

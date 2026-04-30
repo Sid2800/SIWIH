@@ -164,6 +164,12 @@ class SolicitudPrestamo(models.Model):
         default=False,
         verbose_name='Notificado al usuario (Listo para recoger)'
     )
+    tiempo_sugerido_horas = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        verbose_name='Tiempo sugerido por el solicitante (horas)',
+        help_text='Sugerencia opcional del usuario al crear la solicitud. Mismo día: máx hasta 4:00 PM. Días posteriores: máx 72 horas.'
+    )
 
     class Meta:
         db_table = 's_exp_solicitudprestamo'

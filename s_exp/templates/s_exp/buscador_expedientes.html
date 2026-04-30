@@ -99,6 +99,40 @@
                     </div>
                 </div>
 
+                <!-- Sugerencia opcional de tiempo de entrega -->
+                <div class="sexp-sugerir-tiempo">
+                    <label class="sexp-sugerir-tiempo-check">
+                        <input type="checkbox" id="solicitud-sugerir-tiempo">
+                        <span><i class="bi bi-clock-history"></i> Sugerir tiempo de entrega</span>
+                    </label>
+
+                    <div class="sexp-sugerir-tiempo-panel" id="sugerir-tiempo-panel" style="display:none;">
+                        <div class="sexp-sugerir-tiempo-grid">
+                            <div>
+                                <label for="solicitud-tiempo-cuando">¿Cuándo lo necesita?</label>
+                                <select id="solicitud-tiempo-cuando">
+                                    <option value="hoy">Mismo día (antes de 4:00 PM)</option>
+                                    <option value="dias">Días posteriores (máx. 72 horas)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="solicitud-tiempo-valor">Tiempo</label>
+                                <div class="sexp-sugerir-tiempo-row">
+                                    <input type="number" id="solicitud-tiempo-valor" min="1" value="1">
+                                    <select id="solicitud-tiempo-unidad">
+                                        <option value="horas" selected>Horas</option>
+                                        <option value="dias">Días</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <p class="sexp-sugerir-tiempo-hint" id="sugerir-tiempo-hint">
+                            <i class="bi bi-info-circle"></i>
+                            <span>Mismo día: máximo hasta las 4:00 PM. Es solo una sugerencia, el administrador define el tiempo final.</span>
+                        </p>
+                    </div>
+                </div>
+
                 <p id="info-unidad" class="sexp-info-unidad"></p>
 
                 <button class="sexp-submit-btn" id="btn-enviar-solicitud" disabled>

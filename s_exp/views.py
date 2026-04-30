@@ -303,7 +303,6 @@ def aprobar_solicitud_api(request):
         return JsonResponse({"error": "Datos inválidos"}, status=400)
 
     solicitud_id = body.get('solicitud_id')
-    comentarios = body.get('comentarios', '')
     tiempo_limite = body.get('tiempo_limite_horas', 24)
     es_minutos = body.get('es_minutos', False)
     expedientes_decisiones = body.get('expedientes_decisiones', [])
@@ -317,24 +316,15 @@ def aprobar_solicitud_api(request):
 
     # Mapa de decisiones: {detalle_id: {aprobado, observaciones}}
     mapa_decisiones = {}
-    hay_rechazos = False
     for d in expedientes_decisiones:
         det_id = d.get('detalle_id')
         if det_id is None:
             continue
         aprobado = d.get('aprobado', True)
-        if not aprobado:
-            hay_rechazos = True
         mapa_decisiones[det_id] = {
             'aprobado': aprobado,
             'observaciones': (d.get('observaciones') or '').strip(),
         }
-
-    # Si hay rechazos, comentarios generales es obligatorio
-    if hay_rechazos and not comentarios.strip():
-        return JsonResponse({
-            "error": "Comentarios generales obligatorios cuando hay expedientes rechazados"
-        }, status=400)
 
     try:
         solicitud = SolicitudPrestamo.objects.get(id=solicitud_id, estado_flujo_id='SOL_PENDIENTE')
@@ -445,7 +435,6 @@ def aprobar_solicitud_api(request):
         prestamo = Prestamo.objects.create(
             solicitud=solicitud,
             admin_aprobador=request.user,
-            comentarios=comentarios,
             tiempo_limite_horas=int(tiempo_limite),
             es_minutos=es_minutos,
             estado='Activo'
@@ -487,7 +476,11 @@ def expedientes_solicitud_api(request, solicitud_id):
                 "paciente_identidad": d.paciente_identidad or "",
                 "estado_fisico": d.expediente_prestamo.estado_id,
             })
-        return JsonResponse({"expedientes": expedientes})
+        return JsonResponse({
+            "expedientes": expedientes,
+            "tiempo_sugerido_horas": solicitud.tiempo_sugerido_horas,
+            "motivo": solicitud.motivo.nombre if solicitud.motivo_id else "",
+        })
     except Exception as e:
         logger.error(f"Error en expedientes_solicitud_api: {e}", exc_info=True)
         return JsonResponse({"error": "Error interno del servidor"}, status=500)
@@ -1149,11 +1142,23 @@ def crear_solicitud_api(request):
     expediente_ids = body.get('expedientes', [])  # lista de expediente IDs (de tabla Expediente)
     motivo_id = body.get('motivo_id')
     observaciones = body.get('observaciones', '').strip()
+    tiempo_sugerido_horas = body.get('tiempo_sugerido_horas')
 
     if not expediente_ids:
         return JsonResponse({"error": "Debe seleccionar al menos un expediente"}, status=400)
     if not motivo_id:
         return JsonResponse({"error": "El motivo es obligatorio"}, status=400)
+
+    # Validar tiempo sugerido (opcional). Mismo día: max horas hasta 4 PM. Días posteriores: max 72h.
+    if tiempo_sugerido_horas is not None:
+        try:
+            tiempo_sugerido_horas = int(tiempo_sugerido_horas)
+        except (TypeError, ValueError):
+            return JsonResponse({"error": "Tiempo sugerido inválido"}, status=400)
+        if tiempo_sugerido_horas < 1:
+            return JsonResponse({"error": "El tiempo sugerido debe ser mayor a 0"}, status=400)
+        if tiempo_sugerido_horas > 72:
+            return JsonResponse({"error": "El tiempo sugerido no puede superar 72 horas"}, status=400)
 
     # Validar motivo
     try:
@@ -1196,6 +1201,7 @@ def crear_solicitud_api(request):
             motivo=motivo,
             observaciones=observaciones or None,
             area_destino=area_destino or None,
+            tiempo_sugerido_horas=tiempo_sugerido_horas,
         )
 
         # Crear detalles con datos históricos

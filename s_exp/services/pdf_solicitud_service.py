@@ -62,6 +62,9 @@ def _unidad_usuario(user):
 def _fmt_fecha(dt, con_hora=True):
     if not dt:
         return ''
+    # Convertir a la zona horaria local del sistema antes de formatear
+    if timezone.is_aware(dt):
+        dt = dt.astimezone(timezone.get_current_timezone())
     if con_hora:
         return dt.strftime('%d/%m/%Y %H:%M')
     return dt.strftime('%d/%m/%Y')
@@ -230,7 +233,18 @@ def generar_pdf_solicitud(solicitud):
     elementos.append(Paragraph(f'Solicitud #{solicitud.id}', st_titulo))
     elementos.append(Spacer(1, 4))
 
-    fecha_salida = _fmt_fecha(solicitud.fecha_creacion, con_hora=not ya_entregado)
+    # "Hora de salida" = momento real en que el expediente sale del archivo.
+    # Si el préstamo ya tiene fecha_entrega, usarla; si no, usar la hora actual del sistema.
+    fecha_salida_dt = None
+    try:
+        if solicitud.prestamo and solicitud.prestamo.fecha_entrega:
+            fecha_salida_dt = solicitud.prestamo.fecha_entrega
+    except Exception:
+        fecha_salida_dt = None
+    if fecha_salida_dt is None:
+        fecha_salida_dt = ahora
+    fecha_salida = _fmt_fecha(fecha_salida_dt, con_hora=True)
+
     responsable = f"{solicitud.usuario.first_name} {solicitud.usuario.last_name}".strip() or solicitud.usuario.username
     unidad = _unidad_usuario(solicitud.usuario) or solicitud.area_destino or '—'
 
@@ -255,17 +269,10 @@ def generar_pdf_solicitud(solicitud):
     fecha_entrega_calc = _calcular_fecha_entrega(solicitud, ahora)
     fecha_entrega_str = _fmt_fecha(fecha_entrega_calc, con_hora=not ya_entregado) if fecha_entrega_calc else ''
 
-    # Obtener comentario general
-    comentarios_generales = ''
-    try:
-        p = solicitud.prestamo
-        comentarios_generales = p.comentarios or ''
-    except Exception:
-        pass
-
     cabeceras = [
         Paragraph('Fecha salida', st_tabla_head),
         Paragraph('Expediente', st_tabla_head),
+        Paragraph('¿Disponible?', st_tabla_head),
         Paragraph('Identidad', st_tabla_head),
         Paragraph('Paciente', st_tabla_head),
         Paragraph('Motivo', st_tabla_head),
@@ -289,6 +296,7 @@ def generar_pdf_solicitud(solicitud):
         filas.append([
             Paragraph(fecha_salida, st_tabla_cell),
             Paragraph(f'#{num_exp}', st_tabla_cell),
+            Paragraph('', st_tabla_cell),  # ¿Disponible? — recuadro físico para marcado manual
             Paragraph(identidad, st_tabla_cell),
             Paragraph(paciente, st_tabla_cell),
             Paragraph(motivo_solicitud, st_tabla_cell),
@@ -301,8 +309,8 @@ def generar_pdf_solicitud(solicitud):
     tabla_exp = Table(
         filas,
         colWidths=[
-            col_w * 0.10, col_w * 0.10, col_w * 0.12, col_w * 0.15,
-            col_w * 0.12, col_w * 0.11, col_w * 0.15, col_w * 0.15,
+            col_w * 0.10, col_w * 0.08, col_w * 0.07, col_w * 0.11, col_w * 0.14,
+            col_w * 0.11, col_w * 0.10, col_w * 0.14, col_w * 0.15,
         ],
         repeatRows=1,
     )
@@ -322,19 +330,6 @@ def generar_pdf_solicitud(solicitud):
     tabla_exp.setStyle(TableStyle(tabla_styles))
     elementos.append(tabla_exp)
     elementos.append(Spacer(1, 16))
-
-    # =========================================================
-    # Observaciones General (comentarios)
-    # =========================================================
-    if comentarios_generales:
-        st_obs_general = ParagraphStyle('obs_general', parent=styles['Normal'],
-                                        fontName='Helvetica', fontSize=9,
-                                        textColor=colors.HexColor('#333333'))
-        obs_titulo = Paragraph('<b>Observaciones generales:</b>', st_obs_general)
-        obs_contenido = Paragraph(comentarios_generales, st_obs_general)
-        elementos.append(obs_titulo)
-        elementos.append(obs_contenido)
-        elementos.append(Spacer(1, 12))
 
     # =========================================================
     # Firmas (Entrega + Devolución)

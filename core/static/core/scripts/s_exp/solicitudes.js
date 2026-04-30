@@ -161,7 +161,10 @@ function aprobarSolicitud(id) {
         method: 'GET',
         success: function (resp) {
             Swal.close();
-            _mostrarModalAprobacion(id, resp.expedientes || []);
+            _mostrarModalAprobacion(id, resp.expedientes || [], {
+                tiempo_sugerido_horas: resp.tiempo_sugerido_horas,
+                motivo: resp.motivo
+            });
         },
         error: function () {
             Swal.close();
@@ -197,7 +200,8 @@ function horasHastaCuatroPM() {
  * @param {number} id          - ID de la solicitud.
  * @param {Array}  expedientes - Lista de objetos {detalle_id, numero, paciente_nombre}.
  */
-function _mostrarModalAprobacion(id, expedientes) {
+function _mostrarModalAprobacion(id, expedientes, meta) {
+    meta = meta || {};
     const expHtml = expedientes.map(function (exp) {
         const nombre = exp.paciente_nombre ? `<span class="sexp-exp-lista-patient">${exp.paciente_nombre}</span>` : '';
         return `
@@ -213,33 +217,48 @@ function _mostrarModalAprobacion(id, expedientes) {
         </div>`;
     }).join('');
 
+    // Texto del tiempo sugerido por el solicitante (si existe)
+    let sugeridoBlock = '';
+    if (meta.tiempo_sugerido_horas && meta.tiempo_sugerido_horas > 0) {
+        const h = meta.tiempo_sugerido_horas;
+        let txt;
+        if (h % 24 === 0) {
+            const d = h / 24;
+            txt = `${d} día${d === 1 ? '' : 's'} (${h}h)`;
+        } else {
+            txt = `${h} hora${h === 1 ? '' : 's'}`;
+        }
+        sugeridoBlock = `
+            <div class="sexp-modal-sugerido">
+                <i class="bi bi-lightbulb"></i>
+                <span><strong>Tiempo sugerido por el solicitante:</strong> ${txt}</span>
+            </div>`;
+    }
+
     Swal.fire({
         title: 'Aprobar Solicitud #' + id,
         width: 950,
         html: `<div style="text-align:left; display:grid; grid-template-columns: 1.5fr 280px; gap: 15px;">
             <div>
                 <label style="display:block; font-weight:600; margin-bottom:4px;">
-                    Expedientes solicitados: <strong>${expedientes.length}</strong>
+                    Total de expedientes: <strong>${expedientes.length}</strong>
                     <small style="font-weight:normal; opacity:.75; display:block; font-size:12px;">(desmarca los que NO se prestarán)</small>
                 </label>
                 <div id="swal-exp-list" style="border: 1px solid #ddd; border-radius: 6px; padding: 10px; max-height: 350px; overflow-y: auto; background:#f9fafb;">${expHtml}</div>
             </div>
             <div style="border-left:1px solid #ccc; padding-left:15px;">
+                ${sugeridoBlock}
                 <div class="sexp-modal-campo">
-                    <label>Tiempo límite</label>
+                    <label>Tiempo de entrega</label>
                 <div class="sexp-modal-tiempo-row">
-                    <input type="number" id="swal-tiempo" value="5" min="1" class="sexp-modal-input">
+                    <input type="number" id="swal-tiempo" value="1" min="1" class="sexp-modal-input">
                     <select id="swal-unidad" class="sexp-modal-select">
-                        <option value="minutos" selected>Minutos</option>
+                        <option value="dias" selected>Días</option>
                         <option value="horas">Horas</option>
-                        <option value="dias">Días</option>
+                        <option value="minutos">Minutos</option>
                     </select>
                 </div>
-                <small id="swal-tiempo-hint" class="sexp-modal-hint">Ingrese el tiempo en minutos.</small>
-                </div>
-                <div class="sexp-modal-campo">
-                    <label>Comentarios generales (opcional)</label>
-                    <textarea id="swal-comentarios" rows="5" class="sexp-modal-input"></textarea>
+                <small id="swal-tiempo-hint" class="sexp-modal-hint">De 1 a 3 días. Vencimiento a las 4:00 PM del último día.</small>
                 </div>
             </div>
         </div>`,
@@ -354,7 +373,6 @@ function _mostrarModalAprobacion(id, expedientes) {
             return {
                 tiempo_horas: tiempoHoras,
                 es_minutos: esMinutos,
-                comentarios: document.getElementById('swal-comentarios').value,
                 decisiones: decisiones
             };
         }
@@ -370,7 +388,6 @@ function _mostrarModalAprobacion(id, expedientes) {
                 solicitud_id: id,
                 tiempo_limite_horas: result.value.tiempo_horas,
                 es_minutos: result.value.es_minutos,
-                comentarios: result.value.comentarios,
                 expedientes_decisiones: result.value.decisiones
             }),
             success: function (resp) {
