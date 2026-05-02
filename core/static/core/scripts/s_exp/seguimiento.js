@@ -209,8 +209,7 @@ function solicitarDevolucion(solicitudId) {
         icon: 'question',
         showCancelButton: true,
         confirmButtonText: 'Sí, Devolver',
-        cancelButtonText: 'Cancelar',
-        confirmButtonColor: '#f59e0b'
+        cancelButtonText: 'Cancelar'
     }).then((result) => {
         if (result.isConfirmed) {
             $.ajax({

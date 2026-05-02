@@ -44,7 +44,6 @@ function mostrarModalAlertaSticky(alerta) {
         text: alerta.mensaje,
         icon: 'info',
         confirmButtonText: '<i class="bi bi-check-circle"></i> Entendido, pasaré por ellos',
-        confirmButtonColor: '#22c55e',
         allowOutsideClick: false,
         allowEscapeKey: false,
     }).then((result) => {
@@ -83,7 +82,6 @@ function mostrarModalAlertaVencimiento(alerta) {
         text: alerta.mensaje,
         icon: 'error',
         confirmButtonText: '<i class="bi bi-exclamation-triangle"></i> Entendido, devolveré los expedientes',
-        confirmButtonColor: '#ef4444',
         allowOutsideClick: false,
         allowEscapeKey: false,
     }).then((result) => {

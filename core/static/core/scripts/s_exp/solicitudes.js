@@ -275,7 +275,6 @@ function _mostrarModalAprobacion(id, expedientes, meta) {
         showCancelButton: true,
         confirmButtonText: '<i class="bi bi-check-lg"></i> Aprobar',
         cancelButtonText: 'Cancelar',
-        confirmButtonColor: '#16a34a',
         didOpen: () => {
             const selUnidad = document.getElementById('swal-unidad');
             const inputTiempo = document.getElementById('swal-tiempo');
@@ -417,7 +416,6 @@ function rechazarSolicitud(id) {
         showCancelButton: true,
         confirmButtonText: '<i class="bi bi-x-lg"></i> Rechazar',
         cancelButtonText: 'Cancelar',
-        confirmButtonColor: '#dc2626',
         preConfirm: () => {
             const motivo = document.getElementById('swal-motivo').value.trim();
             if (!motivo) {
@@ -474,8 +472,7 @@ function marcarListo(id) {
         icon: 'question',
         showCancelButton: true,
         confirmButtonText: 'Sí, notificar',
-        cancelButtonText: 'Cancelar',
-        confirmButtonColor: '#059669'
+        cancelButtonText: 'Cancelar'
     }).then((result) => {
         if (result.isConfirmed) {
             $.ajax({
@@ -566,7 +563,6 @@ function _mostrarModalRevision(id, expedientes) {
         showCancelButton: true,
         confirmButtonText: '<i class="bi bi-save"></i> Guardar Revisión',
         cancelButtonText: 'Cancelar',
-        confirmButtonColor: '#059669',
         didOpen: () => {
             document.querySelectorAll('.sexp-revision-check').forEach(chk => {
                 chk.addEventListener('change', function () {
@@ -638,8 +634,7 @@ function entregarPrestamoDesdeGestion(prestamoId, solicitudId) {
         icon: 'question',
         showCancelButton: true,
         confirmButtonText: '<i class="bi bi-box-arrow-up-right"></i> Sí, entregar',
-        cancelButtonText: 'Cancelar',
-        confirmButtonColor: '#0d9488'
+        cancelButtonText: 'Cancelar'
     }).then(function (result) {
         if (!result.isConfirmed) return;
         $.ajax({

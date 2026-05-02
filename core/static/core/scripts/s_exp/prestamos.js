@@ -185,8 +185,7 @@ function marcarEntregado(prestamoId) {
         icon: 'question',
         showCancelButton: true,
         confirmButtonText: 'Sí, Entregar',
-        cancelButtonText: 'Cancelar',
-        confirmButtonColor: '#22c55e'
+        cancelButtonText: 'Cancelar'
     }).then((result) => {
         if (result.isConfirmed) {
             $.ajax({
