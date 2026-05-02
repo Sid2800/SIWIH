@@ -102,29 +102,51 @@ function renderSolicitudes(data, filtro = '') {
             'sol_en_devolucion': '#8b5cf6'
         };
 
-        const sanitize = (txt) => (txt || '').replace(/"/g, '&quot;');
+        const sanitize = (txt) => (txt || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
         // Estados en los que ya hay un préstamo activo y aplica el AMARILLO de "pendiente"
         const enPrestamo = ['SOL_LISTO_RECOGER', 'SOL_EN_PRESTAMO', 'SOL_EN_DEVOLUCION', 'SOL_INCOMPLETA'].includes(s.estado_flujo);
         const exps = s.expedientes.map(e => {
             const num = typeof e === 'object' ? e.numero : e;
             if (typeof e !== 'object') {
-                return `<span class="sexp-exp-tag">#${num}</span>`;
+                return `<span class="sexp-exp-tag" onclick="mostrarInfoExpediente(${JSON.stringify({numero: num, estado: 'normal'}).replace(/"/g,'&quot;')})">#${num}</span>`;
             }
+            // Construir objeto info para el popup
+            let estadoTag = 'normal';
+            if (e.aprobado === false) estadoTag = 'rechazado';
+            else if (enPrestamo && e.devuelto === false) estadoTag = 'pendiente';
+            else if (e.fuera_de_tiempo) estadoTag = 'late';
+            else if (e.devuelto) estadoTag = 'devuelto';
+
+            const info = {
+                numero: num,
+                estado: estadoTag,
+                aprobado: e.aprobado,
+                devuelto: e.devuelto,
+                motivo_rechazo: e.motivo_rechazo_individual || '',
+                comentario_devolucion: e.comentario_devolucion || '',
+                paciente_nombre: e.paciente_nombre || '',
+                paciente_identidad: e.paciente_identidad || '',
+                fuera_de_tiempo: !!e.fuera_de_tiempo
+            };
+            const infoAttr = sanitize(JSON.stringify(info));
+            const onClick = `onclick="mostrarInfoExpediente(JSON.parse(this.getAttribute('data-info')))"`;
+            const dataAttr = `data-info="${infoAttr}"`;
+
             // ROJO: no se prestó (rechazado / no encontrado)
             if (e.aprobado === false) {
                 const motivo = e.motivo_rechazo_individual || 'No se prestó este expediente';
-                return `<span class="sexp-exp-tag sexp-exp-tag--rechazado" title="${sanitize(motivo)}">#${num}</span>`;
+                return `<span class="sexp-exp-tag sexp-exp-tag--rechazado" title="${sanitize(motivo)}" ${dataAttr} ${onClick}>#${num}</span>`;
             }
             // AMARILLO: en préstamo activo y aún no devuelto
             if (enPrestamo && e.devuelto === false) {
-                return `<span class="sexp-exp-tag sexp-exp-tag--pendiente" title="Pendiente de devolver">#${num}</span>`;
+                return `<span class="sexp-exp-tag sexp-exp-tag--pendiente" title="Pendiente de devolver" ${dataAttr} ${onClick}>#${num}</span>`;
             }
             // ESTANDAR (con fuera de tiempo si aplica)
             if (e.fuera_de_tiempo) {
-                return `<span class="sexp-exp-tag sexp-exp-tag--late" title="Entregado fuera de tiempo${e.comentario_devolucion ? ' — ' + sanitize(e.comentario_devolucion) : ''}">#${num}</span>`;
+                return `<span class="sexp-exp-tag sexp-exp-tag--late" title="Entregado fuera de tiempo${e.comentario_devolucion ? ' — ' + sanitize(e.comentario_devolucion) : ''}" ${dataAttr} ${onClick}>#${num}</span>`;
             }
             const tooltip = e.devuelto ? (e.comentario_devolucion ? sanitize(e.comentario_devolucion) : 'Devuelto correctamente') : '';
-            return `<span class="sexp-exp-tag" title="${tooltip}">#${num}</span>`;
+            return `<span class="sexp-exp-tag" title="${tooltip}" ${dataAttr} ${onClick}>#${num}</span>`;
         }).join(' ');
         const badgeEstilo = badgeEstilos[claseEstado] || '';
         const borderColor = borderColors[claseEstado] || '#6366f1';
@@ -254,4 +276,75 @@ function toggleCard(headerEl) {
     // Colapso disponible en todos los tamaños de pantalla
     const card = $(headerEl).closest('.sexp-card-collapsible');
     card.toggleClass('sexp-collapsed');
+}
+
+/**
+ * Muestra un popup con la información del expediente al tocar/clickear el tag.
+ * Útil en móvil/tablet donde el tooltip nativo no aparece sin mouse.
+ * @param {Object} info - Datos del expediente y su estado.
+ */
+function mostrarInfoExpediente(info) {
+    if (!info) return;
+    info = info || {};
+    const num = info.numero || '—';
+    const estado = info.estado || 'normal';
+
+    const labelEstado = {
+        'rechazado': '<span class="sexp-exp-info-estado--rec"><i class="bi bi-x-circle-fill"></i> No prestado</span>',
+        'pendiente': '<span class="sexp-exp-info-estado--pend"><i class="bi bi-hourglass-split"></i> Pendiente de devolver</span>',
+        'late': '<span class="sexp-exp-info-estado--late"><i class="bi bi-exclamation-triangle-fill"></i> Devuelto fuera de tiempo</span>',
+        'devuelto': '<span class="sexp-exp-info-estado--ok"><i class="bi bi-check-circle-fill"></i> Devuelto correctamente</span>',
+        'normal': '<span class="sexp-exp-info-estado--ok"><i class="bi bi-circle-fill"></i> En proceso</span>'
+    };
+
+    let filas = `
+        <div class="sexp-exp-info-fila">
+            <span class="sexp-exp-info-label">Expediente:</span>
+            <span class="sexp-exp-info-valor"><strong>#${num}</strong></span>
+        </div>
+        <div class="sexp-exp-info-fila">
+            <span class="sexp-exp-info-label">Estado:</span>
+            <span class="sexp-exp-info-valor">${labelEstado[estado] || labelEstado.normal}</span>
+        </div>`;
+
+    if (info.paciente_identidad) {
+        filas += `<div class="sexp-exp-info-fila">
+            <span class="sexp-exp-info-label">Identidad:</span>
+            <span class="sexp-exp-info-valor">${info.paciente_identidad}</span>
+        </div>`;
+    }
+    if (info.paciente_nombre) {
+        filas += `<div class="sexp-exp-info-fila">
+            <span class="sexp-exp-info-label">Paciente:</span>
+            <span class="sexp-exp-info-valor">${info.paciente_nombre}</span>
+        </div>`;
+    }
+    if (info.motivo_rechazo) {
+        filas += `<div class="sexp-exp-info-fila">
+            <span class="sexp-exp-info-label">Motivo:</span>
+            <span class="sexp-exp-info-valor">${info.motivo_rechazo}</span>
+        </div>`;
+    }
+    if (info.comentario_devolucion) {
+        filas += `<div class="sexp-exp-info-fila">
+            <span class="sexp-exp-info-label">Comentario:</span>
+            <span class="sexp-exp-info-valor">${info.comentario_devolucion}</span>
+        </div>`;
+    }
+
+    Swal.fire({
+        title: `Expediente #${num}`,
+        html: `<div class="sexp-exp-info-popup">${filas}</div>`,
+        showCancelButton: false,
+        confirmButtonText: '<i class="bi bi-check-circle-fill"></i> Cerrar',
+        customClass: {
+            popup: 'contenedor-modal',
+            title: 'contener-modal-titulo',
+            confirmButton: 'contener-modal-boton-confirmar',
+        },
+        didOpen: () => {
+            const actionsContainer = document.querySelector('.swal2-actions');
+            if (actionsContainer) actionsContainer.classList.add('contener-modal-contenedor-botones-min');
+        }
+    });
 }

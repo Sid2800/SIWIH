@@ -289,16 +289,19 @@ body.darkmode .sexp-exp-tag--pendiente {
     color: var(--colorTextoBoton) !important;
     transition: background-color 0.3s ease;
     border-radius: 1rem !important;
-    font-size: 1.6rem !important;
+    font-size: 1.5rem !important;
     font-family: var(--fuenteTablaTitulo);
     font-weight: bold;
     text-transform: uppercase;
-    display: flex !important;
+    display: inline-flex !important;
     align-items: center;
     justify-content: center;
-    column-gap: 1rem;
-    width: 15rem;
+    column-gap: 0.8rem;
+    min-width: 18rem;
+    width: auto;
     height: 4rem;
+    padding: 0 1.5rem;
+    white-space: nowrap;
 }
 
 /* Hover de botones: cambio de color */
@@ -354,15 +357,23 @@ body.darkmode .sexp-exp-tag--pendiente {
     box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
 }
 
-/* Fila de inputs de tiempo */
+/* Fila de inputs de tiempo: input numérico + select unidad */
 .sexp-modal-tiempo-row {
-    display: flex;
-    gap: 0.5rem;
+    display: grid;
+    grid-template-columns: 12rem 1fr;
+    gap: 0.8rem;
     align-items: center;
 }
 
-.sexp-modal-tiempo-row input {
-    flex: 1;
+.sexp-modal-tiempo-row input[type="number"] {
+    width: 100%;
+    text-align: center;
+    font-weight: 700;
+    font-size: 1.8rem;
+}
+
+.sexp-modal-tiempo-row select {
+    width: 100%;
 }
 
 /* Hint/ayuda en modales */
@@ -411,7 +422,7 @@ body.darkmode .sexp-exp-tag--pendiente {
     opacity: 0.85;
 }
 
-/* Resumen y lista de aprobación */
+/* Resumen y lista de aprobación con botón de colapsar/expandir */
 .sexp-modal-aprob-resumen {
     margin: 0 0 0.8rem 0 !important;
     padding: 0.8rem 1rem;
@@ -421,13 +432,50 @@ body.darkmode .sexp-exp-tag--pendiente {
     font-size: 1.55rem !important;
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 0.6rem;
     border: 1px solid var(--colorLinea);
 }
 
-/* Lista en grid de 2 columnas (responsive 1 col en móvil) */
+.sexp-modal-aprob-resumen-info {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex: 1;
+}
+
+.sexp-modal-aprob-toggle {
+    background: transparent;
+    border: 1px solid var(--colorLinea);
+    color: var(--colorTablacelda);
+    border-radius: 0.5rem;
+    padding: 0.3rem 0.7rem;
+    cursor: pointer;
+    font-size: 1.3rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    transition: all 0.2s;
+}
+
+.sexp-modal-aprob-toggle:hover {
+    background: var(--colorBoton);
+    color: var(--colorTextoBoton);
+    border-color: var(--colorBoton);
+}
+
+.sexp-modal-aprob-toggle i {
+    transition: transform 0.2s;
+}
+
+.sexp-modal-aprob-lista--collapsed .sexp-modal-aprob-toggle i,
+.sexp-modal-aprob-resumen.is-collapsed + .sexp-modal-aprob-lista {
+    display: none;
+}
+
+/* Lista en grid de 3 columnas (PC), 2 (tablet), 1 (móvil) */
 .sexp-modal-aprob-lista {
-    max-height: 320px;
+    max-height: 360px;
     overflow-y: auto;
     margin-bottom: 1rem;
     background: var(--blanco);
@@ -435,33 +483,42 @@ body.darkmode .sexp-exp-tag--pendiente {
     border: 1px solid var(--colorLinea);
     padding: 0.6rem;
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: 0.5rem;
+    transition: max-height 0.3s ease, padding 0.3s ease;
+}
+
+.sexp-modal-aprob-lista.is-collapsed {
+    max-height: 0;
+    padding: 0;
+    margin: 0;
+    overflow: hidden;
+    border-width: 0;
 }
 
 .sexp-modal-aprob-item {
     display: flex;
-    align-items: center;
-    gap: 0.8rem;
-    padding: 0.6rem 0.9rem;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.6rem 0.8rem;
     border: 1px solid var(--colorLinea);
     border-radius: 0.5rem;
-    font-size: 1.45rem !important;
     color: var(--colorTablacelda);
     background-color: var(--colorContendor);
+    word-break: break-word;
 }
 
 .sexp-modal-aprob-id {
     font-weight: 700;
     color: var(--colorBoton);
-    flex: 0 0 auto;
-    font-size: 1.4rem;
+    font-size: 1.35rem;
+    line-height: 1.2;
 }
 
 .sexp-modal-aprob-nombre {
-    flex: 1;
+    font-size: 1.35rem;
+    line-height: 1.3;
     word-break: break-word;
-    font-size: 1.4rem;
 }
 
 /* Sugerencia de tiempo en modal */
@@ -516,21 +573,31 @@ body.darkmode .sexp-exp-tag--pendiente {
     flex: 0 0 auto;
 }
 
-/* Cabecera del grid */
+/* Cabecera del grid: columnas alineadas con las filas */
 .sexp-revision-cabecera {
     display: grid;
-    grid-template-columns: 5rem 8rem 1.4fr 1.4fr;
-    gap: 0.8rem;
-    padding: 0.6rem 0.9rem;
+    grid-template-columns: 7rem 11rem 1.4fr 1.6fr;
+    gap: 1rem;
+    padding: 0.7rem 0.9rem;
     background-color: var(--colorContendor);
     border: 1px solid var(--colorLinea);
     border-radius: 0.5rem;
     margin-bottom: 0.5rem;
     font-weight: 700;
     color: var(--colorTablacelda);
-    font-size: 1.35rem;
+    font-size: 1.3rem;
     text-transform: uppercase;
     letter-spacing: 0.03rem;
+}
+
+.sexp-revision-cabecera span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sexp-revision-cabecera span:first-child {
+    text-align: center;
 }
 
 .sexp-revision-list {
@@ -541,11 +608,11 @@ body.darkmode .sexp-exp-tag--pendiente {
     gap: 0.5rem;
 }
 
-/* Cada fila como grid con 4 columnas */
+/* Cada fila como grid con 4 columnas — ALINEADAS con la cabecera */
 .sexp-revision-row {
     display: grid;
-    grid-template-columns: 5rem 8rem 1.4fr 1.4fr;
-    gap: 0.8rem;
+    grid-template-columns: 7rem 11rem 1.4fr 1.6fr;
+    gap: 1rem;
     align-items: center;
     padding: 0.7rem 0.9rem;
     background-color: var(--blanco);
@@ -674,6 +741,65 @@ body.darkmode .sexp-exp-tag--pendiente {
 
 
 /* ============================================================
+   POPUP INFO EXPEDIENTE (tap en móvil/tablet)
+   ============================================================ */
+.sexp-exp-info-popup {
+    text-align: left;
+    font-size: 1.5rem;
+    line-height: 1.5;
+    color: var(--colorTablacelda);
+}
+
+.sexp-exp-info-popup .sexp-exp-info-fila {
+    display: flex;
+    gap: 0.6rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px dashed var(--colorLinea);
+}
+
+.sexp-exp-info-popup .sexp-exp-info-fila:last-child {
+    border-bottom: none;
+}
+
+.sexp-exp-info-popup .sexp-exp-info-label {
+    font-weight: 700;
+    min-width: 9rem;
+    color: var(--colorBoton);
+}
+
+.sexp-exp-info-popup .sexp-exp-info-valor {
+    flex: 1;
+    word-break: break-word;
+}
+
+.sexp-exp-info-popup .sexp-exp-info-estado--ok {
+    color: #16a34a;
+    font-weight: 700;
+}
+
+.sexp-exp-info-popup .sexp-exp-info-estado--rec {
+    color: #dc2626;
+    font-weight: 700;
+}
+
+.sexp-exp-info-popup .sexp-exp-info-estado--pend {
+    color: #d97706;
+    font-weight: 700;
+}
+
+.sexp-exp-info-popup .sexp-exp-info-estado--late {
+    color: #d97706;
+    font-weight: 700;
+}
+
+/* Tag clickeable: cursor pointer en touch */
+.sexp-exp-tag {
+    cursor: pointer;
+    user-select: none;
+}
+
+
+/* ============================================================
    MODAL AUDITORÍA DE DEVOLUCIÓN
    ============================================================ */
 
@@ -752,7 +878,13 @@ body.darkmode .sexp-exp-tag--pendiente {
     }
 
     .sexp-modal-aprob-lista {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .contener-modal-boton-confirmar,
+    .contener-modal-boton-cancelar {
+        min-width: 15rem;
+        font-size: 1.4rem !important;
     }
 }
 
@@ -763,6 +895,10 @@ body.darkmode .sexp-exp-tag--pendiente {
 
     .sexp-modal-lista-grid {
         grid-template-columns: 1fr;
+    }
+
+    .sexp-modal-aprob-lista {
+        grid-template-columns: repeat(2, 1fr);
     }
 
     /* Apilar columnas de revisión en móvil */
@@ -805,20 +941,37 @@ body.darkmode .sexp-exp-tag--pendiente {
     .sexp-auditoria-radios {
         justify-content: flex-start;
     }
+
+    .contener-modal-boton-confirmar,
+    .contener-modal-boton-cancelar {
+        min-width: 13rem;
+        height: 3.6rem;
+    }
 }
 
 @media (max-width: 480px) {
     .sexp-modal-tiempo-row {
-        flex-direction: column;
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
     }
 
     .sexp-modal-select {
         width: 100%;
     }
 
+    .sexp-modal-aprob-lista {
+        grid-template-columns: 1fr;
+    }
+
     .sexp-auditoria-radios {
         flex-direction: column;
         gap: 0.5rem;
+    }
+
+    .contener-modal-boton-confirmar,
+    .contener-modal-boton-cancelar {
+        min-width: 11rem;
+        font-size: 1.2rem !important;
     }
 }
 

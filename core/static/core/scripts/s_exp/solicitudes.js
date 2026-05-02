@@ -63,6 +63,76 @@ $(document).ready(function () {
 });
 
 /**
+ * Muestra un popup con la información del expediente al tocar/clickear el tag.
+ * Útil en móvil/tablet donde el tooltip nativo no aparece sin mouse.
+ * @param {Object} info - Datos del expediente y su estado.
+ */
+function mostrarInfoExpediente(info) {
+    if (!info) return;
+    const num = info.numero || '—';
+    const estado = info.estado || 'normal';
+
+    const labelEstado = {
+        'rechazado': '<span class="sexp-exp-info-estado--rec"><i class="bi bi-x-circle-fill"></i> No prestado</span>',
+        'pendiente': '<span class="sexp-exp-info-estado--pend"><i class="bi bi-hourglass-split"></i> Pendiente de devolver</span>',
+        'late': '<span class="sexp-exp-info-estado--late"><i class="bi bi-exclamation-triangle-fill"></i> Devuelto fuera de tiempo</span>',
+        'devuelto': '<span class="sexp-exp-info-estado--ok"><i class="bi bi-check-circle-fill"></i> Devuelto correctamente</span>',
+        'normal': '<span class="sexp-exp-info-estado--ok"><i class="bi bi-circle-fill"></i> En proceso</span>'
+    };
+
+    let filas = `
+        <div class="sexp-exp-info-fila">
+            <span class="sexp-exp-info-label">Expediente:</span>
+            <span class="sexp-exp-info-valor"><strong>#${num}</strong></span>
+        </div>
+        <div class="sexp-exp-info-fila">
+            <span class="sexp-exp-info-label">Estado:</span>
+            <span class="sexp-exp-info-valor">${labelEstado[estado] || labelEstado.normal}</span>
+        </div>`;
+
+    if (info.paciente_identidad) {
+        filas += `<div class="sexp-exp-info-fila">
+            <span class="sexp-exp-info-label">Identidad:</span>
+            <span class="sexp-exp-info-valor">${info.paciente_identidad}</span>
+        </div>`;
+    }
+    if (info.paciente_nombre) {
+        filas += `<div class="sexp-exp-info-fila">
+            <span class="sexp-exp-info-label">Paciente:</span>
+            <span class="sexp-exp-info-valor">${info.paciente_nombre}</span>
+        </div>`;
+    }
+    if (info.motivo_rechazo) {
+        filas += `<div class="sexp-exp-info-fila">
+            <span class="sexp-exp-info-label">Motivo:</span>
+            <span class="sexp-exp-info-valor">${info.motivo_rechazo}</span>
+        </div>`;
+    }
+    if (info.comentario_devolucion) {
+        filas += `<div class="sexp-exp-info-fila">
+            <span class="sexp-exp-info-label">Comentario:</span>
+            <span class="sexp-exp-info-valor">${info.comentario_devolucion}</span>
+        </div>`;
+    }
+
+    Swal.fire({
+        title: `Expediente #${num}`,
+        html: `<div class="sexp-exp-info-popup">${filas}</div>`,
+        showCancelButton: false,
+        confirmButtonText: '<i class="bi bi-check-circle-fill"></i> Cerrar',
+        customClass: {
+            popup: 'contenedor-modal',
+            title: 'contener-modal-titulo',
+            confirmButton: 'contener-modal-boton-confirmar',
+        },
+        didOpen: () => {
+            const actionsContainer = document.querySelector('.swal2-actions');
+            if (actionsContainer) actionsContainer.classList.add('contener-modal-contenedor-botones-min');
+        }
+    });
+}
+
+/**
  * Inicializa el DataTable de gestión de solicitudes.
  * Carga datos desde el servidor con paginación, ordenamiento y búsqueda.
  */
@@ -93,20 +163,36 @@ function initTabla() {
                         const num = typeof e === 'object' ? e.numero : e;
                         const noAprobado = e.aprobado === false;
                         const esFuera = e.fuera_de_tiempo;
-                        const sanitize = (t) => (t || '').replace(/"/g, '&quot;');
+                        const sanitize = (t) => (t || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
                         let cls = 'sexp-exp-tag';
                         let title = '';
+                        let estadoTag = 'normal';
                         if (noAprobado) {
                             cls = 'sexp-exp-tag sexp-exp-tag--rechazado';
                             title = e.motivo_rechazo_individual ? `No prestado: ${e.motivo_rechazo_individual}` : 'No prestado';
+                            estadoTag = 'rechazado';
                         } else if (enPrestamo && e.devuelto === false) {
                             cls = 'sexp-exp-tag sexp-exp-tag--pendiente';
                             title = 'Pendiente de devolver';
+                            estadoTag = 'pendiente';
                         } else if (esFuera) {
                             cls = 'sexp-exp-tag sexp-exp-tag--late';
                             title = 'Entregado fuera de tiempo';
+                            estadoTag = 'late';
+                        } else if (e.devuelto) {
+                            estadoTag = 'devuelto';
                         }
-                        return `<span class="${cls}" title="${sanitize(title)}">#${num}</span>`;
+                        const info = {
+                            numero: num,
+                            estado: estadoTag,
+                            paciente_nombre: e.paciente_nombre || '',
+                            paciente_identidad: e.paciente_identidad || '',
+                            motivo_rechazo: e.motivo_rechazo_individual || '',
+                            comentario_devolucion: e.comentario_devolucion || ''
+                        };
+                        const dataAttr = `data-info="${sanitize(JSON.stringify(info))}"`;
+                        const onClick = `onclick="mostrarInfoExpediente(JSON.parse(this.getAttribute('data-info')))"`;
+                        return `<span class="${cls}" title="${sanitize(title)}" ${dataAttr} ${onClick}>#${num}</span>`;
                     }).join(' ');
                 }
             },
@@ -277,6 +363,13 @@ function _mostrarModalAprobacion(id, expedientes, meta) {
         return `<div class="sexp-modal-aprob-item">${ident}<span class="sexp-modal-aprob-nombre">${nombre}</span></div>`;
     }).join('');
 
+    // Mostrar colapsado por defecto si hay muchos expedientes (>= 9)
+    const esLargo = expedientes.length >= 9;
+    const claseInicial = esLargo ? ' is-collapsed' : '';
+    const claseInicialResumen = esLargo ? ' is-collapsed' : '';
+    const iconoInicial = esLargo ? 'bi-chevron-down' : 'bi-chevron-up';
+    const textoInicial = esLargo ? 'Mostrar' : 'Ocultar';
+
     // Tiempo sugerido por el solicitante: pre-cargar como valor por defecto
     let prefillValor = 1;
     let prefillUnidad = 'dias';
@@ -302,13 +395,18 @@ function _mostrarModalAprobacion(id, expedientes, meta) {
 
     Swal.fire({
         title: 'Aprobar Solicitud #' + id,
-        width: '90%',
+        width: '95%',
         html: `<div style="text-align:left;">
-            <p class="sexp-modal-aprob-resumen">
-                <i class="bi bi-folder2-open"></i>
-                Total de expedientes solicitados: <strong>${expedientes.length}</strong>
+            <p class="sexp-modal-aprob-resumen${claseInicialResumen}">
+                <span class="sexp-modal-aprob-resumen-info">
+                    <i class="bi bi-folder2-open"></i>
+                    Total de expedientes solicitados: <strong>${expedientes.length}</strong>
+                </span>
+                <button type="button" class="sexp-modal-aprob-toggle" id="swal-toggle-lista">
+                    <i class="bi ${iconoInicial}"></i> <span>${textoInicial}</span>
+                </button>
             </p>
-            <div class="sexp-modal-aprob-lista">${expHtml}</div>
+            <div class="sexp-modal-aprob-lista${claseInicial}" id="swal-lista-exp">${expHtml}</div>
             ${sugeridoBlock}
             <div class="sexp-modal-campo">
                 <label>Tiempo de entrega (puede ajustarlo)</label>
@@ -335,6 +433,24 @@ function _mostrarModalAprobacion(id, expedientes, meta) {
         didOpen: () => {
             const actionsContainer = document.querySelector('.swal2-actions');
             if (actionsContainer) actionsContainer.classList.add('contener-modal-contenedor-botones');
+
+            // Toggle colapsar/expandir lista
+            const btnToggle = document.getElementById('swal-toggle-lista');
+            const lista = document.getElementById('swal-lista-exp');
+            if (btnToggle && lista) {
+                btnToggle.addEventListener('click', function () {
+                    const colapsado = lista.classList.toggle('is-collapsed');
+                    const i = btnToggle.querySelector('i');
+                    const sp = btnToggle.querySelector('span');
+                    if (colapsado) {
+                        i.className = 'bi bi-chevron-down';
+                        sp.textContent = 'Mostrar';
+                    } else {
+                        i.className = 'bi bi-chevron-up';
+                        sp.textContent = 'Ocultar';
+                    }
+                });
+            }
             const selUnidad = document.getElementById('swal-unidad');
             const inputTiempo = document.getElementById('swal-tiempo');
             const hint = document.getElementById('swal-tiempo-hint');
@@ -648,10 +764,10 @@ function _mostrarModalRevision(id, expedientes) {
                     Marque los que encontró físicamente. Desmarque los que <strong>NO</strong> se encontraron y agregue un comentario.
                 </p>
                 <div class="sexp-revision-cabecera">
-                    <span>Encontrado</span>
-                    <span>Expediente</span>
-                    <span>Identidad / Nombre</span>
-                    <span>Comentario</span>
+                    <span title="Encontrado">Encontrado</span>
+                    <span title="Expediente">Expediente</span>
+                    <span title="Identidad / Nombre">Identidad / Nombre</span>
+                    <span title="Comentario">Comentario</span>
                 </div>
                 <div class="sexp-revision-list">${filasHtml}</div>
             </div>`,
