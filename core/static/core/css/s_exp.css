@@ -209,6 +209,15 @@ body.darkmode .sexp-exp-tag--pendiente {
     transform: translateY(-1px);
 }
 
+/* Botón deshabilitado (esperando un paso previo en el flujo) */
+.sexp-action-btn:disabled,
+.sexp-action-btn[disabled] {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+    filter: grayscale(0.5);
+}
+
 .sexp-action-btn--aprobar {
     background: rgba(34, 197, 94, 0.2);
     color: #16a34a;
@@ -405,7 +414,7 @@ body.darkmode .sexp-exp-tag--pendiente {
 /* Resumen y lista de aprobación */
 .sexp-modal-aprob-resumen {
     margin: 0 0 0.8rem 0 !important;
-    padding: 0.7rem 1rem;
+    padding: 0.8rem 1rem;
     background: var(--colorContendor);
     border-radius: 0.6rem;
     color: var(--colorTablacelda);
@@ -413,41 +422,46 @@ body.darkmode .sexp-exp-tag--pendiente {
     display: flex;
     align-items: center;
     gap: 0.6rem;
+    border: 1px solid var(--colorLinea);
 }
 
+/* Lista en grid de 2 columnas (responsive 1 col en móvil) */
 .sexp-modal-aprob-lista {
-    max-height: 260px;
+    max-height: 320px;
     overflow-y: auto;
     margin-bottom: 1rem;
     background: var(--blanco);
     border-radius: 0.6rem;
     border: 1px solid var(--colorLinea);
-    padding: 0.5rem;
+    padding: 0.6rem;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
 }
 
 .sexp-modal-aprob-item {
     display: flex;
     align-items: center;
     gap: 0.8rem;
-    padding: 0.55rem 0.8rem;
-    border-bottom: 1px solid var(--colorLinea);
+    padding: 0.6rem 0.9rem;
+    border: 1px solid var(--colorLinea);
+    border-radius: 0.5rem;
     font-size: 1.45rem !important;
     color: var(--colorTablacelda);
-}
-
-.sexp-modal-aprob-item:last-child {
-    border-bottom: none;
+    background-color: var(--colorContendor);
 }
 
 .sexp-modal-aprob-id {
     font-weight: 700;
     color: var(--colorBoton);
     flex: 0 0 auto;
+    font-size: 1.4rem;
 }
 
 .sexp-modal-aprob-nombre {
     flex: 1;
     word-break: break-word;
+    font-size: 1.4rem;
 }
 
 /* Sugerencia de tiempo en modal */
@@ -472,10 +486,273 @@ body.darkmode .sexp-exp-tag--pendiente {
     margin-top: 0.1rem;
 }
 
+
+/* ============================================================
+   MODAL REVISIÓN DE ENTREGA — Grid 4 columnas
+   Columnas: checkbox | expediente | nombre | comentario
+   ============================================================ */
+
+.sexp-revision-modal {
+    text-align: left;
+}
+
+.sexp-revision-help {
+    margin: 0 0 1rem 0;
+    padding: 0.7rem 0.9rem;
+    background: var(--colorContendor);
+    border: 1px solid var(--colorLinea);
+    border-radius: 0.6rem;
+    font-size: 1.4rem !important;
+    color: var(--colorTablacelda);
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+}
+
+.sexp-revision-help i {
+    color: var(--colorBoton);
+    font-size: 1.5rem;
+    margin-top: 0.1rem;
+    flex: 0 0 auto;
+}
+
+/* Cabecera del grid */
+.sexp-revision-cabecera {
+    display: grid;
+    grid-template-columns: 5rem 8rem 1.4fr 1.4fr;
+    gap: 0.8rem;
+    padding: 0.6rem 0.9rem;
+    background-color: var(--colorContendor);
+    border: 1px solid var(--colorLinea);
+    border-radius: 0.5rem;
+    margin-bottom: 0.5rem;
+    font-weight: 700;
+    color: var(--colorTablacelda);
+    font-size: 1.35rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03rem;
+}
+
+.sexp-revision-list {
+    max-height: 480px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+/* Cada fila como grid con 4 columnas */
+.sexp-revision-row {
+    display: grid;
+    grid-template-columns: 5rem 8rem 1.4fr 1.4fr;
+    gap: 0.8rem;
+    align-items: center;
+    padding: 0.7rem 0.9rem;
+    background-color: var(--blanco);
+    border: 1px solid var(--colorLinea);
+    border-radius: 0.6rem;
+    transition: background 0.2s, border-color 0.2s;
+    color: var(--colorTablacelda);
+}
+
+/* Estado: NO encontrado (rojo) */
+.sexp-revision-row--rechazado {
+    background-color: rgba(239, 68, 68, 0.12);
+    border-color: #ef4444;
+}
+
+.sexp-revision-row--rechazado .sexp-revision-id,
+.sexp-revision-row--rechazado .sexp-revision-nombre {
+    color: #b91c1c;
+}
+
+.sexp-revision-row--rechazado .sexp-exp-tag {
+    background: rgba(239, 68, 68, 0.18) !important;
+    color: #b91c1c !important;
+    border: 1px solid rgba(239, 68, 68, 0.5) !important;
+    font-weight: 700 !important;
+}
+
+.sexp-revision-row--rechazado .sexp-revision-comentario {
+    border-color: #ef4444 !important;
+    background-color: var(--blanco) !important;
+}
+
+/* Checkbox personalizado para revisión */
+.sexp-revision-row .sexp-exp-dec-check {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+    flex-shrink: 0;
+    justify-self: center;
+}
+
+.sexp-revision-row .sexp-exp-dec-check input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+    height: 0;
+    width: 0;
+}
+
+.sexp-revision-row .sexp-exp-dec-checkmark {
+    height: 2.4rem;
+    width: 2.4rem;
+    background-color: var(--blanco);
+    border: 2px solid var(--colorLinea);
+    border-radius: 0.4rem;
+    display: inline-block;
+    position: relative;
+    transition: all 0.15s;
+}
+
+.sexp-revision-row .sexp-exp-dec-check:hover .sexp-exp-dec-checkmark {
+    border-color: var(--colorBoton);
+}
+
+.sexp-revision-row .sexp-exp-dec-check input:checked ~ .sexp-exp-dec-checkmark {
+    background-color: var(--colorBoton);
+    border-color: var(--colorBoton);
+}
+
+.sexp-revision-row .sexp-exp-dec-check input:checked ~ .sexp-exp-dec-checkmark::after {
+    content: "";
+    position: absolute;
+    left: 0.7rem;
+    top: 0.25rem;
+    width: 0.5rem;
+    height: 1rem;
+    border: solid var(--colorTextoBoton);
+    border-width: 0 0.3rem 0.3rem 0;
+    transform: rotate(45deg);
+}
+
+/* Etiqueta del expediente */
+.sexp-revision-row .sexp-exp-tag {
+    background: rgba(99, 102, 241, 0.15);
+    color: var(--colorTablacelda);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    padding: 0.35rem 0.7rem;
+    border-radius: 0.4rem;
+    font-size: 1.3rem;
+    font-weight: 600;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.sexp-revision-id {
+    font-weight: 700;
+    color: var(--colorTablacelda);
+    font-size: 1.4rem;
+}
+
+.sexp-revision-nombre {
+    color: var(--colorTablacelda);
+    font-size: 1.4rem;
+    word-break: break-word;
+    line-height: 1.3;
+}
+
+.sexp-revision-comentario {
+    width: 100%;
+    padding: 0.55rem 0.75rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--colorLinea);
+    background: var(--blanco);
+    color: var(--colorTablacelda);
+    font-size: 1.35rem;
+    font-family: var(--fuenteCuerpo);
+    box-sizing: border-box;
+}
+
+.sexp-revision-comentario:focus {
+    outline: none;
+    border-color: var(--colorBoton);
+}
+
+
+/* ============================================================
+   MODAL AUDITORÍA DE DEVOLUCIÓN
+   ============================================================ */
+
+.sexp-auditoria-help {
+    margin: 0 0 1rem 0;
+    padding: 0.7rem 0.9rem;
+    background: var(--colorContendor);
+    border: 1px solid var(--colorLinea);
+    border-radius: 0.6rem;
+    font-size: 1.45rem !important;
+    color: var(--colorTablacelda);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.sexp-auditoria-list {
+    max-height: 420px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.sexp-auditoria-row {
+    display: grid;
+    grid-template-columns: 8rem 1fr;
+    gap: 0.8rem;
+    align-items: center;
+    padding: 0.8rem 0.9rem;
+    background-color: var(--blanco);
+    border: 1px solid var(--colorLinea);
+    border-radius: 0.6rem;
+}
+
+.sexp-auditoria-num {
+    font-weight: 700;
+    font-size: 1.5rem;
+    color: var(--colorBoton);
+    text-align: center;
+}
+
+.sexp-auditoria-radios {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.2rem;
+    justify-content: flex-end;
+}
+
+.sexp-auditoria-radio {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    cursor: pointer;
+    font-size: 1.4rem;
+    color: var(--colorTablacelda);
+}
+
+.sexp-auditoria-radio input[type="radio"] {
+    width: 1.6rem;
+    height: 1.6rem;
+    cursor: pointer;
+    accent-color: var(--colorBoton);
+}
+
+.sexp-auditoria-radio--ok { color: #22c55e; font-weight: 600; }
+.sexp-auditoria-radio--no { color: #94a3b8; font-weight: 600; }
+.sexp-auditoria-radio--lost { color: #ef4444; font-weight: 600; }
+
+
 /* Responsive modales */
 @media (max-width: 1024px) {
     .sexp-modal-lista-grid {
         grid-template-columns: repeat(2, 1fr);
+    }
+
+    .sexp-modal-aprob-lista {
+        grid-template-columns: 1fr;
     }
 }
 
@@ -487,6 +764,47 @@ body.darkmode .sexp-exp-tag--pendiente {
     .sexp-modal-lista-grid {
         grid-template-columns: 1fr;
     }
+
+    /* Apilar columnas de revisión en móvil */
+    .sexp-revision-cabecera {
+        display: none;
+    }
+
+    .sexp-revision-row {
+        grid-template-columns: auto 1fr;
+        grid-template-areas:
+            "check id"
+            "check nombre"
+            "comen comen";
+        gap: 0.5rem 0.8rem;
+    }
+
+    .sexp-revision-row .sexp-exp-dec-check {
+        grid-area: check;
+    }
+
+    .sexp-revision-row .sexp-exp-tag {
+        grid-area: id;
+        justify-self: start;
+    }
+
+    .sexp-revision-row .sexp-revision-info-mobile {
+        grid-area: nombre;
+    }
+
+    .sexp-revision-comentario {
+        grid-area: comen;
+    }
+
+    /* Auditoría apilada */
+    .sexp-auditoria-row {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+    }
+
+    .sexp-auditoria-radios {
+        justify-content: flex-start;
+    }
 }
 
 @media (max-width: 480px) {
@@ -496,6 +814,11 @@ body.darkmode .sexp-exp-tag--pendiente {
 
     .sexp-modal-select {
         width: 100%;
+    }
+
+    .sexp-auditoria-radios {
+        flex-direction: column;
+        gap: 0.5rem;
     }
 }
 

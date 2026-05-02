@@ -205,11 +205,24 @@ function renderSolicitudes(data, filtro = '') {
 function solicitarDevolucion(solicitudId) {
     Swal.fire({
         title: 'Solicitar Devolución',
-        text: '¿Desea iniciar el proceso de devolución? Entregue los expedientes físicos al administrador para su revisión.',
+        html: '¿Desea iniciar el proceso de devolución? Entregue los expedientes físicos al administrador para su revisión.',
         icon: 'question',
         showCancelButton: true,
-        confirmButtonText: 'Sí, Devolver',
-        cancelButtonText: 'Cancelar'
+        confirmButtonText: '<i class="bi bi-check-circle-fill"></i> Sí, Devolver',
+        cancelButtonText: '<i class="bi bi-x-circle-fill"></i> Cancelar',
+        customClass: {
+            icon: 'contenedor-modal-icon',
+            popup: 'contenedor-modal',
+            title: 'contener-modal-titulo',
+            confirmButton: 'contener-modal-boton-confirmar',
+            cancelButton: 'contener-modal-boton-cancelar',
+        },
+        didOpen: () => {
+            const actionsContainer = document.querySelector('.swal2-actions');
+            if (actionsContainer) actionsContainer.classList.add('contener-modal-contenedor-botones-min');
+            const htmlContainer = document.querySelector('.swal2-html-container');
+            if (htmlContainer) htmlContainer.classList.add('contener-modal-contenedor-html');
+        }
     }).then((result) => {
         if (result.isConfirmed) {
             $.ajax({

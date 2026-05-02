@@ -12,6 +12,47 @@
 let tablaSolicitudes;
 let estadoFiltro = '';
 
+/**
+ * Almacenamiento local del flujo de aprobación:
+ * - Imprimir habilita Revisión de Entrega
+ * - Revisar habilita Listo para entregar
+ * Se persiste en sessionStorage para que sobreviva a recargas de la tabla.
+ */
+const sexpFlujoLocal = {
+    _key: 'sexp_flujo_solicitud',
+    _get: function () {
+        try { return JSON.parse(sessionStorage.getItem(this._key) || '{}'); } catch (e) { return {}; }
+    },
+    _set: function (data) {
+        sessionStorage.setItem(this._key, JSON.stringify(data));
+    },
+    marcarImpreso: function (id) {
+        const data = this._get();
+        data[id] = data[id] || {};
+        data[id].impreso = true;
+        this._set(data);
+    },
+    marcarRevisado: function (id) {
+        const data = this._get();
+        data[id] = data[id] || {};
+        data[id].revisado = true;
+        this._set(data);
+    },
+    haImpreso: function (id) {
+        const data = this._get();
+        return !!(data[id] && data[id].impreso);
+    },
+    haRevisado: function (id) {
+        const data = this._get();
+        return !!(data[id] && data[id].revisado);
+    },
+    limpiar: function (id) {
+        const data = this._get();
+        delete data[id];
+        this._set(data);
+    }
+};
+
 $(document).ready(function () {
     initTabla();
     initFiltros();
@@ -104,15 +145,25 @@ function initTabla() {
                             <i class="bi bi-printer"></i> Imprimir
                         </button>`;
                     if (data.estado_flujo === 'SOL_APROBADA_ORGANIZANDO') {
+                        const haImpreso = sexpFlujoLocal.haImpreso(data.id);
+                        const haRevisado = sexpFlujoLocal.haRevisado(data.id);
+                        const btnRevisar = `
+                            <button class="sexp-action-btn sexp-action-btn--revisar"
+                                    ${haImpreso ? '' : 'disabled title="Primero imprima la solicitud"'}
+                                    onclick="revisarEntrega(${data.id})">
+                                <i class="bi bi-clipboard-check"></i> Revisión de Entrega
+                            </button>`;
+                        const btnListo = `
+                            <button class="sexp-action-btn sexp-action-btn--listo"
+                                    ${haRevisado ? '' : 'disabled title="Primero realice la revisión de entrega"'}
+                                    onclick="marcarListo(${data.id})">
+                                <i class="bi bi-bell"></i> Listo para entregar
+                            </button>`;
                         return `
                             <div class="sexp-action-group">
                                 ${btnImprimir}
-                                <button class="sexp-action-btn sexp-action-btn--revisar" onclick="revisarEntrega(${data.id})">
-                                    <i class="bi bi-clipboard-check"></i> Revisión de Entrega
-                                </button>
-                                <button class="sexp-action-btn sexp-action-btn--listo" onclick="marcarListo(${data.id})">
-                                    <i class="bi bi-bell"></i> Listo para entregar
-                                </button>
+                                ${btnRevisar}
+                                ${btnListo}
                             </div>`;
                     }
                     if (data.estado_flujo === 'SOL_LISTO_RECOGER') {
@@ -251,7 +302,7 @@ function _mostrarModalAprobacion(id, expedientes, meta) {
 
     Swal.fire({
         title: 'Aprobar Solicitud #' + id,
-        width: 800,
+        width: '90%',
         html: `<div style="text-align:left;">
             <p class="sexp-modal-aprob-resumen">
                 <i class="bi bi-folder2-open"></i>
@@ -273,9 +324,17 @@ function _mostrarModalAprobacion(id, expedientes, meta) {
             </div>
         </div>`,
         showCancelButton: true,
-        confirmButtonText: '<i class="bi bi-check-lg"></i> Aprobar',
-        cancelButtonText: 'Cancelar',
+        confirmButtonText: '<i class="bi bi-check-circle-fill"></i> Aprobar',
+        cancelButtonText: '<i class="bi bi-x-circle-fill"></i> Cancelar',
+        customClass: {
+            popup: 'contenedor-modal',
+            title: 'contener-modal-titulo',
+            confirmButton: 'contener-modal-boton-confirmar',
+            cancelButton: 'contener-modal-boton-cancelar',
+        },
         didOpen: () => {
+            const actionsContainer = document.querySelector('.swal2-actions');
+            if (actionsContainer) actionsContainer.classList.add('contener-modal-contenedor-botones');
             const selUnidad = document.getElementById('swal-unidad');
             const inputTiempo = document.getElementById('swal-tiempo');
             const hint = document.getElementById('swal-tiempo-hint');
@@ -408,14 +467,25 @@ function _mostrarModalAprobacion(id, expedientes, meta) {
 function rechazarSolicitud(id) {
     Swal.fire({
         title: 'Rechazar Solicitud #' + id,
+        width: '60rem',
         html: `<div style="text-align:left;">
             <div class="sexp-modal-campo">
                 <label>Motivo de Rechazo *</label>
-                <textarea id="swal-motivo" rows="3" placeholder="Ingrese el motivo del rechazo (obligatorio)..." class="sexp-modal-input"></textarea>
+                <textarea id="swal-motivo" rows="4" placeholder="Ingrese el motivo del rechazo (obligatorio)..." class="sexp-modal-input"></textarea>
             </div></div>`,
         showCancelButton: true,
-        confirmButtonText: '<i class="bi bi-x-lg"></i> Rechazar',
-        cancelButtonText: 'Cancelar',
+        confirmButtonText: '<i class="bi bi-x-circle-fill"></i> Rechazar',
+        cancelButtonText: '<i class="bi bi-arrow-left-circle-fill"></i> Cancelar',
+        customClass: {
+            popup: 'contenedor-modal',
+            title: 'contener-modal-titulo',
+            confirmButton: 'contener-modal-boton-confirmar',
+            cancelButton: 'contener-modal-boton-cancelar',
+        },
+        didOpen: () => {
+            const actionsContainer = document.querySelector('.swal2-actions');
+            if (actionsContainer) actionsContainer.classList.add('contener-modal-contenedor-botones');
+        },
         preConfirm: () => {
             const motivo = document.getElementById('swal-motivo').value.trim();
             if (!motivo) {
@@ -457,6 +527,10 @@ function rechazarSolicitud(id) {
 function imprimirSolicitud(id) {
     const url = window.urls.s_exp_imprimir_solicitud_pdf + id + '/';
     window.open(url, '_blank');
+    sexpFlujoLocal.marcarImpreso(id);
+    if (typeof tablaSolicitudes !== 'undefined' && tablaSolicitudes) {
+        tablaSolicitudes.ajax.reload(null, false);
+    }
 }
 
 /**
@@ -468,11 +542,24 @@ function imprimirSolicitud(id) {
 function marcarListo(id) {
     Swal.fire({
         title: '¿Listo para entregar?',
-        text: 'La solicitud #' + id + ' pasará a "Listo para entregar" y se notificará al usuario para que pase a recoger los expedientes.',
+        html: 'La solicitud <strong>#' + id + '</strong> pasará a "Listo para entregar" y se notificará al usuario para que pase a recoger los expedientes.',
         icon: 'question',
         showCancelButton: true,
-        confirmButtonText: 'Sí, notificar',
-        cancelButtonText: 'Cancelar'
+        confirmButtonText: '<i class="bi bi-check-circle-fill"></i> Sí, notificar',
+        cancelButtonText: '<i class="bi bi-x-circle-fill"></i> Cancelar',
+        customClass: {
+            icon: 'contenedor-modal-icon',
+            popup: 'contenedor-modal',
+            title: 'contener-modal-titulo',
+            confirmButton: 'contener-modal-boton-confirmar',
+            cancelButton: 'contener-modal-boton-cancelar',
+        },
+        didOpen: () => {
+            const actionsContainer = document.querySelector('.swal2-actions');
+            if (actionsContainer) actionsContainer.classList.add('contener-modal-contenedor-botones-min');
+            const htmlContainer = document.querySelector('.swal2-html-container');
+            if (htmlContainer) htmlContainer.classList.add('contener-modal-contenedor-html');
+        }
     }).then((result) => {
         if (result.isConfirmed) {
             $.ajax({
@@ -484,6 +571,7 @@ function marcarListo(id) {
                 success: function (resp) {
                     if (resp.success) {
                         toastr.success('Solicitud marcada como lista. Usuario notificado.');
+                        sexpFlujoLocal.limpiar(id);
                         tablaSolicitudes.ajax.reload();
                     }
                 },
@@ -533,16 +621,17 @@ function _mostrarModalRevision(id, expedientes) {
     const filasHtml = expedientes.map(function (exp) {
         const identidad = exp.paciente_identidad || exp.identidad || '';
         const nombre = exp.paciente_nombre || exp.nombre || '';
+        const nombreCompleto = `${identidad ? identidad + ' — ' : ''}${nombre || 'N/A'}`;
         return `
         <div class="sexp-revision-row" id="rev-row-${exp.detalle_id}">
             <label class="sexp-exp-dec-check" title="Marcado = encontrado, desmarcado = NO encontrado">
                 <input type="checkbox" class="sexp-revision-check" data-detalle="${exp.detalle_id}" checked>
                 <span class="sexp-exp-dec-checkmark"></span>
             </label>
-            <div class="sexp-revision-info">
-                <span class="sexp-exp-tag">#${exp.numero}</span>
-                <span class="sexp-revision-id">${identidad || 'S/ID'}</span>
-                <span class="sexp-revision-nombre">${nombre || 'N/A'}</span>
+            <span class="sexp-exp-tag">#${exp.numero}</span>
+            <div class="sexp-revision-nombre sexp-revision-info-mobile">
+                <span class="sexp-revision-id">${identidad || 'S/ID'}</span><br>
+                ${nombre || 'N/A'}
             </div>
             <input type="text" class="sexp-revision-comentario" data-detalle="${exp.detalle_id}"
                    placeholder="Comentario (obligatorio si se desmarca)" maxlength="200">
@@ -551,19 +640,33 @@ function _mostrarModalRevision(id, expedientes) {
 
     Swal.fire({
         title: 'Revisión de Entrega — Solicitud #' + id,
-        width: 900,
+        width: '90%',
         html: `
             <div class="sexp-revision-modal">
                 <p class="sexp-revision-help">
                     <i class="bi bi-info-circle"></i>
                     Marque los que encontró físicamente. Desmarque los que <strong>NO</strong> se encontraron y agregue un comentario.
                 </p>
+                <div class="sexp-revision-cabecera">
+                    <span>Encontrado</span>
+                    <span>Expediente</span>
+                    <span>Identidad / Nombre</span>
+                    <span>Comentario</span>
+                </div>
                 <div class="sexp-revision-list">${filasHtml}</div>
             </div>`,
         showCancelButton: true,
         confirmButtonText: '<i class="bi bi-save"></i> Guardar Revisión',
-        cancelButtonText: 'Cancelar',
+        cancelButtonText: '<i class="bi bi-x-circle-fill"></i> Cancelar',
+        customClass: {
+            popup: 'contenedor-modal',
+            title: 'contener-modal-titulo',
+            confirmButton: 'contener-modal-boton-confirmar',
+            cancelButton: 'contener-modal-boton-cancelar',
+        },
         didOpen: () => {
+            const actionsContainer = document.querySelector('.swal2-actions');
+            if (actionsContainer) actionsContainer.classList.add('contener-modal-contenedor-botones');
             document.querySelectorAll('.sexp-revision-check').forEach(chk => {
                 chk.addEventListener('change', function () {
                     const det = this.dataset.detalle;
@@ -604,8 +707,10 @@ function _mostrarModalRevision(id, expedientes) {
                 if (resp.success) {
                     if (resp.todos_rechazados) {
                         toastr.warning('Todos los expedientes fueron rechazados. Solicitud cerrada.');
+                        sexpFlujoLocal.limpiar(id);
                     } else {
                         toastr.success(`Revisión guardada (${resp.cambios} cambio${resp.cambios === 1 ? '' : 's'}).`);
+                        sexpFlujoLocal.marcarRevisado(id);
                     }
                     tablaSolicitudes.ajax.reload();
                 }
@@ -630,11 +735,24 @@ function entregarPrestamoDesdeGestion(prestamoId, solicitudId) {
     }
     Swal.fire({
         title: '¿Entregar expedientes?',
-        text: `Al confirmar, se inicia el conteo del tiempo límite para la solicitud #${solicitudId}.`,
+        html: `Al confirmar, se inicia el conteo del tiempo límite para la solicitud <strong>#${solicitudId}</strong>.`,
         icon: 'question',
         showCancelButton: true,
-        confirmButtonText: '<i class="bi bi-box-arrow-up-right"></i> Sí, entregar',
-        cancelButtonText: 'Cancelar'
+        confirmButtonText: '<i class="bi bi-check-circle-fill"></i> Sí, entregar',
+        cancelButtonText: '<i class="bi bi-x-circle-fill"></i> Cancelar',
+        customClass: {
+            icon: 'contenedor-modal-icon',
+            popup: 'contenedor-modal',
+            title: 'contener-modal-titulo',
+            confirmButton: 'contener-modal-boton-confirmar',
+            cancelButton: 'contener-modal-boton-cancelar',
+        },
+        didOpen: () => {
+            const actionsContainer = document.querySelector('.swal2-actions');
+            if (actionsContainer) actionsContainer.classList.add('contener-modal-contenedor-botones-min');
+            const htmlContainer = document.querySelector('.swal2-html-container');
+            if (htmlContainer) htmlContainer.classList.add('contener-modal-contenedor-html');
+        }
     }).then(function (result) {
         if (!result.isConfirmed) return;
         $.ajax({

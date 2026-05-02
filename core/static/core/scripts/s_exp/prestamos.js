@@ -181,11 +181,24 @@ function iniciarCronometro(prestamoId, fechaLimiteISO, porcentaje) {
 function marcarEntregado(prestamoId) {
     Swal.fire({
         title: 'Confirmar entrega',
-        text: 'Se iniciará el cronómetro del préstamo al confirmar.',
+        html: 'Se iniciará el cronómetro del préstamo al confirmar.',
         icon: 'question',
         showCancelButton: true,
-        confirmButtonText: 'Sí, Entregar',
-        cancelButtonText: 'Cancelar'
+        confirmButtonText: '<i class="bi bi-check-circle-fill"></i> Sí, Entregar',
+        cancelButtonText: '<i class="bi bi-x-circle-fill"></i> Cancelar',
+        customClass: {
+            icon: 'contenedor-modal-icon',
+            popup: 'contenedor-modal',
+            title: 'contener-modal-titulo',
+            confirmButton: 'contener-modal-boton-confirmar',
+            cancelButton: 'contener-modal-boton-cancelar',
+        },
+        didOpen: () => {
+            const actionsContainer = document.querySelector('.swal2-actions');
+            if (actionsContainer) actionsContainer.classList.add('contener-modal-contenedor-botones-min');
+            const htmlContainer = document.querySelector('.swal2-html-container');
+            if (htmlContainer) htmlContainer.classList.add('contener-modal-contenedor-html');
+        }
     }).then((result) => {
         if (result.isConfirmed) {
             $.ajax({
