@@ -127,49 +127,63 @@ function toggleCard(headerEl) {
 function abrirModalAuditoria(prestamoId, detallesEncoded) {
     const detalles = JSON.parse(decodeURIComponent(detallesEncoded));
 
-    let expedientesHtml = '<div class="sexp-auditoria-list">';
-    detalles.forEach(d => {
-        expedientesHtml += `
-            <div class="sexp-auditoria-row">
-                <div class="sexp-auditoria-num">#${d.numero}</div>
+    const tarjetasHtml = detalles.map(d => {
+        const ident = d.paciente_identidad || 'S/ID';
+        const nom = d.paciente_nombre || 'N/A';
+        return `
+            <div class="sexp-auditoria-card" id="aud-card-${d.id}">
+                <div class="sexp-auditoria-card-header">
+                    <span class="sexp-exp-tag">#${d.numero}</span>
+                    <div class="sexp-auditoria-paciente">
+                        <span class="sexp-auditoria-id">${ident}</span>
+                        <span class="sexp-auditoria-nombre">${nom}</span>
+                    </div>
+                </div>
                 <div class="sexp-auditoria-radios">
                     <label class="sexp-auditoria-radio sexp-auditoria-radio--ok">
-                        <input type="radio" name="estado_exp_${d.id}" value="recibido" checked>
+                        <input type="radio" name="estado_exp_${d.id}" value="recibido" data-detalle="${d.id}" checked>
                         <i class="bi bi-check-circle"></i> Recibido
                     </label>
                     <label class="sexp-auditoria-radio sexp-auditoria-radio--no">
-                        <input type="radio" name="estado_exp_${d.id}" value="no_recibido">
+                        <input type="radio" name="estado_exp_${d.id}" value="no_recibido" data-detalle="${d.id}">
                         <i class="bi bi-dash-circle"></i> No Recibido
                     </label>
                     <label class="sexp-auditoria-radio sexp-auditoria-radio--lost">
-                        <input type="radio" name="estado_exp_${d.id}" value="perdido">
+                        <input type="radio" name="estado_exp_${d.id}" value="perdido" data-detalle="${d.id}">
                         <i class="bi bi-exclamation-triangle"></i> Perdido
                     </label>
                 </div>
+                <div class="sexp-auditoria-coment-row">
+                    <label class="sexp-revision-card-label" for="coment-${d.id}">
+                        Comentario (obligatorio si NO se recibió)
+                    </label>
+                    <input type="text" id="coment-${d.id}" class="sexp-modal-input sexp-auditoria-coment"
+                           data-detalle="${d.id}" maxlength="200"
+                           placeholder="Ingrese comentario (irá al PDF en Observaciones devolución)">
+                </div>
             </div>`;
-    });
-    expedientesHtml += '</div>';
+    }).join('');
 
     Swal.fire({
         title: 'Auditoría de Devolución — Préstamo #' + prestamoId,
-        width: '90%',
+        width: '95%',
         html: `
             <div class="sexp-revision-modal">
                 <p class="sexp-auditoria-help">
                     <i class="bi bi-info-circle"></i>
-                    Marque el estado físico de cada expediente recibido:
+                    Marque el estado físico de cada expediente. El comentario es obligatorio si NO se recibió y quedará en el PDF.
                 </p>
-                ${expedientesHtml}
+                <div class="sexp-auditoria-grid">${tarjetasHtml}</div>
                 <div class="sexp-modal-campo">
                     <label>Notas Generales (opcional)</label>
-                    <textarea id="swal-notas" rows="3" class="sexp-modal-input" placeholder="Agregar notas sobre la devolución..."></textarea>
+                    <textarea id="swal-notas" rows="2" class="sexp-modal-input" placeholder="Notas globales sobre la devolución..."></textarea>
                 </div>
             </div>`,
         showCancelButton: true,
         confirmButtonText: '<i class="bi bi-check-circle-fill"></i> Finalizar Auditoría',
         cancelButtonText: '<i class="bi bi-x-circle-fill"></i> Cancelar',
         customClass: {
-            popup: 'contenedor-modal',
+            popup: 'contenedor-modal sexp-modal-grande',
             title: 'contener-modal-titulo',
             confirmButton: 'contener-modal-boton-confirmar',
             cancelButton: 'contener-modal-boton-cancelar',
@@ -177,21 +191,50 @@ function abrirModalAuditoria(prestamoId, detallesEncoded) {
         didOpen: () => {
             const actionsContainer = document.querySelector('.swal2-actions');
             if (actionsContainer) actionsContainer.classList.add('contener-modal-contenedor-botones');
+
+            // Resaltar tarjeta cuando se elija "no recibido" o "perdido"
+            document.querySelectorAll('.sexp-auditoria-card input[type="radio"]').forEach(rad => {
+                rad.addEventListener('change', function () {
+                    const det = this.dataset.detalle;
+                    const card = document.getElementById('aud-card-' + det);
+                    if (!card) return;
+                    card.classList.remove('sexp-auditoria-card--no', 'sexp-auditoria-card--lost');
+                    if (this.value === 'no_recibido') card.classList.add('sexp-auditoria-card--no');
+                    else if (this.value === 'perdido') card.classList.add('sexp-auditoria-card--lost');
+                });
+            });
         },
         preConfirm: () => {
             const recibidos = [];
             const perdidos = [];
             const no_recibidos = [];
+            const comentarios_por_detalle = {};
+            const sinComentario = [];
+
             detalles.forEach(d => {
                 const val = document.querySelector(`input[name="estado_exp_${d.id}"]:checked`).value;
+                const com = (document.getElementById('coment-' + d.id).value || '').trim();
                 if (val === 'recibido') recibidos.push(d.id);
                 else if (val === 'perdido') perdidos.push(d.id);
-                else no_recibidos.push(d.id);
+                else {
+                    no_recibidos.push(d.id);
+                    if (!com) sinComentario.push(d.numero);
+                }
+                if (com) comentarios_por_detalle[d.id] = com;
             });
+
+            if (sinComentario.length) {
+                Swal.showValidationMessage(
+                    `Comentario obligatorio para los expedientes NO recibidos: ${sinComentario.map(n => '#' + n).join(', ')}`
+                );
+                return false;
+            }
+
             return {
                 recibidos: recibidos,
                 perdidos: perdidos,
                 no_recibidos: no_recibidos,
+                comentarios_por_detalle: comentarios_por_detalle,
                 notas: document.getElementById('swal-notas').value
             };
         }
@@ -213,6 +256,7 @@ function enviarAuditoria(prestamoId, data) {
             detalles_recibidos: data.recibidos,
             detalles_perdidos: data.perdidos,
             detalles_no_recibidos: data.no_recibidos,
+            comentarios_por_detalle: data.comentarios_por_detalle || {},
             notas: data.notas
         }),
         success: function(resp) {

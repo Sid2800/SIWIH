@@ -929,7 +929,9 @@ def prestamos_para_devolucion_api(request):
                 detalles.append({
                     "id": d.id,
                     "numero": d.expediente_prestamo.expediente.numero,
-                    "estado_fisico": d.expediente_prestamo.estado.nombre
+                    "estado_fisico": d.expediente_prestamo.estado.nombre,
+                    "paciente_identidad": d.paciente_identidad or '',
+                    "paciente_nombre": d.paciente_nombre or '',
                 })
 
             data.append({

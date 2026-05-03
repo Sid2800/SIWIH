@@ -284,14 +284,38 @@ def generar_pdf_solicitud(solicitud):
     filas = [cabeceras]
     detalles_list = list(solicitud.detalles.select_related('expediente_prestamo__expediente').order_by('id'))
 
+    # Estado del flujo: si la solicitud está finalizada/incompleta/etc., los comentarios
+    # de devolución y rechazo individual ya tienen sentido y deben imprimirse.
+    estado_flujo = (solicitud.estado_flujo_id or '').upper() if hasattr(solicitud, 'estado_flujo_id') else ''
+    estados_con_revision = {'SOL_LISTO_RECOGER', 'SOL_EN_PRESTAMO', 'SOL_EN_DEVOLUCION',
+                             'SOL_INCOMPLETA', 'SOL_FINALIZADA', 'SOL_RECHAZADA'}
+    mostrar_comentarios = estado_flujo in estados_con_revision
+
     # Agregar filas de detalles
     for d in detalles_list:
         num_exp = d.expediente_prestamo.expediente.numero
         identidad = d.paciente_identidad or ''
         paciente = d.paciente_nombre or ''
 
-        # Mostrar "[NO PRESTADO]" solo para expedientes rechazados
-        obs_entrega_text = '[NO PRESTADO]' if not d.aprobado else ''
+        # Observaciones de entrega:
+        #   - Si NO se prestó (aprobado=False) y hay revisión, mostrar el motivo del rechazo
+        #     individual; si no hay motivo, fallback a "[NO PRESTADO]".
+        #   - Si sí se prestó, queda vacío (lo llena el responsable a mano si aplica).
+        if not d.aprobado:
+            if mostrar_comentarios and d.motivo_rechazo_individual:
+                obs_entrega_text = d.motivo_rechazo_individual
+            else:
+                obs_entrega_text = '[NO PRESTADO]'
+        else:
+            obs_entrega_text = ''
+
+        # Observaciones de devolución:
+        #   - Sólo se imprime si el flujo ya pasó por revisión/devolución/finalizada
+        #   - Usa el comentario individual guardado durante la auditoría de devolución
+        if mostrar_comentarios and d.aprobado and d.comentario_devolucion:
+            obs_devolucion_text = d.comentario_devolucion
+        else:
+            obs_devolucion_text = ''
 
         filas.append([
             Paragraph(fecha_salida, st_tabla_cell),
@@ -302,7 +326,7 @@ def generar_pdf_solicitud(solicitud):
             Paragraph(motivo_solicitud, st_tabla_cell),
             Paragraph(fecha_entrega_str if d.aprobado else '—', st_tabla_cell),
             Paragraph(obs_entrega_text, st_tabla_cell),
-            Paragraph('', st_tabla_cell),  # Observaciones devolución vacía
+            Paragraph(obs_devolucion_text, st_tabla_cell),
         ])
 
     col_w = doc.width

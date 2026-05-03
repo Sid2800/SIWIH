@@ -411,7 +411,11 @@ function _mostrarModalAprobacion(id, expedientes, meta) {
             <div class="sexp-modal-campo">
                 <label>Tiempo de entrega (puede ajustarlo)</label>
                 <div class="sexp-modal-tiempo-row">
-                    <input type="number" id="swal-tiempo" value="${prefillValor}" min="1" class="sexp-modal-input">
+                    <div class="sexp-tiempo-stepper">
+                        <button type="button" class="sexp-stepper-btn" id="swal-tiempo-menos" aria-label="Disminuir">−</button>
+                        <input type="number" id="swal-tiempo" value="${prefillValor}" min="1" max="3" inputmode="numeric" pattern="[0-9]*" class="sexp-modal-input">
+                        <button type="button" class="sexp-stepper-btn" id="swal-tiempo-mas" aria-label="Aumentar">+</button>
+                    </div>
                     <select id="swal-unidad" class="sexp-modal-select">
                         <option value="dias"${prefillUnidad === 'dias' ? ' selected' : ''}>Días</option>
                         <option value="horas"${prefillUnidad === 'horas' ? ' selected' : ''}>Horas</option>
@@ -425,7 +429,7 @@ function _mostrarModalAprobacion(id, expedientes, meta) {
         confirmButtonText: '<i class="bi bi-check-circle-fill"></i> Aprobar',
         cancelButtonText: '<i class="bi bi-x-circle-fill"></i> Cancelar',
         customClass: {
-            popup: 'contenedor-modal',
+            popup: 'contenedor-modal sexp-modal-grande',
             title: 'contener-modal-titulo',
             confirmButton: 'contener-modal-boton-confirmar',
             cancelButton: 'contener-modal-boton-cancelar',
@@ -449,6 +453,24 @@ function _mostrarModalAprobacion(id, expedientes, meta) {
                         i.className = 'bi bi-chevron-up';
                         sp.textContent = 'Ocultar';
                     }
+                });
+            }
+
+            // Stepper buttons (arregla problema en táctil donde el spinner nativo no funciona)
+            const btnMenos = document.getElementById('swal-tiempo-menos');
+            const btnMas = document.getElementById('swal-tiempo-mas');
+            if (btnMenos && btnMas) {
+                btnMenos.addEventListener('click', function () {
+                    const inp = document.getElementById('swal-tiempo');
+                    const min = parseInt(inp.min || '1', 10);
+                    const v = Math.max(min, (parseInt(inp.value, 10) || min) - 1);
+                    inp.value = v;
+                });
+                btnMas.addEventListener('click', function () {
+                    const inp = document.getElementById('swal-tiempo');
+                    const max = parseInt(inp.max || '999', 10) || 999;
+                    const v = Math.min(max, (parseInt(inp.value, 10) || 0) + 1);
+                    inp.value = v;
                 });
             }
             const selUnidad = document.getElementById('swal-unidad');
@@ -737,45 +759,43 @@ function _mostrarModalRevision(id, expedientes) {
     const filasHtml = expedientes.map(function (exp) {
         const identidad = exp.paciente_identidad || exp.identidad || '';
         const nombre = exp.paciente_nombre || exp.nombre || '';
-        const nombreCompleto = `${identidad ? identidad + ' — ' : ''}${nombre || 'N/A'}`;
         return `
-        <div class="sexp-revision-row" id="rev-row-${exp.detalle_id}">
-            <label class="sexp-exp-dec-check" title="Marcado = encontrado, desmarcado = NO encontrado">
-                <input type="checkbox" class="sexp-revision-check" data-detalle="${exp.detalle_id}" checked>
-                <span class="sexp-exp-dec-checkmark"></span>
-            </label>
-            <span class="sexp-exp-tag">#${exp.numero}</span>
-            <div class="sexp-revision-nombre sexp-revision-info-mobile">
-                <span class="sexp-revision-id">${identidad || 'S/ID'}</span><br>
-                ${nombre || 'N/A'}
+        <div class="sexp-revision-card" id="rev-row-${exp.detalle_id}">
+            <div class="sexp-revision-card-header">
+                <label class="sexp-exp-dec-check" title="Marcado = encontrado, desmarcado = NO encontrado">
+                    <input type="checkbox" class="sexp-revision-check" data-detalle="${exp.detalle_id}" checked>
+                    <span class="sexp-exp-dec-checkmark"></span>
+                </label>
+                <span class="sexp-exp-tag">#${exp.numero}</span>
+                <div class="sexp-revision-paciente">
+                    <span class="sexp-revision-id">${identidad || 'S/ID'}</span>
+                    <span class="sexp-revision-nombre">${nombre || 'N/A'}</span>
+                </div>
             </div>
-            <input type="text" class="sexp-revision-comentario" data-detalle="${exp.detalle_id}"
-                   placeholder="Comentario (obligatorio si se desmarca)" maxlength="200">
+            <div class="sexp-revision-card-comentario">
+                <label class="sexp-revision-card-label">Comentario:</label>
+                <input type="text" class="sexp-revision-comentario" data-detalle="${exp.detalle_id}"
+                       placeholder="Obligatorio si se desmarca" maxlength="200">
+            </div>
         </div>`;
     }).join('');
 
     Swal.fire({
         title: 'Revisión de Entrega — Solicitud #' + id,
-        width: '90%',
+        width: '95%',
         html: `
             <div class="sexp-revision-modal">
                 <p class="sexp-revision-help">
                     <i class="bi bi-info-circle"></i>
                     Marque los que encontró físicamente. Desmarque los que <strong>NO</strong> se encontraron y agregue un comentario.
                 </p>
-                <div class="sexp-revision-cabecera">
-                    <span title="Encontrado">Encontrado</span>
-                    <span title="Expediente">Expediente</span>
-                    <span title="Identidad / Nombre">Identidad / Nombre</span>
-                    <span title="Comentario">Comentario</span>
-                </div>
-                <div class="sexp-revision-list">${filasHtml}</div>
+                <div class="sexp-revision-grid">${filasHtml}</div>
             </div>`,
         showCancelButton: true,
         confirmButtonText: '<i class="bi bi-save"></i> Guardar Revisión',
         cancelButtonText: '<i class="bi bi-x-circle-fill"></i> Cancelar',
         customClass: {
-            popup: 'contenedor-modal',
+            popup: 'contenedor-modal sexp-modal-grande',
             title: 'contener-modal-titulo',
             confirmButton: 'contener-modal-boton-confirmar',
             cancelButton: 'contener-modal-boton-cancelar',
@@ -788,9 +808,9 @@ function _mostrarModalRevision(id, expedientes) {
                     const det = this.dataset.detalle;
                     const row = document.getElementById('rev-row-' + det);
                     if (this.checked) {
-                        row.classList.remove('sexp-revision-row--rechazado');
+                        row.classList.remove('sexp-revision-card--rechazado');
                     } else {
-                        row.classList.add('sexp-revision-row--rechazado');
+                        row.classList.add('sexp-revision-card--rechazado');
                     }
                 });
             });

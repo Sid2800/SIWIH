@@ -322,13 +322,14 @@ function renderResultados(data) {
         // Botón agregar
         let botonHtml = '';
         if (disponible && !enCarrito) {
-            botonHtml = `<button class="sexp-add-btn" onclick='agregarAlCarrito(${JSON.stringify(item)})'>
+            const dataItem = JSON.stringify(item).replace(/"/g, '&quot;');
+            botonHtml = `<button type="button" class="sexp-add-btn" data-item="${dataItem}" data-exp-id="${item.expediente_id}" onclick="agregarAlCarrito(JSON.parse(this.getAttribute('data-item')))">
                 <i class="bi bi-plus-circle"></i> Agregar
             </button>`;
         } else if (enCarrito) {
             botonHtml = '<span class="sexp-badge--en-carrito"><i class="bi bi-check-circle"></i> Seleccionado</span>';
         } else {
-            botonHtml = '<button class="sexp-add-btn" disabled>No disponible</button>';
+            botonHtml = '<button type="button" class="sexp-add-btn" disabled>No disponible</button>';
         }
 
         // Display: "Identidad - Nombre" como título principal
@@ -336,7 +337,7 @@ function renderResultados(data) {
         const nombre = item.paciente_nombre || 'Sin paciente asignado';
 
         html += `
-        <div class="sexp-resultado sexp-resultado--card">
+        <div class="sexp-resultado sexp-resultado--card" data-exp-id="${item.expediente_id}">
             <div class="sexp-resultado__info">
                 <h4 class="sexp-resultado-id-nombre">
                     <i class="bi bi-person-badge"></i>
@@ -370,11 +371,14 @@ function agregarAlCarrito(item) {
 
     carrito.push(item);
     renderCarrito();
-    // Refrescar para actualizar badges sin perder la búsqueda
-    const tipoActual = $('#tipo-busqueda').val();
-    let queryActual = $('#busqueda-input').val();
-    queryActual = (tipoActual === 'identidad' ? queryActual.replace(/_/g, '') : queryActual).trim();
-    if (queryActual) buscarExpedientes();
+
+    // Actualizar SOLO el botón del item agregado (sin re-fetch que causa "refresh")
+    const $card = $(`.sexp-resultado[data-exp-id="${item.expediente_id}"]`);
+    if ($card.length) {
+        $card.find('.sexp-add-btn').replaceWith(
+            '<span class="sexp-badge--en-carrito"><i class="bi bi-check-circle"></i> Seleccionado</span>'
+        );
+    }
 
     toastr.success(`Expediente agregado: ${item.paciente_dni || ''} - ${item.paciente_nombre || ''}`);
 }
@@ -495,14 +499,28 @@ async function enviarSolicitud() {
             <p class="sexp-modal-resumen">¿Desea continuar?</p>
         </div>`;
 
-    // Reutilizar el modal estándar de helpers.js (mismo flujo que cerrar sesión)
-    // Textos de botones cortos para que quepan en una sola línea
-    const confirmado = await confirmarAccion(
-        'Confirmar Solicitud',
-        mensaje,
-        'Aceptar',
-        'Cancelar'
-    );
+    // Modal con styling del sistema (light/dark) pero más ancho y texto más grande
+    const resultado = await Swal.fire({
+        title: 'Confirmar Solicitud',
+        html: mensaje,
+        icon: 'question',
+        width: '95%',
+        showCancelButton: true,
+        confirmButtonText: '<i class="bi bi-check-circle-fill"></i> Aceptar',
+        cancelButtonText: '<i class="bi bi-x-circle-fill"></i> Cancelar',
+        customClass: {
+            icon: 'contenedor-modal-icon',
+            popup: 'contenedor-modal sexp-modal-grande',
+            title: 'contener-modal-titulo',
+            confirmButton: 'contener-modal-boton-confirmar',
+            cancelButton: 'contener-modal-boton-cancelar',
+        },
+        didOpen: () => {
+            const actionsContainer = document.querySelector('.swal2-actions');
+            if (actionsContainer) actionsContainer.classList.add('contener-modal-contenedor-botones');
+        }
+    });
+    const confirmado = resultado.isConfirmed;
 
     if (!confirmado) return;
 
