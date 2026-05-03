@@ -91,6 +91,20 @@ function renderDevoluciones(data) {
         
         const detallesJSON = encodeURIComponent(JSON.stringify(p.detalles_expedientes));
 
+        // Render de tags coloreados según estado de devolución de cada expediente
+        const tagsHtml = p.detalles_expedientes.map(d => {
+            const est = d.estado_devolucion || 'pendiente';
+            const cls = est === 'perdido'
+                ? 'sexp-exp-tag sexp-exp-tag--rechazado'
+                : est === 'pendiente'
+                    ? 'sexp-exp-tag sexp-exp-tag--pendiente'
+                    : 'sexp-exp-tag';
+            const tip = est === 'perdido' ? 'Marcado como perdido'
+                : est === 'pendiente' ? 'Pendiente de devolver'
+                : 'Devuelto correctamente';
+            return `<span class="${cls}" title="${tip}">#${d.numero}</span>`;
+        }).join(' ');
+
         html += `
         <div class="sexp-dev-card sexp-card-collapsible sexp-collapsed ${claseExtra}">
             <div class="sexp-dev-header" onclick="toggleCard(this)">
@@ -106,8 +120,13 @@ function renderDevoluciones(data) {
                     <div><span>Total Solic.:</span> ${p.cant_expedientes}</div>
                     <div><span>Devueltos:</span> ${p.cant_devueltos}</div>
                 </div>
-                <div style="margin-bottom:1.5rem; display:flex; flex-wrap:wrap; gap:0.5rem;">
-                     ${p.detalles_expedientes.map(d => `<span class="sexp-exp-tag">#${d.numero}</span>`).join(' ')}
+                <div style="margin-bottom:1rem;">
+                    <div class="sexp-dev-leyenda">
+                        <span><span class="sexp-exp-tag">#</span> Devuelto</span>
+                        <span><span class="sexp-exp-tag sexp-exp-tag--pendiente">#</span> Pendiente</span>
+                        <span><span class="sexp-exp-tag sexp-exp-tag--rechazado">#</span> Perdido</span>
+                    </div>
+                    <div class="sexp-dev-tags">${tagsHtml}</div>
                 </div>
                 <div class="sexp-dev-actions">
                     <button class="sexp-dev-btn sexp-dev-btn--completa" onclick="abrirModalAuditoria(${p.id}, '${detallesJSON}')">
@@ -130,26 +149,44 @@ function abrirModalAuditoria(prestamoId, detallesEncoded) {
     const tarjetasHtml = detalles.map(d => {
         const ident = d.paciente_identidad || 'S/ID';
         const nom = d.paciente_nombre || 'N/A';
+        const estado = d.estado_devolucion || 'pendiente';
+        const yaProcesado = (estado === 'devuelto' || estado === 'perdido');
+        const comentarioPrev = (d.comentario_devolucion || '').replace(/"/g, '&quot;');
+
+        // Estado pre-seleccionado y clase de la tarjeta
+        let valorInicial, clase = '';
+        if (estado === 'devuelto') { valorInicial = 'recibido'; }
+        else if (estado === 'perdido') { valorInicial = 'perdido'; clase = ' sexp-auditoria-card--lost'; }
+        else { valorInicial = 'recibido'; }  // pendiente: por defecto recibido
+
+        const disabledAttr = yaProcesado ? ' disabled' : '';
+        const lockBadge = yaProcesado
+            ? `<span class="sexp-auditoria-lock" title="Ya procesado en una auditoría previa">
+                  <i class="bi bi-lock-fill"></i> Procesado
+               </span>`
+            : '';
+
         return `
-            <div class="sexp-auditoria-card" id="aud-card-${d.id}">
+            <div class="sexp-auditoria-card${clase}" id="aud-card-${d.id}" data-estado-prev="${estado}">
                 <div class="sexp-auditoria-card-header">
                     <span class="sexp-exp-tag">#${d.numero}</span>
                     <div class="sexp-auditoria-paciente">
                         <span class="sexp-auditoria-id">${ident}</span>
                         <span class="sexp-auditoria-nombre">${nom}</span>
                     </div>
+                    ${lockBadge}
                 </div>
                 <div class="sexp-auditoria-radios">
                     <label class="sexp-auditoria-radio sexp-auditoria-radio--ok">
-                        <input type="radio" name="estado_exp_${d.id}" value="recibido" data-detalle="${d.id}" checked>
+                        <input type="radio" name="estado_exp_${d.id}" value="recibido" data-detalle="${d.id}"${valorInicial==='recibido'?' checked':''}${disabledAttr}>
                         <i class="bi bi-check-circle"></i> Recibido
                     </label>
                     <label class="sexp-auditoria-radio sexp-auditoria-radio--no">
-                        <input type="radio" name="estado_exp_${d.id}" value="no_recibido" data-detalle="${d.id}">
-                        <i class="bi bi-dash-circle"></i> No Recibido
+                        <input type="radio" name="estado_exp_${d.id}" value="no_recibido" data-detalle="${d.id}"${disabledAttr}>
+                        <i class="bi bi-hourglass-split"></i> No Recibido
                     </label>
                     <label class="sexp-auditoria-radio sexp-auditoria-radio--lost">
-                        <input type="radio" name="estado_exp_${d.id}" value="perdido" data-detalle="${d.id}">
+                        <input type="radio" name="estado_exp_${d.id}" value="perdido" data-detalle="${d.id}"${valorInicial==='perdido'?' checked':''}${disabledAttr}>
                         <i class="bi bi-exclamation-triangle"></i> Perdido
                     </label>
                 </div>
@@ -159,7 +196,8 @@ function abrirModalAuditoria(prestamoId, detallesEncoded) {
                     </label>
                     <input type="text" id="coment-${d.id}" class="sexp-modal-input sexp-auditoria-coment"
                            data-detalle="${d.id}" maxlength="200"
-                           placeholder="Ingrese comentario (irá al PDF en Observaciones devolución)">
+                           value="${comentarioPrev}"
+                           placeholder="Ingrese comentario (irá al PDF en Observaciones devolución)"${disabledAttr}>
                 </div>
             </div>`;
     }).join('');
@@ -173,11 +211,20 @@ function abrirModalAuditoria(prestamoId, detallesEncoded) {
                     <i class="bi bi-info-circle"></i>
                     Marque el estado físico de cada expediente. El comentario es obligatorio si NO se recibió y quedará en el PDF.
                 </p>
-                <div class="sexp-auditoria-grid">${tarjetasHtml}</div>
-                <div class="sexp-modal-campo">
-                    <label>Notas Generales (opcional)</label>
-                    <textarea id="swal-notas" rows="2" class="sexp-modal-input" placeholder="Notas globales sobre la devolución..."></textarea>
+                <div class="sexp-modal-buscador-row">
+                    <div class="sexp-modal-buscador-input">
+                        <i class="bi bi-search"></i>
+                        <input type="search" id="sexp-aud-buscar" class="sexp-modal-input"
+                               placeholder="Filtrar por identidad, nombre o número de expediente..."
+                               autocomplete="off">
+                        <button type="button" class="sexp-modal-buscador-clear" id="sexp-aud-buscar-clear"
+                                title="Limpiar filtro" aria-label="Limpiar filtro">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    </div>
+                    <span class="sexp-modal-buscador-info" id="sexp-aud-buscar-info"></span>
                 </div>
+                <div class="sexp-auditoria-grid">${tarjetasHtml}</div>
             </div>`,
         showCancelButton: true,
         confirmButtonText: '<i class="bi bi-check-circle-fill"></i> Finalizar Auditoría',
@@ -192,6 +239,13 @@ function abrirModalAuditoria(prestamoId, detallesEncoded) {
             const actionsContainer = document.querySelector('.swal2-actions');
             if (actionsContainer) actionsContainer.classList.add('contener-modal-contenedor-botones');
 
+            // Aplicar clase visual inicial según pre-selección
+            document.querySelectorAll('.sexp-auditoria-card').forEach(card => {
+                const sel = card.querySelector('input[type="radio"]:checked');
+                if (sel && sel.value === 'no_recibido') card.classList.add('sexp-auditoria-card--no');
+                else if (sel && sel.value === 'perdido') card.classList.add('sexp-auditoria-card--lost');
+            });
+
             // Resaltar tarjeta cuando se elija "no recibido" o "perdido"
             document.querySelectorAll('.sexp-auditoria-card input[type="radio"]').forEach(rad => {
                 rad.addEventListener('change', function () {
@@ -203,6 +257,36 @@ function abrirModalAuditoria(prestamoId, detallesEncoded) {
                     else if (this.value === 'perdido') card.classList.add('sexp-auditoria-card--lost');
                 });
             });
+
+            // Buscador local
+            const inpBuscar = document.getElementById('sexp-aud-buscar');
+            const btnClear = document.getElementById('sexp-aud-buscar-clear');
+            const info = document.getElementById('sexp-aud-buscar-info');
+            const cards = document.querySelectorAll('.sexp-auditoria-card');
+
+            function filtrar() {
+                const q = (inpBuscar.value || '').trim().toLowerCase();
+                let visibles = 0;
+                cards.forEach(card => {
+                    const text = card.textContent.toLowerCase();
+                    const match = !q || text.indexOf(q) >= 0;
+                    card.style.display = match ? '' : 'none';
+                    if (match) visibles++;
+                });
+                if (info) {
+                    info.textContent = q
+                        ? `${visibles} de ${cards.length} expediente(s)`
+                        : `${cards.length} expediente(s)`;
+                }
+                btnClear.style.display = q ? '' : 'none';
+            }
+            inpBuscar.addEventListener('input', filtrar);
+            btnClear.addEventListener('click', function () {
+                inpBuscar.value = '';
+                filtrar();
+                inpBuscar.focus();
+            });
+            filtrar();
         },
         preConfirm: () => {
             const recibidos = [];
@@ -212,6 +296,11 @@ function abrirModalAuditoria(prestamoId, detallesEncoded) {
             const sinComentario = [];
 
             detalles.forEach(d => {
+                // Si ya estaba procesado (devuelto/perdido), no se vuelve a enviar
+                const card = document.getElementById('aud-card-' + d.id);
+                const estadoPrev = card ? card.getAttribute('data-estado-prev') : 'pendiente';
+                if (estadoPrev === 'devuelto' || estadoPrev === 'perdido') return;
+
                 const val = document.querySelector(`input[name="estado_exp_${d.id}"]:checked`).value;
                 const com = (document.getElementById('coment-' + d.id).value || '').trim();
                 if (val === 'recibido') recibidos.push(d.id);
@@ -235,7 +324,7 @@ function abrirModalAuditoria(prestamoId, detallesEncoded) {
                 perdidos: perdidos,
                 no_recibidos: no_recibidos,
                 comentarios_por_detalle: comentarios_por_detalle,
-                notas: document.getElementById('swal-notas').value
+                notas: ''
             };
         }
     }).then((result) => {

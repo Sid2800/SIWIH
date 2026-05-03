@@ -112,14 +112,18 @@
                                 <label for="solicitud-tiempo-cuando">¿Cuándo lo necesita?</label>
                                 <select id="solicitud-tiempo-cuando">
                                     <option value="hoy">Mismo día (antes de 4:00 PM)</option>
-                                    <option value="dias">Días posteriores (máx. 72 horas)</option>
+                                    <option value="dias">Días posteriores (máx. 3 días)</option>
                                 </select>
                             </div>
                             <div>
                                 <label for="solicitud-tiempo-valor">Tiempo</label>
                                 <div class="sexp-sugerir-tiempo-row">
-                                    <input type="number" id="solicitud-tiempo-valor" min="1" value="1">
-                                    <select id="solicitud-tiempo-unidad">
+                                    <div class="sexp-tiempo-stepper">
+                                        <button type="button" class="sexp-stepper-btn" id="solicitud-tiempo-menos" aria-label="Disminuir">−</button>
+                                        <input type="number" id="solicitud-tiempo-valor" min="1" value="1" inputmode="numeric" pattern="[0-9]*">
+                                        <button type="button" class="sexp-stepper-btn" id="solicitud-tiempo-mas" aria-label="Aumentar">+</button>
+                                    </div>
+                                    <select id="solicitud-tiempo-unidad" disabled>
                                         <option value="horas" selected>Horas</option>
                                         <option value="dias">Días</option>
                                     </select>

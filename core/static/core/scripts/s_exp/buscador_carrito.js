@@ -36,8 +36,21 @@ $(document).ready(function () {
     // Sugerir tiempo de entrega
     $('#solicitud-sugerir-tiempo').on('change', toggleSugerirTiempo);
     $('#solicitud-tiempo-cuando').on('change', actualizarLimitesTiempo);
-    $('#solicitud-tiempo-unidad').on('change', actualizarLimitesTiempo);
     $('#solicitud-tiempo-valor').on('input', validarValorTiempo);
+
+    // Stepper táctil (− N +)
+    $('#solicitud-tiempo-menos').on('click', function () {
+        const $inp = $('#solicitud-tiempo-valor');
+        const min = parseInt($inp.attr('min'), 10) || 1;
+        const v = Math.max(min, (parseInt($inp.val(), 10) || min) - 1);
+        $inp.val(v);
+    });
+    $('#solicitud-tiempo-mas').on('click', function () {
+        const $inp = $('#solicitud-tiempo-valor');
+        const max = parseInt($inp.attr('max'), 10) || 999;
+        const v = Math.min(max, (parseInt($inp.val(), 10) || 0) + 1);
+        $inp.val(v);
+    });
 
     // Aplicar máscara inicial (Identidad por defecto)
     actualizarMascaraInput();
@@ -72,20 +85,23 @@ function _horasHastaCuatroPM() {
 
 
 /**
- * Actualiza límites min/max y texto informativo según
- * "cuando" (hoy / días posteriores) y "unidad" (horas / días).
+ * Actualiza límites min/max y texto informativo según "cuando" (hoy / días posteriores).
+ * - hoy → unidad forzada a HORAS, máx hasta las 4:00 PM
+ * - dias → unidad forzada a DÍAS, máx 3 días
+ * El select de unidad queda disabled (cambia automáticamente).
  */
 function actualizarLimitesTiempo() {
     const cuando = $('#solicitud-tiempo-cuando').val();
-    const unidad = $('#solicitud-tiempo-unidad').val();
     const $valor = $('#solicitud-tiempo-valor');
     const $unidadSel = $('#solicitud-tiempo-unidad');
     const $hint = $('#sugerir-tiempo-hint span');
 
+    // El select de unidad SIEMPRE va sincronizado con "cuando" y queda disabled
+    $unidadSel.prop('disabled', true);
+
     if (cuando === 'hoy') {
         // Mismo día → siempre en horas, máximo hasta las 4 PM
-        if ($unidadSel.val() !== 'horas') $unidadSel.val('horas');
-        $unidadSel.prop('disabled', true);
+        $unidadSel.val('horas');
         const maxH = _horasHastaCuatroPM();
         $valor.attr('min', 1);
         $valor.attr('max', Math.max(maxH, 1));
@@ -99,29 +115,14 @@ function actualizarLimitesTiempo() {
             $hint.html(`Mismo día: máximo <strong>${maxH} hora(s)</strong> disponibles hasta las 4:00 PM. Es solo una sugerencia; el administrador define el tiempo final.`);
         }
     } else {
-        // Días posteriores → forzar unidad "Días" por defecto cuando se selecciona esta opción
-        $unidadSel.prop('disabled', false);
+        // Días posteriores → siempre DÍAS, máximo 3
+        $unidadSel.val('dias');
         $valor.prop('disabled', false);
-        // Si venimos de "hoy" la unidad estaba forzada a "horas"; al pasar a "dias" cambiamos a Días automáticamente.
-        const veniaDeHoy = $unidadSel.data('prev-cuando') !== 'dias';
-        if (veniaDeHoy) {
-            $unidadSel.val('dias');
-        }
-        $unidadSel.data('prev-cuando', 'dias');
-        const unidadActual = $unidadSel.val();
-        if (unidadActual === 'dias') {
-            $valor.attr('min', 1);
-            $valor.attr('max', 3);
-            const valorActual = parseInt($valor.val(), 10);
-            if (!valorActual || valorActual > 3) $valor.val(1);
-            $hint.html('Días posteriores: <strong>de 1 a 3 días</strong> (máximo 72 horas). Es solo una sugerencia; el administrador define el tiempo final.');
-        } else {
-            $valor.attr('min', 1);
-            $valor.attr('max', 72);
-            const valorActual = parseInt($valor.val(), 10);
-            if (!valorActual || valorActual > 72) $valor.val(24);
-            $hint.html('Días posteriores: <strong>máximo 72 horas</strong>. Es solo una sugerencia; el administrador define el tiempo final.');
-        }
+        $valor.attr('min', 1);
+        $valor.attr('max', 3);
+        const valorActual = parseInt($valor.val(), 10);
+        if (!valorActual || valorActual > 3) $valor.val(1);
+        $hint.html('Días posteriores: <strong>de 1 a 3 días</strong>. Es solo una sugerencia; el administrador define el tiempo final.');
     }
 }
 

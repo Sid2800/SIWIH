@@ -419,7 +419,6 @@ function _mostrarModalAprobacion(id, expedientes, meta) {
                     <select id="swal-unidad" class="sexp-modal-select">
                         <option value="dias"${prefillUnidad === 'dias' ? ' selected' : ''}>Días</option>
                         <option value="horas"${prefillUnidad === 'horas' ? ' selected' : ''}>Horas</option>
-                        <option value="minutos">Minutos</option>
                     </select>
                 </div>
                 <small id="swal-tiempo-hint" class="sexp-modal-hint">De 1 a 3 días. Vencimiento a las 4:00 PM del último día.</small>
@@ -479,39 +478,37 @@ function _mostrarModalAprobacion(id, expedientes, meta) {
 
             function actualizarHintTiempo() {
                 const unidad = selUnidad.value;
-                if (unidad === 'minutos') {
-                    if (!estaEnHorarioLaboral()) {
-                        hint.textContent = 'Fuera de horario (6:00 AM - 4:00 PM). Use "Días" o vuelva en horario.';
-                        hint.style.color = '#dc2626';
+                if (unidad === 'horas') {
+                    const maxH = horasHastaCuatroPM();
+                    inputTiempo.min = '1';
+                    inputTiempo.max = String(Math.max(maxH, 1));
+                    if (maxH <= 0) {
+                        hint.textContent = 'Ya pasó la hora límite (4:00 PM). Use "Días".';
+                        inputTiempo.value = '';
                         inputTiempo.disabled = true;
                     } else {
                         inputTiempo.disabled = false;
-                        hint.style.color = 'inherit';
-                        inputTiempo.min = '1';
-                        inputTiempo.max = '';
-                        if (!inputTiempo.value || parseInt(inputTiempo.value) < 1) inputTiempo.value = '5';
-                        hint.textContent = 'Ingrese el tiempo en minutos.';
-                    }
-                } else if (unidad === 'horas') {
-                    const maxH = horasHastaCuatroPM();
-                    inputTiempo.min = '1';
-                    inputTiempo.max = String(maxH);
-                    if (maxH <= 0) {
-                        hint.textContent = 'Ya pasó la hora límite (4:00 PM). Use "Días" o "Minutos".';
-                        inputTiempo.value = '';
-                    } else {
-                        inputTiempo.value = String(maxH);
-                        hint.textContent = `Horas solo el mismo día, máximo hasta las 4:00 PM (disponible: ${maxH}h).`;
+                        const valActual = parseInt(inputTiempo.value, 10);
+                        if (!valActual || valActual > maxH) inputTiempo.value = String(maxH);
+                        hint.textContent = `Horas: el mismo día, máximo hasta las 4:00 PM (disponible: ${maxH}h).`;
                     }
                 } else if (unidad === 'dias') {
+                    inputTiempo.disabled = false;
                     inputTiempo.min = '1';
                     inputTiempo.max = '3';
-                    inputTiempo.value = '1';
+                    const valActual = parseInt(inputTiempo.value, 10);
+                    if (!valActual || valActual > 3) inputTiempo.value = '1';
                     hint.textContent = 'De 1 a 3 días. Vencimiento a las 4:00 PM del último día.';
                 }
             }
             selUnidad.addEventListener('change', actualizarHintTiempo);
-            // No reset del valor pre-cargado en didOpen (respeta el sugerido)
+            // Sincronizar max y hint según unidad inicial (si es horas, debe ajustarse a maxH)
+            // Sin alterar el valor pre-cargado por el solicitante.
+            (function syncInicial() {
+                const valorPrev = inputTiempo.value;
+                actualizarHintTiempo();
+                if (valorPrev) inputTiempo.value = valorPrev;
+            })();
         },
         preConfirm: () => {
             const tiempo = parseInt(document.getElementById('swal-tiempo').value);
@@ -522,19 +519,13 @@ function _mostrarModalAprobacion(id, expedientes, meta) {
                 return false;
             }
 
-            // Validación de minutos: solo en horario laboral
-            if (unidad === 'minutos' && !estaEnHorarioLaboral()) {
-                Swal.showValidationMessage('Minutos solo disponible entre 6:00 AM y 4:00 PM. Use "Días" o espere el horario laboral.');
-                return false;
-            }
-
             // Validación de horas: mismo día, no pasar 4 PM
             if (unidad === 'horas') {
                 const ahora = new Date();
                 const limite = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 16, 0, 0);
                 const maxH = limite > ahora ? Math.floor((limite - ahora) / (1000 * 60 * 60)) : 0;
                 if (maxH <= 0) {
-                    Swal.showValidationMessage('Ya pasó la hora límite (4:00 PM). Use "Días" o "Minutos".');
+                    Swal.showValidationMessage('Ya pasó la hora límite (4:00 PM). Use "Días".');
                     return false;
                 }
                 if (tiempo > maxH) {
@@ -557,11 +548,10 @@ function _mostrarModalAprobacion(id, expedientes, meta) {
 
             // Convertir valor a horas si se eligieron días
             const tiempoHoras = (unidad === 'dias') ? tiempo * 24 : tiempo;
-            const esMinutos = (unidad === 'minutos');
 
             return {
                 tiempo_horas: tiempoHoras,
-                es_minutos: esMinutos,
+                es_minutos: false,
                 decisiones: decisiones
             };
         }
@@ -789,6 +779,19 @@ function _mostrarModalRevision(id, expedientes) {
                     <i class="bi bi-info-circle"></i>
                     Marque los que encontró físicamente. Desmarque los que <strong>NO</strong> se encontraron y agregue un comentario.
                 </p>
+                <div class="sexp-modal-buscador-row">
+                    <div class="sexp-modal-buscador-input">
+                        <i class="bi bi-search"></i>
+                        <input type="search" id="sexp-rev-buscar" class="sexp-modal-input"
+                               placeholder="Filtrar por identidad, nombre o número de expediente..."
+                               autocomplete="off">
+                        <button type="button" class="sexp-modal-buscador-clear" id="sexp-rev-buscar-clear"
+                                title="Limpiar filtro" aria-label="Limpiar filtro">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    </div>
+                    <span class="sexp-modal-buscador-info" id="sexp-rev-buscar-info"></span>
+                </div>
                 <div class="sexp-revision-grid">${filasHtml}</div>
             </div>`,
         showCancelButton: true,
@@ -814,6 +817,36 @@ function _mostrarModalRevision(id, expedientes) {
                     }
                 });
             });
+
+            // Buscador local: filtra tarjetas sin afectar marcado/comentarios
+            const inpBuscar = document.getElementById('sexp-rev-buscar');
+            const btnClear = document.getElementById('sexp-rev-buscar-clear');
+            const info = document.getElementById('sexp-rev-buscar-info');
+            const cards = document.querySelectorAll('.sexp-revision-card');
+
+            function filtrar() {
+                const q = (inpBuscar.value || '').trim().toLowerCase();
+                let visibles = 0;
+                cards.forEach(card => {
+                    const text = card.textContent.toLowerCase();
+                    const match = !q || text.indexOf(q) >= 0;
+                    card.style.display = match ? '' : 'none';
+                    if (match) visibles++;
+                });
+                if (info) {
+                    info.textContent = q
+                        ? `${visibles} de ${cards.length} expediente(s)`
+                        : `${cards.length} expediente(s)`;
+                }
+                btnClear.style.display = q ? '' : 'none';
+            }
+            inpBuscar.addEventListener('input', filtrar);
+            btnClear.addEventListener('click', function () {
+                inpBuscar.value = '';
+                filtrar();
+                inpBuscar.focus();
+            });
+            filtrar();
         },
         preConfirm: () => {
             const decisiones = [];

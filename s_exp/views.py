@@ -925,13 +925,30 @@ def prestamos_para_devolucion_api(request):
         data = []
         for p in qs:
             detalles = []
-            for d in p.solicitud.detalles.select_related('expediente_prestamo__expediente').filter(aprobado=True, devuelto=False):
+            # Mostrar TODOS los expedientes aprobados (devueltos y pendientes)
+            # — los devueltos se muestran como ya recibidos / perdidos / etc.
+            for d in p.solicitud.detalles.select_related('expediente_prestamo__expediente').filter(aprobado=True):
+                estado_fisico_id = d.expediente_prestamo.estado_id or ''
+                # Etiqueta para el front:
+                #   - 'pendiente'  : aún no devuelto
+                #   - 'devuelto'   : devuelto correctamente (EXP_DISPONIBLE)
+                #   - 'perdido'    : marcado como perdido (EXP_PERDIDO)
+                if not d.devuelto:
+                    estado_devolucion = 'pendiente'
+                elif estado_fisico_id == 'EXP_PERDIDO':
+                    estado_devolucion = 'perdido'
+                else:
+                    estado_devolucion = 'devuelto'
+
                 detalles.append({
                     "id": d.id,
                     "numero": d.expediente_prestamo.expediente.numero,
                     "estado_fisico": d.expediente_prestamo.estado.nombre,
+                    "estado_devolucion": estado_devolucion,
+                    "devuelto": bool(d.devuelto),
                     "paciente_identidad": d.paciente_identidad or '',
                     "paciente_nombre": d.paciente_nombre or '',
+                    "comentario_devolucion": d.comentario_devolucion or '',
                 })
 
             data.append({

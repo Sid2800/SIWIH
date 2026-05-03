@@ -19,6 +19,7 @@ from reportlab.platypus import (
     BaseDocTemplate, PageTemplate, Frame, Paragraph, Table, TableStyle,
     Spacer, KeepTogether,
 )
+from reportlab.graphics.shapes import Drawing, Rect, Line
 
 from usuario.models import PerfilUnidad
 
@@ -28,6 +29,24 @@ IMG_GOB_SESAL = os.path.join(IMG_DIR, 'GOB_SESAL_COLOR.png')
 IMG_HEAC = os.path.join(IMG_DIR, 'logo_HEAC.png')
 IMG_FUNDAGES = os.path.join(IMG_DIR, 'logo_FUNDAGES2.png')
 IMG_SIWIH = os.path.join(IMG_DIR, 'SIWIFINAL_3.png')
+
+
+def _checkbox_pdf(marcado=False, size=11):
+    """Devuelve un Drawing con un checkbox dibujado.
+    - marcado=False: cuadro vacío (para marcado manual antes de la entrega)
+    - marcado=True: cuadro con check verde (expediente sí prestado/finalizado)
+    """
+    d = Drawing(size, size)
+    d.add(Rect(0, 0, size, size, strokeWidth=0.6,
+               strokeColor=colors.HexColor('#444444'),
+               fillColor=colors.white))
+    if marcado:
+        # Checkmark V (de izquierda-medio hacia abajo-medio y luego arriba-derecha)
+        d.add(Line(size * 0.18, size * 0.50, size * 0.42, size * 0.22,
+                   strokeWidth=1.5, strokeColor=colors.HexColor('#16a34a')))
+        d.add(Line(size * 0.42, size * 0.22, size * 0.85, size * 0.78,
+                   strokeWidth=1.5, strokeColor=colors.HexColor('#16a34a')))
+    return d
 
 
 class _NumberedCanvas(rl_canvas.Canvas):
@@ -269,10 +288,13 @@ def generar_pdf_solicitud(solicitud):
     fecha_entrega_calc = _calcular_fecha_entrega(solicitud, ahora)
     fecha_entrega_str = _fmt_fecha(fecha_entrega_calc, con_hora=not ya_entregado) if fecha_entrega_calc else ''
 
+    # Estilo de cabecera más pequeño para columna "Disponible"
+    st_tabla_head_sm = ParagraphStyle('tabla_head_sm', parent=st_tabla_head, fontSize=7, leading=9)
+
     cabeceras = [
         Paragraph('Fecha salida', st_tabla_head),
         Paragraph('Expediente', st_tabla_head),
-        Paragraph('¿Disponible?', st_tabla_head),
+        Paragraph('Recibido', st_tabla_head_sm),
         Paragraph('Identidad', st_tabla_head),
         Paragraph('Paciente', st_tabla_head),
         Paragraph('Motivo', st_tabla_head),
@@ -290,9 +312,15 @@ def generar_pdf_solicitud(solicitud):
     estados_con_revision = {'SOL_LISTO_RECOGER', 'SOL_EN_PRESTAMO', 'SOL_EN_DEVOLUCION',
                              'SOL_INCOMPLETA', 'SOL_FINALIZADA', 'SOL_RECHAZADA'}
     mostrar_comentarios = estado_flujo in estados_con_revision
+    # Solo en estos estados ya se sabe definitivamente si el expediente se prestó o no
+    estados_finalizado = {'SOL_FINALIZADA', 'SOL_RECHAZADA', 'SOL_INCOMPLETA'}
+    pdf_finalizado = estado_flujo in estados_finalizado
+
+    # Filas que NO se prestaron — para resaltar en rojo pastel
+    filas_no_prestadas = []  # índices de fila (1-based porque cabecera es fila 0)
 
     # Agregar filas de detalles
-    for d in detalles_list:
+    for idx, d in enumerate(detalles_list, start=1):
         num_exp = d.expediente_prestamo.expediente.numero
         identidad = d.paciente_identidad or ''
         paciente = d.paciente_nombre or ''
@@ -317,10 +345,22 @@ def generar_pdf_solicitud(solicitud):
         else:
             obs_devolucion_text = ''
 
+        # Checkbox visual:
+        #   - Antes de finalizar: SIEMPRE vacío (el responsable lo marca a mano)
+        #   - Si finalizado: marcado para los que sí se prestaron, vacío para no prestados
+        if pdf_finalizado:
+            cb = _checkbox_pdf(marcado=bool(d.aprobado))
+        else:
+            cb = _checkbox_pdf(marcado=False)
+
+        # Marcar para resaltado rojo pastel si NO se prestó y el flujo ya finalizó
+        if pdf_finalizado and not d.aprobado:
+            filas_no_prestadas.append(idx)
+
         filas.append([
             Paragraph(fecha_salida, st_tabla_cell),
             Paragraph(f'#{num_exp}', st_tabla_cell),
-            Paragraph('', st_tabla_cell),  # ¿Disponible? — recuadro físico para marcado manual
+            cb,  # Checkbox visual centrado
             Paragraph(identidad, st_tabla_cell),
             Paragraph(paciente, st_tabla_cell),
             Paragraph(motivo_solicitud, st_tabla_cell),
@@ -344,12 +384,18 @@ def generar_pdf_solicitud(solicitud):
         ('GRID', (0, 0), (-1, -1), 0.4, colors.HexColor('#444444')),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+        ('ALIGN', (2, 1), (2, -1), 'CENTER'),  # Centrar checkbox en su columna
         ('LEFTPADDING', (0, 0), (-1, -1), 3),
         ('RIGHTPADDING', (0, 0), (-1, -1), 3),
         ('TOPPADDING', (0, 0), (-1, -1), 3),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
         ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f1f5f5')]),
     ]
+
+    # Resaltar en rojo pastel las filas de expedientes NO prestados (sólo cuando el PDF ya finalizó)
+    rojo_pastel = colors.HexColor('#fde2e2')
+    for fila_idx in filas_no_prestadas:
+        tabla_styles.append(('BACKGROUND', (0, fila_idx), (-1, fila_idx), rojo_pastel))
 
     tabla_exp.setStyle(TableStyle(tabla_styles))
     elementos.append(tabla_exp)
