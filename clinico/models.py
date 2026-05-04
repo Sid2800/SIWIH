@@ -1,4 +1,5 @@
 from django.db import models
+from core.constants.choices_constants import EstadoRegistro, PrioridadAtencion
 
 # Create your models here.
 
@@ -69,3 +70,24 @@ class Condicion_paciente(models.Model):
 
     def __str__(self):
         return self.nombre_condicion_paciente
+    
+
+class Tipo_atencion(models.Model):
+    nombre_tipo_atencion =  models.CharField(max_length=100, unique=True)
+    prioridad = models.PositiveSmallIntegerField(
+            choices=PrioridadAtencion.choices,
+            default=PrioridadAtencion.ORDINARIA,
+            db_index=True
+    )
+    estado = models.SmallIntegerField(
+        choices=EstadoRegistro.choices,
+        default=EstadoRegistro.ACTIVO
+    )
+
+    class Meta:
+        verbose_name = "Tipo de atencion"
+        verbose_name_plural = "Tipos de atencion"
+        ordering = ['nombre_tipo_atencion']
+
+    def __str__(self):
+        return self.nombre_tipo_atencion

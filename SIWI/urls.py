@@ -30,5 +30,7 @@ urlpatterns = [
     path('imagenologia/',include('imagenologia.urls')),
     path('referencia/',include('referencia.urls')),
     path('clinico/',include('clinico.urls')),
+    path('agenda-medica/',include('agenda_medica.urls')),
+
     path('admin/', admin.site.urls),
 ]

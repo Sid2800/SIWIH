@@ -84,7 +84,7 @@ async function confirmarAccion(titulo, mensaje, botonAfirmativo = "Aceptar", bot
 }
 
 
-function renderDatosPaciente(containerId, datos = {}) {
+function renderDatosContexto(containerId, datos = {}) {
    const header = document.getElementById(containerId);
 
    if (!header) return;
@@ -131,6 +131,7 @@ const API_URLS = {
    obtenerSeguimientoTIC: urls["seguimientoTicObtener"],
    listarObitosPaciente: urls["listarObitosPaciente"],
    listarUnidadClinica: urls["listarUnidadClinica"],
+   listarAgendaMedicaAPI: urls["listarAgendaMedicaAPI"],
 };
 
 /**

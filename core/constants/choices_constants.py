@@ -71,3 +71,16 @@ class FuenteSeguimiento(models.IntegerChoices):
 class TipoDefuncion(models.IntegerChoices):
     INTRAHOSPITALARIA = 1, "Intrahospitalaria"
     EXTRAHOSPITALARIA = 2, "Extrahospitalaria"
+    
+class DiaSemana(models.IntegerChoices):
+    LUNES = 1, "LUNES"
+    MARTES = 2, "MARTES"
+    MIERCOLES = 3, "MIÉRCOLES"
+    JUEVES = 4, "JUEVES"
+    VIERNES = 5, "VIERNES"
+    SABADO = 6, "SÁBADO"
+    DOMINGO = 7, "DOMINGO"
+
+class PrioridadAtencion(models.IntegerChoices):
+    ORDINARIA = 1, "ORDINARIA"
+    PREFERENTE = 2, "PREFERENTE"

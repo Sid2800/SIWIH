@@ -138,6 +138,19 @@
             {% endif %}
 
 
+            {% if  request.user|tiene_rol:"ADMIN:Admision"  %}
+
+               <li>
+                  <a href="{% url 'listar_agenda_medica' %}" class="bn-navegacion__enlace">
+                     <i class="bi bi-calendar-check bn-navegacion-enlace__logo"></i>
+                     <span class="bn-navegacion-enlace__texto">
+                        Agenda Medica
+                     </span>
+                  </a>
+               </li>
+            {% endif %}
+
+
             <li>  
                <a href="{% url 'generador_reporte' %}" class="bn-navegacion__enlace">
                   <i class="bi bi-journal-text bn-navegacion-enlace__logo"></i>
@@ -422,7 +435,11 @@
       obtenerImagenesEvaluacion: "{% url 'dispensaciones_paciente' %}",
 
       /* ---------------- MEDIA ---------------- */
-      obtenerImagenesEvaluacion: "{% url 'obtener_imagenes_evaluacion'%}"
+      obtenerImagenesEvaluacion: "{% url 'obtener_imagenes_evaluacion'%}",
+
+      /* ---------------- AGENDA MEDICA ---------------- */
+      listarAgendaMedicaAPI: "{% url 'listar_agenda_medica_API'%}"
+      
 
    };
 

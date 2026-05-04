@@ -498,7 +498,7 @@ class listarReferencias(UnidadRolRequiredMixin,TemplateView):
     required_unidades = permisos.REFERENCIA_VISUALIZACION_UNIDADES
 
 
-def listarEvaluacionrxAPI(request):
+def listarReferenciaAPI(request):
     draw = int(request.GET.get('draw', 0))
     start = int(request.GET.get('start', 0))
     length = int(request.GET.get('length', 10))

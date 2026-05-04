@@ -131,7 +131,7 @@ const ModalPacienteProcesos = (function () {
 
 
     function renderDatos() {
-        renderDatosPaciente("modalOtrosProcesosHeader",datos);
+        renderDatosContexto("modalOtrosProcesosHeader",datos);
     }
 
     function renderProcesos(){
@@ -592,7 +592,7 @@ async function AgregarDefuncionModal(paciente, lectura) {
             const fieldsetRegistro = document.getElementById("modal-campos-defuncion-registros");
 
             //header paciente
-            renderDatosPaciente("modalDefuncionHeader",{
+            renderDatosContexto("modalDefuncionHeader",{
                 "Paciente": paciente.nombre,
                 "DNI": paciente.dni,
                 "Expediente": paciente.numero
@@ -851,7 +851,7 @@ async function registrarObito(IdObito,idPaciente, datosMadre) {
             const dniResponsable = document.getElementById("modal-cadaver-dni-responsable");
             const nombreResponsable = document.getElementById("modal-cadaver-nombre-responsable");
 
-            renderDatosPaciente("modalObitoHeader",{
+            renderDatosContexto("modalObitoHeader",{
                 "Nombre Madre: ": datosMadre.Paciente,
                 "DNI Madre: ": datosMadre.DNI,
                 "Expediente Madre: ": datosMadre.Expediente

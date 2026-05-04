@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Empleado, PersonalSalud, PersonalNoClinico
+from .models import Empleado, PersonalSalud, PersonalNoClinico, Jornada_laboral
 
 
 class EmpleadoAdmin(admin.ModelAdmin):
@@ -40,7 +40,7 @@ class PersonalSaludAdmin(admin.ModelAdmin):
     empleado_nombre.short_description = "Empleado"
 
     def tipo_personal(self, obj):
-        return obj.tipo_personal_salud.nombre
+        return obj.tipo_personal_salud.nombre_tipo_personal
     tipo_personal.short_description = "Tipo"
 
     def servicio_unidad_nombre(self, obj):
@@ -81,6 +81,23 @@ class PersonalNoClinicoAdmin(admin.ModelAdmin):
     servicio_unidad_nombre.short_description = "Unidad"
 
 
+
+
+class JornadaLaboralAdmin(admin.ModelAdmin):
+    list_display = ('nombre_jornada_laboral', 'hora_inicio', 'hora_fin', 'estado')
+    search_fields = ('nombre_jornada_laboral',)
+    list_filter = ('estado',)
+
+
+    ordering = ('nombre_jornada_laboral',)
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+
+
+
+
 admin.site.register(Empleado, EmpleadoAdmin)
 admin.site.register(PersonalSalud, PersonalSaludAdmin)
 admin.site.register(PersonalNoClinico, PersonalNoClinicoAdmin)
+admin.site.register(Jornada_laboral, JornadaLaboralAdmin)
