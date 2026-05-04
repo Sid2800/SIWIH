@@ -260,6 +260,8 @@ def listar_solicitudes_api(request):
                     "aprobado": d.aprobado,
                     "motivo_rechazo_individual": d.motivo_rechazo_individual or "",
                     "comentario_devolucion": d.comentario_devolucion or "",
+                    "paciente_identidad": d.paciente_identidad or "",
+                    "paciente_nombre": d.paciente_nombre or "",
                 })
 
             prestamo_id = None
@@ -1501,6 +1503,8 @@ def mis_solicitudes_api(request):
                     "aprobado": d.aprobado,
                     "motivo_rechazo_individual": d.motivo_rechazo_individual or "",
                     "comentario_devolucion": d.comentario_devolucion or "",
+                    "paciente_identidad": d.paciente_identidad or "",
+                    "paciente_nombre": d.paciente_nombre or "",
                 })
 
             prestamo_info = None
