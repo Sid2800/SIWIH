@@ -204,14 +204,6 @@ $(document).ready(function () {
                                 const estilo = colores[data] || '';
                                 return `<span style="padding:0.2rem 0.5rem;border-radius:12px;font-size:1.2rem;font-weight:600;${estilo}">${data}</span>`;
                             }
-                        },
-                        {
-                            data: 'devuelto',
-                            render: function (data) {
-                                return data
-                                    ? '<i class="bi bi-check-circle-fill" style="color:var(--negro);"></i> Sí'
-                                    : '<i class="bi bi-clock" style="color:var(--negro);"></i> No';
-                            }
                         }
                     ],
                     language: {
@@ -242,6 +234,28 @@ $(document).ready(function () {
     }
 
     inicializarTablaHistorialPrestamos();
+
+    // Tabs: alternar entre "Historial Propietarios" e "Historial de Préstamos"
+    $('.exp-historial-tab').on('click', function () {
+        const targetId = $(this).data('target');
+
+        $('.exp-historial-tab')
+            .removeClass('exp-historial-tab--active')
+            .attr('aria-selected', 'false');
+        $(this)
+            .addClass('exp-historial-tab--active')
+            .attr('aria-selected', 'true');
+
+        $('.exp-historial-panel').removeClass('exp-historial-panel--active');
+        $('#' + targetId).addClass('exp-historial-panel--active');
+
+        // Reajustar columnas de DataTables al mostrar (evita que se vean colapsadas)
+        if (targetId === 'exp-tab-propietarios' && table) {
+            setTimeout(() => table.columns.adjust().draw(false), 50);
+        } else if (targetId === 'exp-tab-prestamos' && tablePrestamos) {
+            setTimeout(() => tablePrestamos.columns.adjust().draw(false), 50);
+        }
+    });
 
 });
 

@@ -5029,3 +5029,69 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
       width: 92rem !important
    }
 }
+
+
+/* ============================================================
+   EXPEDIENTE — Tabs de Historial (Propietarios / Préstamos)
+   ============================================================ */
+.exp-historial-tabs-wrapper {
+   /* Hereda fieldsetExp pero permite el layout vertical de tabs+panel */
+}
+
+.exp-historial-tabs {
+   display: flex;
+   gap: 0.6rem;
+   flex-wrap: wrap;
+   margin-bottom: 1rem;
+}
+
+.exp-historial-tab {
+   display: inline-flex;
+   align-items: center;
+   gap: 0.5rem;
+   padding: 0.7rem 1.4rem;
+   border-radius: 0.8rem 0.8rem 0 0;
+   border: 1px solid var(--colorTablaceldaBorde);
+   border-bottom: 2px solid transparent;
+   background-color: transparent;
+   color: var(--colorTablacelda);
+   cursor: pointer;
+   font-size: 1.5rem;
+   font-family: var(--fuenteCuerpo);
+   font-weight: 600;
+   transition: all 0.2s;
+}
+
+.exp-historial-tab:hover {
+   background-color: var(--colorMenuHover);
+   color: var(--colorBoton);
+}
+
+.exp-historial-tab--active {
+   background-color: var(--colorBoton) !important;
+   color: var(--colorTextoBoton) !important;
+   border-color: var(--colorBoton) !important;
+   border-bottom-color: var(--colorBoton) !important;
+}
+
+.exp-historial-tab i {
+   font-size: 1.7rem;
+}
+
+/* Paneles: ocultos por defecto, visible solo el activo */
+.exp-historial-panel {
+   display: none;
+}
+
+.exp-historial-panel--active {
+   display: block;
+}
+
+@media (max-width: 480px) {
+   .exp-historial-tab {
+      flex: 1 1 100%;
+      justify-content: center;
+      font-size: 1.3rem;
+      padding: 0.6rem 1rem;
+   }
+}
