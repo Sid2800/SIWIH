@@ -8,7 +8,7 @@ Management command para probar el flujo completo de mapeo de camas:
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from ingreso.models import Ingreso
-from mapeo_camas.models import AsignacionCamaPaciente, HistorialEstadoCama
+from mapeo_camas.models import AsignacionCamaPaciente, HistorialEstadoCama, EstadoMapeo
 from paciente.models import Paciente
 from servicio.models import Servicio
 from django.utils import timezone
@@ -20,6 +20,10 @@ try:
     User = get_user_model()
 except ImportError:
     from usuario.models import User
+
+
+def get_estado_mapeo(codigo, categoria="ESTADO_CAMA"):
+    return EstadoMapeo.objects.get(codigo=codigo, categoria=categoria)
 
 
 class Command(BaseCommand):
@@ -90,6 +94,9 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.WARNING('  ⚠️ No hay servicios disponibles'))
                 raise Exception('Sin servicios disponibles')
             return servicio
+        except Exception:
+            self.stdout.write(self.style.WARNING('  ⚠️ Error obteniendo servicio'))
+            raise
 
     def _obtener_camas_prueba(self):
         """Obtiene dos camas disponibles."""
@@ -128,13 +135,14 @@ class Command(BaseCommand):
             )
         
         # Verificar resultados
+        estado_ocupada = get_estado_mapeo("OCUPADA")
         asignacion = AsignacionCamaPaciente.objects.get(
             paciente=paciente,
-            estado='OCUPADA'
+            estado=estado_ocupada
         )
         historial = HistorialEstadoCama.objects.filter(
             cama=cama,
-            estado='OCUPADA'
+            estado_nuevo=estado_ocupada
         ).last()
         
         self.stdout.write(self.style.SUCCESS('  ✓ Ingreso creado'))
@@ -150,9 +158,10 @@ class Command(BaseCommand):
         self.stdout.write(f'• Editando ingreso (cama anterior: {ingreso.cama.numero_cama} → cama nueva: {cama_nueva.numero_cama})...')
         
         cama_anterior = ingreso.cama
+        estado_ocupada = get_estado_mapeo("OCUPADA")
         asignacion_id_anterior = AsignacionCamaPaciente.objects.filter(
             paciente=ingreso.paciente,
-            estado='OCUPADA'
+            estado=estado_ocupada
         ).first().id
         
         with transaction.atomic():
@@ -171,19 +180,19 @@ class Command(BaseCommand):
         # Verificar resultados
         asignacion_actualizada = AsignacionCamaPaciente.objects.get(
             paciente=ingreso.paciente,
-            estado='OCUPADA'
+            estado=estado_ocupada
         )
         
         # Historial: debe haber VACIA (salida) y OCUPADA (entrada)
+        estado_vacia = get_estado_mapeo("VACIA")
         historial_salida = HistorialEstadoCama.objects.filter(
             cama=cama_anterior,
-            estado='VACIA'
-        ).order_by('-fecha_registro').first()
-        
+            estado_nuevo=estado_vacia
+        ).order_by('-fecha_hora').first()
         historial_entrada = HistorialEstadoCama.objects.filter(
             cama=cama_nueva,
-            estado='OCUPADA'
-        ).order_by('-fecha_registro').first()
+            estado_nuevo=estado_ocupada
+        ).order_by('-fecha_hora').first()
         
         self.stdout.write(self.style.SUCCESS('  ✓ Ingreso editado'))
         self.stdout.write(f'    - Asignacion anterior ID: {asignacion_id_anterior} (queda VACIA)')
@@ -199,6 +208,7 @@ class Command(BaseCommand):
         self.stdout.write('• Inactivando ingreso...')
         
         cama = ingreso.cama
+        estado_vacia = get_estado_mapeo("VACIA")
         
         with transaction.atomic():
             ingreso.estado = 2  # Inactivo
@@ -211,16 +221,16 @@ class Command(BaseCommand):
         # Verificar resultados
         asignacion_cerrada = AsignacionCamaPaciente.objects.get(
             paciente=ingreso.paciente,
-            estado='VACIA'
+            estado=estado_vacia
         )
         
         historial_vacia = HistorialEstadoCama.objects.filter(
             cama=cama,
-            estado='VACIA'
-        ).order_by('-fecha_registro').first()
+            estado_nuevo=estado_vacia
+        ).order_by('-fecha_hora').first()
         
         self.stdout.write(self.style.SUCCESS('  ✓ Ingreso inactivado'))
         self.stdout.write(f'    - AsignacionCamaPaciente: Estado VACIA')
         self.stdout.write(f'    - Fecha fin: {asignacion_cerrada.fecha_fin}')
         self.stdout.write(f'    - HistorialEstadoCama: Cama {cama.numero_cama} → VACIA')
-        self.stdout.write(f'    - Historial registrado: {historial_vacia.fecha_registro}')
+        self.stdout.write(f'    - Historial registrado: {historial_vacia.fecha_hora}')

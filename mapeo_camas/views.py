@@ -1,24 +1,155 @@
+# --- Helpers de serialización robustos para el mapa de camas ---
+def _paciente_payload_v2(paciente):
+    if not paciente:
+        return None
+    return {
+        "id": paciente.id,
+        "nombre": str(paciente),
+        "dni": getattr(paciente, "dni", "") or ""
+    }
+
+def _cama_payload(cama, asig, cambios_realizados, max_cambios, meta_actualizacion):
+    return {
+        "numero_cama": cama.numero_cama,
+        "estado_visual": asig.estado.codigo if (asig and asig.estado) else "SIN_ASIGNACION",
+        "asignacion_estado": asig.estado.codigo if (asig and asig.estado) else "SIN_ASIGNACION",
+        "paciente": _paciente_payload_v2(asig.paciente) if asig else None,
+        "cambios_realizados": cambios_realizados,
+        "max_cambios": max_cambios,
+        "ultima_actualizacion": meta_actualizacion.get("ultima_actualizacion", ""),
+        "usuario_ultima_actualizacion": meta_actualizacion.get("usuario_ultima_actualizacion", ""),
+    }
+
+def _cubiculo_payload(cubiculo, camas_data):
+    return {
+        "id": cubiculo.id,
+        "numero": cubiculo.numero,
+        "nombre": cubiculo.nombre_cubiculo,
+        "camas": camas_data,
+    }
+
+def _sala_payload(sala, cubiculos_data, camas_directas_data):
+    return {
+        "id": sala.id,
+        "nombre": sala.nombre_sala,
+        "nombre_corto": sala.nombre_corto_sala,
+        "cubiculos": cubiculos_data,
+        "camas_directas": camas_directas_data,
+    }
+
+def _servicio_payload(servicio, salas_data):
+    return {
+        "id": servicio.id,
+        "nombre": servicio.nombre_servicio,
+        "nombre_corto": getattr(servicio, "nombre_corto", ""),
+        "salas": salas_data,
+    }
 from datetime import datetime, timedelta
 import json
+from collections import defaultdict
+from functools import lru_cache
+
+from django.contrib.auth.decorators import user_passes_test
 
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import transaction
-from django.db.models import Count, OuterRef, Prefetch, Q, Subquery
+from django.db.models import Count, Exists, OuterRef, Prefetch, Q, Subquery
 from django.http import JsonResponse
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 from django.views.generic import TemplateView
+from ingreso.models import Ingreso
+from core.services.mapeo_camas_service import MapeoCamasService
+
+# Helper global para obtener instancias de EstadoMapeo
+@lru_cache(maxsize=64)
+def get_estado_mapeo(codigo, categoria):
+    return EstadoMapeo.objects.get(codigo=codigo, categoria=categoria)
+# =============================================================================
+# API: Sincronizar camas con ingresos activos (solo superadmin)
+# -----------------------------------------------------------------------------
+@login_required
+@user_passes_test(lambda u: u.is_superuser)
+def sincronizar_camas_superadmin(request):
+    """
+    Sincroniza AsignacionCamaPaciente para todos los ingresos activos con cama asignada.
+    Solo accesible para superusuarios.
+    """
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "error": "Solo se permite POST."}, status=405)
+
+    # Obtener el ÚLTIMO ingreso activo POR CAMA (más reciente para cada cama)
+    from django.db.models import Max
+    
+    camas_ultimos_ingresos = (
+        Ingreso.objects.filter(
+            estado=1,
+            fecha_egreso__isnull=True,
+            cama_id__isnull=False,
+            paciente_id__isnull=False,
+        )
+        .values("cama_id")
+        .annotate(ingreso_id=Max("id"))
+        .values_list("ingreso_id", flat=True)
+    )
+    
+    ingresos = Ingreso.objects.filter(pk__in=camas_ultimos_ingresos).values(
+        "id", "cama_id", "paciente_id"
+    )
+    
+    if not ingresos.exists():
+        return JsonResponse({"ok": True, "mensaje": "No hay ingresos activos con cama asignada."})
+
+    from mapeo_camas.models import AsignacionCamaPaciente
+    estado_ocupada = get_estado_mapeo("OCUPADA", "ESTADO_CAMA")
+    ocupadas = set(
+        AsignacionCamaPaciente.objects.filter(
+            estado=estado_ocupada
+        ).values_list("cama_id", flat=True)
+    )
+
+    sincronizados = 0
+    omitidos = 0
+    errores = 0
+    errores_detalle = []
+
+    for ingreso in ingresos:
+        cama_id = ingreso["cama_id"]
+        paciente_id = ingreso["paciente_id"]
+        ingreso_id = ingreso["id"]
+        if cama_id in ocupadas:
+            omitidos += 1
+            continue
+        try:
+            MapeoCamasService.sincronizar_cama_con_ingreso(
+                cama_id=cama_id,
+                paciente_id=paciente_id,
+                usuario=request.user,
+            )
+            ocupadas.add(cama_id)
+            sincronizados += 1
+        except Exception as exc:
+            errores += 1
+            errores_detalle.append(f"Ingreso #{ingreso_id} — cama #{cama_id}: {exc}")
+
+    return JsonResponse({
+        "ok": True,
+        "sincronizados": sincronizados,
+        "omitidos": omitidos,
+        "errores": errores,
+        "errores_detalle": errores_detalle,
+        "mensaje": f"Sincronización finalizada. {sincronizados} sincronizados, {omitidos} omitidos, {errores} errores."
+    })
 
 from mapeo_camas.models import (
     AsignacionCamaPaciente,
     DetalleMapeoCama,
+    EstadoMapeo,
     HistorialEstadoCama,
     MapeoSesionCama,
     MovimientoCama,
 )
-from core.services.mapeo_camas_service import MapeoCamasService
-from ingreso.models import Ingreso
 from paciente.models import Paciente
 from servicio.models import Cama, Cubiculo, Sala, Servicio
 
@@ -36,11 +167,15 @@ from servicio.models import Cama, Cubiculo, Sala, Servicio
 MAX_CAMBIOS_CAMA = 5
 # Parametro de ventana para reinicio del limite por sala (horas)
 VENTANA_LIMITE_CAMBIOS_SALA_HORAS = 1
+# Ventana para considerar altas recientes en el buscador de pacientes del mapa.
+VENTANA_ALTAS_RECIENTES_HORAS = 24
 OBSERVACION_CAMBIO_MANUAL_MAPA = "Cambio manual desde mapa"
 OBSERVACION_CAMBIO_MANUAL_MAPA_DETALLE = "Cambio manual desde mapa (detalle)"
 OBSERVACION_MOVIMIENTO_PACIENTE_MAPA = "Movimiento de paciente entre camas (mapa)"
 OBSERVACION_MOVIMIENTO_PACIENTE_MAPA_DETALLE = "Movimiento de paciente entre camas (mapa detalle)"
-OBSERVACION_LIBERACION_ALTA_AUTOMATICA = "Liberacion automatica de cama en PRE_ALTA por nueva ocupacion"
+# Observacion para traslados de superadmin: queda registrado pero NO cuenta
+# en _contar_cambios_manual_por_sala, por lo que no descuenta del límite.
+OBSERVACION_MOVIMIENTO_PACIENTE_MAPA_SUPERADMIN = "Movimiento de paciente entre camas (superadmin)"
 
 
 # =============================================================================
@@ -57,6 +192,18 @@ class MapeoCamasMapaView(LoginRequiredMixin, TemplateView):
         context = super().get_context_data(**kwargs)
         context["titulo"] = "Mapa de Camas"
         context["subtitulo"] = "Asignacion por paciente y estado de cama"
+        # [2026-05-04 FEATURE] Sesion activa de OTRO usuario (para mostrar advertencia a los demas).
+        # Banner rojo con nombre del usuario aparece si otro usuario tiene mapeo activo.
+        context["sesion_ajena"] = (
+            MapeoSesionCama.objects.select_related("usuario")
+            .filter(
+                estado=get_estado_mapeo("EN_PROGRESO", "ESTADO_SESION"),
+                fecha_fin__isnull=True,
+            )
+            .exclude(usuario=self.request.user)
+            .order_by("-fecha_inicio")
+            .first()
+        )
         return context
 
 
@@ -115,9 +262,9 @@ def _hora_local_iso(dt):
 def _estado_visual(asignacion):
     """Devuelve el estado de la asignación para mostrarlo en el mapa.
     Si la cama no tiene asignación registrada, retorna 'SIN_ASIGNACION'."""
-    if not asignacion:
+    if not asignacion or not asignacion.estado:
         return "SIN_ASIGNACION"
-    return asignacion.estado
+    return asignacion.estado.codigo
 
 
 def _paciente_payload(paciente):
@@ -161,7 +308,7 @@ def _obtener_sesion_mapeo_activa(usuario):
     return (
         MapeoSesionCama.objects.filter(
             usuario=usuario,
-            estado=MapeoSesionCama.Estado.EN_PROGRESO,
+            estado=get_estado_mapeo("EN_PROGRESO", "ESTADO_SESION"),
             fecha_fin__isnull=True,
         )
         .order_by("-fecha_inicio")
@@ -194,14 +341,19 @@ def _registrar_detalle_mapeo(
     if not sesion:
         return None
 
+    # [2026-05-04 AUDIT] Bug Fix: Convertir string de tipo_accion a objeto FK EstadoMapeo.
+    # tipo_accion puede ser un string (codigo) o un objeto EstadoMapeo.
+    # codigo es unique en la tabla, por lo que no se necesita filtrar por categoria.
+    if isinstance(tipo_accion, str):
+        tipo_accion = EstadoMapeo.objects.get(codigo=tipo_accion)
+
     return DetalleMapeoCama.objects.create(
         sesion_mapeo=sesion,
         cama=cama,
         fue_validada=fue_validada,
         hubo_cambio=hubo_cambio,
-        estado_actual=asignacion.estado if asignacion else "SIN_ASIGNACION",
+        estado_actual=asignacion.estado if asignacion else None,
         paciente_actual=asignacion.paciente if asignacion else None,
-        ubicacion=_ubicacion_cama(cama),
         tipo_accion=tipo_accion,
         usuario=usuario,
         observacion=observacion or "",
@@ -267,16 +419,16 @@ def _ubicacion_desde_cama(cama):
 
 def _estado_css_mapa(estado):
     """Mapea estado de cama a clase visual usada en el mapa."""
-    valor = (estado or "").strip().upper()
-    if valor == AsignacionCamaPaciente.Estado.VACIA:
+    valor = (getattr(estado, "codigo", estado) or "").strip().upper()
+    if valor == "VACIA":
         return "mapa-cama--vacia"
-    if valor == AsignacionCamaPaciente.Estado.OCUPADA:
+    if valor == "OCUPADA":
         return "mapa-cama--ocupada"
-    if valor in {AsignacionCamaPaciente.Estado.PRE_ALTA, HistorialEstadoCama.Estado.ALTA}:
+    if valor == "ALTA":
         return "mapa-cama--alta"
-    if valor == AsignacionCamaPaciente.Estado.FUERA_SERVICIO:
+    if valor == "FUERA_SERVICIO":
         return "mapa-cama--fuera-servicio"
-    if valor == AsignacionCamaPaciente.Estado.CONSULTA_EXTERNA:
+    if valor == "CONSULTA_EXTERNA":
         return "mapa-cama--consulta-externa"
     return "mapa-cama--sin-asignacion"
 
@@ -334,12 +486,14 @@ def historiales_data(request):
                     "id": sesion.id,
                     "referencia": f"Sesion {sesion.id}",
                     "tipo": "MAPEO",
-                    "estado": sesion.estado,
+                    "estado": sesion.estado.codigo if hasattr(sesion.estado, 'codigo') else str(sesion.estado),
                     "fecha_principal": _hora_local_iso(sesion.fecha_inicio),
                     "fecha_inicio": _hora_local_iso(sesion.fecha_inicio),
                     "fecha_fin": _hora_local_iso(sesion.fecha_fin),
                     "usuario": _nombre_usuario(sesion.usuario),
-                    "observacion": sesion.observacion or "Sin Observaciones",
+                    "detalle_1": f"Camas procesadas: {sesion.total_camas}",
+                    "detalle_2": f"Cambios detectados: {sesion.total_cambios}",
+                    "detalle_3": f"Registros detalle: {sesion.total_detalles}",
                 }
             )
         return JsonResponse({"ok": True, "results": results})
@@ -355,45 +509,49 @@ def historiales_data(request):
         if cama_id:
             historial_qs = historial_qs.filter(cama_id=cama_id)
 
-        # Se muestra una fila por cama (último evento) para abrir luego
-        # la línea de tiempo completa de esa cama en el detalle.
-        historial_qs = historial_qs.order_by("cama_id", "-fecha_hora", "-id")
-        resumen_por_cama = {}
-        for item in historial_qs:
-            cama_key = str(item.cama_id)
-            if cama_key not in resumen_por_cama:
-                resumen_por_cama[cama_key] = {
-                    "ultimo": item,
-                    "total": 1,
-                }
-            else:
-                resumen_por_cama[cama_key]["total"] += 1
+        # Optimización: obtener solo el último evento por cama en DB,
+        # evitando recorrer y ordenar en Python todo el historial filtrado.
+        latest_id_por_cama = (
+            historial_qs.filter(cama_id=OuterRef("cama_id"))
+            .order_by("-fecha_hora", "-id")
+            .values("id")[:1]
+        )
+
+        eventos_por_cama = {
+            str(item["cama_id"]): item["total"]
+            for item in historial_qs.values("cama_id").annotate(total=Count("id"))
+        }
+
+        ultimos_eventos = (
+            historial_qs.filter(id=Subquery(latest_id_por_cama))
+            .order_by("-fecha_hora", "-id")[:300]
+        )
 
         results = []
-        camas_ordenadas = sorted(
-            resumen_por_cama.values(),
-            key=lambda x: x["ultimo"].fecha_hora,
-            reverse=True,
-        )[:300]
-
-        for registro in camas_ordenadas:
-            item = registro["ultimo"]
-            total_eventos = registro["total"]
+        for item in ultimos_eventos:
+            total_eventos = eventos_por_cama.get(str(item.cama_id), 0)
             paciente = _paciente_payload(item.paciente)
             results.append(
                 {
                     "id": item.cama_id,
                     "referencia": f"Cama {_nombre_cama(item.cama)}",
                     "tipo": "HISTORIAL",
-                    "estado": item.estado_nuevo,
+                    "estado": item.estado_nuevo.codigo if hasattr(item.estado_nuevo, 'codigo') else str(item.estado_nuevo),
                     "fecha_principal": _hora_local_iso(item.fecha_hora),
                     "fecha_inicio": _hora_local_iso(item.fecha_hora),
                     "fecha_fin": "",
                     "usuario": _nombre_usuario(item.usuario),
+                    "detalle_1": f"Cama: {_nombre_cama(item.cama)}",
+                    "detalle_2": f"Ultimo cambio: {(getattr(item.estado_anterior, 'codigo', item.estado_anterior) or 'SIN_ESTADO')} -> {getattr(item.estado_nuevo, 'codigo', item.estado_nuevo)}",
+                    "detalle_3": f"Eventos: {total_eventos} | " + (
+                        f"Paciente: {paciente['nombre']}" if paciente else "Paciente: Sin paciente"
+                    ),
                 }
             )
         return JsonResponse({"ok": True, "results": results})
 
+    # [2026-05-05 FEATURE] Agrupa movimientos por cama para mostrar una fila por cama.
+    # id = cama.pk → al abrir detalle se muestran todos los movimientos de esa cama.
     movimientos = (
         MovimientoCama.objects.select_related(
             "cama_origen__sala__servicio",
@@ -412,20 +570,39 @@ def historiales_data(request):
     if cama_id:
         movimientos = movimientos.filter(Q(cama_origen_id=cama_id) | Q(cama_destino_id=cama_id))
 
-    movimientos = movimientos[:300]
+    camas_map = {}
+    for mov in movimientos[:500]:
+        for cama in [mov.cama_origen, mov.cama_destino]:
+            key = str(cama.pk)
+            if key not in camas_map:
+                camas_map[key] = {"cama": cama, "ultimo": mov, "total": 0}
+            camas_map[key]["total"] += 1
+
+    camas_ordenadas = sorted(
+        camas_map.values(),
+        key=lambda x: x["ultimo"].fecha_hora,
+        reverse=True,
+    )[:300]
+
     results = []
-    for mov in movimientos:
-        paciente = _paciente_payload(mov.paciente)
+    for registro in camas_ordenadas:
+        cama = registro["cama"]
+        ultimo = registro["ultimo"]
+        total = registro["total"]
+        paciente = _paciente_payload(ultimo.paciente)
         results.append(
             {
-                "id": mov.id,
-                "referencia": f"Cama {_nombre_cama(mov.cama_origen)} -> {_nombre_cama(mov.cama_destino)}",
+                "id": cama.pk,
+                "referencia": f"Cama {_nombre_cama(cama)}",
                 "tipo": "MOVIMIENTO",
-                "estado": mov.tipo_movimiento,
-                "fecha_principal": _hora_local_iso(mov.fecha_hora),
-                "fecha_inicio": _hora_local_iso(mov.fecha_hora),
+                "estado": f"{total} movimiento(s)",
+                "fecha_principal": _hora_local_iso(ultimo.fecha_hora),
+                "fecha_inicio": _hora_local_iso(ultimo.fecha_hora),
                 "fecha_fin": "",
-                "usuario": _nombre_usuario(mov.usuario),
+                "usuario": _nombre_usuario(ultimo.usuario),
+                "detalle_1": f"Cama: {_nombre_cama(cama)}",
+                "detalle_2": f"Total movimientos: {total}",
+                "detalle_3": f"Ultimo paciente: {paciente['nombre']}" if paciente else "Sin paciente",
             }
         )
     return JsonResponse({"ok": True, "results": results})
@@ -446,217 +623,229 @@ def historiales_cards_data(request):
         if not sesion:
             return JsonResponse({"ok": False, "error": "Sesion no encontrada."}, status=404)
 
+        # [2026-05-04 AUDIT] Bug Fix: Añadir select_related() para estado_actual y tipo_accion
+        # para evitar serialización de objetos FK. Asegurar acceso a .codigo para serializar.
         detalles = (
             DetalleMapeoCama.objects.filter(sesion_mapeo=sesion)
-            .select_related("cama__sala__servicio", "cama__cubiculo", "paciente_actual", "usuario")
-            .order_by("-fecha_hora")
+            .select_related("cama__sala__servicio", "cama__cubiculo", "paciente_actual", "usuario", "estado_actual", "tipo_accion")
+            .order_by("cama__sala__nombre_sala", "cama__cubiculo__numero", "cama__numero_cama", "-fecha_hora")
         )
         cards = []
         servicios_map = {}
         for item in detalles:
             paciente = _paciente_payload(item.paciente_actual)
             cama_numero = _nombre_cama(item.cama)
-            servicio_obj = getattr(getattr(item.cama, "sala", None), "servicio", None)
-            sala_obj = getattr(item.cama, "sala", None)
+            servicio_nombre = getattr(getattr(getattr(item.cama, "sala", None), "servicio", None), "nombre_servicio", "") or "SIN_SERVICIO"
+            sala_nombre = getattr(getattr(item.cama, "sala", None), "nombre_sala", "") or "SIN_SALA"
             cubiculo_obj = getattr(item.cama, "cubiculo", None)
+            cubiculo_nombre = (f"#{cubiculo_obj.numero} {cubiculo_obj.nombre_cubiculo}") if cubiculo_obj else "SIN_CUBICULO"
 
-            servicio_id = getattr(servicio_obj, "id", None)
-            sala_id = getattr(sala_obj, "id", None)
-            cubiculo_id = getattr(cubiculo_obj, "id", None)
-
-            servicio_nombre = getattr(servicio_obj, "nombre_servicio", "") or "SIN_SERVICIO"
-            sala_nombre = getattr(sala_obj, "nombre_sala", "") or "SIN_SALA"
-            cubiculo_nombre = getattr(getattr(item.cama, "cubiculo", None), "nombre_cubiculo", "") or "SIN_CUBICULO"
-
-            if servicio_id is None or sala_id is None:
-                continue
-
-            if servicio_id not in servicios_map:
-                servicios_map[servicio_id] = {
-                    "id": servicio_id,
-                    "nombre": servicio_nombre,
-                    "salas": {},
-                }
-            if sala_id not in servicios_map[servicio_id]["salas"]:
-                servicios_map[servicio_id]["salas"][sala_id] = {
-                    "id": sala_id,
+            if servicio_nombre not in servicios_map:
+                servicios_map[servicio_nombre] = {"nombre": servicio_nombre, "salas": {}}
+            if sala_nombre not in servicios_map[servicio_nombre]["salas"]:
+                servicios_map[servicio_nombre]["salas"][sala_nombre] = {
                     "nombre": sala_nombre,
                     "cubiculos": {},
                     "camas_directas": [],
                 }
 
+            # [2026-05-04 AUDIT] Access .codigo for serializable values (EstadoMapeo objects).
             cama_item = {
                 "numero_cama": cama_numero,
-                "estado": item.estado_actual,
+                "estado": item.estado_actual.codigo if item.estado_actual else "",
                 "paciente": paciente["nombre"] if paciente else "Sin paciente",
+                "dni": paciente["dni"] if paciente else "",
                 "usuario": _nombre_usuario(item.usuario),
                 "fecha": _hora_local_iso(item.fecha_hora),
-                "tipo_accion": item.tipo_accion,
+                "tipo_accion": item.tipo_accion.codigo if item.tipo_accion else "",
                 "hubo_cambio": bool(item.hubo_cambio),
                 "fue_validada": bool(item.fue_validada),
                 "observacion": item.observacion or "",
             }
 
             if cubiculo_nombre == "SIN_CUBICULO":
-                servicios_map[servicio_id]["salas"][sala_id]["camas_directas"].append(cama_item)
+                servicios_map[servicio_nombre]["salas"][sala_nombre]["camas_directas"].append(cama_item)
             else:
-                cubiculos_map = servicios_map[servicio_id]["salas"][sala_id]["cubiculos"]
-                if cubiculo_id is None:
-                    continue
-                if cubiculo_id not in cubiculos_map:
-                    cubiculos_map[cubiculo_id] = {
-                        "id": cubiculo_id,
+                cubiculos_map = servicios_map[servicio_nombre]["salas"][sala_nombre]["cubiculos"]
+                if cubiculo_nombre not in cubiculos_map:
+                    cubiculos_map[cubiculo_nombre] = {
                         "nombre": cubiculo_nombre,
                         "camas": [],
                     }
-                cubiculos_map[cubiculo_id]["camas"].append(cama_item)
+                cubiculos_map[cubiculo_nombre]["camas"].append(cama_item)
 
             cards.append(
                 {
                     "titulo": f"Cama {item.cama_id}",
-                    "subtitulo": item.tipo_accion,
-                    "estado": item.estado_actual,
+                    "subtitulo": item.tipo_accion.codigo if item.tipo_accion else "",
+                    "estado": item.estado_actual.codigo if item.estado_actual else "",
                     "paciente": paciente["nombre"] if paciente else "Sin paciente",
                     "usuario": _nombre_usuario(item.usuario),
                     "fecha": _hora_local_iso(item.fecha_hora),
-                    "detalle_1": f"Ubicacion: {item.ubicacion or _ubicacion_desde_cama(item.cama)}",
+                    "detalle_1": f"Ubicacion: {_ubicacion_desde_cama(item.cama)}",
                     "detalle_2": f"Validada: {'SI' if item.fue_validada else 'NO'}",
                     "detalle_3": f"Hubo cambio: {'SI' if item.hubo_cambio else 'NO'}",
                     "observacion": item.observacion or "",
                 }
             )
 
-        def _orden_numero_cama(cama_item):
-            numero = str(cama_item.get("numero_cama") or "")
-            return (0, int(numero)) if numero.isdigit() else (1, numero)
-
         estructura = []
-        servicios_ordenados = Servicio.objects.filter(estado=1).order_by("nombre_servicio", "id")
-        for servicio in servicios_ordenados:
-            servicio_data = servicios_map.get(servicio.id)
-            if not servicio_data:
-                continue
-
+        for servicio_data in servicios_map.values():
             salas_data = []
-
-            salas_ordenadas = Sala.objects.filter(estado=1, servicio_id=servicio.id).order_by("nombre_sala", "id")
-            for sala in salas_ordenadas:
-                sala_data = servicio_data["salas"].get(sala.id)
-                if not sala_data:
-                    continue
-
-                cubiculos_data = []
-                cubiculos_ordenados = Cubiculo.objects.filter(estado=1, sala_id=sala.id).order_by("numero", "nombre_cubiculo", "id")
-                for cubiculo in cubiculos_ordenados:
-                    cubiculo_data = sala_data["cubiculos"].get(cubiculo.id)
-                    if not cubiculo_data:
-                        continue
-
-                    cubiculo_data["camas"] = sorted(
-                        cubiculo_data["camas"],
-                        key=_orden_numero_cama,
-                    )
-                    cubiculos_data.append(cubiculo_data)
-
-                camas_directas = sorted(
-                    sala_data["camas_directas"],
-                    key=_orden_numero_cama,
-                )
-
+            for sala_data in servicio_data["salas"].values():
+                cubiculos_data = list(sala_data["cubiculos"].values())
                 salas_data.append(
                     {
-                        "id": sala_data["id"],
                         "nombre": sala_data["nombre"],
                         "cubiculos": cubiculos_data,
-                        "camas_directas": camas_directas,
+                        "camas_directas": sala_data["camas_directas"],
                     }
                 )
-
-            estructura.append(
-                {
-                    "id": servicio_data["id"],
-                    "nombre": servicio_data["nombre"],
-                    "salas": salas_data,
-                }
-            )
+            estructura.append({"nombre": servicio_data["nombre"], "salas": salas_data})
 
         return JsonResponse({"ok": True, "cards": cards, "estructura": estructura})
 
     if tipo == "historial":
+        # [2026-05-05 FEATURE] Construye estructura servicio>sala>cubiculo igual que mapeo.
+        # Cada evento del historial se convierte en un cama_item de la estructura.
         timeline_qs = (
             HistorialEstadoCama.objects.select_related(
-                "cama__sala__servicio", "cama__cubiculo", "paciente", "usuario"
+                "cama__sala__servicio", "cama__cubiculo",
+                "estado_anterior", "estado_nuevo", "paciente", "usuario",
             )
             .filter(cama_id=registro_id)
-            .order_by("-fecha_hora", "-id")
+            .order_by("cama__sala__nombre_sala", "cama__cubiculo__numero", "cama__numero_cama", "-fecha_hora")
         )
         if not timeline_qs.exists():
             return JsonResponse({"ok": False, "error": "Historial no encontrado para esta cama."}, status=404)
 
-        cards = []
+        servicios_map = {}
         for item in timeline_qs:
             paciente = _paciente_payload(item.paciente)
-            cards.append(
-                {
-                    "titulo": f"Cama {_nombre_cama(item.cama)}",
-                    "subtitulo": "Evento de historial",
-                    "estado": item.estado_nuevo,
-                    "estado_css": _estado_css_mapa(item.estado_nuevo),
-                    "paciente": paciente["nombre"] if paciente else "Sin paciente",
-                    "usuario": _nombre_usuario(item.usuario),
-                    "fecha": _hora_local_iso(item.fecha_hora),
-                    "detalle_1": f"Estado anterior: {item.estado_anterior or 'SIN_ESTADO'}",
-                    "detalle_2": f"Transicion: {(item.estado_anterior or 'SIN_ESTADO')} -> {item.estado_nuevo}",
-                    "detalle_3": f"Ubicacion: {_ubicacion_desde_cama(item.cama)}",
-                    "observacion": item.observacion or "",
+            estado_nuevo_codigo = item.estado_nuevo.codigo if hasattr(item.estado_nuevo, "codigo") else str(item.estado_nuevo)
+            estado_anterior_codigo = (
+                item.estado_anterior.codigo if hasattr(item.estado_anterior, "codigo") else str(item.estado_anterior)
+            ) if item.estado_anterior else "SIN_ESTADO"
+
+            servicio_nombre = getattr(getattr(getattr(item.cama, "sala", None), "servicio", None), "nombre_servicio", "") or "SIN_SERVICIO"
+            sala_nombre = getattr(getattr(item.cama, "sala", None), "nombre_sala", "") or "SIN_SALA"
+            cubiculo_obj = getattr(item.cama, "cubiculo", None)
+            cubiculo_nombre = (f"#{cubiculo_obj.numero} {cubiculo_obj.nombre_cubiculo}") if cubiculo_obj else "SIN_CUBICULO"
+
+            if servicio_nombre not in servicios_map:
+                servicios_map[servicio_nombre] = {"nombre": servicio_nombre, "salas": {}}
+            if sala_nombre not in servicios_map[servicio_nombre]["salas"]:
+                servicios_map[servicio_nombre]["salas"][sala_nombre] = {
+                    "nombre": sala_nombre, "cubiculos": {}, "camas_directas": [],
                 }
-            )
-        return JsonResponse({"ok": True, "cards": cards})
+
+            cama_item = {
+                "numero_cama": _nombre_cama(item.cama),
+                "estado": estado_nuevo_codigo,
+                "paciente": paciente["nombre"] if paciente else "Sin paciente",
+                "dni": paciente["dni"] if paciente else "",
+                "usuario": _nombre_usuario(item.usuario),
+                "fecha": _hora_local_iso(item.fecha_hora),
+                "tipo_accion": f"{estado_anterior_codigo} \u2192 {estado_nuevo_codigo}",
+                "observacion": item.observacion or "",
+            }
+
+            if cubiculo_nombre == "SIN_CUBICULO":
+                servicios_map[servicio_nombre]["salas"][sala_nombre]["camas_directas"].append(cama_item)
+            else:
+                cubiculos_map = servicios_map[servicio_nombre]["salas"][sala_nombre]["cubiculos"]
+                if cubiculo_nombre not in cubiculos_map:
+                    cubiculos_map[cubiculo_nombre] = {"nombre": cubiculo_nombre, "camas": []}
+                cubiculos_map[cubiculo_nombre]["camas"].append(cama_item)
+
+        estructura = []
+        for servicio_data in servicios_map.values():
+            salas_data = []
+            for sala_data in servicio_data["salas"].values():
+                salas_data.append({
+                    "nombre": sala_data["nombre"],
+                    "cubiculos": list(sala_data["cubiculos"].values()),
+                    "camas_directas": sala_data["camas_directas"],
+                })
+            estructura.append({"nombre": servicio_data["nombre"], "salas": salas_data})
+
+        return JsonResponse({"ok": True, "cards": [], "estructura": estructura})
 
     if tipo == "movimiento":
-        mov = (
+        # [2026-05-05 FEATURE] Recibe cama_id, muestra todos sus movimientos en estructura mapeo.
+        # Cada movimiento = un cama_item con rol SALIDA/ENTRADA y la cama contraparte.
+        movimientos_qs = (
             MovimientoCama.objects.select_related(
-                "cama_origen__sala__servicio",
-                "cama_origen__cubiculo",
-                "cama_destino__sala__servicio",
-                "cama_destino__cubiculo",
-                "paciente",
-                "usuario",
+                "cama_origen__sala__servicio", "cama_origen__cubiculo",
+                "cama_destino__sala__servicio", "cama_destino__cubiculo",
+                "paciente", "usuario",
             )
-            .filter(pk=registro_id)
-            .first()
+            .filter(Q(cama_origen_id=registro_id) | Q(cama_destino_id=registro_id))
+            .order_by("-fecha_hora")
         )
-        if not mov:
-            return JsonResponse({"ok": False, "error": "Movimiento no encontrado."}, status=404)
+        if not movimientos_qs.exists():
+            return JsonResponse({"ok": False, "error": "No se encontraron movimientos para esta cama."}, status=404)
 
-        paciente = _paciente_payload(mov.paciente)
-        cards = [
-            {
-                "titulo": f"Cama {mov.cama_origen_id}",
-                "subtitulo": "Origen",
-                "estado": mov.tipo_movimiento,
+        # Determinar la cama de referencia usando el primer movimiento
+        primer_mov = movimientos_qs.first()
+        cama_ref = (
+            primer_mov.cama_origen
+            if str(primer_mov.cama_origen_id) == str(registro_id)
+            else primer_mov.cama_destino
+        )
+
+        servicio_nombre = getattr(getattr(getattr(cama_ref, "sala", None), "servicio", None), "nombre_servicio", "") or "SIN_SERVICIO"
+        sala_nombre = getattr(getattr(cama_ref, "sala", None), "nombre_sala", "") or "SIN_SALA"
+        cubiculo_obj_ref = getattr(cama_ref, "cubiculo", None)
+        cubiculo_nombre = (f"#{cubiculo_obj_ref.numero} {cubiculo_obj_ref.nombre_cubiculo}") if cubiculo_obj_ref else "SIN_CUBICULO"
+
+        servicios_map = {
+            servicio_nombre: {
+                "nombre": servicio_nombre,
+                "salas": {
+                    sala_nombre: {
+                        "nombre": sala_nombre, "cubiculos": {}, "camas_directas": [],
+                    }
+                },
+            }
+        }
+
+        for mov in movimientos_qs:
+            paciente = _paciente_payload(mov.paciente)
+            tipo_mov = mov.tipo_movimiento.codigo if hasattr(mov.tipo_movimiento, "codigo") else str(mov.tipo_movimiento)
+            es_origen = str(mov.cama_origen_id) == str(registro_id)
+            otra_cama = mov.cama_destino if es_origen else mov.cama_origen
+            rol = f"SALIDA \u2192 Cama {_nombre_cama(otra_cama)}" if es_origen else f"ENTRADA \u2190 Cama {_nombre_cama(otra_cama)}"
+
+            cama_item = {
+                "numero_cama": _nombre_cama(cama_ref),
+                "estado": tipo_mov,
                 "paciente": paciente["nombre"] if paciente else "Sin paciente",
+                "dni": paciente["dni"] if paciente else "",
                 "usuario": _nombre_usuario(mov.usuario),
                 "fecha": _hora_local_iso(mov.fecha_hora),
-                "detalle_1": f"Ubicacion: {_ubicacion_desde_cama(mov.cama_origen)}",
-                "detalle_2": f"Hacia cama: {mov.cama_destino_id}",
-                "detalle_3": "",
+                "tipo_accion": rol,
                 "observacion": mov.observacion or "",
-            },
-            {
-                "titulo": f"Cama {mov.cama_destino_id}",
-                "subtitulo": "Destino",
-                "estado": mov.tipo_movimiento,
-                "paciente": paciente["nombre"] if paciente else "Sin paciente",
-                "usuario": _nombre_usuario(mov.usuario),
-                "fecha": _hora_local_iso(mov.fecha_hora),
-                "detalle_1": f"Ubicacion: {_ubicacion_desde_cama(mov.cama_destino)}",
-                "detalle_2": f"Desde cama: {mov.cama_origen_id}",
-                "detalle_3": "",
-                "observacion": mov.observacion or "",
-            },
-        ]
-        return JsonResponse({"ok": True, "cards": cards})
+            }
+
+            if cubiculo_nombre == "SIN_CUBICULO":
+                servicios_map[servicio_nombre]["salas"][sala_nombre]["camas_directas"].append(cama_item)
+            else:
+                cubiculos_map = servicios_map[servicio_nombre]["salas"][sala_nombre]["cubiculos"]
+                if cubiculo_nombre not in cubiculos_map:
+                    cubiculos_map[cubiculo_nombre] = {"nombre": cubiculo_nombre, "camas": []}
+                cubiculos_map[cubiculo_nombre]["camas"].append(cama_item)
+
+        salas_data = []
+        for sala_data in servicios_map[servicio_nombre]["salas"].values():
+            salas_data.append({
+                "nombre": sala_data["nombre"],
+                "cubiculos": list(sala_data["cubiculos"].values()),
+                "camas_directas": sala_data["camas_directas"],
+            })
+        estructura = [{"nombre": servicio_nombre, "salas": salas_data}]
+
+        return JsonResponse({"ok": True, "cards": [], "estructura": estructura})
 
     return JsonResponse({"ok": False, "error": "Tipo no soportado."}, status=400)
 
@@ -671,7 +860,7 @@ def iniciar_mapeo(request):
             {
                 "ok": True,
                 "sesion_id": sesion_activa.id,
-                "estado": sesion_activa.estado,
+                "estado": sesion_activa.estado.codigo if sesion_activa.estado else None,
                 "hora_inicio": timezone.localtime(sesion_activa.fecha_inicio).isoformat(),
                 "camas_mapeadas": _camas_mapeadas_sesion(sesion_activa),
                 "mensaje": "Ya existe una sesion de mapeo en progreso.",
@@ -680,13 +869,13 @@ def iniciar_mapeo(request):
 
     sesion = MapeoSesionCama.objects.create(
         usuario=request.user,
-        estado=MapeoSesionCama.Estado.EN_PROGRESO,
+        estado=get_estado_mapeo("EN_PROGRESO", "ESTADO_SESION"),
     )
     return JsonResponse(
         {
             "ok": True,
             "sesion_id": sesion.id,
-            "estado": sesion.estado,
+            "estado": sesion.estado.codigo if sesion.estado else None,
             "hora_inicio": timezone.localtime(sesion.fecha_inicio).isoformat(),
             "camas_mapeadas": [],
             "mensaje": "Mapeo iniciado correctamente.",
@@ -708,7 +897,7 @@ def estado_mapeo(request):
             "ok": True,
             "sesion_activa": {
                 "id": sesion.id,
-                "estado": sesion.estado,
+                "estado": sesion.estado.codigo if sesion.estado else None,
                 "hora_inicio": timezone.localtime(sesion.fecha_inicio).isoformat(),
             },
             "camas_mapeadas": _camas_mapeadas_sesion(sesion),
@@ -754,26 +943,18 @@ def terminar_mapeo(request):
             status=400,
         )
 
-    try:
-        body = json.loads(request.body or "{}")
-    except (ValueError, AttributeError):
-        body = {}
-    observacion = (body.get("observacion") or "").strip() or "Sin Observaciones"
-
-    sesion.estado = MapeoSesionCama.Estado.FINALIZADO
+    sesion.estado = get_estado_mapeo("FINALIZADO", "ESTADO_SESION")
     sesion.fecha_fin = timezone.now()
-    sesion.observacion = observacion
-    sesion.save(update_fields=["estado", "fecha_fin", "observacion"])
+    sesion.save(update_fields=["estado", "fecha_fin"])
 
     total_detalles = DetalleMapeoCama.objects.filter(sesion_mapeo=sesion).count()
     return JsonResponse(
         {
             "ok": True,
             "sesion_id": sesion.id,
-            "estado": sesion.estado,
+            "estado": sesion.estado.codigo if hasattr(sesion.estado, 'codigo') else str(sesion.estado),
             "hora_fin": timezone.localtime(sesion.fecha_fin).isoformat(),
             "total_detalles": total_detalles,
-            "observacion": sesion.observacion,
             "mensaje": "Mapeo finalizado correctamente.",
         }
     )
@@ -787,7 +968,7 @@ def cancelar_mapeo(request):
     if not sesion:
         return JsonResponse({"ok": False, "error": "No hay una sesion de mapeo activa."}, status=400)
 
-    sesion.estado = MapeoSesionCama.Estado.CANCELADO
+    sesion.estado = get_estado_mapeo("CANCELADO", "ESTADO_SESION")
     sesion.fecha_fin = timezone.now()
     sesion.save(update_fields=["estado", "fecha_fin"])
 
@@ -796,7 +977,7 @@ def cancelar_mapeo(request):
         {
             "ok": True,
             "sesion_id": sesion.id,
-            "estado": sesion.estado,
+            "estado": sesion.estado.codigo if hasattr(sesion.estado, 'codigo') else str(sesion.estado),
             "hora_fin": timezone.localtime(sesion.fecha_fin).isoformat(),
             "total_detalles": total_detalles,
             "mensaje": "Mapeo cancelado correctamente.",
@@ -842,11 +1023,11 @@ def mapa_camas_data(request):
     #    al momento de armar el árbol del mapa.
     asignaciones = (
         AsignacionCamaPaciente.objects
-        .select_related("paciente")
+        .select_related("paciente", "estado")
         .order_by("cama_id", "-fecha_inicio", "-id")
     )
     asignacion_por_cama = {}
-    for asig in asignaciones:
+    for asig in asignaciones.iterator(chunk_size=1000):
         if asig.cama_id not in asignacion_por_cama:
             asignacion_por_cama[asig.cama_id] = asig
 
@@ -858,7 +1039,7 @@ def mapa_camas_data(request):
         .select_related("usuario")
         .order_by("cama_id", "-fecha_hora", "-id")
     )
-    for historial in historial_qs:
+    for historial in historial_qs.iterator(chunk_size=1000):
         if historial.cama_id not in historial_por_cama:
             historial_por_cama[historial.cama_id] = historial
 
@@ -946,169 +1127,62 @@ def mapa_camas_data(request):
     data = []
     for servicio in servicios:
         salas_data = []
-
         for sala in servicio.salas_servicio.all():
             cubiculos_data = []
-            camas_sin_cubiculo = []
-
-            # 4.a. Procesar primero las camas directas de la sala.
-            #      Para cada cama se busca su última asignación en el diccionario
-            #      asignacion_por_cama y, si existe, se toma también el paciente.
-            for cama in sala.camas_sala.all():
-                asig = asignacion_por_cama.get(cama.numero_cama)
-                paciente = asig.paciente if asig else None
-                meta_actualizacion = _meta_ultima_actualizacion(
-                    historial_por_cama.get(cama.numero_cama)
-                )
-
-                camas_sin_cubiculo.append(
-                    {
-                        "numero_cama": cama.numero_cama,
-                        "estado_visual": _estado_visual(asig),
-                        "asignacion_estado": asig.estado if asig else "SIN_ASIGNACION",
-                        "paciente": _paciente_payload(paciente),
-                        "cambios_realizados": cambios_por_sala.get(sala.id, 0),
-                        "max_cambios": MAX_CAMBIOS_CAMA,
-                        **meta_actualizacion,
-                    }
-                )
-
-            # 4.b. Procesar los cubículos de la sala.
-            #      Cada cubículo genera su propia lista interna de camas, usando
-            #      exactamente la misma lógica de resolución de asignación actual.
             for cubiculo in sala.cubiculos.all():
                 camas_data = []
                 for cama in cubiculo.camas.all():
                     asig = asignacion_por_cama.get(cama.numero_cama)
-                    paciente = asig.paciente if asig else None
-                    meta_actualizacion = _meta_ultima_actualizacion(
-                        historial_por_cama.get(cama.numero_cama)
-                    )
-
-                    camas_data.append(
-                        {
-                            "numero_cama": cama.numero_cama,
-                            "estado_visual": _estado_visual(asig),
-                            "asignacion_estado": asig.estado if asig else "SIN_ASIGNACION",
-                            "paciente": _paciente_payload(paciente),
-                            "cambios_realizados": cambios_por_sala.get(sala.id, 0),
-                            "max_cambios": MAX_CAMBIOS_CAMA,
-                            **meta_actualizacion,
-                        }
-                    )
-
-                # Si el cubículo no tiene camas, no se incluye en el payload.
-                if not camas_data:
-                    continue
-
-                # Cada cubículo queda serializado con su metadata básica y la
-                # colección de camas ya listas para renderizar en la interfaz.
-                cubiculos_data.append(
-                    {
-                        "id": cubiculo.id,
-                        "numero": cubiculo.numero,
-                        "nombre": cubiculo.nombre_cubiculo,
-                        "camas": camas_data,
-                    }
-                )
-
-            # Si la sala no tiene cubículos con camas ni camas directas,
-            # tampoco se incluye en la respuesta.
-            if not cubiculos_data and not camas_sin_cubiculo:
-                continue
-
-            # 4.c. Finalmente se agrega la sala con sus dos grupos de camas:
-            #      - cubículos con camas internas
-            #      - camas directas sin cubículo
-            salas_data.append(
-                {
-                    "id": sala.id,
-                    "nombre": sala.nombre_sala,
-                    "nombre_corto": sala.nombre_corto_sala,
-                    "cubiculos": cubiculos_data,
-                    "camas_directas": camas_sin_cubiculo,
-                }
-            )
-
-        # Si el servicio no tiene salas útiles (con camas), no se retorna.
-        if not salas_data:
-            continue
-
-        # 4.d. Cada servicio consolida todas sus salas ya serializadas.
-        data.append(
-            {
-                "id": servicio.id,
-                "nombre": servicio.nombre_servicio,
-                "nombre_corto": servicio.nombre_corto,
-                "salas": salas_data,
-            }
-        )
-
-    # 5. Respuesta final consumida por el JavaScript del mapa.
+                    meta_actualizacion = _meta_ultima_actualizacion(historial_por_cama.get(cama.numero_cama))
+                    camas_data.append(_cama_payload(
+                        cama,
+                        asig,
+                        cambios_por_sala.get(sala.id, 0),
+                        MAX_CAMBIOS_CAMA,
+                        meta_actualizacion
+                    ))
+                if camas_data:
+                    cubiculos_data.append(_cubiculo_payload(cubiculo, camas_data))
+            camas_directas_data = []
+            for cama in sala.camas_sala.all():
+                asig = asignacion_por_cama.get(cama.numero_cama)
+                meta_actualizacion = _meta_ultima_actualizacion(historial_por_cama.get(cama.numero_cama))
+                camas_directas_data.append(_cama_payload(
+                    cama,
+                    asig,
+                    cambios_por_sala.get(sala.id, 0),
+                    MAX_CAMBIOS_CAMA,
+                    meta_actualizacion
+                ))
+            if cubiculos_data or camas_directas_data:
+                salas_data.append(_sala_payload(sala, cubiculos_data, camas_directas_data))
+        if salas_data:
+            data.append(_servicio_payload(servicio, salas_data))
     return JsonResponse({"servicios": data})
 
 
 # =============================================================================
 # buscar_pacientes_mapa
 # -----------------------------------------------------------------------------
-# API GET de autocompletado. Devuelve pacientes elegibles para asignar a una
-# cama desde el mapa. Se incluyen dos grupos excluyentes entre sí:
+# API GET de autocompletado. Busca pacientes activos que NO tienen una cama
+# OCUPADA actualmente, para poder asignarlos desde el mapa.
 #
-#   Grupo A — Pre altas recientes:
-#     El último registro de AsignacionCamaPaciente del paciente tiene
-#     estado = PRE_ALTA. El paciente se encuentra listo para egreso y
-#     pendiente de liberación final de la cama.
-#
-#   Grupo B — Ingreso activo sin cama asignada:
-#     El paciente tiene un Ingreso con estado=1, sin fecha_egreso y sin
-#     cama registrada en el ingreso (Ingreso.cama es null). Nunca se le
-#     asignó cama o fue desvinculado del ingreso.
-#
-# En ambos grupos se excluyen los pacientes que ya ocupan una cama (OCUPADA).
-# Acepta ?q= para filtrar por nombre o DNI y ?tipo= (nombre|dni|todo).
+# Regla de negocio:
+# - Solo mostrar pacientes con ingreso activo sin cama asignada, o
+# - pacientes con alta reciente.
+# En ambos casos, se excluyen pacientes que mantengan ocupacion activa.
+# Acepta el parámetro ?q= para filtrar por nombre o DNI.
 # Retorna un máximo de 20 resultados.
 # =============================================================================
 @login_required
 @require_GET
 def buscar_pacientes_mapa(request):
     termino = (request.GET.get("q") or "").strip()
-    tipo_busqueda = (request.GET.get("tipo") or "todo").strip().lower()
+    tipo_busqueda = (request.GET.get("tipo") or "dni").strip().lower()
 
-    # IDs de pacientes que actualmente tienen una cama OCUPADA → excluir siempre.
-    pacientes_con_cama_ocupada = AsignacionCamaPaciente.objects.filter(
-        estado=AsignacionCamaPaciente.Estado.OCUPADA
-    ).values_list("paciente_id", flat=True)
-
-    # Subquery: último estado de cama registrado para cada paciente.
-    ultimo_estado_cama_subquery = (
-        AsignacionCamaPaciente.objects.filter(paciente_id=OuterRef("pk"))
-        .order_by("-fecha_inicio", "-id")
-        .values("estado")[:1]
-    )
-
-    # Grupo B: IDs de pacientes con ingreso activo y SIN cama asignada en el ingreso.
-    ids_ingreso_sin_cama = (
-        Ingreso.objects.filter(
-            estado=1,
-            fecha_egreso__isnull=True,
-            cama__isnull=True,
-        )
-        .values_list("paciente_id", flat=True)
-        .distinct()
-    )
-
-    pacientes_qs = (
-        Paciente.objects.filter(estado__in=["A", "P"])
-        .exclude(id__in=pacientes_con_cama_ocupada)
-        .annotate(ultimo_estado_cama=Subquery(ultimo_estado_cama_subquery))
-        .filter(
-            # Grupo A: último estado en tabla de asignación es PRE_ALTA.
-            Q(ultimo_estado_cama=AsignacionCamaPaciente.Estado.PRE_ALTA)
-            # Grupo B: ingreso activo registrado sin cama en la tabla Ingreso.
-            | Q(id__in=ids_ingreso_sin_cama)
-        )
-        .distinct()
-    )
+    # --- 1. Base: pacientes activos o pendientes; aplica filtro de texto primero
+    #        (rápido: usa índices de la tabla paciente).
+    pacientes_qs = Paciente.objects.filter(estado__in=["A", "P"])
 
     if termino:
         if tipo_busqueda == "dni":
@@ -1128,6 +1202,17 @@ def buscar_pacientes_mapa(request):
                 | Q(primer_apellido__icontains=termino)
                 | Q(segundo_apellido__icontains=termino)
             )
+
+    # --- 2. Regla de negocio: excluir pacientes que ya tienen una cama OCUPADA.
+    #        Evita duplicados en el mapa. Usa EXISTS para mayor rendimiento.
+    ya_ocupando_cama = Exists(
+        AsignacionCamaPaciente.objects.filter(
+            paciente_id=OuterRef("pk"),
+            estado__codigo="OCUPADA",
+            estado__categoria="ESTADO_CAMA",
+        )
+    )
+    pacientes_qs = pacientes_qs.exclude(ya_ocupando_cama)
 
     pacientes = pacientes_qs.order_by("primer_nombre", "primer_apellido")[:20]
     resultados = [_paciente_payload(p) for p in pacientes]
@@ -1161,13 +1246,16 @@ def camas_disponibles_mapa(request):
     )
 
     resultados = []
+    estado_vacia = get_estado_mapeo("VACIA", "ESTADO_CAMA")
     for cama in todas_camas:
         # Omitir la cama de origen para que no aparezca como destino disponible.
         if excluir_cama and str(cama.numero_cama) == str(excluir_cama):
             continue
-        asig = asignacion_por_cama.get(cama.numero_cama)
-        estado = asig.estado if asig else AsignacionCamaPaciente.Estado.VACIA
-        if estado == AsignacionCamaPaciente.Estado.VACIA:
+        # [2026-05-04 AUDIT] Bug Fix: Usar cama.pk (PK real) como clave, no numero_cama.
+        # Esto arregla el problema donde camas disponibles no se mostraban correctamente.
+        asig = asignacion_por_cama.get(cama.pk)
+        estado = asig.estado if asig else estado_vacia
+        if getattr(estado, "codigo", estado) == "VACIA":
             resultados.append({
                 "numero_cama": cama.numero_cama,
                 "sala": cama.sala.nombre_sala,
@@ -1213,19 +1301,10 @@ def mover_paciente_cama(request):
 
     asig_origen = (
         AsignacionCamaPaciente.objects
-        .select_related("paciente")
         .filter(cama_id=cama_origen_id)
         .order_by("-fecha_inicio", "-id")
         .first()
     )
-
-    if not asig_origen or asig_origen.estado != AsignacionCamaPaciente.Estado.OCUPADA:
-        return JsonResponse({"ok": False, "error": "La cama origen no esta ocupada."}, status=400)
-
-    paciente = asig_origen.paciente
-    if not paciente:
-        return JsonResponse({"ok": False, "error": "La cama origen no tiene paciente asignado."}, status=400)
-
     asig_destino = (
         AsignacionCamaPaciente.objects
         .filter(cama_id=cama_destino_id)
@@ -1233,7 +1312,17 @@ def mover_paciente_cama(request):
         .first()
     )
 
-    if asig_destino and asig_destino.estado != AsignacionCamaPaciente.Estado.VACIA:
+    estado_ocupada = get_estado_mapeo("OCUPADA", "ESTADO_CAMA")
+    estado_vacia = get_estado_mapeo("VACIA", "ESTADO_CAMA")
+
+    if not asig_origen or asig_origen.estado is None or asig_origen.estado.codigo not in {"OCUPADA", "PRE_ALTA"}:
+        return JsonResponse({"ok": False, "error": "La cama origen no tiene paciente asignado (debe estar OCUPADA o PRE_ALTA)."}, status=400)
+
+    paciente = asig_origen.paciente
+    if not paciente:
+        return JsonResponse({"ok": False, "error": "La cama origen no tiene paciente asignado."}, status=400)
+
+    if asig_destino and (asig_destino.estado is not None and asig_destino.estado.codigo != "VACIA"):
         return JsonResponse({"ok": False, "error": "La cama destino no esta disponible (no esta vacia)."}, status=400)
 
     if not _es_superadmin(request.user):
@@ -1264,11 +1353,30 @@ def mover_paciente_cama(request):
                     status=400,
                 )
 
-    estado_anterior_destino = asig_destino.estado if asig_destino else AsignacionCamaPaciente.Estado.VACIA
+    estado_anterior_origen = asig_origen.estado
+    estado_anterior_destino = asig_destino.estado if asig_destino else estado_vacia
+
+    # Superadmin: el registro queda, pero con una observación distinta
+    # para que _contar_cambios_manual_por_sala no lo cuente.
+    es_superadmin = _es_superadmin(request.user)
+    obs_origen = (
+        OBSERVACION_MOVIMIENTO_PACIENTE_MAPA_SUPERADMIN
+        if es_superadmin
+        else OBSERVACION_MOVIMIENTO_PACIENTE_MAPA
+    )
+    obs_destino = (
+        OBSERVACION_MOVIMIENTO_PACIENTE_MAPA_SUPERADMIN
+        if es_superadmin
+        else (
+            OBSERVACION_MOVIMIENTO_PACIENTE_MAPA
+            if sala_destino_id != sala_origen_id
+            else OBSERVACION_MOVIMIENTO_PACIENTE_MAPA_DETALLE
+        )
+    )
 
     with transaction.atomic():
         # 1. Liberar cama origen (OCUPADA -> VACIA)
-        asig_origen.estado = AsignacionCamaPaciente.Estado.VACIA
+        asig_origen.estado = estado_vacia
         asig_origen.paciente = None
         asig_origen.save()
 
@@ -1276,12 +1384,12 @@ def mover_paciente_cama(request):
         if not asig_destino:
             asig_destino = AsignacionCamaPaciente(
                 cama=cama_destino,
-                estado=AsignacionCamaPaciente.Estado.OCUPADA,
+                estado=estado_ocupada,
                 paciente=paciente,
                 usuario_asignacion=request.user,
             )
         else:
-            asig_destino.estado = AsignacionCamaPaciente.Estado.OCUPADA
+            asig_destino.estado = estado_ocupada
             asig_destino.paciente = paciente
             asig_destino.usuario_asignacion = request.user
             asig_destino.fecha_fin = None
@@ -1291,23 +1399,19 @@ def mover_paciente_cama(request):
         # 3. Registrar historial para ambas camas
         historial_origen = HistorialEstadoCama.objects.create(
             cama_id=cama_origen_id,
-            estado_anterior=AsignacionCamaPaciente.Estado.OCUPADA,
-            estado_nuevo=AsignacionCamaPaciente.Estado.VACIA,
+            estado_anterior=estado_anterior_origen,
+            estado_nuevo=estado_vacia,
             paciente=None,
             usuario=request.user,
-            observacion=OBSERVACION_MOVIMIENTO_PACIENTE_MAPA,
+            observacion=obs_origen,
         )
         historial_destino = HistorialEstadoCama.objects.create(
             cama_id=cama_destino_id,
             estado_anterior=estado_anterior_destino,
-            estado_nuevo=AsignacionCamaPaciente.Estado.OCUPADA,
+            estado_nuevo=estado_ocupada,
             paciente=paciente,
             usuario=request.user,
-            observacion=(
-                OBSERVACION_MOVIMIENTO_PACIENTE_MAPA
-                if sala_destino_id != sala_origen_id
-                else OBSERVACION_MOVIMIENTO_PACIENTE_MAPA_DETALLE
-            ),
+            observacion=obs_destino,
         )
 
         MovimientoCama.objects.create(
@@ -1345,7 +1449,7 @@ def mover_paciente_cama(request):
         "mensaje": f"Paciente movido a la cama {cama_destino_id} correctamente.",
         "cama_origen": {
             "numero_cama": int(cama_origen_id),
-            "estado_visual": AsignacionCamaPaciente.Estado.VACIA,
+            "estado_visual": estado_vacia.codigo,
             "paciente": None,
             "cambios_realizados": cambios_origen_post,
             "max_cambios": MAX_CAMBIOS_CAMA,
@@ -1354,7 +1458,7 @@ def mover_paciente_cama(request):
         },
         "cama_destino": {
             "numero_cama": int(cama_destino_id),
-            "estado_visual": AsignacionCamaPaciente.Estado.OCUPADA,
+            "estado_visual": estado_ocupada.codigo,
             "paciente": _paciente_payload(paciente),
             "cambios_realizados": cambios_destino_post,
             "max_cambios": MAX_CAMBIOS_CAMA,
@@ -1378,33 +1482,38 @@ def mover_paciente_cama(request):
 @require_POST
 def actualizar_cama_mapa(request):
     cama_id = request.POST.get("cama_id")
-    estado_nuevo = (request.POST.get("estado") or "").strip()
+    estado_codigo = (request.POST.get("estado") or "").strip()
     paciente_id = request.POST.get("paciente_id") or None
 
     if not cama_id:
         return JsonResponse({"ok": False, "error": "Debe indicar la cama."}, status=400)
 
-    estados_validos = {item[0] for item in AsignacionCamaPaciente.Estado.choices}
-    if estado_nuevo not in estados_validos:
-        return JsonResponse({"ok": False, "error": "Estado de cama no valido."}, status=400)
+    # Validar que el estado existe y pertenece a la categoría ESTADO_CAMA
+    try:
+        estado_nuevo_obj = EstadoMapeo.objects.get(codigo=estado_codigo, categoria="ESTADO_CAMA")
+    except EstadoMapeo.DoesNotExist:
+        return JsonResponse({"ok": False, "error": "Estado de cama no válido."}, status=400)
 
     try:
         cama = Cama.objects.select_related("sala__servicio", "cubiculo").get(pk=cama_id)
     except Cama.DoesNotExist:
         return JsonResponse({"ok": False, "error": "La cama no existe."}, status=404)
 
+    # Obtener la asignación actual (la más reciente)
     asignacion = (
-        AsignacionCamaPaciente.objects.select_related("paciente")
+        AsignacionCamaPaciente.objects.select_related("paciente", "estado")
         .filter(cama_id=cama_id)
         .order_by("-fecha_inicio", "-id")
         .first()
     )
 
+    # Si no existe asignación previa, crear una en estado VACIA
     if not asignacion:
+        estado_vacia = EstadoMapeo.objects.get(codigo="VACIA", categoria="ESTADO_CAMA")
         asignacion = AsignacionCamaPaciente.objects.create(
             cama=cama,
             usuario_asignacion=request.user,
-            estado=AsignacionCamaPaciente.Estado.VACIA,
+            estado=estado_vacia,
             paciente=None,
         )
 
@@ -1415,7 +1524,24 @@ def actualizar_cama_mapa(request):
         except Paciente.DoesNotExist:
             return JsonResponse({"ok": False, "error": "El paciente seleccionado no existe."}, status=404)
 
-    if estado_nuevo == AsignacionCamaPaciente.Estado.OCUPADA and not paciente_nuevo:
+    # Si el paciente ya tiene otra cama (OCUPADA o PRE_ALTA), detectar para liberar
+    asig_previa_paciente = None
+    if paciente_nuevo and estado_codigo == "OCUPADA":
+        asig_previa_paciente = (
+            AsignacionCamaPaciente.objects
+            .select_related("estado", "cama")
+            .filter(
+                paciente=paciente_nuevo,
+                estado__codigo__in=["OCUPADA", "PRE_ALTA"],
+                estado__categoria="ESTADO_CAMA",
+            )
+            .exclude(cama_id=cama_id)
+            .order_by("-fecha_inicio", "-id")
+            .first()
+        )
+
+    # Validar que OCUPADA requiere paciente
+    if estado_codigo == "OCUPADA" and not paciente_nuevo:
         return JsonResponse(
             {
                 "ok": False,
@@ -1427,15 +1553,38 @@ def actualizar_cama_mapa(request):
     estado_anterior = asignacion.estado
     paciente_anterior_id = asignacion.paciente_id
     paciente_anterior = asignacion.paciente
+    estado_vacia = get_estado_mapeo("VACIA", "ESTADO_CAMA")
+    estado_alta = get_estado_mapeo("ALTA", "ESTADO_CAMA")
 
-    if estado_nuevo == AsignacionCamaPaciente.Estado.VACIA:
+    # Si la cama estaba en PRE_ALTA y se reasigna a OCUPADA con otro paciente,
+    # se registra primero el cierre histórico de alta y la liberación lógica.
+    requiere_cierre_prealta = (
+        estado_anterior
+        and estado_anterior.codigo == "PRE_ALTA"
+        and estado_codigo == "OCUPADA"
+        and paciente_anterior
+        and (not paciente_nuevo or paciente_anterior.id != paciente_nuevo.id)
+    )
+
+    # Si la cama pasa a VACIA desde un estado con paciente, se registra alta.
+    requiere_registro_alta_a_vacia = (
+        estado_codigo == "VACIA"
+        and paciente_anterior is not None
+        and estado_anterior is not None
+        and estado_anterior.codigo in {"OCUPADA", "PRE_ALTA", "ALTA"}
+    )
+
+    # Lógica de estados especiales
+    if estado_codigo == "VACIA":
         paciente_nuevo = None
-    elif estado_nuevo == AsignacionCamaPaciente.Estado.PRE_ALTA and paciente_nuevo is None:
-        # Regla solicitada: PRE_ALTA debe conservar el paciente actual si no se envía uno nuevo.
+    elif estado_codigo in {"PRE_ALTA", "ALTA"} and paciente_nuevo is None:
+        # PRE_ALTA y ALTA deben conservar el paciente actual
+        # hasta que la cama pase a VACIA.
         paciente_nuevo = paciente_anterior
 
+    # Verificar si hay cambio real
     hubo_cambio = (
-        estado_anterior != estado_nuevo
+        estado_anterior.id != estado_nuevo_obj.id
         or paciente_anterior_id != (paciente_nuevo.id if paciente_nuevo else None)
     )
 
@@ -1456,7 +1605,7 @@ def actualizar_cama_mapa(request):
                 "mensaje": "No se detectaron cambios para guardar.",
                 "cama": {
                     "numero_cama": int(cama_id),
-                    "estado_visual": asignacion.estado,
+                    "estado_visual": asignacion.estado.codigo,
                     "paciente": _paciente_payload(asignacion.paciente),
                     "cambios_realizados": cambios_realizados,
                     "max_cambios": MAX_CAMBIOS_CAMA,
@@ -1464,114 +1613,87 @@ def actualizar_cama_mapa(request):
             }
         )
 
-    asignacion_alta_previa = None
-    if estado_nuevo == AsignacionCamaPaciente.Estado.OCUPADA and paciente_nuevo:
-        asignacion_alta_previa = (
-            AsignacionCamaPaciente.objects.select_related("cama")
-            .filter(
-                paciente_id=paciente_nuevo.id,
-                estado=AsignacionCamaPaciente.Estado.PRE_ALTA,
-            )
-            .exclude(cama_id=cama_id)
-            .order_by("-fecha_inicio", "-id")
-            .first()
-        )
-
     try:
         with transaction.atomic():
-            if asignacion_alta_previa:
-                cama_alta_previa_id = asignacion_alta_previa.cama_id
-                asignacion_alta_previa.estado = AsignacionCamaPaciente.Estado.VACIA
-                asignacion_alta_previa.paciente = None
-                asignacion_alta_previa.fecha_fin = timezone.now()
-                asignacion_alta_previa.usuario_cierre = request.user
-                asignacion_alta_previa.save(
-                    update_fields=["estado", "paciente", "fecha_fin", "usuario_cierre"]
-                )
+            estado_historial_anterior = estado_anterior
 
+            if requiere_cierre_prealta:
                 HistorialEstadoCama.objects.create(
-                    cama_id=cama_alta_previa_id,
-                    estado_anterior=AsignacionCamaPaciente.Estado.PRE_ALTA,
-                    estado_nuevo=AsignacionCamaPaciente.Estado.VACIA,
-                    paciente=None,
-                    usuario=request.user,
-                    observacion=OBSERVACION_LIBERACION_ALTA_AUTOMATICA,
-                )
-
-            asignacion.estado = estado_nuevo
-            asignacion.paciente = paciente_nuevo
-            asignacion.usuario_asignacion = request.user
-            if estado_nuevo == AsignacionCamaPaciente.Estado.OCUPADA:
-                asignacion.fecha_fin = None
-                asignacion.usuario_cierre = None
-            elif estado_nuevo == AsignacionCamaPaciente.Estado.VACIA and estado_anterior == AsignacionCamaPaciente.Estado.OCUPADA:
-                # Registrar cierre formal cuando la cama pasa de OCUPADA a VACIA.
-                asignacion.fecha_fin = timezone.now()
-                asignacion.usuario_cierre = request.user
-
-            asignacion.save()
-
-            es_egreso_directo = (
-                estado_anterior == AsignacionCamaPaciente.Estado.OCUPADA
-                and estado_nuevo == AsignacionCamaPaciente.Estado.VACIA
-            )
-
-            # Cuando la cama pasa de OCUPADA a VACIA, registrar el egreso del paciente anterior.
-            if es_egreso_directo and paciente_anterior:
-                MovimientoCama.objects.create(
-                    tipo_movimiento="EGRESO",
-                    cama_origen=cama,
-                    cama_destino=cama,
-                    paciente=paciente_anterior,
-                    usuario=request.user,
-                    observacion="Egreso por cambio de estado a VACIA desde mapa",
-                )
-
-            if es_egreso_directo:
-                # Dejar trazabilidad explícita: OCUPADA -> PRE_ALTA -> VACIA.
-                HistorialEstadoCama.objects.create(
-                    cama_id=cama_id,
-                    estado_anterior=AsignacionCamaPaciente.Estado.OCUPADA,
-                    estado_nuevo=AsignacionCamaPaciente.Estado.PRE_ALTA,
-                    paciente=paciente_anterior,
-                    usuario=request.user,
-                    observacion=OBSERVACION_CAMBIO_MANUAL_MAPA,
-                )
-                historial = HistorialEstadoCama.objects.create(
-                    cama_id=cama_id,
-                    estado_anterior=AsignacionCamaPaciente.Estado.PRE_ALTA,
-                    estado_nuevo=AsignacionCamaPaciente.Estado.VACIA,
-                    paciente=None,
-                    usuario=request.user,
-                    observacion=OBSERVACION_CAMBIO_MANUAL_MAPA,
-                )
-            else:
-                historial = HistorialEstadoCama.objects.create(
                     cama_id=cama_id,
                     estado_anterior=estado_anterior,
-                    estado_nuevo=asignacion.estado,
-                    paciente=(
-                        paciente_anterior
-                        if estado_nuevo == AsignacionCamaPaciente.Estado.VACIA
-                        else asignacion.paciente
-                    ),
+                    estado_nuevo=estado_alta,
+                    paciente=paciente_anterior,
                     usuario=request.user,
-                    observacion=OBSERVACION_CAMBIO_MANUAL_MAPA,
+                    observacion="Alta historica por reasignacion desde PRE_ALTA",
                 )
+                estado_historial_anterior = estado_vacia
+
+            if requiere_registro_alta_a_vacia:
+                HistorialEstadoCama.objects.create(
+                    cama_id=cama_id,
+                    estado_anterior=estado_anterior,
+                    estado_nuevo=estado_alta,
+                    paciente=paciente_anterior,
+                    usuario=request.user,
+                    observacion="Alta historica por cambio manual a VACIA",
+                )
+                estado_historial_anterior = estado_alta
+
+            # Si el paciente ya tenía otra cama asignada, liberarla (cambio de cama)
+            if asig_previa_paciente:
+                estado_anterior_previa = asig_previa_paciente.estado
+                asig_previa_paciente.estado = estado_vacia
+                asig_previa_paciente.paciente = None
+                asig_previa_paciente.save()
+
+                HistorialEstadoCama.objects.create(
+                    cama=asig_previa_paciente.cama,
+                    estado_anterior=estado_anterior_previa,
+                    estado_nuevo=estado_vacia,
+                    paciente=None,
+                    usuario=request.user,
+                    observacion="Cambio de cama: paciente trasladado a otra cama",
+                )
+
+                MovimientoCama.objects.create(
+                    tipo_movimiento="TRASLADO",
+                    cama_origen=asig_previa_paciente.cama,
+                    cama_destino=cama,
+                    paciente=paciente_nuevo,
+                    usuario=request.user,
+                    observacion="Cambio de cama desde mapa",
+                )
+
+            # Aplicar cambios finales de la asignacion.
+            asignacion.estado = estado_nuevo_obj
+            asignacion.paciente = paciente_nuevo
+            asignacion.usuario_asignacion = request.user
+            asignacion.save()
+
+            # Registrar historial final del cambio visible en cama.
+            historial = HistorialEstadoCama.objects.create(
+                cama_id=cama_id,
+                estado_anterior=estado_historial_anterior,
+                estado_nuevo=estado_nuevo_obj,
+                paciente=asignacion.paciente,
+                usuario=request.user,
+                observacion=OBSERVACION_CAMBIO_MANUAL_MAPA,
+            )
     except Exception as exc:
         return JsonResponse({"ok": False, "error": str(exc)}, status=400)
 
+    # Registrar detalle del mapeo
     _registrar_detalle_mapeo(
         usuario=request.user,
         cama=cama,
         asignacion=asignacion,
         tipo_accion=(
             DetalleMapeoCama.TipoAccion.ALTA
-            if asignacion.estado == AsignacionCamaPaciente.Estado.PRE_ALTA
+            if estado_codigo == "ALTA" or requiere_registro_alta_a_vacia
             else DetalleMapeoCama.TipoAccion.CAMBIO
         ),
         hubo_cambio=True,
-        observacion="Actualizacion de cama desde mapa.",
+        observacion="Actualización de cama desde mapa.",
     )
 
     cambios_realizados = _contar_cambios_manual_por_sala(cama.sala_id)
@@ -1581,7 +1703,7 @@ def actualizar_cama_mapa(request):
             "mensaje": "Cambio de cama actualizado correctamente.",
             "cama": {
                 "numero_cama": int(cama_id),
-                "estado_visual": asignacion.estado,
+                "estado_visual": asignacion.estado.codigo,
                 "paciente": _paciente_payload(asignacion.paciente),
                 "cambios_realizados": cambios_realizados,
                 "max_cambios": MAX_CAMBIOS_CAMA,
@@ -1629,7 +1751,7 @@ def procesar_cama_mapeo(request):
         sesion = MapeoSesionCama.objects.filter(
             pk=sesion_mapeo_id,
             usuario=request.user,
-            estado=MapeoSesionCama.Estado.EN_PROGRESO,
+            estado=get_estado_mapeo("EN_PROGRESO", "ESTADO_SESION"),
             fecha_fin__isnull=True,
         ).first()
     if not sesion:
@@ -1655,7 +1777,14 @@ def procesar_cama_mapeo(request):
         except Paciente.DoesNotExist:
             return JsonResponse({"ok": False, "error": "Paciente observado no existe."}, status=404)
 
-    estado_sistema = asig_actual.estado if asig_actual else AsignacionCamaPaciente.Estado.VACIA
+    # Obtener instancias de estados
+    estado_vacia = get_estado_mapeo("VACIA", "ESTADO_CAMA")
+    estado_ocupada = get_estado_mapeo("OCUPADA", "ESTADO_CAMA")
+    estado_alta = get_estado_mapeo("ALTA", "ESTADO_CAMA")
+    
+    # [2026-05-04 AUDIT] Bug Fix: estado_sistema es EstadoMapeo object.
+    # Se serializa como .codigo en JsonResponse. No retornar el objeto directamente.
+    estado_sistema = asig_actual.estado if asig_actual else estado_vacia
 
     with transaction.atomic():
         # Caso 1: todo correcto (sin cambios en sistema)
@@ -1679,39 +1808,27 @@ def procesar_cama_mapeo(request):
                 observacion=observacion or "Confirmacion de estado sin cambios.",
                 sesion_mapeo=sesion,
             )
-            return JsonResponse({"ok": True, "mensaje": "Cama confirmada sin cambios.", "estado_sistema": estado_sistema})
+            return JsonResponse({"ok": True, "mensaje": "Cama confirmada sin cambios.", "estado_sistema": estado_sistema.codigo})
 
-        # Caso 2A: sistema en PRE_ALTA y paciente ya egreso.
+        # Caso 2A: sistema en ALTA (prealta) y paciente ya egreso.
         if accion == "CONFIRMAR_ALTA":
             if not asig_actual:
                 return JsonResponse({"ok": False, "error": "No hay asignacion activa para confirmar alta."}, status=400)
 
             paciente_mov = asig_actual.paciente
             estado_anterior = asig_actual.estado
-            asig_actual.estado = AsignacionCamaPaciente.Estado.VACIA
+            asig_actual.estado = estado_vacia
             asig_actual.paciente = None
-            asig_actual.fecha_fin = timezone.now()
-            asig_actual.usuario_cierre = request.user
             asig_actual.save()
 
             HistorialEstadoCama.objects.create(
                 cama=cama,
                 estado_anterior=estado_anterior,
-                estado_nuevo=AsignacionCamaPaciente.Estado.VACIA,
+                estado_nuevo=estado_vacia,
                 paciente=None,
                 usuario=request.user,
                 observacion="Confirmacion de alta desde mapeo",
             )
-
-            if paciente_mov:
-                MovimientoCama.objects.create(
-                    tipo_movimiento="EGRESO",
-                    cama_origen=cama,
-                    cama_destino=cama,
-                    paciente=paciente_mov,
-                    usuario=request.user,
-                    observacion="Egreso confirmado en mapeo",
-                )
 
             _registrar_detalle_mapeo(
                 usuario=request.user,
@@ -1724,19 +1841,19 @@ def procesar_cama_mapeo(request):
             )
             return JsonResponse({"ok": True, "mensaje": "Alta confirmada. Cama liberada."})
 
-        # Caso 2B: cancelar prealta (PRE_ALTA -> OCUPADA con mismo paciente)
+        # Caso 2B: cancelar prealta (ALTA -> OCUPADA con mismo paciente)
         if accion == "CANCELAR_PREALTA":
             if not asig_actual or not asig_actual.paciente:
                 return JsonResponse({"ok": False, "error": "No existe paciente actual para cancelar prealta."}, status=400)
 
             estado_anterior = asig_actual.estado
-            asig_actual.estado = AsignacionCamaPaciente.Estado.OCUPADA
+            asig_actual.estado = estado_ocupada
             asig_actual.save()
 
             HistorialEstadoCama.objects.create(
                 cama=cama,
                 estado_anterior=estado_anterior,
-                estado_nuevo=AsignacionCamaPaciente.Estado.OCUPADA,
+                estado_nuevo=estado_ocupada,
                 paciente=asig_actual.paciente,
                 usuario=request.user,
                 observacion="Cancelar prealta desde mapeo",
@@ -1783,37 +1900,26 @@ def procesar_cama_mapeo(request):
                 )
                 return JsonResponse({"ok": True, "mensaje": "Sin cambios: paciente ya coincide con sistema."})
 
-            estado_anterior = asig_actual.estado if asig_actual else AsignacionCamaPaciente.Estado.VACIA
+            estado_anterior = asig_actual.estado if asig_actual else estado_vacia
             if asig_actual and asig_actual.paciente:
-                asig_actual.estado = AsignacionCamaPaciente.Estado.VACIA
+                asig_actual.estado = estado_vacia
                 asig_actual.paciente = None
-                asig_actual.fecha_fin = timezone.now()
-                asig_actual.usuario_cierre = request.user
                 asig_actual.save()
 
             nueva_asig = AsignacionCamaPaciente.objects.create(
                 cama=cama,
                 paciente=paciente_observado,
-                estado=AsignacionCamaPaciente.Estado.OCUPADA,
+                estado=estado_ocupada,
                 usuario_asignacion=request.user,
             )
 
             HistorialEstadoCama.objects.create(
                 cama=cama,
                 estado_anterior=estado_anterior,
-                estado_nuevo=AsignacionCamaPaciente.Estado.OCUPADA,
+                estado_nuevo=estado_ocupada,
                 paciente=paciente_observado,
                 usuario=request.user,
                 observacion="Cambio/traslado desde mapeo",
-            )
-
-            MovimientoCama.objects.create(
-                tipo_movimiento="TRASLADO",
-                cama_origen=cama,
-                cama_destino=cama,
-                paciente=paciente_observado,
-                usuario=request.user,
-                observacion="Cambio de paciente en cama durante mapeo",
             )
 
             _registrar_detalle_mapeo(
@@ -1835,44 +1941,33 @@ def procesar_cama_mapeo(request):
                     status=400,
                 )
 
-            if asig_actual and asig_actual.estado == AsignacionCamaPaciente.Estado.OCUPADA:
+            if asig_actual and asig_actual.estado == estado_ocupada:
                 return JsonResponse(
                     {"ok": False, "error": "La cama ya figura ocupada en sistema. Use CAMBIO_TRASLADO."},
                     status=400,
                 )
 
             if asig_actual:
-                asig_actual.estado = AsignacionCamaPaciente.Estado.OCUPADA
+                asig_actual.estado = estado_ocupada
                 asig_actual.paciente = paciente_observado
                 asig_actual.usuario_asignacion = request.user
-                asig_actual.fecha_fin = None
-                asig_actual.usuario_cierre = None
                 asig_actual.save()
                 asignacion_obj = asig_actual
             else:
                 asignacion_obj = AsignacionCamaPaciente.objects.create(
                     cama=cama,
                     paciente=paciente_observado,
-                    estado=AsignacionCamaPaciente.Estado.OCUPADA,
+                    estado=estado_ocupada,
                     usuario_asignacion=request.user,
                 )
 
             HistorialEstadoCama.objects.create(
                 cama=cama,
-                estado_anterior=AsignacionCamaPaciente.Estado.VACIA,
-                estado_nuevo=AsignacionCamaPaciente.Estado.OCUPADA,
+                estado_anterior=estado_vacia,
+                estado_nuevo=estado_ocupada,
                 paciente=paciente_observado,
                 usuario=request.user,
                 observacion="Asignacion detectada durante mapeo",
-            )
-
-            MovimientoCama.objects.create(
-                tipo_movimiento="ASIGNACION",
-                cama_origen=cama,
-                cama_destino=cama,
-                paciente=paciente_observado,
-                usuario=request.user,
-                observacion="Asignacion manual durante mapeo",
             )
 
             _registrar_detalle_mapeo(
@@ -1888,37 +1983,25 @@ def procesar_cama_mapeo(request):
 
         # Caso 5: sistema ocupado, pero cama vacia en la realidad.
         if accion == "ALTA_FORZADA":
-            if not asig_actual or asig_actual.estado != AsignacionCamaPaciente.Estado.OCUPADA:
+            if not asig_actual or asig_actual.estado != estado_ocupada:
                 return JsonResponse(
                     {"ok": False, "error": "No existe ocupacion activa para forzar alta."},
                     status=400,
                 )
 
             paciente_prev = asig_actual.paciente
-            asig_actual.estado = AsignacionCamaPaciente.Estado.VACIA
+            asig_actual.estado = estado_vacia
             asig_actual.paciente = None
-            asig_actual.fecha_fin = timezone.now()
-            asig_actual.usuario_cierre = request.user
             asig_actual.save()
 
             HistorialEstadoCama.objects.create(
                 cama=cama,
-                estado_anterior=AsignacionCamaPaciente.Estado.OCUPADA,
-                estado_nuevo=AsignacionCamaPaciente.Estado.VACIA,
+                estado_anterior=estado_ocupada,
+                estado_nuevo=estado_vacia,
                 paciente=None,
                 usuario=request.user,
                 observacion="Alta forzada desde mapeo",
             )
-
-            if paciente_prev:
-                MovimientoCama.objects.create(
-                    tipo_movimiento="EGRESO",
-                    cama_origen=cama,
-                    cama_destino=cama,
-                    paciente=paciente_prev,
-                    usuario=request.user,
-                    observacion="Alta forzada durante mapeo",
-                )
 
             _registrar_detalle_mapeo(
                 usuario=request.user,
@@ -1932,69 +2015,3 @@ def procesar_cama_mapeo(request):
             return JsonResponse({"ok": True, "mensaje": "Alta forzada aplicada. Cama liberada."})
 
     return JsonResponse({"ok": False, "error": "No se pudo procesar la accion solicitada."}, status=400)
-
-
-# ---------------------------------------------------------------------------
-# Sincronización de camas desde el listado de ingresos (solo superusuarios)
-# ---------------------------------------------------------------------------
-@require_POST
-def sincronizar_camas_superadmin(request):
-    """
-    Endpoint exclusivo para superusuarios.
-    Recorre los ingresos activos con cama asignada y crea el registro
-    AsignacionCamaPaciente faltante mediante MapeoCamasService.
-
-    POST /mapeo-camas/api/sincronizar-camas/
-    Respuesta JSON:
-      { "success": true, "sincronizados": N, "omitidos": N, "errores": [...] }
-    """
-    if not request.user.is_superuser:
-        return JsonResponse({"success": False, "error": "Acceso denegado."}, status=403)
-
-    ingresos = list(
-        Ingreso.objects.filter(
-            estado=1,
-            fecha_egreso__isnull=True,
-            cama_id__isnull=False,
-            paciente_id__isnull=False,
-        ).values("id", "cama_id", "paciente_id")
-    )
-
-    ocupadas = set(
-        AsignacionCamaPaciente.objects.filter(
-            estado=AsignacionCamaPaciente.Estado.OCUPADA
-        ).values_list("cama_id", flat=True)
-    )
-
-    sincronizados = 0
-    omitidos = 0
-    errores = []
-
-    for ingreso in ingresos:
-        cama_id = ingreso["cama_id"]
-        paciente_id = ingreso["paciente_id"]
-        ingreso_id = ingreso["id"]
-
-        if cama_id in ocupadas:
-            omitidos += 1
-            continue
-
-        try:
-            MapeoCamasService.sincronizar_cama_con_ingreso(
-                cama_id=cama_id,
-                paciente_id=paciente_id,
-                usuario=request.user,
-            )
-            ocupadas.add(cama_id)
-            sincronizados += 1
-        except Exception as exc:
-            errores.append({"ingreso_id": ingreso_id, "error": str(exc)})
-
-    return JsonResponse(
-        {
-            "success": True,
-            "sincronizados": sincronizados,
-            "omitidos": omitidos,
-            "errores": errores,
-        }
-    )

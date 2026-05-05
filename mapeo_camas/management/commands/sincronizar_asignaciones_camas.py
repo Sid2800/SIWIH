@@ -18,11 +18,13 @@ from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 
 from ingreso.models import Ingreso
-from mapeo_camas.models import AsignacionCamaPaciente
+from mapeo_camas.models import AsignacionCamaPaciente, EstadoMapeo
 from core.services.mapeo_camas_service import MapeoCamasService
 
 User = get_user_model()
 
+def get_estado_mapeo(codigo, categoria="ESTADO_CAMA"):
+    return EstadoMapeo.objects.get(codigo=codigo, categoria=categoria)
 
 class Command(BaseCommand):
     help = "Sincroniza AsignacionCamaPaciente para todos los ingresos activos con cama asignada."
@@ -83,9 +85,10 @@ class Command(BaseCommand):
             return
 
         # Obtener camas que ya tienen asignación OCUPADA (para no duplicar)
+        estado_ocupada = get_estado_mapeo("OCUPADA")
         ocupadas = set(
             AsignacionCamaPaciente.objects.filter(
-                estado=AsignacionCamaPaciente.Estado.OCUPADA
+                estado=estado_ocupada
             ).values_list("cama_id", flat=True)
         )
 

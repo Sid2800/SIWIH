@@ -38,38 +38,15 @@ document.addEventListener("DOMContentLoaded", function () {
   var btnCancelarMapeo = document.getElementById("btn-cancelar-mapeo");
   var btnTerminarMapeoPie = document.getElementById("btn-terminar-mapeo-pie");
   var mapapiemapeo = document.getElementById("mapa-pie-mapeo");
+  // [2026-05-04 FEATURE] Banner pegajoso de mapeo activo (amarillo con pulso)
+  var mapaBannerMapeo = document.getElementById("mapa-banner-mapeo");
   var camasRenderizadas = [];
   var sesionMapeoActivaId = null;
   var camasMapeadasSesion = new Set();
 
-  function insertarBotonAccionRapida(camaEl) {
-    if (!camaEl || camaEl.querySelector(".mapa-cama-accion-rapida")) {
-      return;
-    }
-
-    var botonActualizacionRapida = document.createElement("button");
-    botonActualizacionRapida.type = "button";
-    botonActualizacionRapida.className = "mapa-cama-accion-rapida";
-    botonActualizacionRapida.title = "Confirmar cama sin cambios";
-    botonActualizacionRapida.innerHTML = '<i class="bi bi-arrow-repeat boton-exportacion" aria-hidden="true"></i>';
-    botonActualizacionRapida.setAttribute("aria-label", "Confirmar cama sin cambios");
-    botonActualizacionRapida.style.display = sesionMapeoActivaId ? "inline-flex" : "none";
-    botonActualizacionRapida.addEventListener("click", function (event) {
-      event.preventDefault();
-      event.stopPropagation();
-      confirmarCamaSinCambios(camaEl);
-    });
-
-    camaEl.appendChild(botonActualizacionRapida);
-  }
-
-  function actualizarBotonesAccionRapidaVisibilidad() {
-    var visible = Boolean(sesionMapeoActivaId);
-    var botones = document.querySelectorAll(".mapa-cama-accion-rapida");
-    botones.forEach(function (btn) {
-      btn.style.display = visible ? "inline-flex" : "none";
-    });
-  }
+  // Constantes de interaccion
+  var CLICK_DELAY_MS = 300;  // ms para distinguir simple vs doble clic
+  var LONG_PRESS_MS  = 600;  // ms para activar confirmacion por pulsacion larga (tactil)
 
   function restaurarBotonesBase() {
     if (btnIniciarMapeo) {
@@ -129,13 +106,10 @@ document.addEventListener("DOMContentLoaded", function () {
     if (mapapiemapeo) {
       mapapiemapeo.style.display = activo ? "flex" : "none";
     }
-
-    if (activo) {
-      camasRenderizadas.forEach(function (camaEl) {
-        insertarBotonAccionRapida(camaEl);
-      });
+    // [2026-05-04 FEATURE] Mostrar/ocultar banner pegajoso segun modo mapeo activo.
+    if (mapaBannerMapeo) {
+      mapaBannerMapeo.style.display = activo ? "flex" : "none";
     }
-    actualizarBotonesAccionRapidaVisibilidad();
   }
 
   async function confirmarCamaSinCambios(camaEl) {
@@ -318,6 +292,8 @@ document.addEventListener("DOMContentLoaded", function () {
       var campo = "";
       if (tipo === "cama") {
         campo = item.dataset.numeroCama || "";
+      } else if (tipo === "dni") {
+        campo = item.dataset.pacienteDni || "";
       } else if (tipo === "paciente") {
         campo = item.dataset.paciente || "";
       } else if (tipo === "estado") {
@@ -328,6 +304,27 @@ document.addEventListener("DOMContentLoaded", function () {
 
       item.style.display = campo.toLowerCase().includes(valor) ? "" : "none";
     });
+
+    // Si hay búsqueda activa, ocultar salas y servicios que no tengan camas visibles
+    if (valor) {
+      document.querySelectorAll(".mapa-cubiculo").forEach(function (cub) {
+        var visible = Array.from(cub.querySelectorAll(".mapa-cama")).some(function (c) { return c.style.display !== "none"; });
+        cub.style.display = visible ? "" : "none";
+      });
+      document.querySelectorAll(".mapa-sala").forEach(function (sala) {
+        var visible = Array.from(sala.querySelectorAll(".mapa-cama")).some(function (c) { return c.style.display !== "none"; });
+        sala.style.display = visible ? "" : "none";
+      });
+      document.querySelectorAll(".mapa-servicio-card").forEach(function (serv) {
+        var visible = Array.from(serv.querySelectorAll(".mapa-cama")).some(function (c) { return c.style.display !== "none"; });
+        serv.style.display = visible ? "" : "none";
+      });
+    } else {
+      // Limpiar ocultos al borrar la búsqueda
+      document.querySelectorAll(".mapa-cubiculo, .mapa-sala, .mapa-servicio-card").forEach(function (el) {
+        el.style.display = "";
+      });
+    }
   }
 
   // Sincroniza una card del DOM con la respuesta actualizada del backend.
@@ -422,17 +419,12 @@ document.addEventListener("DOMContentLoaded", function () {
     var ultimaActualizacion = formatearFechaHoraCorta(camaEl.dataset.ultimaActualizacion || "");
     var usuarioUltimaActualizacion = camaEl.dataset.usuarioUltimaActualizacion || "Sin registro";
     var estadoActualTexto = estadoActual || "SIN_ASIGNACION";
-    var pacienteActualTexto = pacienteActual || "Sin paciente";
     var htmlInformacion =
       '<fieldset class="modalAtencionCampos">' +
       "  <legend>Informacion</legend>" +
       '  <div class="formularioCampoModal">' +
       "    <label>Estado actual</label>" +
       '    <input type="text" class="formularioCampo-text" readonly value="' + escaparHtml(estadoActualTexto) + '">' +
-      "  </div>" +
-      '  <div class="formularioCampoModal">' +
-      "    <label>Paciente actual</label>" +
-      '    <input type="text" class="formularioCampo-text" readonly value="' + escaparHtml(pacienteActualTexto) + '">' +
       "  </div>" +
       '  <div class="formularioCampoModal">' +
       "    <label>Ultima actualizacion</label>" +
@@ -444,13 +436,20 @@ document.addEventListener("DOMContentLoaded", function () {
       "  </div>" +
       "</fieldset>";
 
-    // La cama esta OCUPADA cuando el estado visual actual es OCUPADA.
+    // La cama esta OCUPADA (o PRE_ALTA) cuando tiene paciente asignado.
     // Esta bandera define toda la estructura del modal.
-    var esOcupada = estadoActual === "OCUPADA";
+    var esOcupada = estadoActual === "OCUPADA" || estadoActual === "PRE_ALTA";
 
     // ── HTML para cama VACIA (u otro estado sin paciente) ────────────────────
     // Permite cambiar el estado; si se elige OCUPADA aparece busqueda de paciente
     var opcionesEstadoVacia = ESTADOS_CAMA.map(function (e) {
+      var sel = e === estadoActual ? ' selected="selected"' : "";
+      return '<option value="' + e + '"' + sel + ">" + e + "</option>";
+    }).join("");
+
+    // [2026-05-04 IMPROVEMENT] Opciones del select para cama OCUPADA con pre-selección del estado actual.
+    // El usuario ve inmediatamente qué estado tiene la cama antes de cambiar.
+    var opcionesEstadoOcupada = ESTADOS_CAMA.map(function (e) {
       var sel = e === estadoActual ? ' selected="selected"' : "";
       return '<option value="' + e + '"' + sel + ">" + e + "</option>";
     }).join("");
@@ -471,8 +470,8 @@ document.addEventListener("DOMContentLoaded", function () {
       '  <div class="formularioCampoModal">' +
       '    <label for="modal-tipo-busqueda-paciente">Buscar por</label>' +
       '    <select id="modal-tipo-busqueda-paciente" class="formularioCampo-select">' +
-      '      <option value="nombre" selected>Nombre</option>' +
-      '      <option value="dni">DNI</option>' +
+      '      <option value="dni" selected>DNI</option>' +
+      '      <option value="nombre">Nombre</option>' +
       "    </select>" +
       "  </div>" +
       '  <div class="formularioCampoModal">' +
@@ -515,14 +514,11 @@ document.addEventListener("DOMContentLoaded", function () {
       "  </div>" +
       "</fieldset>" +
       '<fieldset id="bloque-cambiar-estado" class="modalAtencionCampos">' +
-      "  <legend>Nuevo estado </legend>" +
+      "  <legend>Nuevo estado</legend>" +
       '  <div class="formularioCampoModal">' +
       '    <label for="modal-mapa-estado">Estado</label>' +
       '    <select id="modal-mapa-estado" class="formularioCampo-select">' +
-      '      <option value="VACIA">VACIA (desocupar)</option>' +
-      '      <option value="PRE_ALTA">PRE_ALTA</option>' +
-      '      <option value="FUERA_SERVICIO">FUERA_SERVICIO</option>' +
-      '      <option value="CONSULTA_EXTERNA">CONSULTA_EXTERNA</option>' +
+      opcionesEstadoOcupada +
       "    </select>" +
       "  </div>" +
       "</fieldset>" +
@@ -580,7 +576,13 @@ document.addEventListener("DOMContentLoaded", function () {
               Swal.showValidationMessage("Debe seleccionar el nuevo estado.");
               return false;
             }
-            return { tipo: "cambiar_estado", estado: estadoEl.value };
+            // Si se mantiene OCUPADA, re-enviar el paciente actual para no romper validacion del backend.
+            var pacienteIdActual = camaEl.dataset.pacienteId || "";
+            return {
+              tipo: "cambiar_estado",
+              estado: estadoEl.value,
+              paciente_id: estadoEl.value === "OCUPADA" ? pacienteIdActual : ""
+            };
           } else {
             // Rama B: mover el paciente actual a una cama destino.
             var camaDestinoEl = document.getElementById("modal-cama-destino");
@@ -718,6 +720,10 @@ document.addEventListener("DOMContentLoaded", function () {
           var selectPaciente = document.getElementById("modal-mapa-paciente");
           var tomPaciente = null;
 
+          if (tipoBusquedaPaciente) {
+            tipoBusquedaPaciente.value = "dni";
+          }
+
           function limpiarSeleccionPaciente() {
             if (tomPaciente) {
               tomPaciente.clear(true);
@@ -732,7 +738,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
           function cargarPacientesFallback(query) {
             // Fallback para navegadores/situaciones sin TomSelect disponible.
-            var tipo = (tipoBusquedaPaciente && tipoBusquedaPaciente.value) ? tipoBusquedaPaciente.value : "nombre";
+            var tipo = (tipoBusquedaPaciente && tipoBusquedaPaciente.value) ? tipoBusquedaPaciente.value : "dni";
             var params = [];
             if (query) {
               params.push("q=" + encodeURIComponent(query));
@@ -766,7 +772,7 @@ document.addEventListener("DOMContentLoaded", function () {
               placeholder: "Buscar paciente...",
               preload: false,
               load: function (query, callback) {
-                var tipo = (tipoBusquedaPaciente && tipoBusquedaPaciente.value) ? tipoBusquedaPaciente.value : "nombre";
+                var tipo = (tipoBusquedaPaciente && tipoBusquedaPaciente.value) ? tipoBusquedaPaciente.value : "dni";
                 var params = [];
                 if (query) {
                   params.push("q=" + encodeURIComponent(query));
@@ -782,16 +788,41 @@ document.addEventListener("DOMContentLoaded", function () {
             });
           }
 
+          function activarBuscadorPacienteParaOcupada() {
+            if (!bloquePaciente) {
+              return;
+            }
+            bloquePaciente.style.display = "";
+
+            if (tipoBusquedaPaciente) {
+              tipoBusquedaPaciente.value = "dni";
+            }
+
+            if (tomPaciente) {
+              tomPaciente.clear(true);
+              tomPaciente.clearOptions();
+              tomPaciente.load("");
+              return;
+            }
+
+            cargarPacientesFallback("");
+          }
+
           estadoSelect.addEventListener("change", function () {
             if (estadoSelect.value === "OCUPADA") {
               // Solo en OCUPADA se habilita la asignacion de paciente.
-              bloquePaciente.style.display = "";
+              activarBuscadorPacienteParaOcupada();
             } else {
               // Si cambia a un estado no-ocupado, se limpia seleccion previa.
               bloquePaciente.style.display = "none";
               limpiarSeleccionPaciente();
             }
           });
+
+          // Si el estado ya abre en OCUPADA, preparar el buscador inmediatamente.
+          if (estadoSelect && estadoSelect.value === "OCUPADA") {
+            activarBuscadorPacienteParaOcupada();
+          }
 
           if (tipoBusquedaPaciente) {
             tipoBusquedaPaciente.addEventListener("change", function () {
@@ -828,6 +859,8 @@ document.addEventListener("DOMContentLoaded", function () {
           throw new Error(dataMover.error || "No se pudo mover al paciente.");
         }
 
+        // [2026-05-04 IMPROVEMENT] No hacer location.reload().
+        // Actualizar cards dinámicamente desde respuesta sin recarga de página.
         // Actualizar la card de la cama origen (queda VACIA)
         actualizarCardDesdeRespuesta(camaEl, dataMover.cama_origen);
         if (sesionMapeoActivaId) {
@@ -845,8 +878,6 @@ document.addEventListener("DOMContentLoaded", function () {
           }
         }
 
-        // Reaplica filtro actual para mantener coherencia visual tras el cambio.
-        aplicarFiltro();
         toastr.success(dataMover.mensaje || "Paciente movido correctamente.", "Exito");
 
       } else {
@@ -870,11 +901,10 @@ document.addEventListener("DOMContentLoaded", function () {
         }
 
         actualizarCardDesdeRespuesta(camaEl, data.cama);
+        // [2026-05-04 IMPROVEMENT] Marcar cama como mapeada sin reload de página.
         if (sesionMapeoActivaId) {
           marcarCamaComoMapeada(camaEl);
         }
-        // Reaplica filtro actual para mantener coherencia visual tras el cambio.
-        aplicarFiltro();
         toastr.success(data.mensaje || "Cama actualizada.", "Exito");
       }
 
@@ -957,14 +987,47 @@ document.addEventListener("DOMContentLoaded", function () {
           var dni = document.createElement("span");
           dni.className = "mapa-cama-dni";
           dni.textContent = cama.paciente && cama.paciente.dni ? cama.paciente.dni : "";
-          insertarBotonAccionRapida(camaEl);
           camaEl.appendChild(numero);
           camaEl.appendChild(estado);
           camaEl.appendChild(paciente);
           camaEl.appendChild(dni);
+
+          // --- Interaccion: doble clic (escritorio) o pulsacion larga (tactil)
+          // Simple clic  -> abre modal de edicion
+          // Doble clic   -> confirma cama sin cambios (solo en sesion de mapeo activa)
+          // Long press   -> idem doble clic en pantallas tactiles
+          var _clickTimer = null;
+          var _longTimer  = null;
+          var _touchWasLong = false;
+
+          camaEl.addEventListener("touchstart", function () {
+            _longTimer = setTimeout(function () {
+              _longTimer = null;
+              _touchWasLong = true;
+              if (sesionMapeoActivaId) { confirmarCamaSinCambios(camaEl); }
+            }, LONG_PRESS_MS);
+          }, { passive: true });
+
+          camaEl.addEventListener("touchend", function () {
+            if (_longTimer) { clearTimeout(_longTimer); _longTimer = null; }
+          });
+
+          camaEl.addEventListener("touchmove", function () {
+            if (_longTimer) { clearTimeout(_longTimer); _longTimer = null; }
+          });
+
           camaEl.addEventListener("click", function () {
-            // Cada card abre un modal contextual sobre su propia cama.
-            abrirModalEdicionCama(camaEl);
+            if (_touchWasLong) { _touchWasLong = false; return; }
+            if (_clickTimer) {
+              clearTimeout(_clickTimer);
+              _clickTimer = null;
+              if (sesionMapeoActivaId) { confirmarCamaSinCambios(camaEl); }
+            } else {
+              _clickTimer = setTimeout(function () {
+                _clickTimer = null;
+                abrirModalEdicionCama(camaEl);
+              }, CLICK_DELAY_MS);
+            }
           });
           camasRenderizadas.push(camaEl);
           return camaEl;
@@ -1016,7 +1079,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // Reaplicar marca visual de camas ya mapeadas cuando se vuelve a renderizar.
     aplicarMarcasSesionEnRender();
-    actualizarBotonesAccionRapidaVisibilidad();
   }
 
   // Carga inicial del mapa y manejo de errores de red/servidor.
@@ -1037,7 +1099,22 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   inputBusqueda.addEventListener("input", aplicarFiltro);
-  tipoBusqueda.addEventListener("change", aplicarFiltro);
+
+  // [2026-05-05 FEATURE] Persistir tipo de búsqueda en localStorage.
+  // Restaura la selección al cargar la página o volver desde otra sección.
+  var STORAGE_KEY_TIPO = "mapa_tipo_busqueda";
+  if (tipoBusqueda) {
+    var tipoPersistido = localStorage.getItem(STORAGE_KEY_TIPO);
+    if (tipoPersistido) {
+      tipoBusqueda.value = tipoPersistido;
+    }
+  }
+
+  tipoBusqueda.addEventListener("change", function () {
+    // [2026-05-05 FEATURE] Guardar selección al cambiar.
+    localStorage.setItem(STORAGE_KEY_TIPO, tipoBusqueda.value);
+    aplicarFiltro();
+  });
 
   // ========================================================================
   // Acciones de barra superior (filtros, utilidades y control de sesion)
@@ -1047,6 +1124,8 @@ document.addEventListener("DOMContentLoaded", function () {
   btnLimpiar.addEventListener("click", function () {
     inputBusqueda.value = "";
     tipoBusqueda.value = "todo";
+    // [2026-05-05 FEATURE] Al limpiar, también resetear el valor persistido.
+    localStorage.setItem(STORAGE_KEY_TIPO, "todo");
     aplicarFiltro();
     inputBusqueda.focus();
   });

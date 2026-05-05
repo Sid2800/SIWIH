@@ -1,6 +1,6 @@
 from servicio import models as modelosServicio
 from servicio.models import Institucion_salud
-from mapeo_camas.models import AsignacionCamaPaciente
+from mapeo_camas.models import AsignacionCamaPaciente, EstadoMapeo
 from core.constants.domain_constants import HEAC_INSTITUCION_ID
 from core.constants.domain_constants import SALAS_EXCLUIDAS, SERVICIOS_AUX_EXTERNOS
 from django.db import transaction
@@ -50,9 +50,14 @@ class ServicioService:
     @staticmethod
     def obtener_camas_activas():
         # La disponibilidad se define unicamente por el estado de asignacion de cama.
+        try:
+            estado_vacia = EstadoMapeo.objects.get(codigo="VACIA", categoria="ESTADO_CAMA")
+        except EstadoMapeo.DoesNotExist:
+            # Si no existe el estado VACIA, retornar lista vacía
+            return modelosServicio.Cama.objects.none()
             
         camas_disponibles_ids = AsignacionCamaPaciente.objects.filter(
-            estado=AsignacionCamaPaciente.Estado.VACIA
+            estado=estado_vacia
         ).values_list("cama_id", flat=True)
 
         return (

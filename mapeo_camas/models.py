@@ -1,7 +1,39 @@
+
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
+
+
+# =============================================================================
+# EstadoMapeo
+# -----------------------------------------------------------------------------
+# Catálogo centralizado de estados para camas, sesiones, etc.
+# =============================================================================
+class EstadoMapeo(models.Model):
+
+    class Categoria(models.TextChoices):
+        ESTADO_CAMA = "ESTADO_CAMA", "Estado de cama"
+        ESTADO_SESION = "ESTADO_SESION", "Estado de sesion"
+        TIPO_ACCION = "TIPO_ACCION", "Tipo de accion"
+
+    codigo = models.CharField(max_length=40, unique=True, db_index=True, verbose_name="Código")
+    categoria = models.CharField(
+        max_length=20,
+        choices=Categoria.choices,
+        verbose_name="Categoría",
+    )
+    activo = models.BooleanField(default=True, verbose_name="Activo")
+
+    class Meta:
+        db_table = "mapeo_camas_estado_mapeo"
+        verbose_name = "Estado de mapeo"
+        verbose_name_plural = "Estados de mapeo"
+        ordering = ["categoria", "codigo"]
+
+    def __str__(self):
+        return f"{self.categoria} | {self.codigo}"
+    
 
 
 # =============================================================================
@@ -14,18 +46,7 @@ from django.utils import timezone
 # =============================================================================
 class AsignacionCamaPaciente(models.Model):
 
-    # Catálogo de estados posibles de una cama.
-    # VACIA         → cama disponible, sin paciente.
-    # OCUPADA       → cama con paciente internado.
-    # PRE_ALTA      → paciente en pre alta; pendiente de liberar la cama.
-    # FUERA_SERVICIO→ cama no disponible por mantenimiento u otra razón.
-    # CONSULTA_EXTERNA → cama reservada para uso de consulta externa.
-    class Estado(models.TextChoices):
-        VACIA = "VACIA", "Vacia"
-        OCUPADA = "OCUPADA", "Ocupada"
-        PRE_ALTA = "PRE_ALTA", "Pre alta"
-        FUERA_SERVICIO = "FUERA_SERVICIO", "Fuera de servicio"
-        CONSULTA_EXTERNA = "CONSULTA_EXTERNA", "Consulta externa"
+    # El estado ahora es una FK a EstadoMapeo (categoria="ESTADO_CAMA")
 
     # Cama física a la que corresponde esta asignación.
     cama = models.ForeignKey(
@@ -45,15 +66,15 @@ class AsignacionCamaPaciente(models.Model):
     )
     # Momento en que se creó esta asignación (automático).
     fecha_inicio = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de inicio")
-    # Momento en que se cerró la asignación. Null mientras está activa.
-    fecha_fin = models.DateTimeField(null=True, blank=True, verbose_name="Fecha de fin")
-    # Estado actual de la cama. Indexado para consultas rápidas en el mapa.
-    estado = models.CharField(
-        max_length=20,
-        choices=Estado.choices,
-        default=Estado.VACIA,
-        db_index=True,
+    # (Eliminado: fecha_fin, ahora gestionado solo por historial)
+    # Estado actual de la cama. Ahora FK a EstadoMapeo.
+    estado = models.ForeignKey(
+        "mapeo_camas.EstadoMapeo",
+        on_delete=models.PROTECT,
+        related_name="asignaciones_cama",
         verbose_name="Estado",
+        db_index=True,
+        limit_choices_to={"categoria": "ESTADO_CAMA"},
     )
     # Usuario que realizó la asignación (ingreso del paciente o cambio de estado).
     usuario_asignacion = models.ForeignKey(
@@ -62,15 +83,7 @@ class AsignacionCamaPaciente(models.Model):
         related_name="asignaciones_cama_creadas",
         verbose_name="Usuario de asignacion",
     )
-    # Usuario que cerró/liberó la asignación. Null mientras está activa.
-    usuario_cierre = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.PROTECT,
-        null=True,
-        blank=True,
-        related_name="asignaciones_cama_cerradas",
-        verbose_name="Usuario de cierre",
-    )
+    # (Eliminado: usuario_cierre, ahora gestionado solo por historial)
 
     class Meta:
         db_table = "mapeo_camas_asignacion_cama_paciente"
@@ -83,14 +96,6 @@ class AsignacionCamaPaciente(models.Model):
             # Optimiza la búsqueda de la cama activa de un paciente.
             models.Index(fields=["paciente", "estado"], name="idx_asig_paciente_estado"),
         ]
-        constraints = [
-            # Garantiza en base de datos que fecha_fin, si existe, no sea anterior a fecha_inicio.
-            models.CheckConstraint(
-                check=models.Q(fecha_fin__isnull=True)
-                | models.Q(fecha_fin__gte=models.F("fecha_inicio")),
-                name="chk_asig_fechas_validas",
-            ),
-        ]
 
     def clean(self):
         """
@@ -99,19 +104,16 @@ class AsignacionCamaPaciente(models.Model):
         """
         errors = {}
 
-        if self.estado == self.Estado.OCUPADA:
-            # Una cama OCUPADA debe tener paciente y no debe tener cierre registrado.
+        # Se asume que los códigos de estado siguen el catálogo de EstadoMapeo
+        if self.estado and self.estado.codigo == "OCUPADA":
+            # Una cama OCUPADA debe tener paciente.
             if self.paciente is None:
                 errors["paciente"] = "Una asignacion ocupada debe tener paciente."
-            if self.fecha_fin is not None:
-                errors["fecha_fin"] = "Una asignacion ocupada no debe tener fecha de fin."
-            if self.usuario_cierre is not None:
-                errors["usuario_cierre"] = "Una asignacion ocupada no debe tener usuario de cierre."
 
             # Impide que una misma cama tenga dos asignaciones OCUPADA al mismo tiempo.
             cama_ocupada = AsignacionCamaPaciente.objects.filter(
                 cama=self.cama,
-                estado=self.Estado.OCUPADA,
+                estado__codigo="OCUPADA",
             ).exclude(pk=self.pk)
             if cama_ocupada.exists():
                 errors["cama"] = "La cama ya tiene una asignacion ocupada."
@@ -120,30 +122,29 @@ class AsignacionCamaPaciente(models.Model):
             if self.paciente_id is not None:
                 paciente_con_cama = AsignacionCamaPaciente.objects.filter(
                     paciente=self.paciente,
-                    estado=self.Estado.OCUPADA,
+                    estado__codigo="OCUPADA",
                 ).exclude(pk=self.pk)
                 if paciente_con_cama.exists():
                     errors["paciente"] = "El paciente ya tiene una asignacion ocupada."
 
-        if self.estado == self.Estado.VACIA:
+        if self.estado and self.estado.codigo == "VACIA":
             # Regla de negocio: cama vacia implica asignacion sin paciente.
             self.paciente = None
 
-        if self.fecha_fin and self.fecha_inicio and self.fecha_fin < self.fecha_inicio:
-            errors["fecha_fin"] = "La fecha de fin no puede ser menor a la fecha de inicio."
+        # (Eliminado: validación de fecha_fin)
 
         if errors:
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
         # Garantiza integridad antes de persistir, independientemente del origen.
-        if self.estado == self.Estado.VACIA:
+        if self.estado and self.estado.codigo == "VACIA":
             self.paciente = None
         self.full_clean()
         return super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"Cama {self.cama_id} - Paciente {self.paciente_id} ({self.estado})"
+        return f"Cama {self.cama_id} - Paciente {self.paciente_id} ({self.estado.codigo if self.estado else ''})"
 
 
 # =============================================================================
@@ -157,13 +158,7 @@ class HistorialEstadoCama(models.Model):
 
     # Catálogo para auditoría histórica.
     # Incluye ALTA como valor legado para no perder trazabilidad.
-    class Estado(models.TextChoices):
-        VACIA             = "VACIA",             "Vacia"
-        OCUPADA           = "OCUPADA",           "Ocupada"
-        PRE_ALTA          = "PRE_ALTA",          "Pre alta"
-        ALTA              = "ALTA",              "Alta (historico)"
-        FUERA_SERVICIO    = "FUERA_SERVICIO",    "Fuera de servicio"
-        CONSULTA_EXTERNA  = "CONSULTA_EXTERNA",  "Consulta externa"
+    # El estado ahora es una FK a EstadoMapeo (categoria="ESTADO_CAMA")
 
     # Cama cuyo estado cambió.
     cama = models.ForeignKey(
@@ -173,18 +168,22 @@ class HistorialEstadoCama(models.Model):
         verbose_name="Cama",
     )
     # Estado en el que estaba la cama antes del cambio. Null para el primer registro.
-    estado_anterior = models.CharField(
-        max_length=20,
-        choices=Estado.choices,
+    estado_anterior = models.ForeignKey(
+        "mapeo_camas.EstadoMapeo",
+        on_delete=models.PROTECT,
+        related_name="historiales_como_anterior",
         null=True,
         blank=True,
         verbose_name="Estado anterior",
+        limit_choices_to={"categoria": "ESTADO_CAMA"},
     )
     # Estado al que transitó la cama en este evento.
-    estado_nuevo = models.CharField(
-        max_length=20,
-        choices=Estado.choices,
+    estado_nuevo = models.ForeignKey(
+        "mapeo_camas.EstadoMapeo",
+        on_delete=models.PROTECT,
+        related_name="historiales_como_nuevo",
         verbose_name="Estado nuevo",
+        limit_choices_to={"categoria": "ESTADO_CAMA"},
     )
     # Paciente involucrado en el cambio, si aplica (p.ej. ingreso o alta).
     paciente = models.ForeignKey(
@@ -229,7 +228,7 @@ class HistorialEstadoCama(models.Model):
     def __str__(self):
         hora_local = timezone.localtime(self.fecha_hora)
         return (
-            f"Cama {self.cama_id} | {self.estado_anterior} → {self.estado_nuevo}"
+            f"Cama {self.cama_id} | {self.estado_anterior.codigo if self.estado_anterior else ''} → {self.estado_nuevo.codigo if self.estado_nuevo else ''}"
             f" | {hora_local:%d/%m/%Y %H:%M}"
         )
 
@@ -324,10 +323,7 @@ class MovimientoCama(models.Model):
 # =============================================================================
 class MapeoSesionCama(models.Model):
 
-    class Estado(models.TextChoices):
-        EN_PROGRESO = "EN_PROGRESO", "En progreso"
-        FINALIZADO = "FINALIZADO", "Finalizado"
-        CANCELADO = "CANCELADO", "Cancelado"
+    # El estado ahora es una FK a EstadoMapeo (categoria="ESTADO_SESION")
 
     usuario = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -337,12 +333,13 @@ class MapeoSesionCama(models.Model):
     )
     fecha_inicio = models.DateTimeField(auto_now_add=True, db_index=True, verbose_name="Fecha de inicio")
     fecha_fin = models.DateTimeField(null=True, blank=True, verbose_name="Fecha de fin")
-    estado = models.CharField(
-        max_length=20,
-        choices=Estado.choices,
-        default=Estado.EN_PROGRESO,
-        db_index=True,
+    estado = models.ForeignKey(
+        "mapeo_camas.EstadoMapeo",
+        on_delete=models.PROTECT,
+        related_name="sesiones_mapeo",
         verbose_name="Estado",
+        db_index=True,
+        limit_choices_to={"categoria": "ESTADO_SESION"},
     )
     observacion = models.CharField(
         max_length=500,
@@ -359,7 +356,7 @@ class MapeoSesionCama(models.Model):
 
     def __str__(self):
         hora_local = timezone.localtime(self.fecha_inicio)
-        return f"Sesion {self.id} | {self.estado} | {hora_local:%d/%m/%Y %H:%M}"
+        return f"Sesion {self.id} | {self.estado.codigo if self.estado else ''} | {hora_local:%d/%m/%Y %H:%M}"
 
 
 # =============================================================================
@@ -370,12 +367,13 @@ class MapeoSesionCama(models.Model):
 # =============================================================================
 class DetalleMapeoCama(models.Model):
 
-    class TipoAccion(models.TextChoices):
-        CONFIRMACION = "CONFIRMACION", "Confirmacion"
-        ALTA = "ALTA", "Alta"
-        CAMBIO = "CAMBIO", "Cambio"
-        TRASLADO = "TRASLADO", "Traslado"
-        CORRECCION = "CORRECCION", "Correccion"
+    # Constantes de codigo para los tipos de accion (categoria TIPO_ACCION en EstadoMapeo)
+    class TipoAccion:
+        CONFIRMACION = "CONFIRMACION"
+        ALTA = "ALTA"
+        CAMBIO = "CAMBIO"
+        TRASLADO = "TRASLADO"
+        CORRECCION = "CORRECCION"
 
     sesion_mapeo = models.ForeignKey(
         MapeoSesionCama,
@@ -391,7 +389,15 @@ class DetalleMapeoCama(models.Model):
     )
     fue_validada = models.BooleanField(default=False, verbose_name="Fue validada")
     hubo_cambio = models.BooleanField(default=False, verbose_name="Hubo cambio")
-    estado_actual = models.CharField(max_length=20, blank=True, default="", verbose_name="Estado actual")
+    estado_actual = models.ForeignKey(
+        "mapeo_camas.EstadoMapeo",
+        on_delete=models.PROTECT,
+        related_name="detalles_mapeo_como_estado",
+        null=True,
+        blank=True,
+        verbose_name="Estado actual",
+        limit_choices_to={"categoria": "ESTADO_CAMA"},
+    )
     paciente_actual = models.ForeignKey(
         "paciente.Paciente",
         on_delete=models.PROTECT,
@@ -400,13 +406,12 @@ class DetalleMapeoCama(models.Model):
         related_name="detalles_mapeo_actual",
         verbose_name="Paciente actual",
     )
-    ubicacion = models.CharField(max_length=255, blank=True, default="", verbose_name="Ubicacion")
-    tipo_accion = models.CharField(
-        max_length=20,
-        choices=TipoAccion.choices,
-        default=TipoAccion.CONFIRMACION,
-        db_index=True,
+    tipo_accion = models.ForeignKey(
+        "mapeo_camas.EstadoMapeo",
+        on_delete=models.PROTECT,
+        related_name="detalles_mapeo_como_accion",
         verbose_name="Tipo de accion",
+        limit_choices_to={"categoria": "TIPO_ACCION"},
     )
     usuario = models.ForeignKey(
         settings.AUTH_USER_MODEL,

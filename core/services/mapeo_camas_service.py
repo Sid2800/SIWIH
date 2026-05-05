@@ -2,12 +2,17 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.utils.timezone import localtime, now
 
-from mapeo_camas.models import AsignacionCamaPaciente, HistorialEstadoCama
+from mapeo_camas.models import AsignacionCamaPaciente, HistorialEstadoCama, EstadoMapeo
 from paciente.models import Paciente
 from servicio.models import Cama
 
 
 class MapeoCamasService:
+    @staticmethod
+    def get_estado_mapeo(codigo, categoria):
+        from mapeo_camas.models import EstadoMapeo
+        return EstadoMapeo.objects.get(codigo=codigo, categoria=categoria)
+
     @staticmethod
     def registrar_historial_estado_cama(
         cama_id,
@@ -40,9 +45,10 @@ class MapeoCamasService:
         """
         errores = {}
 
+        estado_ocupada = MapeoCamasService.get_estado_mapeo("OCUPADA", "ESTADO_CAMA")
         asignacion_activa_cama = AsignacionCamaPaciente.objects.filter(
             cama_id=cama_id,
-            estado=AsignacionCamaPaciente.Estado.OCUPADA,
+            estado=estado_ocupada,
         ).first()
         if asignacion_activa_cama:
             errores["cama_id"] = (
@@ -53,7 +59,7 @@ class MapeoCamasService:
         if paciente_id is not None:
             asignacion_activa_paciente = AsignacionCamaPaciente.objects.filter(
                 paciente_id=paciente_id,
-                estado=AsignacionCamaPaciente.Estado.OCUPADA,
+                estado=estado_ocupada,
             ).first()
             if asignacion_activa_paciente:
                 errores["paciente_id"] = (
@@ -84,6 +90,9 @@ class MapeoCamasService:
                 # Revalidar dentro del bloqueo para evitar carrera entre transacciones.
                 MapeoCamasService.validar_consistencia_minima(cama_id, paciente_id)
 
+                estado_ocupada = MapeoCamasService.get_estado_mapeo("OCUPADA", "ESTADO_CAMA")
+                estado_vacia = MapeoCamasService.get_estado_mapeo("VACIA", "ESTADO_CAMA")
+
                 asignacion = (
                     AsignacionCamaPaciente.objects.select_for_update()
                     .filter(cama_id=cama_id)
@@ -94,18 +103,14 @@ class MapeoCamasService:
                 if asignacion:
                     asignacion.paciente_id = paciente_id
                     asignacion.usuario_asignacion = usuario
-                    asignacion.estado = AsignacionCamaPaciente.Estado.OCUPADA
+                    asignacion.estado = estado_ocupada
                     asignacion.fecha_inicio = now()
-                    asignacion.fecha_fin = None
-                    asignacion.usuario_cierre = None
                     asignacion.save(
                         update_fields=[
                             "paciente",
                             "usuario_asignacion",
                             "estado",
                             "fecha_inicio",
-                            "fecha_fin",
-                            "usuario_cierre",
                         ]
                     )
                 else:
@@ -113,9 +118,7 @@ class MapeoCamasService:
                         cama_id=cama_id,
                         paciente_id=paciente_id,
                         usuario_asignacion=usuario,
-                        estado=AsignacionCamaPaciente.Estado.OCUPADA,
-                        fecha_fin=None,
-                        usuario_cierre=None,
+                        estado=estado_ocupada,
                     )
                     asignacion.save()
 
@@ -123,8 +126,8 @@ class MapeoCamasService:
                 # Ingreso: la cama pasa de Vacia → Ocupada
                 MapeoCamasService.registrar_historial_estado_cama(
                     cama_id=cama_id,
-                    estado_anterior=HistorialEstadoCama.Estado.VACIA,
-                    estado_nuevo=HistorialEstadoCama.Estado.OCUPADA,
+                    estado_anterior=estado_vacia,
+                    estado_nuevo=estado_ocupada,
                     paciente_id=paciente_id,
                     usuario=usuario,
                     observacion="Ingreso",
@@ -141,9 +144,10 @@ class MapeoCamasService:
         """
         Cierra la asignacion activa del paciente (opcionalmente filtrada por cama).
         """
+        estado_ocupada = MapeoCamasService.get_estado_mapeo("OCUPADA", "ESTADO_CAMA")
         filtros = {
             "paciente_id": paciente_id,
-            "estado": AsignacionCamaPaciente.Estado.OCUPADA,
+            "estado": estado_ocupada,
         }
         if cama_id is not None:
             filtros["cama_id"] = cama_id
@@ -157,18 +161,17 @@ class MapeoCamasService:
         if not asignacion_activa:
             return None
 
-        asignacion_activa.estado = AsignacionCamaPaciente.Estado.VACIA
+        estado_vacia = MapeoCamasService.get_estado_mapeo("VACIA", "ESTADO_CAMA")
+        asignacion_activa.estado = estado_vacia
         asignacion_activa.paciente = None
-        asignacion_activa.fecha_fin = localtime()   # hora local de Honduras (America/Tegucigalpa)
-        asignacion_activa.usuario_cierre = usuario
-        asignacion_activa.save(update_fields=["estado", "paciente", "fecha_fin", "usuario_cierre"])
+        asignacion_activa.save(update_fields=["estado", "paciente"])
 
         # FASE 6: registrar en historial de estado
         # Cierre: la cama pasa de Ocupada -> Vacia (libera la cama)
         MapeoCamasService.registrar_historial_estado_cama(
             cama_id=asignacion_activa.cama_id,
-            estado_anterior=HistorialEstadoCama.Estado.OCUPADA,
-            estado_nuevo=HistorialEstadoCama.Estado.VACIA,
+            estado_anterior=estado_ocupada,
+            estado_nuevo=estado_vacia,
             paciente_id=asignacion_activa.paciente_id,
             usuario=usuario,
             observacion="Cierre de asignacion",
@@ -195,11 +198,14 @@ class MapeoCamasService:
             # Bloquea el paciente para serializar cambios de cama por ingreso.
             Paciente.objects.select_for_update().get(pk=paciente_id)
 
+            estado_ocupada = MapeoCamasService.get_estado_mapeo("OCUPADA", "ESTADO_CAMA")
+            estado_vacia = MapeoCamasService.get_estado_mapeo("VACIA", "ESTADO_CAMA")
+
             asignacion_activa = (
                 AsignacionCamaPaciente.objects.select_for_update()
                 .filter(
                     paciente_id=paciente_id,
-                    estado=AsignacionCamaPaciente.Estado.OCUPADA,
+                    estado=estado_ocupada,
                 )
                 .order_by("-fecha_inicio")
                 .first()
@@ -228,7 +234,7 @@ class MapeoCamasService:
 
             cama_ocupada = AsignacionCamaPaciente.objects.filter(
                 cama_id=cama_nueva_id,
-                estado=AsignacionCamaPaciente.Estado.OCUPADA,
+                estado=estado_ocupada,
             ).exclude(pk=asignacion_activa.pk).first()
             if cama_ocupada:
                 raise ValidationError(
@@ -238,19 +244,17 @@ class MapeoCamasService:
             if cama_anterior_id is not None:
                 MapeoCamasService.registrar_historial_estado_cama(
                     cama_id=cama_anterior_id,
-                    estado_anterior=HistorialEstadoCama.Estado.OCUPADA,
-                    estado_nuevo=HistorialEstadoCama.Estado.VACIA,
+                    estado_anterior=estado_ocupada,
+                    estado_nuevo=estado_vacia,
                     paciente_id=paciente_id,
                     usuario=usuario,
                     observacion="Cambio de cama - salida",
                 )
 
             # La fila vieja se conserva para historial: solo se cierra.
-            asignacion_activa.estado = AsignacionCamaPaciente.Estado.VACIA
+            asignacion_activa.estado = estado_vacia
             asignacion_activa.paciente = None
-            asignacion_activa.fecha_fin = localtime()
-            asignacion_activa.usuario_cierre = usuario
-            asignacion_activa.save(update_fields=["estado", "paciente", "fecha_fin", "usuario_cierre"])
+            asignacion_activa.save(update_fields=["estado", "paciente"])
 
             # La nueva cama reutiliza su ultimo registro historico si existe.
             nueva_asignacion = (
@@ -263,18 +267,14 @@ class MapeoCamasService:
             if nueva_asignacion:
                 nueva_asignacion.paciente_id = paciente_id
                 nueva_asignacion.usuario_asignacion = usuario
-                nueva_asignacion.estado = AsignacionCamaPaciente.Estado.OCUPADA
+                nueva_asignacion.estado = estado_ocupada
                 nueva_asignacion.fecha_inicio = now()
-                nueva_asignacion.fecha_fin = None
-                nueva_asignacion.usuario_cierre = None
                 nueva_asignacion.save(
                     update_fields=[
                         "paciente",
                         "usuario_asignacion",
                         "estado",
                         "fecha_inicio",
-                        "fecha_fin",
-                        "usuario_cierre",
                     ]
                 )
             else:
@@ -282,15 +282,13 @@ class MapeoCamasService:
                     cama_id=cama_nueva_id,
                     paciente_id=paciente_id,
                     usuario_asignacion=usuario,
-                    estado=AsignacionCamaPaciente.Estado.OCUPADA,
-                    fecha_fin=None,
-                    usuario_cierre=None,
+                    estado=estado_ocupada,
                 )
 
             MapeoCamasService.registrar_historial_estado_cama(
                 cama_id=cama_nueva_id,
-                estado_anterior=HistorialEstadoCama.Estado.VACIA,
-                estado_nuevo=HistorialEstadoCama.Estado.OCUPADA,
+                estado_anterior=estado_vacia,
+                estado_nuevo=estado_ocupada,
                 paciente_id=paciente_id,
                 usuario=usuario,
                 observacion="Cambio de cama - entrada",

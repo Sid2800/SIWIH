@@ -24,25 +24,21 @@
       <button type="button" class="dt-button" id="btn-imprimir-camas" title="Imprimir mapa">
         <i class="bi bi-printer boton-exportacion"></i>
       </button>
-      <button type="button" class="dt-button" id="btn-historiales-camas" title="Ver historiales de camas" onclick="window.location.href='{% url 'mapeo_camas_historiales' %}'">
+      <a href="{% url 'mapeo_camas_historiales' %}" class="dt-button" id="btn-historiales-camas" title="Ver historiales de camas">
         <i class="bi bi-clock-history boton-exportacion"></i>
-      </button>
+      </a>
       <button type="button" class="dt-button mapa-control-mapeo--oculto" id="btn-terminar-mapeo" title="Terminar mapeo">
         <i class="bi bi-check2-circle boton-exportacion"></i>
       </button>
       <button type="button" class="dt-button mapa-control-mapeo--oculto" id="btn-cancelar-mapeo" title="Cancelar mapeo">
         <i class="bi bi-x-octagon boton-exportacion"></i>
       </button>
-      {% if request.user.is_superuser %}
-      <button type="button" class="dt-button" id="btn-sincronizar-camas" title="Sincronizar camas con ingresos activos">
-        <i class="bi bi-arrow-repeat boton-exportacion"></i>
-      </button>
-      {% endif %}
     </div>
 
     <div class="mapa-buscador">
       <label for="mapa-busqueda" class="mapa-buscador-label">Buscar:</label>
       <select id="mapa-tipo-busqueda" class="formularioCampo-select">
+        <option value="dni" selected>DNI</option>
         <option value="todo">Todos</option>
         <option value="cama">Numero cama</option>
         <option value="paciente">Paciente</option>
@@ -61,6 +57,26 @@
     </div>
   </div>
 
+  {% comment %}
+  [2026-05-04 FEATURE] Banner de advertencia para otros usuarios.
+  Muestra si otro usuario tiene un mapeo activo (EN_PROGRESO).
+  {% endcomment %}
+  {% if sesion_ajena %}
+  <div class="mapa-banner-advertencia">
+    <i class="bi bi-exclamation-triangle-fill mapa-banner-advertencia__icono"></i>
+    <span class="mapa-banner-advertencia__texto">
+      Mapeo en progreso por <strong>{{ sesion_ajena.usuario.get_full_name|default:sesion_ajena.usuario.username }}</strong>
+      &mdash; evita modificar camas durante esta sesión
+    </span>
+  </div>
+  {% endif %}
+
+  {% comment %}[2026-05-04 FEATURE] Banner pegajoso de mapeo activo (propio). Se muestra/oculta con JS.{% endcomment %}
+  <div id="mapa-banner-mapeo" class="mapa-banner-mapeo mapa-control-mapeo--oculto">
+    <i class="bi bi-record-circle-fill mapa-banner-mapeo__icono"></i>
+    <span class="mapa-banner-mapeo__texto">Mapeo en progreso &mdash; revisa cada cama y confirma o corrige su estado</span>
+  </div>
+
   <div id="mapa-servicios" class="mapa-grid-servicios"></div>
 
   <div id="mapa-pie-mapeo" class="mapa-pie-mapeo mapa-control-mapeo--oculto" style="margin-top:1.5rem;">
@@ -73,60 +89,9 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'mapeo_camas/scripts/mapaCamasAsignacion.js' %}"></script>
+<script src="{% static 'mapeo_camas/scripts/mapaCamasAsignacion.js' %}?v=20260505b"></script>
 {% if request.user.is_superuser %}
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-  const btn = document.getElementById('btn-sincronizar-camas');
-  if (!btn) return;
 
-  btn.addEventListener('click', function () {
-    Swal.fire({
-      title: 'Sincronizar camas',
-      text: 'Se crearán registros faltantes de asignación para ingresos activos con cama. ¿Continuar?',
-      icon: 'question',
-      showCancelButton: true,
-      confirmButtonText: 'Sí, sincronizar',
-      cancelButtonText: 'Cancelar',
-    }).then(function (result) {
-      if (!result.isConfirmed) return;
-
-      btn.disabled = true;
-      btn.querySelector('i').className = 'bi bi-hourglass-split boton-exportacion';
-
-      fetch("{% url 'sincronizar-camas-superadmin' %}", {
-        method: 'POST',
-        headers: {
-          'X-CSRFToken': '{{ csrf_token }}',
-          'Content-Type': 'application/json',
-        },
-      })
-      .then(function (res) { return res.json(); })
-      .then(function (data) {
-        if (data.success) {
-          const msg = `Sincronizados: ${data.sincronizados} | Omitidos: ${data.omitidos}` +
-            (data.errores && data.errores.length ? ` | Errores: ${data.errores.length}` : '');
-          if (data.errores && data.errores.length) {
-            toastr.warning(msg, 'Sincronización con advertencias');
-          } else {
-            toastr.success(msg, 'Sincronización exitosa');
-          }
-        } else {
-          toastr.error(data.error || 'Error desconocido', 'Error al sincronizar');
-        }
-      })
-      .catch(function () {
-        toastr.error('No se pudo conectar con el servidor.', 'Error');
-      })
-      .finally(function () {
-        btn.disabled = false;
-        btn.querySelector('i').className = 'bi bi-arrow-repeat boton-exportacion';
-      });
-    });
-  });
-});
-</script>
-{% endif %}
 <style>
   .mapa-acciones-superior {
     display: flex;
@@ -205,8 +170,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
   .mapa-sala-titulo {
     margin: 0;
-    font-size: 1.3rem;
-    padding: 0.55rem 0.75rem;
+    font-size: 1.5rem;
+    padding: 0.6rem 0.8rem;
     background: #f8fafc;
     border-bottom: 1px solid #e2e8f0;
   }
@@ -221,77 +186,31 @@ document.addEventListener('DOMContentLoaded', function () {
 
   .mapa-cubiculo-titulo {
     margin: 0;
-    font-size: 1.1rem;
+    font-size: 1.3rem;
     color: #334155;
-    padding: 0.45rem 0.65rem;
+    padding: 0.5rem 0.75rem;
     background: #f8fafc;
     border-bottom: 1px solid #e2e8f0;
   }
 
   .mapa-camas-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: 0.55rem;
-    padding: 0.6rem;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 0.7rem;
+    padding: 0.75rem;
   }
 
   .mapa-cama {
-    min-height: 70px;
-    border: 1px solid #cbd5e1;
+    min-height: 90px;
     border-radius: 8px;
-    padding: 1.8rem 0.5rem 0.4rem;
-    position: relative;
+    padding: 0.85rem 0.8rem;
     display: flex;
     flex-direction: column;
-    justify-content: center;
+    justify-content: flex-start;
     align-items: flex-start;
     transition: transform 0.12s ease, box-shadow 0.12s ease;
-  }
-
-  .mapa-cama-accion-rapida {
-    position: absolute;
-    top: 0.3rem;
-    right: 0.3rem;
-    border: 1px solid #cbd5e1;
-    background: rgba(255, 255, 255, 0.92);
-    color: #334155;
-    border-radius: 999px;
-    width: 2rem;
-    height: 2rem;
-    line-height: 1;
-    padding: 0;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 2;
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
-    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
-  }
-
-  .mapa-cama-accion-rapida .boton-exportacion {
-    font-size: 1.05rem;
-    margin: 0;
-  }
-
-  .mapa-cama-accion-rapida:hover {
-    background: #f8fafc;
-    border-color: #94a3b8;
-    color: #0f172a;
-  }
-
-  .mapa-cama-accion-rapida:active {
-    transform: scale(0.96);
-  }
-
-  .mapa-cama-accion-rapida:focus-visible {
-    outline: 2px solid #38bdf8;
-    outline-offset: 1px;
-  }
-
-  .mapa-cama-accion-rapida:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
+    user-select: none;
+    -webkit-user-select: none;
   }
 
   .mapa-cama:hover {
@@ -299,17 +218,30 @@ document.addEventListener('DOMContentLoaded', function () {
     box-shadow: 0 3px 10px rgba(15, 23, 42, 0.15);
   }
 
+  /* Indicador sutil de que en modo mapeo se puede doble-clic / presionar largo */
+  .mapa-cama--mapeada-hint::after {
+    content: "";
+    position: absolute;
+    top: 0.3rem;
+    right: 0.3rem;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: #f59e0b;
+    opacity: 0.7;
+  }
+
   .mapa-cama-numero {
-    font-size: 1.5rem;
+    font-size: 2.4rem;
     font-weight: 700;
     line-height: 1.1;
   }
 
   .mapa-cama-estado,
   .mapa-cama-paciente {
-    font-size: 1.15rem;
-    margin-top: 0.2rem;
-    white-space: nowrap;
+    font-size: 1.6rem;
+    margin-top: 0.25rem;
+    white-space: normal;
     overflow: hidden;
     text-overflow: ellipsis;
     width: 100%;
@@ -317,9 +249,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
   /* DNI del paciente: tono más tenue para distinguirlo del nombre */
   .mapa-cama-dni {
-    font-size: 1.0rem;
+    font-size: 1.4rem;
     color: #64748b;
-    white-space: nowrap;
+    white-space: normal;
     overflow: hidden;
     text-overflow: ellipsis;
     width: 100%;
@@ -337,19 +269,19 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   .mapa-cama--alta {
-    background: #dbeafe;
-    color: #1e40af;
+    background: #fef9c3;
+    color: #854d0e;
   }
 
   .mapa-cama--fuera-servicio,
   .mapa-cama--mantenimiento {
-    background: #fef3c7;
-    color: #92400e;
+    background: #1e293b;
+    color: #f1f5f9;
   }
 
   .mapa-cama--consulta-externa {
-    background: #cffafe;
-    color: #155e75;
+    background: #dbeafe;
+    color: #1e40af;
   }
 
   .mapa-cama--sin-asignacion {
@@ -364,6 +296,88 @@ document.addEventListener('DOMContentLoaded', function () {
 
   .mapa-control-mapeo--oculto {
     display: none;
+  }
+
+  /* [2026-05-04 AUDIT] Estilos para banner de advertencia (otro usuario en mapeo) */
+  .mapa-banner-advertencia {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    position: sticky;
+    top: 0;
+    z-index: 200;
+    background: #fee2e2;
+    color: #991b1b;
+    font-weight: 600;
+    font-size: 1.05rem;
+    padding: 0.6rem 1rem;
+    margin-bottom: 0.5rem;
+    border-radius: 0.4rem;
+  }
+
+  .mapa-banner-advertencia__icono {
+    font-size: 1.2rem;
+    animation: banner-pulso 1.4s ease-in-out infinite;
+  }
+
+  /* [2026-05-04 FEATURE] Estilos para banner pegajoso de mapeo propio (amarillo, animado) */
+  .mapa-banner-mapeo {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    position: sticky;
+    top: 0;
+    z-index: 200;
+    background: #fef9c3;
+    color: #854d0e;
+    font-weight: 600;
+    font-size: 1.05rem;
+    padding: 0.6rem 1rem;
+    margin-bottom: 0.5rem;
+    border-radius: 0.4rem;
+  }
+
+  .mapa-banner-mapeo__icono {
+    font-size: 1.2rem;
+    animation: banner-pulso 1.4s ease-in-out infinite;
+  }
+
+  .mapa-banner-mapeo__texto {
+    font-size: 1.35rem;
+    line-height: 1.25;
+  }
+
+  /* [2026-05-05 DARKMODE] Modo oscuro para contenedores de servicio/sala/cubículo */
+  .darkmode .mapa-servicio-card {
+    background: rgb(40, 44, 52);
+  }
+
+  .darkmode .mapa-servicio-titulo {
+    background: rgba(255, 255, 255, 0.06);
+    color: rgb(220, 220, 220);
+  }
+
+  .darkmode .mapa-sala {
+    background: rgb(36, 40, 48);
+  }
+
+  .darkmode .mapa-sala-titulo {
+    background: rgba(255, 255, 255, 0.05);
+    color: rgb(210, 215, 225);
+  }
+
+  .darkmode .mapa-cubiculo {
+    background: rgb(33, 37, 41);
+  }
+
+  .darkmode .mapa-cubiculo-titulo {
+    background: rgba(255, 255, 255, 0.04);
+    color: rgb(200, 210, 225);
+  }
+
+  @keyframes banner-pulso {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.35; }
   }
 
   .mapa-vacio {

@@ -11,11 +11,9 @@ class AsignacionCamaPacienteAdmin(admin.ModelAdmin):
         "paciente",
         "estado",
         "fecha_inicio",
-        "fecha_fin",
         "usuario_asignacion",
-        "usuario_cierre",
     )
-    list_filter = ("estado", "fecha_inicio", "fecha_fin")
+    list_filter = ("estado", "fecha_inicio")
     search_fields = (
         "cama__numero_cama",
         "paciente__primer_nombre",

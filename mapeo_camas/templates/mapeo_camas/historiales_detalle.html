@@ -4,7 +4,7 @@
 {% block title %}{{ titulo }}{% endblock %}
 
 {% block content %}
-<div class="contenedor2">
+<div class="contenedor2 dataTables_wrapper">
   <div class="tituloFormulario" style="margin-bottom: 1.5rem;">
     <div class="tituloFormulario-texto">
       <i class="bi bi-grid"></i>
@@ -24,17 +24,54 @@
       <button type="button" class="dt-button" id="btn-imprimir-detalle" title="Imprimir detalle">
         <i class="bi bi-printer boton-exportacion"></i>
       </button>
+      <button type="button" class="dt-button active" id="btn-vista-estructura" title="Vista estructura">
+        <i class="bi bi-grid boton-exportacion"></i>
+      </button>
+      <button type="button" class="dt-button" id="btn-vista-tabla" title="Vista tabla">
+        <i class="bi bi-table boton-exportacion"></i>
+      </button>
     </div>
     <div id="detalle-meta" class="detalle-meta"></div>
   </div>
 
+  <div id="detalle-tabla-filtros" class="fechasfiltro" style="margin-bottom: 0.75rem;">
+    <label for="dtf-fecha-inicio">Desde</label>
+    <input type="date" id="dtf-fecha-inicio" class="formularioCampo-date">
+    <label for="dtf-fecha-fin">Hasta</label>
+    <input type="date" id="dtf-fecha-fin" class="formularioCampo-date">
+    <label for="dtf-estado">Estado</label>
+    <select id="dtf-estado" class="formularioCampo-select">
+      <option value="">Todos</option>
+    </select>
+    <button type="button" class="dt-button" id="dtf-btn-limpiar" title="Limpiar filtros">
+      <i class="bi bi-eraser boton-exportacion"></i>
+    </button>
+  </div>
+
   <div id="detalle-estructura-contenedor" class="detalle-estructura"></div>
   <div id="detalle-cards-contenedor" class="historial-cards-grid"></div>
+
+  <div id="detalle-tabla-contenedor" style="display:none;">
+    <table id="tabla-detalle-camas" class="dataTable stripe hover row-border">
+      <thead>
+        <tr>
+          <th>Cama</th>
+          <th>Estado</th>
+          <th>Paciente</th>
+          <th>DNI</th>
+          <th>Acción / Transición</th>
+          <th>Fecha</th>
+          <th>Usuario</th>
+        </tr>
+      </thead>
+      <tbody id="tabla-detalle-camas-body"></tbody>
+    </table>
+  </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'mapeo_camas/scripts/historialesDetalleCamas.js' %}?v=20260417-4"></script>
+<script src="{% static 'mapeo_camas/scripts/historialesDetalleCamas.js' %}?v=20260505f"></script>
 <style>
   .contenedor2 {
     overflow-x: hidden;
@@ -118,10 +155,10 @@
 
   .detalle-bloque-titulo {
     font-weight: 700;
-    padding: 0.45rem 0.65rem;
+    padding: 0.55rem 0.75rem;
     background: #f3f6fb;
     border-bottom: 1px solid #d9e3f5;
-    font-size: 0.98rem;
+    font-size: 1.15rem;
   }
 
   .detalle-bloque-contenido {
@@ -130,29 +167,85 @@
 
   .detalle-camas-grid {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.6rem;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 0.7rem;
     align-items: start;
-    margin-top: 0.25rem;
+    margin-top: 0.3rem;
   }
 
+  /* [2026-05-05 FEATURE] Tarjeta de cama con estilo visual del mapa de camas */
   .detalle-cama-item {
-    border: 1px solid #d3deef;
-    border-radius: 10px;
-    padding: 0.5rem 0.6rem;
-    margin-bottom: 0;
-    background: #fff;
-    font-size: 0.9rem;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    border-radius: 8px;
+    padding: 0.85rem 0.8rem;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+    position: relative;
   }
 
-  .detalle-cama-item strong {
-    font-size: 1rem;
+  .detalle-cama-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 3px 10px rgba(15, 23, 42, 0.15);
   }
 
-  .detalle-cama-linea {
-    margin-top: 0.18rem;
-    line-height: 1.28;
+  .detalle-cama-numero {
+    font-size: 2.4rem;
+    font-weight: 700;
+    line-height: 1.1;
+  }
+
+  .detalle-cama-estado-txt,
+  .detalle-cama-paciente-txt {
+    font-size: 1.6rem;
+    margin-top: 0.25rem;
+    white-space: normal;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+  }
+
+  .detalle-cama-dni-txt {
+    font-size: 1.4rem;
+    opacity: 0.75;
+    white-space: normal;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+    margin-top: 0.15rem;
+  }
+
+  .detalle-cama-accion-txt {
+    font-size: 1.35rem;
+    margin-top: 0.25rem;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    font-weight: 600;
+  }
+
+  /* Sección expandible (usuario, fecha, observación) — oculta por defecto */
+  .detalle-cama-extra {
+    display: none;
+    margin-top: 0.45rem;
+    width: 100%;
+  }
+
+  .detalle-cama-linea-extra {
+    font-size: 1.3rem;
+    margin-top: 0.25rem;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .detalle-cama-obs-txt {
+    font-size: 1.2rem;
+    margin-top: 0.35rem;
+    opacity: 0.8;
+    font-style: italic;
     overflow-wrap: anywhere;
     word-break: break-word;
   }
@@ -178,9 +271,48 @@
 
   @media (max-width: 992px) {
     .historial-cards-grid,
-    .detalle-camas-grid,
     .historial-timeline {
       grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .detalle-bloque-contenido {
+      padding: 0.4rem;
+    }
+
+    .detalle-camas-grid {
+      grid-template-columns: 1fr;
+      gap: 0.55rem;
+    }
+
+    .detalle-cama-item {
+      padding: 0.7rem;
+    }
+
+    .detalle-cama-numero {
+      font-size: 2rem;
+    }
+
+    .detalle-cama-estado-txt,
+    .detalle-cama-paciente-txt,
+    .detalle-cama-dni-txt {
+      white-space: normal;
+      overflow: visible;
+      text-overflow: clip;
+      line-height: 1.2;
+    }
+
+    .detalle-cama-estado-txt,
+    .detalle-cama-paciente-txt {
+      font-size: 1.35rem;
+    }
+
+    .detalle-cama-dni-txt,
+    .detalle-cama-accion-txt,
+    .detalle-cama-linea-extra,
+    .detalle-cama-obs-txt {
+      font-size: 1.1rem;
     }
   }
 
@@ -223,5 +355,20 @@
     background: #e2e8f0;
     color: #334155;
   }
+
+  #tabla-detalle-camas {
+    width: 100%;
+  }
+
+  /* [2026-05-05 DARKMODE] Modo oscuro para contenedores de servicio/sala/cubículo */
+  .darkmode .detalle-bloque {
+    background: rgb(40, 44, 52);
+  }
+
+  .darkmode .detalle-bloque-titulo {
+    background: rgba(255, 255, 255, 0.06);
+    color: rgb(220, 220, 220);
+  }
+
 </style>
 {% endblock %}

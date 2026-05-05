@@ -124,6 +124,27 @@ class CamaAdmin(admin.ModelAdmin):
     list_filter = ('estado','cubiculo', 'sala')
     readonly_fields = ('fecha_creado', 'fecha_modificado')
 
+    def save_model(self, request, obj, form, change):
+        from mapeo_camas.models import AsignacionCamaPaciente, EstadoMapeo
+        from django.db import transaction
+        super().save_model(request, obj, form, change)
+        # Solo crear asignación VACIA si es una nueva cama
+        if not change:
+            try:
+                with transaction.atomic():
+                    estado_vacia = EstadoMapeo.objects.get(codigo="VACIA", categoria="ESTADO_CAMA")
+                    AsignacionCamaPaciente.objects.get_or_create(
+                        cama=obj,
+                        defaults={
+                            "estado": estado_vacia,
+                            "paciente": None,
+                            "usuario_asignacion": request.user,
+                        },
+                    )
+            except Exception as e:
+                # Log o manejo de error si se requiere
+                pass
+
 class AreaAtencionAdmin(admin.ModelAdmin):
     list_display = ('nombre_area_atencion', 'servicio_nombre', 'estado')
     search_fields = ('nombre_area_atencion', 'servicio__nombre_servicio')

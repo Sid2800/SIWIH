@@ -44,6 +44,20 @@ document.addEventListener("DOMContentLoaded", function () {
     window.location.href = API_URLS.detalle + "?" + params.toString();
   }
 
+  function resolverIdFila(tablaRow) {
+    if (!tablaRow) {
+      return "";
+    }
+    if (tablaRow.getAttribute("data-id")) {
+      return tablaRow.getAttribute("data-id");
+    }
+    var filaPrevia = tablaRow.previousElementSibling;
+    if (filaPrevia && filaPrevia.getAttribute("data-id")) {
+      return filaPrevia.getAttribute("data-id");
+    }
+    return "";
+  }
+
   function toggleFiltroCama() {
     if (!filtroTipo || !filtroCama) {
       return;
@@ -108,7 +122,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     var filas = tablaBody.querySelectorAll("tr[data-id]");
     filas.forEach(function (fila) {
-      fila.addEventListener("dblclick", function () {
+      fila.addEventListener("click", function () {
         irADetalle(this.getAttribute("data-id"));
       });
     });
@@ -140,6 +154,7 @@ document.addEventListener("DOMContentLoaded", function () {
     hace30DiasDate.setDate(hoyDate.getDate() - 30);
 
     filtroTipo.value = "mapeo";
+    sessionStorage.setItem("historiales_filtro_tipo", "mapeo");
     filtroCama.value = "";
     filtroFechaInicio.value = hace30DiasDate.toISOString().split("T")[0];
     filtroFechaFin.value = hoyDate.toISOString().split("T")[0];
@@ -169,6 +184,11 @@ document.addEventListener("DOMContentLoaded", function () {
       '<option value="historial">HistorialEstadoCama</option>',
       '<option value="movimiento">MovimientoCama</option>'
     ].join("");
+    // Restaurar tipo guardado en sesión anterior
+    var tipoGuardado = sessionStorage.getItem("historiales_filtro_tipo");
+    if (tipoGuardado) {
+      filtroTipo.value = tipoGuardado;
+    }
     fechasFiltro.appendChild(filtroTipo);
 
     var labelCama = document.createElement("label");
@@ -213,6 +233,7 @@ document.addEventListener("DOMContentLoaded", function () {
     fechasFiltro.appendChild(filtroFechaFin);
 
     filtroTipo.addEventListener("change", function () {
+      sessionStorage.setItem("historiales_filtro_tipo", filtroTipo.value);
       toggleFiltroCama();
       cargarTabla();
     });
@@ -264,18 +285,18 @@ document.addEventListener("DOMContentLoaded", function () {
       select: { style: "single" },
       data: [],
       columns: [
-        { data: "referencia", defaultContent: "", responsivePriority: 1 },
-        { data: "tipo", defaultContent: "", responsivePriority: 2 },
-        { data: "estado", defaultContent: "", responsivePriority: 3 },
+        { data: "referencia", defaultContent: "", className: "all" },
+        { data: "tipo", defaultContent: "", className: "all" },
+        { data: "estado", defaultContent: "", className: "all" },
         {
           data: "fecha_principal",
           defaultContent: "",
-          responsivePriority: 4,
+          className: "none",
           render: function (data) {
             return formatearFechaHoraCorta(data);
           }
         },
-        { data: "usuario", defaultContent: "", responsivePriority: 5 }
+        { data: "usuario", defaultContent: "", className: "none" }
       ],
       createdRow: function (row, data) {
         row.setAttribute("data-id", String(data.id || ""));
@@ -330,16 +351,54 @@ document.addEventListener("DOMContentLoaded", function () {
 
     construirControlesFiltro();
 
+    // Navegar al detalle al hacer clic en una fila, incluyendo filas-child de DataTables responsive.
+    // Las filas-child tienen clase .child y no tienen datos propios; su fila padre es la inmediata anterior.
+    // Se ignoran clics en el control de expand/collapse (.dtr-control) para no interferir con responsive.
+    function resolverFilaDt(tr) {
+      // Ignorar clic en el control de expansión responsive
+      var targetTr = tr.hasClass("child") ? tr.prev("tr") : tr;
+      var row = tablaDt.row(targetTr);
+      return row.data() ? row : null;
+    }
+
     $("#tabla-historiales tbody")
-      .off("click.historial dblclick.historial")
-      .on("click.historial", "tr", function () {
+      .off("click.historial dblclick.historial keydown.historial")
+      .on("click.historial", "tr", function (e) {
+        // Solo resaltar la fila al hacer clic simple (sin navegar)
+        if ($(e.target).closest(".dtr-control").length) {
+          return;
+        }
+        var row = resolverFilaDt($(this));
+        if (!row) {
+          return;
+        }
         $("#tabla-historiales tbody tr").removeClass("selected");
         $(this).addClass("selected");
       })
-      .on("dblclick.historial", "tr", function () {
-        var idRegistro = this.getAttribute("data-id");
-        if (idRegistro) {
-          irADetalle(idRegistro);
+      .on("dblclick.historial", "tr", function (e) {
+        // Navegar al detalle al hacer doble clic
+        if ($(e.target).closest(".dtr-control").length) {
+          return;
+        }
+        var row = resolverFilaDt($(this));
+        if (!row) {
+          return;
+        }
+        var rowData = row.data();
+        var idRegistro = String(rowData.id || "");
+        if (!idRegistro) {
+          return;
+        }
+        irADetalle(idRegistro);
+      })
+      .on("keydown.historial", "tr", function (event) {
+        if (event.key !== "Enter" && event.key !== " ") {
+          return;
+        }
+        event.preventDefault();
+        var row = resolverFilaDt($(this));
+        if (row && row.data() && row.data().id) {
+          irADetalle(String(row.data().id));
         }
       });
   }
