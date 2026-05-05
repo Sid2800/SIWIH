@@ -33,23 +33,19 @@ from core.constants.permisos import (
     PACIENTE_DISPENSACION_ROLES,
     PACIENTE_DISPENSACION_UNIDADES,
 )
+from core.constants.choices_constants import TipoDefuncion
 from core.constants.domain_constants import LogApp
 from core.utils.utilidades_logging import *
-
-
-from usuario.models import PerfilUnidad
 from dal import autocomplete
 from types import SimpleNamespace
 
 import json
-from pprint import pprint
+
 from django.urls import reverse_lazy, reverse
-from django.contrib import messages
+
 from django.db import connections, transaction
 from django.http.response import JsonResponse
-from django import forms
 from datetime import datetime
-from django.db.utils import OperationalError
 from django.db.models import Q, F, Value, OuterRef, Subquery, CharField,Case, When, BooleanField
 from django.db.models.functions import Coalesce, Concat
 from django.shortcuts import get_object_or_404, redirect
@@ -1077,23 +1073,20 @@ def guardarDefuncion(request):
         id_paciente = validar_entero_positivo(data.get('idPaciente'), "idPaciente")
         id_defuncion = validar_entero_positivo(data.get('idDefuncion'), "idDefuncion") if data.get('idDefuncion') else None
         tipo = validar_entero_positivo(data.get('tipo'), "tipo")
+
     except ValidationError as e:
         return JsonResponse({'error': e.message_dict}, status=400)
     
     fecha = data.get('fecha')
     motivo = data.get('motivo')
 
-    dependencia_raw = data.get('dependencia')
-
-    dependencia = None
-    tipo_dependencia = None
-
-    if dependencia_raw:
+    unidad_clinica = None
+    if tipo == 1:
         try:
-            dependencia, tipo_dependencia = ServicioService.obtener_dependencia_y_campo(dependencia_raw)
+            unidad_clinica = ServicioService.obtener_unidad_clinica(data.get('unidad_clinica'))
         except ValidationError:
-            return JsonResponse({'error': 'La dependencia no es válida'}, status=400)
-    
+            return JsonResponse({'error': 'La unidad clinica no es válida'}, status=400)
+        
 
     if not fecha or not id_paciente or not tipo:
         return JsonResponse({'error': 'Datos incompletos'}, status=400)
@@ -1110,8 +1103,7 @@ def guardarDefuncion(request):
 
     defuncion = SimpleNamespace(
         fecha=fecha,
-        tipo_dependencia=tipo_dependencia,
-        dependencia=dependencia,
+        unidad_clinica=unidad_clinica,
         motivo=motivo,
         paciente_id=int(id_paciente),
         id=int(id_defuncion) if id_defuncion else None,
@@ -1158,16 +1150,12 @@ def guardarObito(request):
     dni_responsable = data.get('dniResponsable')
     nombre_responsable = data.get('nombreResponsable')
 
-    dependencia_raw = data.get('dependencia')
-
-    dependencia = None
-    tipo_dependencia = None
-
-    if dependencia_raw:
+    unidad_clinica = None
+    if tipo == 1:
         try:
-            dependencia, tipo_dependencia = ServicioService.obtener_dependencia_y_campo(dependencia_raw)
+            unidad_clinica = ServicioService.obtener_unidad_clinica(data.get('unidadClinica'))
         except ValidationError:
-            return JsonResponse({'error': 'La dependencia no es válida'}, status=400)
+            return JsonResponse({'error': 'La unidad clinica no es válida'}, status=400)
 
 
     # Validación básica
@@ -1185,8 +1173,7 @@ def guardarObito(request):
 
     obito = SimpleNamespace(
         fecha=fecha,
-        tipo_dependencia=tipo_dependencia,
-        dependencia=dependencia,
+        unidad_clinica=unidad_clinica,
         paciente_id= int(id_paciente),  # madre
         id=int(id_obito) if id_obito else None,
         tipo=int(tipo),
@@ -1229,21 +1216,21 @@ def obtener_defuncion_paciente(request):
     if not defuncion:
         return JsonResponse({"mensaje": "no defuncion"}, status=200)
     
-    if defuncion.sala or defuncion.servicio_auxiliar or defuncion.area_atencion:
-        info = ServicioService.encontrar_dependencia_en_instance(defuncion)
+    if defuncion.unidad_clinica:
+        info = ServicioService.encontrar_unidad_clinica_en_instance(defuncion)
         if info:
-            dependencia_codigo = info["clave"]
-            dependencia_label = f"{info['nombre']} ({info['tipo']})"
+            unidad_codigo = info["clave"]
+            unidad_label = f"{info['nombre']} ({info['tipo']})"
     else:
-        dependencia_codigo = None
-        dependencia_label = ""
+        unidad_codigo = None
+        unidad_label = ""
 
 
     # Construir la respuesta con los datos del paciente
     return JsonResponse({
         "id": defuncion.id,
-        "dependencia_codigo": dependencia_codigo,
-        "dependencia_label": dependencia_label,
+        "unidad_codigo": unidad_codigo,
+        "unidad_label": unidad_label,
         "fecha_defuncion": defuncion.fecha_defuncion.strftime("%Y-%m-%d"),
         "motivo": defuncion.motivo,
         "fechaAdicion": defuncion.fecha_registro,
@@ -1267,23 +1254,20 @@ def obtener_obito_paciente(request):
     if not obito:
         return JsonResponse({"mensaje": "no obito"}, status=200)
 
-    # Resolver dependencia
-    if obito.sala or obito.servicio_auxiliar or obito.area_atencion:
-        info = ServicioService.encontrar_dependencia_en_instance(obito)
+    # Resolver unidad clinica
+    if obito.unidad_clinica:
+        info = ServicioService.encontrar_unidad_clinica_en_instance(obito)
         if info:
-            dependencia_codigo = info["clave"]
-            dependencia_label = f"{info['nombre']} ({info['tipo']})"
-        else:
-            dependencia_codigo = None
-            dependencia_label = ""
+            unidad_codigo = info["clave"]
+            unidad_label = f"{info['nombre']} ({info['tipo']})"
     else:
-        dependencia_codigo = None
-        dependencia_label = ""
+        unidad_codigo = None
+        unidad_label = ""
 
     return JsonResponse({
         "id": obito.id,
-        "dependencia_codigo": dependencia_codigo,
-        "dependencia_label": dependencia_label,
+        "unidad_codigo": unidad_codigo,
+        "unidad_label": unidad_label,
         "fecha_obito": obito.fecha_obito.strftime("%Y-%m-%d"),
         "reponsable_nombre": obito.responsable_nombre if obito.responsable_nombre else "",
         "reponsable_dni": obito.responsable_dni if obito.responsable_dni else "",
@@ -1465,12 +1449,14 @@ class HistorialPaciente(DetailView):
         #comprueba informacino si es SAI o DEFUNCION
         defuncion = PacienteService.obtener_defuncion(paciente.id)
         if defuncion:
+
+            lugar = defuncion.unidad_clinica if defuncion.tipo_defuncion == TipoDefuncion.INTRAHOSPITALARIA  else "EXTRAHOSPITALARIA"
             info_defuncion = {
                 'id': defuncion.id,
                 'fecha': defuncion.fecha_defuncion,
                 'motivo': defuncion.motivo,
                 'fecha_registro':defuncion.fecha_registro,
-                'sala': defuncion.sala
+                'unidad_clinica': lugar
             }
             context['info_defuncion'] = info_defuncion
 

@@ -48,7 +48,7 @@ class DefuncionAdmin(admin.ModelAdmin):
         'get_dni',
         'get_nombre_completo',
         'fecha_defuncion',
-        'sala',
+        'unidad_clinica',
         'motivo',
         'registrado_por',
         'fecha_registro',
@@ -61,8 +61,8 @@ class DefuncionAdmin(admin.ModelAdmin):
         'paciente__primer_apellido',
         'paciente__segundo_apellido',
     )
-    autocomplete_fields = ['paciente', 'sala']
-    list_filter = ('fecha_defuncion', 'sala', 'registrado_por',)
+    autocomplete_fields = ['paciente',]
+    list_filter = ('fecha_defuncion', 'unidad_clinica', 'registrado_por',)
     readonly_fields = ('fecha_registro',)
 
     def get_dni(self, obj):
@@ -77,10 +77,10 @@ class DefuncionAdmin(admin.ModelAdmin):
 
 
 class ObitoFetalAdmin(admin.ModelAdmin):
-    list_display = ('get_dni','get_nombre_completo','fecha_obito','sala','motivo','responsable_nombre','registrado_por','fecha_registro')
+    list_display = ('get_dni','get_nombre_completo','fecha_obito','motivo','responsable_nombre','registrado_por','fecha_registro')
     search_fields = ('paciente__dni','paciente__primer_nombre','paciente__segundo_nombre','paciente__primer_apellido','paciente__segundo_apellido','responsable_nombre','responsable_dni')
-    autocomplete_fields = ['paciente','sala']
-    list_filter = ('fecha_obito','sala','registrado_por','estado')
+    autocomplete_fields = ['paciente',]
+    list_filter = ('fecha_obito','registrado_por','estado')
     readonly_fields = ('fecha_registro',)
 
     def get_dni(self, obj): return obj.paciente.dni

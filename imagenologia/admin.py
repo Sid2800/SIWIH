@@ -1,6 +1,6 @@
 from django.contrib import admin
 from imagenologia.models import Estudio, MaquinaRX, EvaluacionRx, EvaluacionRxDetalle
-from servicio.models import Sala
+from servicio.models import Unidad_clinica
 
 # Register your models here.
 
@@ -9,29 +9,34 @@ class EvaluacionRxDetalleInline(admin.TabularInline):
     extra = 1
     autocomplete_fields = ['estudio']
 
-
-
-class SalaConRegistrosFilter(admin.SimpleListFilter):
-    title = 'Sala'
-    parameter_name = 'sala'
+class UnidadClinicaConRegistrosFilter(admin.SimpleListFilter):
+    title = 'Unidad Clínica'
+    parameter_name = 'unidad_clinica'
 
     def lookups(self, request, model_admin):
-        # Traemos solo las salas que tienen al menos un EvaluacionRx
-        salas = Sala.objects.filter(evaluacionrx__isnull=False).distinct()
-        return [(s.id, s.nombre_sala) for s in salas]
+        unidades = (
+            Unidad_clinica.objects
+            .filter(evaluacionrx__isnull=False)
+            .distinct()
+        )
+
+        return [
+            (u.id, str(u))  # usa __str__
+            for u in unidades
+        ]
 
     def queryset(self, request, queryset):
         if self.value():
-            return queryset.filter(sala_id=self.value())
+            return queryset.filter(unidad_clinica_id=self.value())
         return queryset
 
 
 class EvaluacionRxAdmin(admin.ModelAdmin):
-    list_display = ('fecha', 'paciente', 'sala', 'area_atencion', 'servicio_auxiliar')
+    list_display = ('fecha', 'paciente', 'unidad_clinica')
     search_fields = ('paciente__nombre', 'paciente__apellido')
-    list_filter = ('fecha', SalaConRegistrosFilter, 'area_atencion', 'servicio_auxiliar')
+    list_filter = ('fecha', UnidadClinicaConRegistrosFilter)
     readonly_fields = ('fecha_creado', 'creado_por', 'fecha_modificado', 'modificado_por')
-    autocomplete_fields = ('paciente', 'sala', 'area_atencion', 'servicio_auxiliar', 'creado_por', 'modificado_por')
+    autocomplete_fields = ('paciente', 'unidad_clinica', 'creado_por', 'modificado_por')
     inlines = [EvaluacionRxDetalleInline]  
 
     def save_model(self, request, obj, form, change):

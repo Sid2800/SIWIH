@@ -1,7 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from paciente.models import Paciente
-from servicio.models import Sala, Area_atencion, ServiciosAux
+from servicio.models import Sala, Area_atencion, ServiciosAux, Unidad_clinica
 from django.core.exceptions import ValidationError
 
 class TipoPaciente:
@@ -73,6 +73,8 @@ class Estudio(models.Model):
         verbose_name_plural = "Estudios"
         ordering = ["descripcion_estudio",]
 
+    def __str__(self):
+        return f"{self.descripcion_estudio}"
 
 class MaquinaRX(models.Model):  # <- AGREGADO
     descripcion_maquina = models.CharField(max_length=100, blank=False, null=False, db_index=True, verbose_name="Descripcion maquina", unique=True)
@@ -87,14 +89,11 @@ class MaquinaRX(models.Model):  # <- AGREGADO
         return f"{self.descripcion_maquina}"
 
 
-
 class EvaluacionRx(models.Model):  # <- AGREGADO
     fecha = models.DateField(verbose_name="Fecha de evaluacion")
     paciente = models.ForeignKey(Paciente, on_delete=models.PROTECT, verbose_name="Paciente", related_name='evalacionesRx', blank=True, null=True)
     paciente_externo = models.ForeignKey(PacienteExterno, on_delete=models.PROTECT, verbose_name="Paciente Externo", blank=True, null=True)
-    sala = models.ForeignKey(Sala, null=True, blank=True, on_delete=models.SET_NULL)
-    area_atencion = models.ForeignKey(Area_atencion, null=True, blank=True, on_delete=models.SET_NULL)
-    servicio_auxiliar = models.ForeignKey(ServiciosAux, null=True, blank=True, on_delete=models.SET_NULL)
+    unidad_clinica = models.ForeignKey(Unidad_clinica,on_delete=models.PROTECT, null=True, blank=True)
     fecha_creado = models.DateTimeField(verbose_name="Fecha Creado", auto_now_add=True)
     observaciones = models.TextField(verbose_name="Observaciones", null=True,blank=True)
     maquinarx = models.ForeignKey(MaquinaRX, null=False, blank=False, on_delete=models.PROTECT, default=1)

@@ -514,9 +514,9 @@ async function AgregarDefuncionModal(paciente, lectura) {
                 </div>
                 
                 <div class="formularioCampoModal">
-                    <label for="modal-defuncion-dependencia">Dependencia</label>
-                    <select id="modal-defuncion-dependencia" class="formularioCampo-select" name="dependencia">
-                        <option value="" disabled selected>Seleccione una dependencia</option>
+                    <label for="modal-defuncion-unidad-clinica">Unidad clinica</label>
+                    <select id="modal-defuncion-unidad-clinica" class="formularioCampo-select" name="unidad-clinica">
+                        <option value="" disabled selected>Seleccione una unidad clinica</option>
                     </select>
                 </div>
 
@@ -549,14 +549,14 @@ async function AgregarDefuncionModal(paciente, lectura) {
         },
         preConfirm: () => {
             
-            const dependencia = document.getElementById("modal-defuncion-dependencia").value;
+            const unidad_clinica = document.getElementById("modal-defuncion-unidad-clinica").value;
             const fecha = document.getElementById("modal-defuncion-fecha").value;
             const tipo = document.getElementById("modal-defuncion-tipo").value
             const motivo = document.getElementById("modal-defuncion-motivo").value;
             const hoy = fechaActualParaInput(false);
             const idDefuncion = document.getElementById("modal-defuncion-id").value;
 
-            if (!dependencia && tipo!=="2") {
+            if (!unidad_clinica && tipo!=="2") {
                 Swal.showValidationMessage('Debe seleccionar una sala');
                 return false;
             }
@@ -574,7 +574,7 @@ async function AgregarDefuncionModal(paciente, lectura) {
             return {
                 tipo,
                 fecha,
-                dependencia,
+                unidad_clinica: unidad_clinica,
                 tipo,
                 motivo,
                 idDefuncion
@@ -583,7 +583,7 @@ async function AgregarDefuncionModal(paciente, lectura) {
         didOpen: async function () {
             const confirmBtn = Swal.getConfirmButton();
             const titleElement = Swal.getTitle(); 
-            const dependencia = document.getElementById("modal-defuncion-dependencia");
+            const unidad_clinica = document.getElementById("modal-defuncion-unidad-clinica");
             const fecha = document.getElementById("modal-defuncion-fecha");
             const motivo = document.getElementById("modal-defuncion-motivo");
             const tipo = document.getElementById("modal-defuncion-tipo");
@@ -599,13 +599,13 @@ async function AgregarDefuncionModal(paciente, lectura) {
             });
 
             // Cargar salas, area_atencion,  desde el backend
-            await DependenciaLoader.cargar(dependencia,'defuncion');
+            await UnidadClinicaLoader.cargar(unidad_clinica,'defuncion');
             
 
 
             // Inicializar TomSelect
-            const dependenciaSelect = new TomSelect("#modal-defuncion-dependencia", {
-                placeholder: 'Seleccione una dependencia',
+            const unidadSelect = new TomSelect("#modal-defuncion-unidad-clinica", {
+                placeholder: 'Seleccione una unidad clinica',
                 allowEmptyOption: true
             });
 
@@ -620,7 +620,7 @@ async function AgregarDefuncionModal(paciente, lectura) {
                 if (data && "mensaje" in data) {
                 // No tiene defunción, establecer valores por defecto
                 fecha.value = fechaActualParaInput(false);
-                dependenciaSelect.clear(true);
+                unidadSelect.clear(true);
                 } else if (data) {
                 llenarDefuncion(data);
                 }
@@ -629,7 +629,6 @@ async function AgregarDefuncionModal(paciente, lectura) {
             }
 
             function llenarDefuncion(defuncion) {
-
                 titleElement.innerHTML = `<i class="bi bi-gear"></i> Actualizar defuncion`;
                 motivo.value = defuncion.motivo || "";
                 fecha.value = defuncion.fecha_defuncion || "";
@@ -638,22 +637,22 @@ async function AgregarDefuncionModal(paciente, lectura) {
                 fieldsetRegistro.style.display = 'block';
                 tipo.value=defuncion.tipo_defuncion;
                 if (String(defuncion.tipo_defuncion) === "2") {
-                dependenciaSelect.disable();
-                dependenciaSelect.clear();
+                unidadSelect.disable();
+                unidadSelect.clear();
                 } else{
-                if (dependenciaSelect){
-                    dependenciaSelect.enable();
-                    dependenciaSelect.clear(); // solo limpia
+                if (unidadSelect){
+                    unidadSelect.enable();
+                    unidadSelect.clear(); // solo limpia
 
-                    if (defuncion.dependencia_codigo) {  
-                        if (!dependenciaSelect.options[defuncion.dependencia_codigo]) {
-                            dependenciaSelect.addOption({
-                            value: defuncion.dependencia_codigo,  
-                            text: defuncion.dependencia_label
+                    if (defuncion.unidad_codigo) {  
+                        if (!unidadSelect.options[defuncion.unidad_codigo]) {
+                            unidadSelect.addOption({
+                            value: defuncion.unidad_codigo,  
+                            text: defuncion.unidad_codigo
                             });
                         }
 
-                        dependenciaSelect.addItem(defuncion.dependencia_codigo, true);
+                        unidadSelect.addItem(defuncion.unidad_codigo, true);
                     }
                 }
                 }
@@ -666,15 +665,15 @@ async function AgregarDefuncionModal(paciente, lectura) {
                 motivo.disabled = true;
                 fecha.disabled = true;
                 confirmBtn.style.pointerEvents = "none";
-                dependenciaSelect.disable();
+                unidadSelect.disable();
             }
 
             tipo.addEventListener("change", function() {
                 if (this.value === "2") { // extrahospitalaria
-                dependenciaSelect.disable();
-                dependenciaSelect.clear();
+                unidadSelect.disable();
+                unidadSelect.clear();
                 } else {
-                dependenciaSelect.enable();
+                unidadSelect.enable();
                 }
             });
 
@@ -696,7 +695,7 @@ async function AgregarDefuncionModal(paciente, lectura) {
                     "X-CSRFToken": csrfToken 
                 },
                 body: JSON.stringify({
-                    dependencia: formData.dependencia, /// OJOOOO
+                    unidad_clinica: formData.unidad_clinica, 
                     fecha: formData.fecha,
                     motivo: formData.motivo,
                     tipo: formData.tipo,
@@ -751,9 +750,9 @@ async function registrarObito(IdObito,idPaciente, datosMadre) {
                 </div>
                 
                 <div class="formularioCampoModal">
-                    <label for="modal-obito-dependencia">Dependencia</label>
-                    <select id="modal-obito-dependencia" class="formularioCampo-select" name="dependencia">
-                        <option value="" disabled selected>Seleccione una dependencia</option>
+                    <label for="modal-obito-unidad-clinica">Unidad Clinica</label>
+                    <select id="modal-obito-unidad-clinica" class="formularioCampo-select" name="unidad_clinica">
+                        <option value="" disabled selected>Seleccione una unidad clinica</option>
                     </select>
                 </div>
 
@@ -798,14 +797,14 @@ async function registrarObito(IdObito,idPaciente, datosMadre) {
         preConfirm: () => {
 
             // validaciones
-            const dependencia = document.getElementById("modal-obito-dependencia").value;
+            const unidad_clinica = document.getElementById("modal-obito-unidad-clinica").value;
             const fecha = document.getElementById("modal-obito-fecha").value;
             const tipo = document.getElementById("modal-obito-tipo").value;
             const dniResponsable = document.getElementById("modal-cadaver-dni-responsable").value;
             const nombreResponsable = document.getElementById("modal-cadaver-nombre-responsable").value;
             const hoy = fechaActualParaInput(false);
 
-            if (!dependencia && tipo!=="2") {
+            if (!unidad_clinica && tipo!=="2") {
                 Swal.showValidationMessage('Debe seleccionar una dependencia');
                 return false;
             }
@@ -833,7 +832,7 @@ async function registrarObito(IdObito,idPaciente, datosMadre) {
             return {
                 tipo,
                 fecha,
-                dependencia: dependencia,
+                unidad_clinica: unidad_clinica,
                 dniResponsable,
                 nombreResponsable,
                 idObito: document.getElementById("modal-obito-id").value || 0
@@ -843,7 +842,7 @@ async function registrarObito(IdObito,idPaciente, datosMadre) {
         didOpen: async function () {
             const confirmBtn = Swal.getConfirmButton();
             const titleElement = Swal.getTitle(); 
-            const dependencia = document.getElementById("modal-obito-dependencia");
+            const unidad_clinica = document.getElementById("modal-obito-unidad-clinica");
             const fecha = document.getElementById("modal-obito-fecha");
             const tipo = document.getElementById("modal-obito-tipo");
             const idObito = document.getElementById("modal-obito-id");
@@ -859,11 +858,11 @@ async function registrarObito(IdObito,idPaciente, datosMadre) {
             });
 
             // Cargar salas desde el backend
-            await DependenciaLoader.cargar(dependencia);
+            await UnidadClinicaLoader.cargar(unidad_clinica);
 
             // Inicializar TomSelect
-            const dependenciaSelect = new TomSelect("#modal-obito-dependencia", {
-                placeholder: 'Seleccione una dependencia',
+            const unidaClinicaSelect = new TomSelect("#modal-obito-unidad-clinica", {
+                placeholder: 'Seleccione una unidad clinica',
                 allowEmptyOption: true
             });
 
@@ -897,7 +896,7 @@ async function registrarObito(IdObito,idPaciente, datosMadre) {
                     data = await fetchData(API_URLS.obtenerObito, { id: IdObito });
                 } else {
                     fecha.value = fechaActualParaInput(false);
-                    dependenciaSelect.clear(true);
+                    unidaClinicaSelect.clear(true);
                 }
                 if (data && !("mensaje" in data)) {
                     llenarObito(data);
@@ -916,22 +915,22 @@ async function registrarObito(IdObito,idPaciente, datosMadre) {
                 fieldsetRegistro.style.display = 'block';
                 tipo.value=obito.tipo_defuncion;
                 if (String(obito.tipo_defuncion) === "2") {
-                dependenciaSelect.disable();
-                dependenciaSelect.clear();
+                unidaClinicaSelect.disable();
+                unidaClinicaSelect.clear();
                 } else{
-                    if (dependenciaSelect){
-                        dependenciaSelect.enable();
-                        dependenciaSelect.clear(); // solo limpia
+                    if (unidaClinicaSelect){
+                        unidaClinicaSelect.enable();
+                        unidaClinicaSelect.clear(); // solo limpia
 
-                        if (obito.dependencia_codigo) {  
-                            if (!dependenciaSelect.options[obito.dependencia_codigo]) {
-                                    dependenciaSelect.addOption({
-                                    value: obito.dependencia_codigo,  
-                                    text: obito.dependencia_label
+                        if (obito.unidad_codigo) {  
+                            if (!unidaClinicaSelect.options[obito.unidad_codigo]) {
+                                    unidaClinicaSelect.addOption({
+                                    value: obito.unidad_codigo,  
+                                    text: obito.unidad_label
                                     });
                                 }
 
-                                dependenciaSelect.addItem(obito.dependencia_codigo, true);
+                                unidaClinicaSelect.addItem(obito.unidad_codigo, true);
                         }
                         
                     }
@@ -944,10 +943,10 @@ async function registrarObito(IdObito,idPaciente, datosMadre) {
 
             tipo.addEventListener("change", function() {
                 if (this.value === "2") { 
-                dependenciaSelect.disable();
-                dependenciaSelect.clear();
+                unidaClinicaSelect.disable();
+                unidaClinicaSelect.clear();
                 } else {
-                dependenciaSelect.enable();
+                unidaClinicaSelect.enable();
                 }
             });
 
@@ -969,7 +968,7 @@ async function registrarObito(IdObito,idPaciente, datosMadre) {
                     idPaciente: idPaciente,
                     idObito: formData.idObito,
                     tipo: formData.tipo,
-                    dependencia: formData.dependencia,
+                    unidadClinica: formData.unidad_clinica,
                     fecha: formData.fecha,
                     dniResponsable: formData.dniResponsable,
                     nombreResponsable: formData.nombreResponsable

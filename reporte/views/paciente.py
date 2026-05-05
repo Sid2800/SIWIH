@@ -1433,8 +1433,6 @@ class reporte_hospitalizacion_2026(View):
         
 
 
-
-        
 def dibujar_encabezado_epicrisis(pdf, ancho, y):
     pdf.setFillColor(colors.black)
     pdf.setFont("Helvetica", 8.5)

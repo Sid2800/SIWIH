@@ -39,7 +39,6 @@ class RefInformeService:
                 tipo=tipo_ref,
                 **filtro_rango_fecha(campo_fecha, inicio, fin)
             ).select_related(
-                'area_atencion_destino',
                 'institucion_destino__nivel_complejidad_institucional',
                 'motivo'
             )
@@ -101,44 +100,64 @@ class RefInformeService:
             key_nombre = 'motivo__nombre_motivo_envio'
 
         elif indice == 5:  # envío según sala/area_atencion/aux
-            etiqueta = "DEPENDENCIA DE ENVIO"
+            etiqueta = "UNIDA CLINICA"
 
             resumen_raw = (
                 qs.annotate(
-                    dependencia_nombre=Case(
+                    unidad_clinica_nombre=Case(
+                        # SALA
                         When(
-                            area_refiere_sala__isnull=False,
-                            then=Concat(Value('HOSP | '), F('area_refiere_sala__nombre_sala'))
+                            unidad_clinica_refiere__sala__isnull=False,
+                            then=Concat(
+                                Value('HOSP | '),
+                                F('unidad_clinica_refiere__sala__nombre_sala')
+                            )
                         ),
-                        # area_atencion
+
+                        # AREA ATENCION
                         When(
-                            area_refiere_area_atencion__isnull=False,
+                            unidad_clinica_refiere__area_atencion__isnull=False,
                             then=Case(
                                 When(
-                                    area_refiere_area_atencion__servicio_id=1000,
-                                    then=Concat(Value('EMER | '), F('area_refiere_area_atencion__nombre_area_atencion'))
+                                    unidad_clinica_refiere__area_atencion__servicio_id=1000,
+                                    then=Concat(
+                                        Value('EMER | '),
+                                        F('unidad_clinica_refiere__area_atencion__nombre_area_atencion')
+                                    )
                                 ),
                                 When(
-                                    area_refiere_area_atencion__servicio_id=700,
-                                    then=Concat(Value('OBST | '), F('area_refiere_area_atencion__nombre_area_atencion'))
+                                    unidad_clinica_refiere__area_atencion__servicio_id=700,
+                                    then=Concat(
+                                        Value('OBST | '),
+                                        F('unidad_clinica_refiere__area_atencion__nombre_area_atencion')
+                                    )
                                 ),
-                                default=Concat(Value('CEXT | '), F('area_refiere_area_atencion__nombre_area_atencion')),
+                                default=Concat(
+                                    Value('CEXT | '),
+                                    F('unidad_clinica_refiere__area_atencion__nombre_area_atencion')
+                                ),
                                 output_field=CharField()
                             )
                         ),
+
+                        # SERVICIO AUX
                         When(
-                            area_refiere_servicio_auxiliar__isnull=False,
-                            then=Concat(Value('SAUX | '), F('area_refiere_servicio_auxiliar__nombre_servicio_a'))
+                            unidad_clinica_refiere__servicio_aux__isnull=False,
+                            then=Concat(
+                                Value('SAUX | '),
+                                F('unidad_clinica_refiere__servicio_aux__nombre_servicio_a')
+                            )
                         ),
+
                         default=Value('Sin asignar'),
                         output_field=CharField()
                     )
                 )
-                .values('dependencia_nombre')
+                .values('unidad_clinica_nombre')
                 .annotate(conteo=Count('id'))
-                .order_by('-conteo', 'dependencia_nombre')
+                .order_by('-conteo', 'unidad_clinica_nombre')
             )
-            key_nombre = 'dependencia_nombre'
+            key_nombre = 'unidad_clinica_nombre'
 
         elif indice == 8:  # REFERENCIAS RECIBIDAS SEGÚN EVALUACIÓN
             # Vienen de la SESAL
@@ -848,42 +867,66 @@ class RefInformeService:
             tabla_final = []
 
             qs = (
-                Respuesta.objects
-                .filter( referencia__tipo=0, **filtro_rango_fecha("fecha_atencion", inicio, fin))
-                .select_related(
-                    'area_reponde_sala',
-                    'area_reponde_area_atencion',
-                    'area_reponde_servicio_auxiliar',
-                    )
-                )
+            Respuesta.objects
+            .filter(
+                referencia__tipo=0,
+                **filtro_rango_fecha("fecha_atencion", inicio, fin)
+            )
+            .select_related(
+                'referencia', 
+                'unidad_clinica_responde__sala',
+                'unidad_clinica_responde__area_atencion',
+                'unidad_clinica_responde__servicio_aux',
+            )
+)
             
             if indice == 1: #referencias enviadas por area_atencion
-                etiqueta = "AREA DA RESPUESTA"
+                etiqueta = "UNIDAD CLINICA RESPONDE"
                 resumen_raw = (
                     qs.annotate(
                         area_responde=Case(
-                            When(area_reponde_sala__isnull=False,
-                                then=Concat(Value('HOSP | '),F('area_reponde_sala__nombre_sala'))
-                            ),
-                            #  area_atencions
+
                             When(
-                                area_reponde_area_atencion__isnull=False,
+                                unidad_clinica_responde__sala__isnull=False,
+                                then=Concat(
+                                    Value('HOSP | '),
+                                    F('unidad_clinica_responde__sala__nombre_sala')
+                                )
+                            ),
+
+                            When(
+                                unidad_clinica_responde__area_atencion__isnull=False,
                                 then=Case(
-                                    When(area_reponde_area_atencion__servicio_id=1000,
-                                        then=Concat(Value('EMER | '),F('area_reponde_area_atencion__nombre_area_atencion'))
-                                        ),
-                                    When(area_reponde_area_atencion__servicio_id=700,
-                                        then=Concat(Value('OBST | '),F('area_reponde_area_atencion__nombre_area_atencion'))
-                                        ),
+                                    When(
+                                        unidad_clinica_responde__area_atencion__servicio_id=1000,
+                                        then=Concat(
+                                            Value('EMER | '),
+                                            F('unidad_clinica_responde__area_atencion__nombre_area_atencion')
+                                        )
+                                    ),
+                                    When(
+                                        unidad_clinica_responde__area_atencion__servicio_id=700,
+                                        then=Concat(
+                                            Value('OBST | '),
+                                            F('unidad_clinica_responde__area_atencion__nombre_area_atencion')
+                                        )
+                                    ),
                                     default=Concat(
-                                        Value('CEXT | '), F('area_reponde_area_atencion__nombre_area_atencion')),
+                                        Value('CEXT | '),
+                                        F('unidad_clinica_responde__area_atencion__nombre_area_atencion')
+                                    ),
                                     output_field=CharField()
                                 )
                             ),
+
                             When(
-                                area_reponde_servicio_auxiliar__isnull=False,
-                                then=Concat(Value('SAUX | '),F('area_reponde_servicio_auxiliar__nombre_servicio_a'))
+                                unidad_clinica_responde__servicio_aux__isnull=False,
+                                then=Concat(
+                                    Value('SAUX | '),
+                                    F('unidad_clinica_responde__servicio_aux__nombre_servicio_a')
+                                )
                             ),
+
                             default=Value('Sin asignar'),
                             output_field=CharField()
                         )
@@ -892,6 +935,7 @@ class RefInformeService:
                     .annotate(conteo=Count('id'))
                     .order_by('-conteo', 'area_responde')
                 )
+
                 key_nombre = 'area_responde'
 
 

@@ -4,8 +4,8 @@ document.addEventListener('DOMContentLoaded', function () {
 //#region Dclaraciones de variables y constantes
 
 
-    const dependencia = document.getElementById('id_dependencia');
-    let Tomdependencia;
+    const unidadClinica = document.getElementById('id_unidad_clinica');
+    let TomUnidadClinica;
     const form = document.getElementById("form-evaluacionrx");
 
     //Paciente
@@ -514,11 +514,8 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
 
-    Tomdependencia =  new TomSelect(dependencia, {
-        valueField: "id",
-        labelField: "text",
-        searchField: "text",
-        placeholder: "DEPENDENCIA",
+    new TomSelect(unidadClinica, {
+        placeholder: "Unidad Clinica",
     });
 
 

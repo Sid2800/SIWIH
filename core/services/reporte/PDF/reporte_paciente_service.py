@@ -1435,11 +1435,13 @@ class ReportePacienteService:
         if defuncion.tipo_defuncion == 2:
             texto_valor = "EXTRAHOSPITALARIA"
         else:
-            info = ServicioService.encontrar_dependencia_en_instance(defuncion)
+
+
+            info = str(defuncion.unidad_clinica)
 
             if info:
                 lugar_label = "SALA / ÁREA: "
-                texto_valor = info['nombre']
+                texto_valor = info
 
         pdf.setFont("Helvetica", 12)
         pdf.drawString(70, alto - 380, lugar_label)
@@ -1556,6 +1558,7 @@ class ReportePacienteService:
             formatear_fecha_simple(defuncion.fecha_obito)
         )
 
+
         # Sala / tipo
         lugar_label = "TIPO: "
         texto_valor = "N/A"
@@ -1563,17 +1566,20 @@ class ReportePacienteService:
         if defuncion.tipo_defuncion == 2:
             texto_valor = "EXTRAHOSPITALARIA"
         else:
-            info = ServicioService.encontrar_dependencia_en_instance(defuncion)
+
+
+            info = str(defuncion.unidad_clinica)
 
             if info:
                 lugar_label = "SALA / ÁREA: "
-                texto_valor = info['nombre']
+                texto_valor = info
+
 
         pdf.setFont("Helvetica", 12)
         pdf.drawString(70, alto - 380, lugar_label)
 
         pdf.setFont("Helvetica-Bold", 12)
-        pdf.drawString(240, alto - 380, texto_valor)
+        pdf.drawString(X_DATO, alto - 380, texto_valor)
 
 
         # Usuario (registro)

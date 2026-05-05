@@ -27,7 +27,7 @@ async function cargarSalas(select) {
       }
 }
 
-const DependenciaLoader = (function () {
+const UnidadClinicaLoader = (function () {
 
    async function cargar(select, uso = "general") {
       if (!select) return;
@@ -36,7 +36,7 @@ const DependenciaLoader = (function () {
          // construir URL correctamente
 
 
-         const data = await fetchData(API_URLS.listarDependencias, { uso: uso });
+         const data = await fetchData(API_URLS.listarUnidadClinica, { uso: uso });
 
          // limpiar select
          select.innerHTML = '';
@@ -49,7 +49,7 @@ const DependenciaLoader = (function () {
             data.forEach(item => {
                const texto =   `${item.nombre}  (${item.tipo})` ;
                const option = new Option(
-                  texto,      // texto visible
+                  texto,            // texto visible
                   item.clave        // valor: "S-1", "E-2", "A-3"
                );
 
@@ -61,12 +61,12 @@ const DependenciaLoader = (function () {
             });
 
          } else {
-            console.warn("No hay dependencias disponibles.");
+            console.warn("No hay unidades clinicas disponibles.");
          }
 
       } catch (error) {
-         console.error("Error cargando dependencias:", error);
-         toastr.error("No se pudieron cargar las dependencias");
+         console.error("Error cargando unidades clinicas:", error);
+         toastr.error("No se pudieron cargar las unidades clinicas");
       }
    }
 
