@@ -21,6 +21,7 @@ from core.utils.utilidades_fechas import formatear_fecha, formatear_fecha_dd_mm_
 from core.utils.utilidades_textos import  formatear_dni, formatear_expediente, formatear_nombre_completo
 from usuario.permisos import verificar_permisos_usuario
 from .views import dibujar_encabezado, dibujar_pie_pagina_carta
+from core.constants.permisos import INGRESO_EDITOR_ROLES, INGRESO_EDITOR_UNIDADES
 
 
 
@@ -30,7 +31,7 @@ class reporte_detalle_recepcion_ingresos_sala(View):
     def dispatch(self, request, *args, **kwargs):
         # Verificar permisos del usuario antes de continuar con la lógica de la vista
         usuario = request.user
-        if not verificar_permisos_usuario(usuario, ['admin', 'digitador'], ['Admision']):
+        if not verificar_permisos_usuario(usuario, INGRESO_EDITOR_ROLES, INGRESO_EDITOR_UNIDADES):
             return JsonResponse({'error': 'No tienes permisos para realizar esta acción'}, status=403)
 
         return super().dispatch(request, *args, **kwargs)
@@ -291,7 +292,7 @@ class reporte_detalle_recepcion_ingresos_SDGI(View):
     def dispatch(self, request, *args, **kwargs):
         # Verificar permisos del usuario antes de continuar con la lógica de la vista
         usuario = request.user
-        if not verificar_permisos_usuario(usuario, ['admin', 'digitador'], ['Admision']):
+        if not verificar_permisos_usuario(usuario,  INGRESO_EDITOR_ROLES, INGRESO_EDITOR_UNIDADES):
             return JsonResponse({'error': 'No tienes permisos para realizar esta acción'}, status=403)
 
         return super().dispatch(request, *args, **kwargs)

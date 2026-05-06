@@ -31,7 +31,7 @@ class UnidadRolRequiredMixin(LoginRequiredMixin):
          usuario=request.user,
          rol__in=self.required_roles,
          alcance=AlcanceUsuario.UNIDAD,
-         servicio_unidad__nombre_unidad__in=self.required_unidades
+         servicio_unidad__nombre_corto_unidad__in=self.required_unidades
       ).exists():
          return super().dispatch(request, *args, **kwargs)
 

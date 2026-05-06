@@ -18,14 +18,14 @@
                         <span class="reporteTabsBoton__texto">GENERADOR</span>
                     </button>
 
-                    {% if  request.user|tiene_unidad:"Referencia:imagenologia" %}
+                    {% if  request.user|tiene_unidad:"UAU:RX" %}
                     <button class="reporteTabsBoton" data-tab="reporteInformes">
                         <i class="bi bi-journal-medical reporteTabsBoton__logo"></i>
                         <span class="reporteTabsBoton__texto">INFORMES</span>
                     </button>
                     {% endif %}
 
-                    {% if  request.user|tiene_unidad:"Referencia" %}
+                    {% if  request.user|tiene_unidad:"UAU" %}
                     <button class="reporteTabsBoton" data-tab="reporteCatalogos">
                         <i class="bi bi-table reporteTabsBoton__logo"></i>
                         <span class="reporteTabsBoton__texto">CATALOGOS</span>
@@ -175,7 +175,7 @@
                 
                     
                 </div>
-                {% if  request.user|tiene_rol:"ADMIN:imagenologia,digitador:imagenologia"%}
+                {% if  request.user|tiene_rol:"ADMIN:RX,digitador:RX"%}
                     <fieldset class="reporteCamposInformes">
                         <legend>Radiologia</legend>
                             <div class="formularioCampoModal">
@@ -192,8 +192,8 @@
                             </div>
                     </fieldset>
                 {% endif %}
-                {% comment "" %}global no es una unidad{% endcomment %}
-                {% if  request.user|tiene_rol:"ADMIN:Referencia,digitador:Referencia,directivo:global"%}
+                {% comment "" %}los usuarios directivos tioene alcance global por eso no llewva unidad{% endcomment %}
+                {% if  request.user|tiene_rol:"ADMIN:UAU,digitador:UAU,directivo:"%}
                     <fieldset class="reporteCamposInformes">
                         <legend>Referencia - Respuesta</legend>
                             <div class="formularioCampoModal">
@@ -215,7 +215,7 @@
         </div>
 
         <div class="reporte-tab-contenido" id="reporteCatalogos">
-            {% if  request.user|tiene_rol:"ADMIN:Referencia,digitador:Referencia,directivo:global"%}
+            {% if  request.user|tiene_rol:"ADMIN:UAU,digitador:UAU,directivo:global"%}
                 <fieldset class="reporte-informe">
                 
                     <fieldset class="detallesRegistro">
