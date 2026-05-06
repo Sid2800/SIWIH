@@ -69,13 +69,13 @@ class UsuarioService:
             return tabs, activo
 
         # Usuarios por unidad
-        if UsuarioService.pertenece_unidad(usuario, UnidadID.ADMISION):  # ADMISION
+        if UsuarioService.pertenece_unidad(usuario, UnidadID.ADMI):  # ADMISION
             tabs["ingresos"] = True
             tabs["atenciones"] = True
             if not activo:
                 activo = "ingresos"
 
-        if UsuarioService.pertenece_unidad(usuario, UnidadID.IMAGENOLOGIA):  # IMAGENOLOGÍA
+        if UsuarioService.pertenece_unidad(usuario, UnidadID.RX):  # IMAGENOLOGÍA
             tabs["radiologia"] = True
             if not activo:
                 activo = "radiologia"
@@ -124,17 +124,17 @@ class UsuarioService:
 
             unidad_id = perfil.servicio_unidad.id
 
-            if unidad_id == UnidadID.ADMISION:
+            if unidad_id == UnidadID.ADMI:
                 botones.update([
                     "crear_paciente",
                     "crear_ingreso",
                     "crear_atencion"
                 ])
 
-            elif unidad_id == UnidadID.IMAGENOLOGIA:
+            elif unidad_id == UnidadID.RX:
                 botones.add("crear_evaluacionrx")
 
-            elif unidad_id == UnidadID.REFERENCIA:
+            elif unidad_id == UnidadID.UAU:
                 botones.add("crear_referencia")
 
         return list(botones)

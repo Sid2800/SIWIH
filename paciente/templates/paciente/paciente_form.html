@@ -36,7 +36,7 @@
                     {% comment "ojo sobre los usurios de alcance global" %}
                     global como unidad no existe se coloca solo para que vaya vacio
                     {% endcomment %}
-                    {% if  request.user|tiene_rol:"ADMIN:Admision,digitador:Admision,visitante:Admision,ADMIN:Imagenologia,digitador:Imagenologia,visitante:Sala,directivo:global"%}
+                    {% if  request.user|tiene_rol:"ADMIN:ADMI,digitador:ADMI,visitante:ADMI,ADMIN:RX,digitador:RX,visitante:SALA,directivo:"%}
 
                         <a href="{{ url_historial }}" class="formularioBotones-boton">
                             <i class="bi bi-journal-medical" class="formularioBotones-icono"></i>

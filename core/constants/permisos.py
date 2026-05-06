@@ -6,9 +6,7 @@
 
 # Acceso de edición (por ejemplo mantenimiento del sistema)
 CORE_EDITOR_ROLES = ["admin"]
-CORE_EDITOR_UNIDADES = ["Admision"]
-
-
+CORE_EDITOR_UNIDADES = ["ADMI"]
 
 # -----------------------------
 # PERMISOS APP ATENCION
@@ -16,11 +14,11 @@ CORE_EDITOR_UNIDADES = ["Admision"]
 
 # Acceso de edición (guardar, registrar, recepcion)
 ATENCION_EDITOR_ROLES = ["admin", "digitador"]
-ATENCION_EDITOR_UNIDADES = ["Admision"]
+ATENCION_EDITOR_UNIDADES = ["ADMI"]
 
 # Acceso de solo visualización (listar, obtener modo lectura)
 ATENCION_VISUALIZACION_ROLES = ["admin", "digitador", "visitante", "directivo"]
-ATENCION_VISUALIZACION_UNIDADES = ["Admision","Sala"]
+ATENCION_VISUALIZACION_UNIDADES = ["ADMI","SALA"]
 
 
 # -----------------------------
@@ -29,7 +27,7 @@ ATENCION_VISUALIZACION_UNIDADES = ["Admision","Sala"]
 
 # Acceso de solo visualización (listar, obtener modo lectura)
 EXPEDIENTE_VISUALIZACION_ROLES = ["admin", "digitador", "visitante", "directivo"]
-EXPEDIENTE_VISUALIZACION_UNIDADES = ["Admision"]
+EXPEDIENTE_VISUALIZACION_UNIDADES = ["ADMI"]
 
 
 # -----------------------------
@@ -38,11 +36,11 @@ EXPEDIENTE_VISUALIZACION_UNIDADES = ["Admision"]
 
 # Acceso de edición (Add, Inactivar)
 IMAGENOLOGIA_EDITOR_ROLES = ["admin", "digitador"]
-IMAGENOLOGIA_EDITOR_UNIDADES = ["Imagenologia"]
+IMAGENOLOGIA_EDITOR_UNIDADES = ["RX"]
 
 # Acceso de solo visualización / edición parcial (Edit, Listar)
 IMAGENOLOGIA_VISUALIZACION_ROLES = ["admin", "digitador", "directivo","visitante"]
-IMAGENOLOGIA_VISUALIZACION_UNIDADES = ["Imagenologia", "DIRECTIVOS","Sala"]
+IMAGENOLOGIA_VISUALIZACION_UNIDADES = ["RX","SALA"]
 
 
 # -----------------------------
@@ -51,11 +49,11 @@ IMAGENOLOGIA_VISUALIZACION_UNIDADES = ["Imagenologia", "DIRECTIVOS","Sala"]
 
 # Acceso de edición
 INGRESO_EDITOR_ROLES = ["admin", "digitador"]
-INGRESO_EDITOR_UNIDADES = ["Admision"]
+INGRESO_EDITOR_UNIDADES = ["ADMI"]
 
 # Acceso de visualización / auditoría
-INGRESO_VISUALIZACION_ROLES = ["admin", "digitador", "directivo", "visitante"]
-INGRESO_VISUALIZACION_UNIDADES = ["Admision","Sala"]
+INGRESO_VISUALIZACION_ROLES = ["admin", "digitador", "visitante", "directivo"]
+INGRESO_VISUALIZACION_UNIDADES = ["ADMI","SALA"]
 
 
 # -----------------------------
@@ -65,25 +63,25 @@ INGRESO_VISUALIZACION_UNIDADES = ["Admision","Sala"]
 
 # Permisos Paciente
 PACIENTE_EDITOR_ROLES = ['admin', 'digitador']
-PACIENTE_EDITOR_UNIDADES = ['Admision']
+PACIENTE_EDITOR_UNIDADES = ['ADMI']
 
-PACIENTE_VISUALIZACION_ROLES = ['admin', 'digitador', 'directivo','visitante']
-PACIENTE_VISUALIZACION_UNIDADES = ['Admision', 'Imagenologia','Sala']
+PACIENTE_VISUALIZACION_ROLES = ['admin', 'digitador','visitante', 'directivo']
+PACIENTE_VISUALIZACION_UNIDADES = ['ADMI', 'RX','SALA']
 
 PACIENTE_DISPENSACION_ROLES = ['admin', 'directivo']
-PACIENTE_DISPENSACION_UNIDADES = ['Admision', 'Imagenologia']
+PACIENTE_DISPENSACION_UNIDADES = ['ADMI', 'RX']
 
 
 # -----------------------------
 # PERMISOS APP REFERECINA
 # -----------------------------
 REFERENCIA_EDITOR_ROLES = ['admin', 'digitador']
-REFERENCIA_EDITOR_UNIDADES = ['Referencia']
+REFERENCIA_EDITOR_UNIDADES = ['UAU']
 
 
 # Acceso de solo visualización / edición parcial (Edit, Listar)
 REFERENCIA_VISUALIZACION_ROLES = ["admin", "digitador", "directivo"]
-REFERENCIA_VISUALIZACION_UNIDADES = ["Referencia"]
+REFERENCIA_VISUALIZACION_UNIDADES = ["UAU"]
 
 
 
