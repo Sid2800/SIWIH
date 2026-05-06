@@ -276,3 +276,5 @@ def filtro_rango_fecha(campo, inicio, fin):
     { "campo__range": (inicio, fin) }
     """
     return {f"{campo}__range": (inicio, fin)}
+
+

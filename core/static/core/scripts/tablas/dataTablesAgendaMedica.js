@@ -39,7 +39,7 @@ document.addEventListener("DOMContentLoaded", () => {
         text: '<i class="bi bi-plus-square boton-exportacion"></i>',  // Icono o texto para el botón
         titleAttr: 'Agregar Periodo Laboral',
         action: function ( e, dt, button, config ) {
-            //window.location.href = API_REFERENCIA.agregarReferencia;
+            ManejarPeriodoLaboral.open();
         }
         },
         {
@@ -362,8 +362,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (selectedRow) {
                 
-            console.log(selectedRow.id);
-            ManejarPeriodoLaboral.open({"hola":"saludo"});
+            ManejarPeriodoLaboral.open({
+                "titulo":"Editar Periodo Laboral",
+                "periodoID": selectedRow.id
+            });
             /*
             let nombreSlug = slugify(
                     `${selectedRow.paciente__primer_nombre}-${selectedRow.paciente__primer_apellido}`

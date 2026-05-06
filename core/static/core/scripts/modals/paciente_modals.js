@@ -668,14 +668,17 @@ async function AgregarDefuncionModal(paciente, lectura) {
                 unidadSelect.disable();
             }
 
-            tipo.addEventListener("change", function() {
-                if (this.value === "2") { // extrahospitalaria
+            tipo.onchange = function () {
+
+                if (this.value === "2") { 
                 unidadSelect.disable();
+
+                
                 unidadSelect.clear();
                 } else {
                 unidadSelect.enable();
                 }
-            });
+            };
 
 
 
@@ -941,14 +944,15 @@ async function registrarObito(IdObito,idPaciente, datosMadre) {
                 }
             }
 
-            tipo.addEventListener("change", function() {
+            tipo.onchange = function () {
+
                 if (this.value === "2") { 
                 unidaClinicaSelect.disable();
                 unidaClinicaSelect.clear();
                 } else {
                 unidaClinicaSelect.enable();
                 }
-            });
+            };
 
         }
 

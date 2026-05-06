@@ -132,6 +132,8 @@ const API_URLS = {
    listarObitosPaciente: urls["listarObitosPaciente"],
    listarUnidadClinica: urls["listarUnidadClinica"],
    listarAgendaMedicaAPI: urls["listarAgendaMedicaAPI"],
+   listarPersonalClinicoAPI: urls["listarPersonalClinicoAPI"],
+   listarJornadaLaboralAPI: urls["listarJornadaLaboralAPI"]
 };
 
 /**

@@ -2649,7 +2649,11 @@ no logro establecer una clase perzonalizada */
    font-family: var(--fuenteTablaCuerpo);
    text-decoration: underline;
 }
-
+@media (min-width: 36rem) {
+   .swal2-actions{
+      column-gap: 2rem;
+   }
+}
 
 /* Contenedor de botones de acción: layout y ancho */
 .contener-modal-contenedor-botones {
@@ -3148,7 +3152,8 @@ select[disabled] {
 
 .contenedor-modal-sector,
 .contenedor-modal-galeria,
-.contener-modal-defuncion{
+.contener-modal-defuncion,
+.contenedor-modal-periodo-laboral{
    background-color: var(--colorContendor);
 
 }
@@ -3218,6 +3223,10 @@ select[disabled] {
    align-items: start;
 }
 
+.formularioCampoModal > * {
+   min-width: 0;
+}
+
 #formulario-model-sector .select2-dropdown {
    z-index: 1111 !important;
 }
@@ -3235,19 +3244,18 @@ select[disabled] {
       width: 12rem;
    }
 
+   .formularioCampoModal{
+      flex-direction: row;
+   }
+
 
    .contener-modal-defuncion{
-      width: 60rem;
+      width: 57rem;
       display: flex !important;
    }
 
    
-   .formularioCampoModal{
-      flex-direction: row;
-      justify-content: center;
-      align-items: center;
-      column-gap: 3rem;
-   }
+
 }
 
 /*REGLAS PARA EL LISTADO DE RECEPCION DE INGRESOS*/
@@ -5109,3 +5117,80 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
       width: 92rem !important
    }
 }
+
+
+/*
+>>>>>>>>>>>>>>>>>>>>>   APP DE AGENDA MEDICA
+*/
+
+
+/*
+----------------   MODAL PERIODO LABORAL
+*/
+
+  .modalPeriodoLaboralCampos .formularioCampoModal{
+      display: grid;
+      grid-template-columns: 1fr;
+   }
+
+@media (min-width: 36rem) {
+
+   #formulario-modal-periodo-laboral{
+      margin-top: 1.5rem;
+      row-gap: .5rem;
+   }
+
+   .contenedor-modal-periodo-laboral{
+      width: 50rem;
+      display: flex !important;
+   }
+
+      .modalPeriodoLaboralCampos .formularioCampoModal{
+      display: grid;
+      grid-template-columns: 1fr 3fr;
+   }
+
+
+}
+
+
+
+.vscomp-ele{
+   width: 100% !important;
+   max-width: 100%;
+   min-width: 0
+}
+
+
+
+.custom-wrapper .vscomp-toggle-button{
+   border-radius: .5rem;
+   background-color: transparent;
+   border: 1px solid #ccc;
+
+   white-space: nowrap;
+   overflow: hidden;
+   text-overflow: ellipsis;
+
+}
+
+
+.custom-wrapper {
+   background-color: transparent;
+   color: var(--negro);
+   font-family: var(--fuenteTablaCuerpo);
+   font-size: 1.7rem;
+   width: 100%;
+   min-width: 0;
+   
+
+}
+
+.custom-dropbox{
+
+   border-radius: 1rem ;
+
+
+}
+
+

@@ -107,6 +107,10 @@ class PersonalSalud(models.Model):
         on_delete=models.PROTECT,
         related_name='personal_salud_modificados'
     )
+    estado = models.SmallIntegerField(
+        choices=EstadoRegistro.choices,
+        default=EstadoRegistro.ACTIVO
+    )
 
     def __str__(self):
         return str(self.empleado)

@@ -157,3 +157,15 @@ function formatearFechaYYYYMMDD_a_DDMMYYYY(fechaStr) {
     const [anio, mes, dia] = fechaStr.split("-");
     return `${dia}/${mes}/${anio}`;
 }
+
+
+function fechaManana() {
+    const fecha = new Date();
+    fecha.setDate(fecha.getDate() + 1);
+
+    return fecha.toISOString().split('T')[0];
+}
+
+function formatearHora(hora) {
+    return hora.slice(0, 5); // "13:00"
+}
