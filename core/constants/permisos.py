@@ -8,8 +8,6 @@
 CORE_EDITOR_ROLES = ["admin"]
 CORE_EDITOR_UNIDADES = ["Admision"]
 
-
-
 # -----------------------------
 # PERMISOS APP ATENCION
 # -----------------------------
@@ -42,7 +40,7 @@ IMAGENOLOGIA_EDITOR_UNIDADES = ["Imagenologia"]
 
 # Acceso de solo visualización / edición parcial (Edit, Listar)
 IMAGENOLOGIA_VISUALIZACION_ROLES = ["admin", "digitador", "directivo","visitante"]
-IMAGENOLOGIA_VISUALIZACION_UNIDADES = ["Imagenologia", "DIRECTIVOS","Sala"]
+IMAGENOLOGIA_VISUALIZACION_UNIDADES = ["Imagenologia","Sala"]
 
 
 # -----------------------------
@@ -54,7 +52,7 @@ INGRESO_EDITOR_ROLES = ["admin", "digitador"]
 INGRESO_EDITOR_UNIDADES = ["Admision"]
 
 # Acceso de visualización / auditoría
-INGRESO_VISUALIZACION_ROLES = ["admin", "digitador", "directivo", "visitante"]
+INGRESO_VISUALIZACION_ROLES = ["admin", "digitador", "visitante", "directivo"]
 INGRESO_VISUALIZACION_UNIDADES = ["Admision","Sala"]
 
 
@@ -67,7 +65,7 @@ INGRESO_VISUALIZACION_UNIDADES = ["Admision","Sala"]
 PACIENTE_EDITOR_ROLES = ['admin', 'digitador']
 PACIENTE_EDITOR_UNIDADES = ['Admision']
 
-PACIENTE_VISUALIZACION_ROLES = ['admin', 'digitador', 'directivo','visitante']
+PACIENTE_VISUALIZACION_ROLES = ['admin', 'digitador','visitante', 'directivo']
 PACIENTE_VISUALIZACION_UNIDADES = ['Admision', 'Imagenologia','Sala']
 
 PACIENTE_DISPENSACION_ROLES = ['admin', 'directivo']
