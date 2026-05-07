@@ -72,8 +72,14 @@ def _registrar_log(usuario, accion, descripcion, objeto_tipo=None, objeto_id=Non
 def _es_exp_admin(user):
     """
     Verifica si un usuario tiene permisos administrativos sobre el módulo de expedientes.
-    Roles permitidos: Administrador, Digitador, Directivo.
+    Requisitos:
+    - Debe estar registrado en RRHH (rrhh_empleado)
+    - Debe tener uno de estos roles: Administrador, Digitador, Directivo
     """
+    # Validación global: usuario debe estar en RRHH
+    if not _es_usuario_valido_rrhh(user):
+        return False
+
     if user.is_superuser or user.is_staff:
         return True
     if user.groups.filter(name='administradores').exists():
@@ -85,10 +91,28 @@ def _es_exp_admin(user):
     ).exists()
 
 
+def _es_usuario_valido_rrhh(user):
+    """
+    Verifica si el usuario está registrado en la cadena RRHH.
+    Requisito previo para cualquier acceso al módulo s_exp.
+
+    Retorna: True si usuario existe en rrhh_empleado, False en caso contrario
+    """
+    from rrhh.models import Empleado
+
+    return Empleado.objects.filter(usuario_id=user.id).exists()
+
+
 def _es_exp_solicitante(user):
     """True si el usuario puede acceder al módulo (solicitar expedientes).
-    Condiciones: rol 'exp_solicitante' o 'admin' en PerfilUnidad, o admin del módulo.
+    Condiciones:
+    - Debe estar registrado en RRHH (rrhh_empleado)
+    - Debe tener rol 'exp_solicitante' o 'admin' en PerfilUnidad, o ser admin del módulo
     """
+    # Validación global: usuario debe estar en RRHH
+    if not _es_usuario_valido_rrhh(user):
+        return False
+
     if _es_exp_admin(user):
         return True
     return PerfilUnidad.objects.filter(usuario=user, rol='exp_solicitante').exists()
