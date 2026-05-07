@@ -81,9 +81,9 @@
             </li> 
 
          
-            {% if request.user|tiene_unidad:"Admision:Sala" %}
+            {% if request.user|tiene_unidad:"ADMI:SALA" %}
 
-               {% if request.user|tiene_unidad:"Admision:" %}
+               {% if request.user|tiene_unidad:"ADMI:" %}
                <li>
                   <a href="{% url 'listar_expedientes' %}" class="bn-navegacion__enlace" title="Expediente">
                      <i class="bi bi-clipboard2-heart bn-navegacion-enlace__logo"></i>
@@ -125,7 +125,7 @@
             
 
             
-            {% if  request.user|tiene_unidad:"Imagenologia:DIRECTIVOS:Sala" %}
+            {% if  request.user|tiene_unidad:"RX:SALA" %}
                <li>  
                   <a href="{% url 'listar_evalucionesrx' %}" class="bn-navegacion__enlace">
                      <i class="bi  bi-radioactive bn-navegacion-enlace__logo"></i>
@@ -135,7 +135,7 @@
             {% endif %}
 
 
-            {% if  request.user|tiene_unidad:"Referencia:DIRECTIVOS" %}
+            {% if  request.user|tiene_unidad:"UAU" %}
                <li>  
                   <a href="{% url 'listar_referencias' %}" class="bn-navegacion__enlace">
                      <i class="bi bi-link-45deg bn-navegacion-enlace__logo"></i>
@@ -152,7 +152,7 @@
                </a>
             </li>
          
-            {% if  request.user|tiene_rol:"ADMIN:Admision"  %}
+            {% if  request.user|tiene_rol:"ADMIN:ADMI"  %}
 
             <li>
                <a href="{% url 'mantenimiento' %}" class="bn-navegacion__enlace">

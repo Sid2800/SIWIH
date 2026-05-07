@@ -32,6 +32,8 @@ from core.constants.permisos import (
     PACIENTE_VISUALIZACION_UNIDADES,
     PACIENTE_DISPENSACION_ROLES,
     PACIENTE_DISPENSACION_UNIDADES,
+    CORE_EDITOR_ROLES,
+    CORE_EDITOR_UNIDADES
 )
 from core.constants.choices_constants import TipoDefuncion
 from core.constants.domain_constants import LogApp
@@ -379,7 +381,7 @@ class PacienteEditView(UpdateView):
 
         
         #validamos los grupos requeridos con los del usuairo y mandamos un true o false, atravez del diccionario de contexto
-        permiso =  not verificar_permisos_usuario(self.request.user,  ['admin', 'digitador'], ['Admision'])
+        permiso =  not verificar_permisos_usuario(self.request.user,  PACIENTE_EDITOR_ROLES, PACIENTE_EDITOR_UNIDADES)
         context['readonly_mode'] = 1 if permiso else 0
 
         #enlace construido desde elbckend historialpaciente
@@ -1474,7 +1476,7 @@ class HistorialPaciente(DetailView):
 
 def EjecutarReclasificacion(request):
     usuario = request.user
-    if not verificar_permisos_usuario(usuario, ['admin'], ['Admision']):
+    if not verificar_permisos_usuario(usuario, CORE_EDITOR_ROLES, CORE_EDITOR_UNIDADES):
         return JsonResponse({'error': 'No tienes permisos para realizar esta accion'}, status=403)
 
     

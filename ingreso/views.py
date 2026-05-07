@@ -121,6 +121,7 @@ class IngresoAddView(UnidadRolRequiredMixin, CreateView):
             return JsonResponse({"success": False, "error": f"Hubo un error al registrar el ingreso: {str(e)}"})
         return response
 
+
     def dispatch(self, request, *args, **kwargs):
         pkPaciente = self.kwargs.get('pk')  
         if pkPaciente == 0:
