@@ -93,14 +93,51 @@ def _es_exp_admin(user):
 
 def _es_usuario_valido_rrhh(user):
     """
-    Verifica si el usuario está registrado en la cadena RRHH.
+    Verifica si el usuario está completamente registrado en la cadena RRHH.
     Requisito previo para cualquier acceso al módulo s_exp.
 
-    Retorna: True si usuario existe en rrhh_empleado, False en caso contrario
-    """
-    from rrhh.models import Empleado
+    Valida la cadena completa:
+    1. Existe en rrhh_empleado (usuario_id = user.id)
+    2. Existe en rrhh_personalnoclinico O rrhh_personalsalud (empleado_id)
+    3. Tiene servicio_unidad_id asignado en uno de los dos
 
-    return Empleado.objects.filter(usuario_id=user.id).exists()
+    Retorna: True si está completamente registrado, False en caso contrario
+    """
+    from rrhh.models import Empleado, PersonalNoClinico, PersonalSalud
+
+    try:
+        # Paso 1: Verificar que existe rrhh_empleado
+        empleado = Empleado.objects.filter(usuario_id=user.id).first()
+        if not empleado:
+            logger.warning(f"Usuario {user.username} (id={user.id}) no existe en rrhh_empleado")
+            return False
+
+        # Paso 2 & 3: Verificar que está en PersonalNoClinico O PersonalSalud CON servicio_unidad
+        personal_no_clinico = PersonalNoClinico.objects.filter(
+            empleado_id=empleado.id,
+            servicio_unidad_id__isnull=False  # Verificar que servicio_unidad_id está asignado
+        ).exists()
+
+        if personal_no_clinico:
+            logger.info(f"Usuario {user.username}: Validado - PersonalNoClinico con servicio_unidad")
+            return True
+
+        personal_salud = PersonalSalud.objects.filter(
+            empleado_id=empleado.id,
+            servicio_unidad_id__isnull=False  # Verificar que servicio_unidad_id está asignado
+        ).exists()
+
+        if personal_salud:
+            logger.info(f"Usuario {user.username}: Validado - PersonalSalud con servicio_unidad")
+            return True
+
+        # No está en PersonalNoClinico ni PersonalSalud, o no tiene servicio_unidad
+        logger.warning(f"Usuario {user.username}: Empleado registrado pero sin PersonalNoClinico/PersonalSalud o sin servicio_unidad asignado")
+        return False
+
+    except Exception as e:
+        logger.error(f"Error al validar RRHH para usuario {user.username}: {e}", exc_info=True)
+        return False
 
 
 def _es_exp_solicitante(user):
