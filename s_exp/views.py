@@ -104,35 +104,60 @@ def _get_servicio_unidad_from_rrhh(user):
     """
     Obtiene la Unidad de Servicio del usuario mediante la cadena de relaciones RRHH.
 
-    Recorre la cadena: User → Empleado → PersonalNoClinico → ServicioUnidad
+    Verifica explícitamente la cadena de relaciones:
+    1. auth_user.id
+    2. rrhh_empleado donde usuario_id = auth_user.id
+    3. rrhh_personalnoclinico donde empleado_id = rrhh_empleado.id
+    4. servicio_unidad_id en rrhh_personalnoclinico
 
     Retorna:
         - Tuple: (servicio_unidad_obj, es_valido)
         - servicio_unidad_obj: La instancia de ServicioUnidad o None si no existe
-        - es_valido: True si el usuario está registrado en RRHH, False en caso contrario
+        - es_valido: True si el usuario está correctamente registrado en RRHH, False en caso contrario
     """
+    from rrhh.models import Empleado, PersonalNoClinico, PersonalSalud
+
     try:
-        # Verificar que el usuario tenga un empleado asociado
-        empleado = user.empleado
+        # Paso 1: Verificar que existe rrhh_empleado donde usuario_id = user.id
+        empleado = Empleado.objects.filter(usuario_id=user.id).first()
         if not empleado:
+            logger.warning(f"Usuario {user.username} (id={user.id}) no tiene registro en rrhh_empleado")
             return None, False
 
-        # Obtener PersonalNoClinico del empleado
-        # Se intenta PersonalNoClinico (personal administrativo/no clínico)
-        personal = empleado.personal_no_clinico
-        if personal and personal.servicio_unidad:
-            return personal.servicio_unidad, True
+        # Paso 2: Intentar obtener PersonalNoClinico donde empleado_id = empleado.id
+        personal_no_clinico = PersonalNoClinico.objects.filter(
+            empleado_id=empleado.id
+        ).select_related('servicio_unidad').first()
 
-        # Si no tiene PersonalNoClinico, intentar con PersonalSalud
-        personal_salud = empleado.personal_salud_empleado
-        if personal_salud and personal_salud.servicio_unidad:
-            return personal_salud.servicio_unidad, True
+        if personal_no_clinico:
+            # Paso 3: Verificar que servicio_unidad_id está asignado
+            if personal_no_clinico.servicio_unidad_id:
+                logger.info(f"Usuario {user.username}: ServicioUnidad {personal_no_clinico.servicio_unidad_id} desde PersonalNoClinico")
+                return personal_no_clinico.servicio_unidad, True
+            else:
+                logger.warning(f"Usuario {user.username}: PersonalNoClinico sin servicio_unidad asignado")
+                return None, True  # Registrado en RRHH pero sin unidad
 
-        # El usuario está registrado en RRHH pero sin unidad asignada
+        # Paso 2 (alternativo): Intentar obtener PersonalSalud si no tiene PersonalNoClinico
+        personal_salud = PersonalSalud.objects.filter(
+            empleado_id=empleado.id
+        ).select_related('servicio_unidad').first()
+
+        if personal_salud:
+            # Paso 3: Verificar que servicio_unidad_id está asignado
+            if personal_salud.servicio_unidad_id:
+                logger.info(f"Usuario {user.username}: ServicioUnidad {personal_salud.servicio_unidad_id} desde PersonalSalud")
+                return personal_salud.servicio_unidad, True
+            else:
+                logger.warning(f"Usuario {user.username}: PersonalSalud sin servicio_unidad asignado")
+                return None, True  # Registrado en RRHH pero sin unidad
+
+        # Si llegamos aquí: empleado existe pero sin PersonalNoClinico ni PersonalSalud
+        logger.warning(f"Usuario {user.username}: Empleado registrado pero sin PersonalNoClinico ni PersonalSalud")
         return None, True
 
-    except (AttributeError, Exception):
-        # El usuario no está registrado en RRHH
+    except Exception as e:
+        logger.error(f"Error al verificar RRHH para usuario {user.username}: {e}", exc_info=True)
         return None, False
 
 
