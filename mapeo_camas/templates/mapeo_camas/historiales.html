@@ -39,8 +39,7 @@
 </div>
 {% endblock %}
 
-{% block extra_js %}
-<script src="{% static 'mapeo_camas/scripts/historialesCamas.js' %}?v=20260506g"></script>
+{% block extra_css %}
 <style>
   #tabla-historiales {
     width: 100%;
@@ -50,4 +49,8 @@
     cursor: pointer;
   }
 </style>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'mapeo_camas/scripts/historialesCamas.js' %}?v=20260506g"></script>
 {% endblock %}

@@ -1,3 +1,23 @@
+
+from datetime import datetime, timedelta
+import json
+from collections import defaultdict
+from functools import lru_cache
+
+from django.contrib.auth.decorators import user_passes_test
+
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db import transaction
+from django.db.models import Count, Exists, OuterRef, Prefetch, Q, Subquery
+from django.http import JsonResponse
+from django.utils import timezone
+from django.views.decorators.http import require_GET, require_POST
+from django.views.generic import TemplateView
+from ingreso.models import Ingreso
+from core.services.mapeo_camas_service import MapeoCamasService
+
+
 # --- Helpers de serialización robustos para el mapa de camas ---
 def _paciente_payload_v2(paciente):
     if not paciente:
@@ -44,23 +64,6 @@ def _servicio_payload(servicio, salas_data):
         "nombre_corto": getattr(servicio, "nombre_corto", ""),
         "salas": salas_data,
     }
-from datetime import datetime, timedelta
-import json
-from collections import defaultdict
-from functools import lru_cache
-
-from django.contrib.auth.decorators import user_passes_test
-
-from django.contrib.auth.decorators import login_required
-from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db import transaction
-from django.db.models import Count, Exists, OuterRef, Prefetch, Q, Subquery
-from django.http import JsonResponse
-from django.utils import timezone
-from django.views.decorators.http import require_GET, require_POST
-from django.views.generic import TemplateView
-from ingreso.models import Ingreso
-from core.services.mapeo_camas_service import MapeoCamasService
 
 # Helper global para obtener instancias de EstadoMapeo
 @lru_cache(maxsize=64)

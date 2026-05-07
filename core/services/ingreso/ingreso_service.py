@@ -5,7 +5,7 @@ from paciente.models import Paciente, Padre
 from expediente.models import PacienteAsignacion
 from servicio.models import Sala
 from core.services.paciente_service import PacienteService
-from core.services.mapeo_camas_service import MapeoCamasService
+from core.services.mapeo_camas_service import MapeoCamasService  # [2026-05-07] Se agregó para liberar cama al inactivar ingreso
 from django.db.models import Func, F, Q, OuterRef, Subquery, DateField, Value, Count
 from django.db.models.functions import Concat
 from django.db import transaction
@@ -421,7 +421,7 @@ class IngresoService:
 
     @staticmethod
 
-    def inactivar_ingreso(ingresoId, usuario):
+    def inactivar_ingreso(ingresoId, usuario):  # [2026-05-07] Se agregó parámetro 'usuario' para registrar quién libera la cama
         """
         Inactiva un ingreso y libera la cama asignada de forma atómica.
 
@@ -453,14 +453,14 @@ class IngresoService:
         ).first()
 
         if ingreso:
-            with transaction.atomic():
+            with transaction.atomic():  # [2026-05-07] Antes: ingreso.save() simple sin atomic ni liberación de cama
                 # Paso 1: marcar el ingreso como inactivo
                 ingreso.estado = 2
                 ingreso.save(update_fields=["estado"])
 
                 # Paso 2: liberar la cama - cierra la asignación activa del paciente
                 # y registra OCUPADA → LIBRE en HistorialEstadoCama
-                if ingreso.paciente_id:
+                if ingreso.paciente_id:  # [2026-05-07] Bloque nuevo: liberación atómica de cama al inactivar
                     MapeoCamasService.cerrar_asignacion_activa_paciente(
                         paciente_id=ingreso.paciente_id,
                         usuario=usuario,

@@ -19,6 +19,7 @@ from core.utils.utilidades_textos import formatear_nombre_completo, formatear_ub
 
 from core.services.expediente_service import ExpedienteService
 from core.services.ingreso.ingreso_service import IngresoService
+# [2026-05-07] Integracion de Ingreso con mapa/asignacion de camas.
 from core.services.mapeo_camas_service import MapeoCamasService
 from core.constants.permisos import (
     INGRESO_EDITOR_ROLES,
@@ -96,7 +97,8 @@ class IngresoAddView(UnidadRolRequiredMixin, CreateView):
 
                 response = super().form_valid(form) # gurada l ingreo
 
-                # Si el ingreso se guarda con cama y paciente, sincroniza la tabla
+                # [2026-05-07] Cambio relacionado con cama:
+                # si el ingreso se guarda con cama y paciente, sincroniza la tabla
                 # de asignacion para reutilizar o activar el registro de esa cama.
                 if self.object.cama_id and self.object.paciente_id:
                     MapeoCamasService.sincronizar_cama_con_ingreso(
@@ -253,7 +255,8 @@ class IngresoEditView(UnidadRolRequiredMixin, UpdateView):
         if usuario.id:
             form.instance.modificado_por_id = usuario.id
 
-        # Se toma una foto del ingreso antes de guardar para saber cual era la
+        # [2026-05-07] Cambio relacionado con cama:
+        # se toma una foto del ingreso antes de guardar para saber cual era la
         # cama anterior y poder cerrar esa asignacion correctamente.
         ingreso_anterior = Ingreso.objects.filter(pk=self.object.pk).values(
             "cama_id",
@@ -284,7 +287,8 @@ class IngresoEditView(UnidadRolRequiredMixin, UpdateView):
 
                 response = super().form_valid(form) # gurada l ingreo
 
-                # Solo sincronizamos camas si el paciente sigue siendo el mismo.
+                # [2026-05-07] Cambio relacionado con cama:
+                # solo sincronizamos camas si el paciente sigue siendo el mismo.
                 # En ese caso la cama anterior se cierra y la cama nueva se activa.
                 if paciente_anterior_id == self.object.paciente_id and self.object.paciente_id:
                     MapeoCamasService.sincronizar_cambio_cama_en_ingreso(

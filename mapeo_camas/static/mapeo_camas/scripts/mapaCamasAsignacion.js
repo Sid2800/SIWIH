@@ -32,7 +32,6 @@ document.addEventListener("DOMContentLoaded", function () {
   var btnCopiar = document.getElementById("btn-copiar-camas");
   var btnImprimir = document.getElementById("btn-imprimir-camas");
   var btnHistoriales = document.getElementById("btn-historiales-camas");
-  var btnSincronizar = document.getElementById("btn-sincronizar-camas");
   var btnIniciarMapeo = document.getElementById("btn-iniciar-mapeo");
   var btnTerminarMapeo = document.getElementById("btn-terminar-mapeo");
   var btnCancelarMapeo = document.getElementById("btn-cancelar-mapeo");
@@ -47,34 +46,6 @@ document.addEventListener("DOMContentLoaded", function () {
   // Constantes de interaccion
   var CLICK_DELAY_MS = 300;  // ms para distinguir simple vs doble clic
   var LONG_PRESS_MS  = 600;  // ms para activar confirmacion por pulsacion larga (tactil)
-
-  function restaurarBotonesBase() {
-    if (btnIniciarMapeo) {
-      btnIniciarMapeo.style.display = "inline-flex";
-      btnIniciarMapeo.classList.remove("mapa-control-mapeo--oculto");
-    }
-    if (btnCopiar) {
-      btnCopiar.style.display = "inline-flex";
-    }
-    if (btnImprimir) {
-      btnImprimir.style.display = "inline-flex";
-    }
-    if (btnHistoriales) {
-      btnHistoriales.style.display = "inline-flex";
-    }
-    if (btnSincronizar) {
-      btnSincronizar.style.display = "inline-flex";
-    }
-    if (btnTerminarMapeo) {
-      btnTerminarMapeo.style.display = "none";
-    }
-    if (btnCancelarMapeo) {
-      btnCancelarMapeo.style.display = "none";
-    }
-    if (mapapiemapeo) {
-      mapapiemapeo.style.display = "none";
-    }
-  }
 
   // Controla visibilidad de botones segun exista o no sesion activa de mapeo.
   function establecerModoMapeoActivo(activo) {
@@ -99,7 +70,6 @@ document.addEventListener("DOMContentLoaded", function () {
     ocultar(btnCopiar, activo);
     ocultar(btnImprimir, activo);
     ocultar(btnHistoriales, activo);
-    ocultar(btnSincronizar, activo);
     ocultar(btnTerminarMapeo, !activo);
     ocultar(btnCancelarMapeo, !activo);
 
@@ -183,7 +153,6 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
     // Consulta backend para recuperar sesion en progreso y restaurar estado de UI.
-
   async function cargarEstadoSesionMapeo() {
     try {
       var response = await fetch(API_URLS.estadoMapeo);
@@ -442,14 +411,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // ── HTML para cama VACIA (u otro estado sin paciente) ────────────────────
     // Permite cambiar el estado; si se elige OCUPADA aparece busqueda de paciente
-    var opcionesEstadoVacia = ESTADOS_CAMA.map(function (e) {
-      var sel = e === estadoActual ? ' selected="selected"' : "";
-      return '<option value="' + e + '"' + sel + ">" + e + "</option>";
-    }).join("");
-
-    // [2026-05-04 IMPROVEMENT] Opciones del select para cama OCUPADA con pre-selección del estado actual.
-    // El usuario ve inmediatamente qué estado tiene la cama antes de cambiar.
-    var opcionesEstadoOcupada = ESTADOS_CAMA.map(function (e) {
+    var opcionesEstado = ESTADOS_CAMA.map(function (e) {
       var sel = e === estadoActual ? ' selected="selected"' : "";
       return '<option value="' + e + '"' + sel + ">" + e + "</option>";
     }).join("");
@@ -461,7 +423,7 @@ document.addEventListener("DOMContentLoaded", function () {
       '  <div class="formularioCampoModal">' +
       '    <label for="modal-mapa-estado">Cambiar a estado</label>' +
       '    <select id="modal-mapa-estado" class="formularioCampo-select">' +
-      opcionesEstadoVacia +
+      opcionesEstado +
       "    </select>" +
       "  </div>" +
       "</fieldset>" +
@@ -518,7 +480,7 @@ document.addEventListener("DOMContentLoaded", function () {
       '  <div class="formularioCampoModal">' +
       '    <label for="modal-mapa-estado">Estado</label>' +
       '    <select id="modal-mapa-estado" class="formularioCampo-select">' +
-      opcionesEstadoOcupada +
+      opcionesEstado +
       "    </select>" +
       "  </div>" +
       "</fieldset>" +
@@ -1238,7 +1200,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
         sesionMapeoActivaId = null;
         establecerModoMapeoActivo(false);
-        restaurarBotonesBase();
         limpiarMarcasMapeo();
         toastr.success(data.mensaje || "Mapeo finalizado.", "Exito");
       } catch (error) {
@@ -1286,7 +1247,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
         sesionMapeoActivaId = null;
         establecerModoMapeoActivo(false);
-        restaurarBotonesBase();
         limpiarMarcasMapeo();
         toastr.success(data.mensaje || "Mapeo cancelado.", "Exito");
       } catch (error) {

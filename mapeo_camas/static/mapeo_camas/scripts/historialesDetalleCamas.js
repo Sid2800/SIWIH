@@ -6,7 +6,6 @@ document.addEventListener("DOMContentLoaded", function () {
   var contenedor = document.getElementById("detalle-cards-contenedor");
   var estructuraContenedor = document.getElementById("detalle-estructura-contenedor");
   var tablaContenedor = document.getElementById("detalle-tabla-contenedor");
-  var tablaFiltros = document.getElementById("detalle-tabla-filtros");
   var tablaBody = document.getElementById("tabla-detalle-camas-body");
   var metaEl = document.getElementById("detalle-meta");
   var btnCopiar = document.getElementById("btn-copiar-detalle");
@@ -15,7 +14,6 @@ document.addEventListener("DOMContentLoaded", function () {
   var btnVistaTabla = document.getElementById("btn-vista-tabla");
 
   var tablaDt = null;
-  // [2026-05-06 FIX] Filtro Estado eliminado; solo se filtra por fecha.
   var dtfFechaInicio = document.getElementById("dtf-fecha-inicio");
   var dtfFechaFin = document.getElementById("dtf-fecha-fin");
   var dtfLimpiar = document.getElementById("dtf-btn-limpiar");
@@ -168,59 +166,6 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 
-  function renderCards(cards) {
-    if (!cards || !cards.length) {
-      renderVacio("No hay cards para este registro.");
-      return;
-    }
-
-    var params = new URLSearchParams(window.location.search || "");
-    var tipoActual = (params.get("tipo") || "").toLowerCase();
-
-    if (tipoActual === "historial") {
-      var htmlTimeline = '<div class="historial-timeline">' + cards.map(function (card) {
-        var estadoCss = escaparHtml(card.estado_css || "mapa-cama--sin-asignacion");
-        return (
-          '<article class="historial-card historial-card-timeline ' + estadoCss + '">' +
-          '<div class="historial-card-time">' + escaparHtml(formatearFechaHoraCorta(card.fecha)) + "</div>" +
-          "<h4>" + escaparHtml(card.titulo || "") + "</h4>" +
-          '<div class="historial-card-subtitulo">' + escaparHtml(card.subtitulo || "") + "</div>" +
-          '<div class="historial-card-linea"><strong>Estado:</strong> ' + escaparHtml(card.estado || "") + "</div>" +
-          '<div class="historial-card-linea"><strong>Paciente:</strong> ' + escaparHtml(card.paciente || "Sin paciente") + "</div>" +
-          '<div class="historial-card-linea"><strong>Usuario:</strong> ' + escaparHtml(card.usuario || "") + "</div>" +
-          '<div class="historial-card-linea">' + escaparHtml(card.detalle_1 || "") + "</div>" +
-          '<div class="historial-card-linea">' + escaparHtml(card.detalle_2 || "") + "</div>" +
-          '<div class="historial-card-linea">' + escaparHtml(card.detalle_3 || "") + "</div>" +
-          (card.observacion ? '<div class="historial-card-observacion">' + escaparHtml(card.observacion) + "</div>" : "") +
-          "</article>"
-        );
-      }).join("") + "</div>";
-
-      contenedor.innerHTML = htmlTimeline;
-      return;
-    }
-
-    var html = cards.map(function (card) {
-      var estadoCss = estadoCssDesdeTexto(card.estado);
-      return (
-        '<article class="historial-card ' + estadoCss + '">' +
-        "<h4>" + escaparHtml(card.titulo || "") + "</h4>" +
-        '<div class="historial-card-subtitulo">' + escaparHtml(card.subtitulo || "") + "</div>" +
-        '<div class="historial-card-linea"><strong>Estado:</strong> ' + escaparHtml(card.estado || "") + "</div>" +
-        '<div class="historial-card-linea"><strong>Paciente:</strong> ' + escaparHtml(card.paciente || "Sin paciente") + "</div>" +
-        '<div class="historial-card-linea"><strong>Usuario:</strong> ' + escaparHtml(card.usuario || "") + "</div>" +
-        '<div class="historial-card-linea"><strong>Fecha:</strong> ' + escaparHtml(formatearFechaHoraCorta(card.fecha)) + "</div>" +
-        '<div class="historial-card-linea">' + escaparHtml(card.detalle_1 || "") + "</div>" +
-        '<div class="historial-card-linea">' + escaparHtml(card.detalle_2 || "") + "</div>" +
-        '<div class="historial-card-linea">' + escaparHtml(card.detalle_3 || "") + "</div>" +
-        (card.observacion ? '<div class="historial-card-observacion">' + escaparHtml(card.observacion) + "</div>" : "") +
-        "</article>"
-      );
-    }).join("");
-
-    contenedor.innerHTML = html;
-  }
-
   function cargarDetalle() {
     var params = new URLSearchParams(window.location.search || "");
     var tipo = (params.get("tipo") || "").toLowerCase();
@@ -263,11 +208,7 @@ document.addEventListener("DOMContentLoaded", function () {
   function obtenerFiltrosActivos() {
     var fechaIni = dtfFechaInicio && dtfFechaInicio.value ? new Date(dtfFechaInicio.value + "T00:00:00") : null;
     var fechaFin = dtfFechaFin && dtfFechaFin.value ? new Date(dtfFechaFin.value + "T23:59:59") : null;
-    return {
-      fechaInicio: fechaIni,
-      fechaFin: fechaFin,
-      estado: ""
-    };
+    return { fechaInicio: fechaIni, fechaFin: fechaFin };
   }
 
   function cumpleFiltrosItem(item, filtros) {
@@ -279,9 +220,6 @@ document.addEventListener("DOMContentLoaded", function () {
       return false;
     }
     if (filtros.fechaFin && fechaItem > filtros.fechaFin) {
-      return false;
-    }
-    if (filtros.estado && String(item.estado || "").toLowerCase() !== filtros.estado) {
       return false;
     }
     return true;
@@ -350,21 +288,6 @@ document.addEventListener("DOMContentLoaded", function () {
     return items;
   }
 
-  function poblarFiltroEstado(items) {
-    if (!dtfEstado) return;
-    var estados = [];
-    items.forEach(function (item) {
-      var e = String(item.estado || "").trim();
-      if (e && estados.indexOf(e) === -1) estados.push(e);
-    });
-    estados.sort();
-    var opciones = '<option value="">Todos</option>';
-    estados.forEach(function (e) {
-      opciones += '<option value="' + escaparHtml(e) + '">' + escaparHtml(e) + '</option>';
-    });
-    dtfEstado.innerHTML = opciones;
-  }
-
   function inicializarTablaDetalle() {
     if (tablaDt || !(window.$ && $.fn && $.fn.DataTable)) {
       return;
@@ -372,14 +295,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
     tablaDt = $("#tabla-detalle-camas").DataTable({
       responsive: true,
-      processing: false,
       serverSide: false,
       paging: true,
       lengthMenu: [10, 25, 50, 100],
       pageLength: 10,
       ordering: false,
       searching: false,
-      info: true,
       data: [],
       columns: [
         { data: "numero_cama", defaultContent: "" },
