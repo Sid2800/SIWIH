@@ -154,6 +154,15 @@ class SolicitudPrestamo(models.Model):
         null=True,
         verbose_name='Área de Destino'
     )
+    servicio_unidad = models.ForeignKey(
+        'servicio.Unidad',
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='solicitudes_prestamo',
+        verbose_name='Unidad de Servicio del Solicitante',
+        help_text='Obtenida automáticamente del registro en RRHH del usuario solicitante'
+    )
     expedientes = models.ManyToManyField(
         ExpedientePrestamo,
         through='SolicitudExpedienteDetalle',
@@ -183,6 +192,35 @@ class SolicitudPrestamo(models.Model):
     @property
     def cantidad_expedientes(self):
         return self.detalles.count()
+
+    @property
+    def get_servicio_unidad(self):
+        """
+        Retorna la unidad de servicio de la solicitud.
+
+        Intenta devolver el servicio_unidad almacenado directamente.
+        Si no existe, intenta obtenerlo desde la cadena RRHH del usuario.
+        """
+        if self.servicio_unidad:
+            return self.servicio_unidad
+
+        # Fallback: intentar obtener desde RRHH
+        try:
+            empleado = self.usuario.empleado
+            if empleado:
+                # Intentar PersonalNoClinico primero
+                personal = empleado.personal_no_clinico
+                if personal and personal.servicio_unidad:
+                    return personal.servicio_unidad
+
+                # Luego intentar PersonalSalud
+                personal_salud = empleado.personal_salud_empleado
+                if personal_salud and personal_salud.servicio_unidad:
+                    return personal_salud.servicio_unidad
+        except (AttributeError, Exception):
+            pass
+
+        return None
 
 
 # ============================================

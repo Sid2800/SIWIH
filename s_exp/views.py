@@ -100,6 +100,42 @@ def _get_unidad_usuario(user):
     return perfil.servicio_unidad.nombre_unidad if perfil and perfil.servicio_unidad else ''
 
 
+def _get_servicio_unidad_from_rrhh(user):
+    """
+    Obtiene la Unidad de Servicio del usuario mediante la cadena de relaciones RRHH.
+
+    Recorre la cadena: User → Empleado → PersonalNoClinico → ServicioUnidad
+
+    Retorna:
+        - Tuple: (servicio_unidad_obj, es_valido)
+        - servicio_unidad_obj: La instancia de ServicioUnidad o None si no existe
+        - es_valido: True si el usuario está registrado en RRHH, False en caso contrario
+    """
+    try:
+        # Verificar que el usuario tenga un empleado asociado
+        empleado = user.empleado
+        if not empleado:
+            return None, False
+
+        # Obtener PersonalNoClinico del empleado
+        # Se intenta PersonalNoClinico (personal administrativo/no clínico)
+        personal = empleado.personal_no_clinico
+        if personal and personal.servicio_unidad:
+            return personal.servicio_unidad, True
+
+        # Si no tiene PersonalNoClinico, intentar con PersonalSalud
+        personal_salud = empleado.personal_salud_empleado
+        if personal_salud and personal_salud.servicio_unidad:
+            return personal_salud.servicio_unidad, True
+
+        # El usuario está registrado en RRHH pero sin unidad asignada
+        return None, True
+
+    except (AttributeError, Exception):
+        # El usuario no está registrado en RRHH
+        return None, False
+
+
 # ============================================
 # MIXIN: Acceso basado en Groups
 # ============================================
@@ -228,7 +264,7 @@ def listar_solicitudes_api(request):
         search_value = request.GET.get('search[value]', '').strip()
         estado_filtro = request.GET.get('estado', '')
 
-        qs = SolicitudPrestamo.objects.select_related('usuario').annotate(
+        qs = SolicitudPrestamo.objects.select_related('usuario', 'servicio_unidad').annotate(
             cant_expedientes=Count('detalles')
         )
 
@@ -281,6 +317,7 @@ def listar_solicitudes_api(request):
                 "motivo": s.motivo.nombre if s.motivo else "",
                 "observaciones": s.observaciones or "",
                 "area_destino": s.area_destino or "",
+                "servicio_unidad": s.servicio_unidad.nombre_unidad if s.servicio_unidad else "",
                 "cant_expedientes": s.cant_expedientes,
                 "expedientes": detalles_info,
                 "tiempo_sugerido_horas": s.tiempo_sugerido_horas,
@@ -1288,8 +1325,8 @@ def crear_solicitud_api(request):
     """
     Crea una nueva solicitud de préstamo iniciada por un usuario del sistema.
     Verifica la disponibilidad física de los expedientes antes de permitir la creación.
+    Asigna automáticamente la unidad de servicio del usuario desde su registro en RRHH.
     """
-    """Crea una solicitud de préstamo con múltiples expedientes (carrito)."""
     if not _es_exp_solicitante(request.user):
         return JsonResponse({"error": "Sin permisos"}, status=403)
 
@@ -1325,8 +1362,15 @@ def crear_solicitud_api(request):
     except MotivoSolicitud.DoesNotExist:
         return JsonResponse({"error": "Motivo no válido"}, status=400)
 
-    # Auto-asignar unidad del usuario
+    # Obtener unidad del usuario desde PerfilUnidad (fallback)
     area_destino = _get_unidad_usuario(request.user)
+
+    # Obtener unidad de servicio desde RRHH
+    servicio_unidad, es_registrado_rrhh = _get_servicio_unidad_from_rrhh(request.user)
+    if not es_registrado_rrhh:
+        return JsonResponse({
+            "error": "El usuario no está registrado en el sistema RRHH (Recursos Humanos). Contacte al administrador."
+        }, status=403)
 
     try:
         from expediente.models import Expediente, PacienteAsignacion
@@ -1361,6 +1405,7 @@ def crear_solicitud_api(request):
             motivo=motivo,
             observaciones=observaciones or None,
             area_destino=area_destino or None,
+            servicio_unidad=servicio_unidad,
             tiempo_sugerido_horas=tiempo_sugerido_horas,
         )
 
@@ -1455,7 +1500,7 @@ def mis_solicitudes_api(request):
     try:
         qs = SolicitudPrestamo.objects.filter(
             usuario=request.user
-        ).order_by('-fecha_creacion')
+        ).select_related('servicio_unidad').order_by('-fecha_creacion')
 
         # --- Aplicar filtros de fecha (mismo patrón que reportes del módulo) ---
         filtro = request.GET.get('filtro', '').strip()
@@ -1532,6 +1577,7 @@ def mis_solicitudes_api(request):
                 "motivo": s.motivo.nombre if s.motivo else "",
                 "observaciones": s.observaciones or "",
                 "area_destino": s.area_destino or "",
+                "servicio_unidad": s.servicio_unidad.nombre_unidad if s.servicio_unidad else "",
                 "expedientes": detalles_info,
                 "cant_expedientes": len(detalles_info),
                 "prestamo": prestamo_info,
