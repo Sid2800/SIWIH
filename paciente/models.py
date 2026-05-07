@@ -3,14 +3,11 @@ from django.utils.timezone import localtime
 from core.utils.utilidades_fechas import formatear_fecha_simple
 from ubicacion.models import Sector
 from django.contrib.auth.models import User
-from servicio.models import Zona, Sala, ServiciosAux, Area_atencion, Unidad_clinica
+from servicio.models import Zona, Unidad_clinica
 from core.utils.utilidades_textos import construir_nombre_dinamico
+from core.constants.choices_constants import TipoDefuncion
 from django.db import connections
 
-TIPO_DEFUNCION = [
-        (1, "Intrahospitalaria"),
-        (2, "Extrahospitalaria"),
-    ]
 
 class Nacionalidad(models.Model):
     descripcion_nacionalidad = models.CharField(max_length=100, unique=True, verbose_name="Nacionalidad")
@@ -148,8 +145,8 @@ class Defuncion(models.Model):
     fecha_registro = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de registro")
 
     tipo_defuncion = models.PositiveSmallIntegerField(
-        choices=TIPO_DEFUNCION,
-        default=1
+        choices=TipoDefuncion.choices,
+        default=TipoDefuncion.INTRAHOSPITALARIA
     )
 
     class Meta:
@@ -173,8 +170,8 @@ class ObitoFetal(models.Model):
     fecha_registro = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de registro")
     estado = models.BooleanField(default=1, verbose_name="Estado (activo/inactivo)")
     tipo_defuncion = models.PositiveSmallIntegerField(
-        choices=TIPO_DEFUNCION,
-        default=1
+        choices=TipoDefuncion.choices,
+        default=TipoDefuncion.INTRAHOSPITALARIA
     )
 
     class Meta:

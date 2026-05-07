@@ -5,16 +5,16 @@ from enum import Enum
 HEAC_INSTITUCION_ID = 65
 
 class UnidadID:
-    ADMISION = 1
-    IMAGENOLOGIA = 2
-    REFERENCIA = 3
+    ADMI = 1
+    RX = 2
+    UAU = 3
     SALA = 4
 
 class AccionEstudio(str, Enum):
     KEEP = "KEEP"
     DELETE = "DELETE"
 
-class UsoDependencia(str, Enum):
+class UsoUnidadC(str, Enum):
     GENERAL = "general"
     DEFUNCION = "defuncion"
     OBITO = "obito"

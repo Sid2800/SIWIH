@@ -7,7 +7,7 @@ urlpatterns = [
     #path('sala_autocomplete/', views.SalaAutocomplete.as_view(), name='salaAutocomplete' ),
     path('listar-zona/',views.ListarZona.as_view(), name='listarZona'),
     path('listar-sala/',views.ListarSala.as_view(), name='listarSala'),
-    path('listar-dependencias/',views.ListarUnidadesClinicas.as_view(), name='listar_dependencias'),
+    path('listar-unidad-clinica/',views.ListarUnidadesClinicas.as_view(), name='listar_unidad_clinica'),
 
     path('listar-area-atencion/',views.ListarAreaAtencionServicio.as_view(), name='listarAreaAtencion'),
 

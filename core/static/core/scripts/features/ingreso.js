@@ -102,6 +102,7 @@ document.addEventListener('DOMContentLoaded', function () {
             placeholder: "NUMERO DE CAMA",
         });
 
+        /*
         camaSelect.on("change", function (value) {
             const parsedValue = parseInt(value); 
             const salaId = camaSalaMap[parsedValue];
@@ -112,7 +113,7 @@ document.addEventListener('DOMContentLoaded', function () {
             } else {
                 salaSelect.clear(); 
             }
-        });
+        });*/
         
         /*Auto complete para elemnto ya cargados en el control   salas*/
         const salaSelect = new TomSelect("#id_sala", {

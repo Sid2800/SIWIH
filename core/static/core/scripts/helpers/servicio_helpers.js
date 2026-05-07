@@ -36,7 +36,7 @@ const UnidadClinicaLoader = (function () {
          // construir URL correctamente
 
 
-         const data = await fetchData(API_URLS.listarDependencias, { uso: uso });
+         const data = await fetchData(API_URLS.listarUnidadClinica, { uso: uso });
 
          // limpiar select
          select.innerHTML = '';
@@ -61,12 +61,12 @@ const UnidadClinicaLoader = (function () {
             });
 
          } else {
-            console.warn("No hay dependencias disponibles.");
+            console.warn("No hay unidades clinicas disponibles.");
          }
 
       } catch (error) {
-         console.error("Error cargando dependencias:", error);
-         toastr.error("No se pudieron cargar las dependencias");
+         console.error("Error cargando unidades clinicas:", error);
+         toastr.error("No se pudieron cargar las unidades clinicas");
       }
    }
 

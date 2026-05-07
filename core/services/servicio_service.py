@@ -146,71 +146,7 @@ class ServicioService:
     sirve las depencias posibeles para (Evalucion Rx, Referecina)
     ojo a la variable que excluye ciertas salas
     """
-    @staticmethod    
-    def obtener_dependencias(incluir_externo=True, solo_emergencia=False):
-
-
-        salas_excluidas = SALAS_EXCLUIDAS
-
-        serv_auxiliares_externos = [] if incluir_externo else SERVICIOS_AUX_EXTERNOS
-
-        def _areas_atencion_por_servicio(servicio_id, tipo):
-            return (
-                modelosServicio.Area_atencion.objects
-                .filter(estado=1, servicio_id=servicio_id)
-                .annotate(
-                    tipo=Value(tipo, output_field=CharField()),
-                    nombre=F('nombre_area_atencion'),
-                    origen=Value('AREA ATENCION', output_field=CharField()),
-                    clave=Concat(Value('E-'), F('id'), output_field=CharField())
-                )
-                .values('clave', 'nombre', 'tipo', 'origen')
-            )
-
-        # Salas hospitalarias activas (excluyendo las no seleccionables)
-        salas = (
-            modelosServicio.Sala.objects
-            .filter(estado=1)
-            .exclude(id__in=salas_excluidas)
-            .annotate(
-                tipo=Value('HOSP', output_field=CharField()),
-                nombre=F('nombre_sala'),
-                origen=Value('SALA', output_field=CharField()),
-                clave=Concat(Value('S-'), F('id'), output_field=CharField())
-            )
-            .values('clave', 'nombre', 'tipo', 'origen')
-        )
-
-        areas_atencion = []
-
-        # area_atencion emergencia servicio 1000 emercia
-        areas_atencion.append(_areas_atencion_por_servicio(1000, 'EMERG'))
-
-        if not solo_emergencia:
-            # area_atencion servicio 50 consulta externa
-            areas_atencion.append(_areas_atencion_por_servicio(50, 'CEXT'))
-
-            # area_atencion emergencia servicio 700 obstetricia
-            areas_atencion.append(_areas_atencion_por_servicio(700, 'OBS'))
-
-        # Servicios auxiliares todos los activos 
-        servicios = (modelosServicio.ServiciosAux.objects
-                    .filter(estado=1)
-                    .exclude(id__in=serv_auxiliares_externos)
-                    .annotate(
-                        tipo=Value('SAUX', output_field=CharField()),
-                        nombre=F('nombre_servicio_a'),
-                        origen=Value('SERVICIO AUXILIAR', output_field=CharField()),
-                        clave=Concat(Value('A-'), F('id'), output_field=CharField())
-                    )
-                    .values('clave', 'nombre', 'tipo', 'origen')
-        )
-
-        # Unir todas las listas
-        areas_atencion = list(chain(*areas_atencion))
-        dependencias = list(chain(salas, areas_atencion, servicios))
-
-        return dependencias
+    
     
     @staticmethod
     def obtener_unidades_clinicas(incluir_externo=True, solo_emergencia=False):
@@ -281,41 +217,6 @@ class ServicioService:
         return unidades_clinicas
 
 
-
-    @staticmethod
-    def obtener_dependencia_y_campo(clave):
-        if not clave or '-' not in clave:
-            raise ValidationError("Clave inválida")
-
-        prefijo, pk = clave.split('-', 1)
-
-        try:
-            pk = int(pk)
-        except ValueError:
-            raise ValidationError("ID inválido")
-
-        if prefijo == 'S':
-            obj = modelosServicio.Sala.objects.filter(id=pk, estado=1).first()
-            if not obj:
-                raise ValidationError("Sala no encontrada.")
-            return obj, 'sala'
-
-        elif prefijo == 'E':
-            obj = modelosServicio.Area_atencion.objects.filter(id=pk, estado=1).first()
-            if not obj:
-                raise ValidationError("Area Atencion no encontrada.")
-            return obj, 'area_atencion'
-
-        elif prefijo == 'A':
-            obj = modelosServicio.ServiciosAux.objects.filter(id=pk, estado=1).first()
-            if not obj:
-                raise ValidationError("Servicio auxiliar no encontrado.")
-            return obj, 'servicio_auxiliar'
-
-        else:
-            raise ValidationError("Prefijo no reconocido.")
-        
-
     @staticmethod
     def obtener_unidad_clinica(id):
         if not id:
@@ -336,40 +237,6 @@ class ServicioService:
         return uc
 
 
-    @staticmethod
-    def encontrar_dependencia_en_instance(instance, prefijo=""):
-        """
-        prefijo = "" → sala
-        prefijo = "area_refiere_" → area_refiere_sala
-        """
-
-        sala = getattr(instance, f"{prefijo}sala", None)
-        area_atencion = getattr(instance, f"{prefijo}area_atencion", None)
-        servicio_aux = getattr(instance, f"{prefijo}servicio_auxiliar", None)
-
-        if sala:
-            return {
-                "clave": f"S-{sala.id}",
-                "nombre": sala.nombre_sala,
-                "tipo": "HOSP"
-            }
-
-        elif area_atencion:
-            return {
-                "clave": f"E-{area_atencion.id}",
-                "nombre": area_atencion.nombre_area_atencion,
-                "tipo": "CEXT"  # lo dejamos así por ahora 
-            }
-
-        elif servicio_aux:
-            return {
-                "clave": f"A-{servicio_aux.id}",
-                "nombre": servicio_aux.nombre_servicio_a,
-                "tipo": "SAUX"
-            }
-
-        return None
-    
     @staticmethod
     def encontrar_unidad_clinica_en_instance(instance):
         uc = instance.unidad_clinica

@@ -130,7 +130,7 @@ const API_URLS = {
    listarEvalucionesrx: urls["listarEvalucionesrx"],
    obtenerSeguimientoTIC: urls["seguimientoTicObtener"],
    listarObitosPaciente: urls["listarObitosPaciente"],
-   listarDependencias: urls["listarDependencias"],
+   listarUnidadClinica: urls["listarUnidadClinica"],
 };
 
 /**

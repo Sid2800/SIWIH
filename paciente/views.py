@@ -32,24 +32,22 @@ from core.constants.permisos import (
     PACIENTE_VISUALIZACION_UNIDADES,
     PACIENTE_DISPENSACION_ROLES,
     PACIENTE_DISPENSACION_UNIDADES,
+    CORE_EDITOR_ROLES,
+    CORE_EDITOR_UNIDADES
 )
+from core.constants.choices_constants import TipoDefuncion
 from core.constants.domain_constants import LogApp
 from core.utils.utilidades_logging import *
-
-
-from usuario.models import PerfilUnidad
 from dal import autocomplete
 from types import SimpleNamespace
 
 import json
-from pprint import pprint
+
 from django.urls import reverse_lazy, reverse
-from django.contrib import messages
+
 from django.db import connections, transaction
 from django.http.response import JsonResponse
-from django import forms
 from datetime import datetime
-from django.db.utils import OperationalError
 from django.db.models import Q, F, Value, OuterRef, Subquery, CharField,Case, When, BooleanField
 from django.db.models.functions import Coalesce, Concat
 from django.shortcuts import get_object_or_404, redirect
@@ -383,7 +381,7 @@ class PacienteEditView(UpdateView):
 
         
         #validamos los grupos requeridos con los del usuairo y mandamos un true o false, atravez del diccionario de contexto
-        permiso =  not verificar_permisos_usuario(self.request.user,  ['admin', 'digitador'], ['Admision'])
+        permiso =  not verificar_permisos_usuario(self.request.user,  PACIENTE_EDITOR_ROLES, PACIENTE_EDITOR_UNIDADES)
         context['readonly_mode'] = 1 if permiso else 0
 
         #enlace construido desde elbckend historialpaciente
@@ -1258,7 +1256,7 @@ def obtener_obito_paciente(request):
     if not obito:
         return JsonResponse({"mensaje": "no obito"}, status=200)
 
-    # Resolver dependencia
+    # Resolver unidad clinica
     if obito.unidad_clinica:
         info = ServicioService.encontrar_unidad_clinica_en_instance(obito)
         if info:
@@ -1453,12 +1451,14 @@ class HistorialPaciente(DetailView):
         #comprueba informacino si es SAI o DEFUNCION
         defuncion = PacienteService.obtener_defuncion(paciente.id)
         if defuncion:
+
+            lugar = defuncion.unidad_clinica if defuncion.tipo_defuncion == TipoDefuncion.INTRAHOSPITALARIA  else "EXTRAHOSPITALARIA"
             info_defuncion = {
                 'id': defuncion.id,
                 'fecha': defuncion.fecha_defuncion,
                 'motivo': defuncion.motivo,
                 'fecha_registro':defuncion.fecha_registro,
-                'sala': defuncion.sala
+                'unidad_clinica': lugar
             }
             context['info_defuncion'] = info_defuncion
 
@@ -1476,7 +1476,7 @@ class HistorialPaciente(DetailView):
 
 def EjecutarReclasificacion(request):
     usuario = request.user
-    if not verificar_permisos_usuario(usuario, ['admin'], ['Admision']):
+    if not verificar_permisos_usuario(usuario, CORE_EDITOR_ROLES, CORE_EDITOR_UNIDADES):
         return JsonResponse({'error': 'No tienes permisos para realizar esta accion'}, status=403)
 
     

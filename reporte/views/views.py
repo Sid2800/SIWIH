@@ -27,7 +27,8 @@ from core.services.paciente_service import PacienteService
 from core.services.reporte.PDF.reporte_generador_service import ReporteGeneradorService
 from core.services.reporte.EXCEL.reporte_service_excel import ServiceExcel
 from core.constants.stored_procedures import SP_CATALOGO_REFERENCIAS_RECIBIDAS, SP_CATALOGO_REFERENCIAS_ENVIADAS
-from core.constants.permisos import ROLES_GLOBALES
+from core.constants.permisos import ROLES_GLOBALES, ATENCION_EDITOR_ROLES, ATENCION_VISUALIZACION_UNIDADES
+from core.constants.domain_constants import UnidadID
 from core.services.usuario_service import UsuarioService
 from core.services.ubicacion_service import UbicacionService
 from core.services.servicio_service import ServicioService
@@ -45,8 +46,8 @@ from reporte.validators import validar_informe
 
 class ReporteGeneradorView(UnidadRolRequiredMixin, TemplateView):
     template_name = "reporte/reportes_gen.html"
-    required_roles = ['admin','digitador', 'directivo', 'Visitante']
-    required_unidades = ['Admision', 'Referencia','Imagenologia', 'DIRECTIVOS']
+    required_roles = ['admin','digitador', 'directivo', 'visitante']
+    required_unidades = ['ADMI', 'UAU','RX', ]
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -61,15 +62,15 @@ class ReporteGeneradorView(UnidadRolRequiredMixin, TemplateView):
         ]
 
         informesReferencia = [
-            (1, 'REFERENCIAS A MAYOR COMPLEJIDAD SEGÚN AREA ATENCION'),
+            (1, 'REFERENCIAS A MAYOR COMPLEJIDAD ESPECIALIDAD DESTINO'),
             (2, 'REFERENCIAS A MAYOR COMPLEJIDAD SEGUN INSTITUCIONES'),
             (3, 'REFERENCIAS A MAYOR COMPLEJIDAD SEGUN MOTIVO'),
             (4, 'SEGUIMIENTO A REFERENCIAS ENVIADAS A MAYOR COMPLEJIDAD'),
-            (5, 'REFERENCIAS A MAYOR COMPLEJIDAD SEGUN AREA DE ENVIO'),
+            (5, 'REFERENCIAS A MAYOR COMPLEJIDAD SEGUN UNIDAD CLINICA DE ENVIO'),
             (6, 'REFERENCIAS RECIBIDAS POR GESTOR- OTROS DEP- CLINICA PRIVADA'),
             (7, 'REFERENCIAS RECIBIDAS POR GESTOR- OTROS DEP- CLINICA PRIVADA. DETALLADO'),
             (8, 'REFERENCIAS RECIBIDAS SEGUN EVALUACION'),
-            (9, 'RESPUESTAS RESUELTAS SEGUN AREAS ATENCION'),
+            (9, 'RESPUESTAS RESUELTAS SEGUN UNIDADES CLINICAS'),
             (10,'REFERENCIAS Y RESPUESTAS POR GESTOR- OTROS DEP- CLINICA PRIVADA'),
             (11,'REFERENCIAS ENVIADAS A PRIMER NIVEL DE ATENCION SEGUN GESTOR'),
         ]
@@ -98,24 +99,26 @@ class ReporteGeneradorView(UnidadRolRequiredMixin, TemplateView):
 
         else:
             # --------- USUARIOS NORMALES ------------
-            user_unidades = [pu.servicio_unidad.nombre_unidad for pu in self.request.user.perfilunidad_set.all()]
+            user_unidades_ids = [pu.servicio_unidad.id for pu in self.request.user.perfilunidad_set.all()]
 
             # Paciente SIEMPRE disponible
             modelos.append(('paciente', 'Paciente'))
 
+
+
             # Admision
-            if 'ADMISION' in user_unidades:
+            if UnidadID.ADMI in user_unidades_ids:
                 modelos.append(('ingreso', 'Ingreso'))
                 modelos.append(('atencion', 'Atencion'))
 
             # Imagenología
-            if 'IMAGENOLOGIA' in user_unidades:
+            if UnidadID.RX in user_unidades_ids:
                 modelos.append(('imagenologia', 'Evaluación RX'))
                 modelos.append(('estudio_rx', 'Estudio RX'))
                 context.setdefault('informesRx', informesRx)  # evita pisar si ya existe
 
             # Referencia
-            if 'REFERENCIA' in user_unidades:
+            if UnidadID.UAU in user_unidades_ids:
                 context.setdefault('informesReferencia', informesReferencia)
                 context.setdefault('informesCatalogo', informesCatalogo[:2])
                     
@@ -555,7 +558,7 @@ class reporte_detalle_recepcion_atenciones(View):
     def dispatch(self, request, *args, **kwargs):
         # Verificar permisos del usuario antes de continuar con la lógica de la vista
         usuario = request.user
-        if not verificar_permisos_usuario(usuario, ['admin', 'digitador'], ['Admision']):
+        if not verificar_permisos_usuario(usuario, ATENCION_EDITOR_ROLES, ATENCION_VISUALIZACION_UNIDADES):
             return JsonResponse({'error': 'No tienes permisos para realizar esta acción'}, status=403)
 
         return super().dispatch(request, *args, **kwargs)

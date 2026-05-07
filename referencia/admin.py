@@ -110,18 +110,19 @@ class RespuestaAdmin(admin.ModelAdmin):
         'fecha_atencion',
         'referencia',
         'paciente',
+        'unidad_responde',
         'tipo',
         'motivo',
         'atencion_requerida',
         'elaborada_por',
+        
     )
 
     autocomplete_fields = [
         'referencia',
         'area_capta',
-        'area_reponde_sala',
-        'area_reponde_area_atencion',
-        'area_reponde_servicio_auxiliar',
+        'seguimiento_referencia',
+        'unidad_clinica_responde',
         'area_seguimiento_area_atencion',
         'institucion_destino',
         'elaborada_por',
@@ -141,7 +142,7 @@ class RespuestaAdmin(admin.ModelAdmin):
         'atencion_requerida',
         'elaborada_por',
         'area_capta',
-        'area_reponde_area_atencion',
+        'unidad_clinica_responde',
         'fecha_elaboracion',
     )
 
@@ -161,12 +162,16 @@ class RespuestaAdmin(admin.ModelAdmin):
             'referencia__institucion_origen',
             'referencia__institucion_destino',
             'area_capta',
-            'area_reponde_sala',
-            'area_reponde_area_atencion',
-            'area_reponde_servicio_auxiliar',
+            'unidad_clinica_responde__sala',
+            'unidad_clinica_responde__area_atencion',
+            'unidad_clinica_responde__servicio_aux',
             'elaborada_por',
             'motivo',
         )
+
+    def unidad_responde(self, obj):
+        return obj.unidad_clinica_responde
+    unidad_responde.short_description = "Unidad Responde"
 
     def paciente(self, obj):
         return f"{obj.referencia.paciente.primer_nombre} {obj.referencia.paciente.primer_apellido}"

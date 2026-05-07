@@ -20,7 +20,6 @@ from core.utils.utilidades_fechas import formatear_fecha, formatear_hora, format
 from usuario.permisos import verificar_permisos_usuario 
 from .views import dibujar_encabezado, dibujar_pie_pagina_carta
 from core.services.ingreso.ingreso_formatos_service import IngresoFormatosService
-from usuario.permisos import verificar_permisos_usuario
 from core.constants import permisos 
 from django.http import HttpResponse
 
@@ -1458,7 +1457,7 @@ class reporte_entrega_cadaver(View):
     def dispatch(self, request, *args, **kwargs):
         # Verificar permisos del usuario antes de continuar con la lógica de la vista
         usuario = request.user
-        if not verificar_permisos_usuario(usuario, ['admin', 'digitador'], ['Admision']):
+        if not verificar_permisos_usuario(usuario, permisos.PACIENTE_EDITOR_ROLES, permisos.PACIENTE_DISPENSACION_UNIDADES):
             return JsonResponse({'error': 'No tienes permisos para realizar esta acción'}, status=403)
 
         return super().dispatch(request, *args, **kwargs)
@@ -1503,7 +1502,7 @@ class reporte_obito(View):
 
     def dispatch(self, request, *args, **kwargs):
         usuario = request.user
-        if not verificar_permisos_usuario(usuario, ['admin', 'digitador'], ['Admision']):
+        if not verificar_permisos_usuario(usuario, permisos.PACIENTE_EDITOR_ROLES, permisos.PACIENTE_DISPENSACION_UNIDADES):
             return JsonResponse({'error': 'No tienes permisos'}, status=403)
 
         return super().dispatch(request, *args, **kwargs)

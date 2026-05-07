@@ -187,13 +187,13 @@ class IngresoFormatosService:
             sala = ingreso_obj.sala.nombre_sala if ingreso_obj.sala else ""
 
             servicio = (
-                ingreso_obj.cama.sala.servicio.nombre_servicio if ingreso_obj.cama
+                ingreso_obj.sala.servicio.nombre_servicio if ingreso_obj.cama
                 else ingreso_obj.sala.servicio.nombre_servicio if ingreso_obj.sala
                 else ""
             )
 
             idservicio = (
-                ingreso_obj.cama.sala.servicio_id if ingreso_obj.cama
+                ingreso_obj.sala.servicio_id if ingreso_obj.cama
                 else ingreso_obj.sala.servicio_id if ingreso_obj.sala
                 else ""
             )
@@ -201,6 +201,8 @@ class IngresoFormatosService:
             fechaIngreso = timezone.localtime(ingreso_obj.fecha_ingreso) if ingreso_obj.fecha_ingreso else None
 
             cama = str(ingreso_obj.cama.numero_cama) if ingreso_obj.cama else ""
+
+            print(ingreso_obj.cama)
 
             cubiculo = str(ingreso_obj.cama.cubiculo) if ingreso_obj.cama else ""
                 

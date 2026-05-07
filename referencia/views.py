@@ -100,7 +100,8 @@ class ReferenciaAddView(UnidadRolRequiredMixin, CreateView):
         diagnosticos = form.diagnosticos_validados
         paciente = form.cleaned_data.get('paciente')
         motivo_no_atencion = form.cleaned_data.get('motivo_no_atencion')
-        
+
+
         if usuario:
             form.instance.creado_por = usuario
             form.instance.modificado_por = usuario
@@ -115,12 +116,6 @@ class ReferenciaAddView(UnidadRolRequiredMixin, CreateView):
             form.instance.paciente = paciente
 
         form.instance.motivo_no_atencion = motivo_no_atencion
-
-        for campo in ["area_refiere_sala", "area_refiere_area_atencion", "area_refiere_servicio_auxiliar"]:
-            valor = form.cleaned_data.get(campo)
-            if valor:
-                setattr(form.instance, campo, valor)
-                break 
             
         try:
             with transaction.atomic():
@@ -256,10 +251,6 @@ class ReferenciaEditView(UnidadRolRequiredMixin, UpdateView):
             permisos.REFERENCIA_EDITOR_UNIDADES):
             return JsonResponse({"success": False, "error": f"No tiene permiso para actualizar una referencia"})
 
-        for campo in ["area_refiere_sala", "area_refiere_area_atencion", "area_refiere_servicio_auxiliar"]:
-            valor = form.cleaned_data.get(campo)
-            setattr(form.instance, campo, valor if valor else None)
-
         form.instance.motivo_no_atencion = motivo_no_atencion
 
         try:
@@ -267,7 +258,6 @@ class ReferenciaEditView(UnidadRolRequiredMixin, UpdateView):
                 response = super().form_valid(form)
 
                 #procesar diagnosticos 
-       
                 RefDiagnosticoService.procesar_diagnosticos_referencia(
                     referencia_id=self.object.id,
                     diagnosticos=diagnosticos
@@ -308,10 +298,6 @@ class RespuestaCreateUpdateView(View):
             form.instance.referencia = referencia
 
 
-        for campo in ["area_reponde_sala", "area_reponde_area_atencion", "area_reponde_servicio_auxiliar"]:
-            valor = form.cleaned_data.get(campo)
-            setattr(form.instance, campo, valor if valor else None)
-
 
         try:
             with transaction.atomic():
@@ -337,9 +323,7 @@ class RespuestaCreateUpdateView(View):
                         "atencion_requerida": instance.atencion_requerida,
                         "elaborada_por": instance.elaborada_por,
                         #area que refiere paso el campo como tal para podemos mapear
-                        "area_refiere_sala": instance.area_reponde_sala,
-                        "area_refiere_area_atencion": instance.area_reponde_area_atencion,
-                        "area_refiere_servicio_auxiliar": instance.area_reponde_servicio_auxiliar,
+                        "unidad_clinica_refiere": instance.unidad_clinica_responde,
                         "especialidad_destino": form.cleaned_data.get('seguimiento_referencia_especialidad_destino'),
                         "observaciones": instance.observaciones                    
                         },diagnosticos, usuario)

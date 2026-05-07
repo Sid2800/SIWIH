@@ -35,9 +35,7 @@ class ReferenciaService:
                     "motivo_detalle": data.get("motivo_detalle"),
                     "atencion_requerida": data.get("atencion_requerida"),
                     "elaborada_por": data.get("elaborada_por"),
-                    "area_refiere_sala": data.get("area_refiere_sala"),
-                    "area_refiere_area_atencion": data.get("area_refiere_area_atencion"),
-                    "area_refiere_servicio_auxiliar": data.get("area_refiere_servicio_auxiliar"),
+                    "unidad_clinica_refiere": data.get("unidad_clinica_refiere"),
                     "especialidad_destino": data.get("especialidad_destino"),
                     "observaciones": data.get("observaciones"),
                     "estado": True

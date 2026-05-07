@@ -26,7 +26,7 @@ def __verificar_permisos(user, roles=None, unidades=None):
 
     if not UsuarioService.es_global_roles(user, roles):
         if unidades:
-            filtros["servicio_unidad__nombre_unidad__in"] = unidades
+            filtros["servicio_unidad__nombre_corto_unidad__in"] = unidades
 
 
     if len(filtros) == 1:  # solo tiene {"usuario": user}

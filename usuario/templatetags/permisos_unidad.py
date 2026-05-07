@@ -37,7 +37,7 @@ def tiene_rol(user, valores):
                 if PerfilUnidad.objects.filter(usuario=user, rol=rol, ).exists():
                     return True
             else:
-                if PerfilUnidad.objects.filter(usuario=user, rol=rol, servicio_unidad__nombre_unidad=unidad).exists():
+                if PerfilUnidad.objects.filter(usuario=user, rol=rol, servicio_unidad__nombre_corto_unidad=unidad).exists():
                     return True
         except ValueError:
             continue
@@ -74,7 +74,7 @@ def tiene_unidad(user, unidades_str):
 
         if PerfilUnidad.objects.filter(
             usuario=user,
-            servicio_unidad__nombre_unidad=unidad
+            servicio_unidad__nombre_corto_unidad=unidad
         ).exists():
             return True
 
