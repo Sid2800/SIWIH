@@ -71,7 +71,7 @@ class IngresoFormatosService:
                 apellido1= construir_nombre_dinamico(paciente, ["primer_apellido",])
                 apellido2 = construir_nombre_dinamico(paciente, ["segundo_apellido",])
 
-                orden_gemelar = paciente.orden_gemelar if  paciente.orden_gemelar >= 1 else None
+                orden_gemelar = paciente.orden_gemelar   if  paciente.orden_gemelar is not None and paciente.orden_gemelar >= 1 else None
     
                 dni = paciente.dni or ""
                 fechaNac = paciente.fecha_nacimiento
