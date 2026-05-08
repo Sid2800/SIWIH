@@ -70,8 +70,9 @@ class IngresoFormatosService:
                 nombres = construir_nombre_dinamico(paciente, ["primer_nombre", "segundo_nombre"])
                 apellido1= construir_nombre_dinamico(paciente, ["primer_apellido",])
                 apellido2 = construir_nombre_dinamico(paciente, ["segundo_apellido",])
-                
 
+                orden_gemelar = paciente.orden_gemelar if  paciente.orden_gemelar >= 1 else None
+    
                 dni = paciente.dni or ""
                 fechaNac = paciente.fecha_nacimiento
 
@@ -202,8 +203,6 @@ class IngresoFormatosService:
 
             cama = str(ingreso_obj.cama.numero_cama) if ingreso_obj.cama else ""
 
-            print(ingreso_obj.cama)
-
             cubiculo = str(ingreso_obj.cama.cubiculo) if ingreso_obj.cama else ""
                 
             #insitucion Agregada a posteriori para incluir la hija de referencia preciamente llenada
@@ -239,6 +238,7 @@ class IngresoFormatosService:
                     "departamento": depto,
                     "municipio": muni,
                     "direccion": ubicacion,
+                    "orden_gemelar": orden_gemelar
                 },
                 "padres": {
                     "nombre_padre": nombrePadre,
