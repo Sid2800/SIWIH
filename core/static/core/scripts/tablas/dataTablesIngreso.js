@@ -390,7 +390,11 @@ document.addEventListener("DOMContentLoaded", () => {
             const titulo = `Desactivar ingreso`;
             const mensaje = `¿ Realmente desea desactivar el ingreso, es un proceso irreversible ?`;
 
-            const resultado = await confirmarAccion(titulo, mensaje);
+            const resultado = await confirmarAccion({
+                titulo: titulo,
+                mensajes: [mensaje]
+            });
+            
             if (!resultado) return;
 
             try {

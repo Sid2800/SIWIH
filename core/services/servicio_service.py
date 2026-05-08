@@ -1,7 +1,6 @@
 from servicio import models as modelosServicio
 from servicio.models import Institucion_salud
 from core.constants.domain_constants import HEAC_INSTITUCION_ID
-from core.constants.domain_constants import SALAS_EXCLUIDAS, SERVICIOS_AUX_EXTERNOS
 
 from django.db import transaction
 from django.db.models import Value, F, CharField

@@ -32,8 +32,15 @@ class LogApp:
     REPLICACION = "replicacion"
     EXPEDIENTE = "expediente"
     ATENCION = "atencion"
+    
+
+class EstadoTemporalPeriodo(str, Enum):
+    FUTURO = "FUTURO"
+    EN_EJECUCION = "EN_EJECUCION"
+    FINALIZADO = "FINALIZADO"
 
 
+"""
 # Salas excluidas para reportes / lógica clínica
 SALAS_EXCLUIDAS = [
     714,  # aislado covid
@@ -59,7 +66,7 @@ SERVICIOS_AUX_EXTERNOS = [
     3,  # CESAMO
     4   # otros hospitales
 ]
-
+"""
 
 # Indicadores de edad
 INDICADOR_DIAS = "2"

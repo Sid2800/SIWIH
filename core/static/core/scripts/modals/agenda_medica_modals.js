@@ -73,7 +73,7 @@ const ManejarPeriodoLaboral = (function (){
 
             },
             didOpen: () => inicializar(periodoID),
-            preConfirm: () => {
+            preConfirm: async () => {
                 const personal = document.querySelector('#modal-periodo-laboral-personal-salud').value;
                 const jornada = document.getElementById("modal-periodo-laboral-jornada").value;
                 const fechaInicio = document.getElementById("modal-periodo-fecha-inicial").value;
@@ -90,12 +90,31 @@ const ManejarPeriodoLaboral = (function (){
                     return false;
                 }
 
-                return {
-                    personal,
-                    jornada,
-                    fechaInicio,
-                    fechaFinal
-                };
+                const formData = {
+                        personal,
+                        jornada,
+                        fechaInicio,
+                        fechaFinal
+                    };
+
+                const resultadoImpacto = await validarImpactoPeriodo(formData);
+
+                console.log(resultadoImpacto.resultado);
+
+                if (!resultadoImpacto.resultado){
+                    Swal.showValidationMessage("Periodo sinconflictos");
+                } else{
+
+                    const htmlMensajes = resultadoImpacto.resultado.mensajes
+                                                                            .map(mensaje => `<li>${mensaje.replace(/\n/g, '<br>')}</li>`)
+                                                                            .join("");
+                    const resultado = await confirmarAccion({
+                        titulo: resultadoImpacto.resultado.titulo,
+                        mensajes: resultadoImpacto.resultado.mensajes
+                    });
+                }
+
+                return false;
                 
             }
 
@@ -103,7 +122,7 @@ const ManejarPeriodoLaboral = (function (){
 
         if (modal.isConfirmed){
             const formData = modal.value;
-            await guardarPeriodo(formData);
+            await validarImpactoPeriodo(formData);
         }
 
         return modal
@@ -171,41 +190,37 @@ const ManejarPeriodoLaboral = (function (){
 
     }
 
-    async function guardarPeriodo(formData){
-        console.log("HOLa");
-        console.log(formData);
+    async function validarImpactoPeriodo(formData){
         if (!formData){
             return
         }
 
         try {
                 const csrfToken = window.CSRF_TOKEN;
-                const response = await fetch(API_URLS.guardarDefuncion, {
+                const response = await fetch(API_URLS.validarImpactoPeriodoLaboral, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                     "X-CSRFToken": csrfToken 
                 },
                 body: JSON.stringify({
-                    unidad_clinica: formData.unidad_clinica, 
-                    fecha: formData.fecha,
-                    motivo: formData.motivo,
-                    tipo: formData.tipo,
-                    idDefuncion: formData.idDefuncion,
-                    idPaciente: paciente.id
+                    personalSalud: formData.personal, 
+                    fechaInicio: formData.fechaInicio,
+                    fechaFinal: formData.fechaFinal,
+                    jornadaLaboral: formData.jornada,
                 })
                 });
                 
                 const data = await response.json();
                 if (!response.ok) throw new Error(`${data.error}`);
                 
+                return data;
                 if (data.guardo) {
-                resultado = data;
-                Swal.close();
+
                 } 
 
             } catch (error) {
-                toastr.error("Error al guardar la defuncion " + error.message);
+                toastr.error("Error al validar  el periodo " + error.message);
             }
     }
 

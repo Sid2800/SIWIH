@@ -88,11 +88,11 @@ REFERENCIA_VISUALIZACION_UNIDADES = ["UAU"]
 # -----------------------------
 # PERMISOS APP AGENDA MEDICA
 # -----------------------------
-REFERENCIA_EDITOR_ROLES = ['admin', 'digitador']
-REFERENCIA_EDITOR_UNIDADES = ['Agenda_medica']
+AGENDA_MEDICA_EDITOR_ROLES = ['admin', ]
+AGENDA_MEDICA_EDITOR_UNIDADES = ['ADMI']
 
-REFERENCIA_VISUALIZACION_ROLES = ["admin", "digitador", "directivo"]
-REFERENCIA_VISUALIZACION_UNIDADES = ["Agenda_medica"]
+AGENDA_MEDICA_VISUALIZACION_ROLES = ["admin", "digitador", "directivo"]
+AGENDA_MEDICA_VISUALIZACION_UNIDADES = ["ADMI"]
 
 # los usauro de alcance gglbal pueden ser 
 

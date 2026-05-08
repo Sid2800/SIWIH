@@ -104,10 +104,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
    if (btnCerrarSesion) {
       btnCerrarSesion.addEventListener('click', async () => {
-         const confirmado = await confirmarAccion(
-            '¿Estás seguro?',
-            'Estás a punto de cerrar sesión.'
-         );
+         const confirmado = await confirmarAccion({
+            titulo: '¿Estás seguro?',
+            mensajes: [
+               'Estás a punto de cerrar sesión.'
+            ]
+         });
 
          if (confirmado) {
             document.getElementById('bp-cerrar-usuario__boton').submit();

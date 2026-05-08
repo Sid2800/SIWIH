@@ -360,7 +360,11 @@ document.addEventListener("DOMContentLoaded", () => {
             const titulo = `Desactivar evaluacion`;
             const mensaje = `¿ Realmente desea desactivar la evaluacion, es un proceso irreversible ?`;
 
-            const resultado = await confirmarAccion(titulo, mensaje);
+            const resultado = await confirmarAccion({
+                titulo: titulo,
+                mensajes: [mensaje]
+            });
+            
             if (!resultado) return;
 
             try {

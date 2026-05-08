@@ -16,6 +16,38 @@ def validar_fecha(fecha, anio_minimo=2000, permitir_futuro=False):
         raise ValidationError(f"La fecha no puede ser menor al año {anio_minimo}.")
 
 
+def validar_rango_fechas(
+        fecha_inicio,
+        fecha_final,
+        permitir_inicio_hoy=False,
+        permitir_fin_igual_inicio=False
+    ):
+        hoy = timezone.localdate()
+
+        # Validar fecha inicio
+        if permitir_inicio_hoy:
+            if fecha_inicio.date() < hoy:
+                raise ValidationError(
+                    "La fecha de inicio no puede ser menor a la fecha actual."
+                )
+        else:
+            if fecha_inicio.date() <= hoy:
+                raise ValidationError(
+                    "La fecha de inicio debe ser mayor a la fecha actual."
+                )
+
+        # Validar relación entre fechas
+        if permitir_fin_igual_inicio:
+            if fecha_final < fecha_inicio:
+                raise ValidationError(
+                    "La fecha final no puede ser menor que la fecha inicial."
+                )
+        else:
+            if fecha_final <= fecha_inicio:
+                raise ValidationError(
+                    "La fecha final debe ser mayor que la fecha inicial."
+                )
+
 def validar_anio(anio):
     anio_actual = date.today().year
     try:

@@ -3,6 +3,7 @@ from datetime import date
 from rrhh.models import PersonalSalud, Jornada_laboral
 from clinico.models import Tipo_atencion
 from core.constants.choices_constants import EstadoRegistro, DiaSemana
+from core.constants.domain_constants import EstadoTemporalPeriodo
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 
@@ -27,11 +28,11 @@ class Periodo_laboral(models.Model):
         hoy = date.today()
 
         if hoy < self.fecha_inicio:
-            return "FUTURO"
+            return EstadoTemporalPeriodo.FUTURO
         elif self.fecha_inicio <= hoy <= self.fecha_fin:
-            return "EN EJECUCION"
+            return EstadoTemporalPeriodo.EN_EJECUCION
         else:
-            return "FINALIZADO"
+            return  EstadoTemporalPeriodo.FINALIZADO
 
     def clean(self): 
         if self.fecha_inicio > self.fecha_fin: 
@@ -47,6 +48,7 @@ class Periodo_laboral(models.Model):
         ordering = ['personal_salud__empleado']
         indexes = [
             models.Index(fields=["estado"]),
+            models.Index(fields=["estado", "fecha_inicio"]),
             models.Index(fields=["personal_salud", "fecha_inicio"])
         ]
 

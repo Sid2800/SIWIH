@@ -2784,6 +2784,21 @@ no logro establecer una clase perzonalizada */
    text-align: center;
    font-family: var(--fuenteTablaCuerpo);
    font-size: 1.5rem;
+   text-align: left;
+}
+
+.contener-modal-mensajes-confirmacion{
+   padding: 2rem 2rem 1rem;
+}
+
+.contener-modal-lista-confirmacion{
+   list-style: none;
+   padding: 0;
+   margin: 0;
+}
+
+.contener-modal-lista-confirmacion li{
+   margin-bottom: 12px;
 }
 
 /*tamaño del modal en pantallas peques */

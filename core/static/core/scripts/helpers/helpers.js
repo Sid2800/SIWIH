@@ -53,14 +53,37 @@ function concatenarLimpio(...args) {
 
 //#region  Busquedas publicas
 
-async function confirmarAccion(titulo, mensaje, botonAfirmativo = "Aceptar", botonNegativo="Cancelar") {
+async function confirmarAccion(config = {}) {
+
+   const {
+      titulo = "Confirmar acción",
+      mensajes = [],
+      icono = "question",
+      botonAfirmativo = "Aceptar",
+      botonNegativo = "Cancelar"
+   } = config;
+
+   const htmlMensajes = mensajes
+      .map(mensaje => `<li>${mensaje}</li>`)
+      .join("");
+
    const resultado = await Swal.fire({
       title: titulo,
-      html: mensaje,
-      icon: 'question',
+      html: `
+         <div class="contener-modal-mensajes-confirmacion">
+            <ul class="contener-modal-lista-confirmacion">
+               ${htmlMensajes}
+            </ul>
+         </div>
+      `,
+      icon: icono,
       showCancelButton: true,
-      confirmButtonText: `<i class="bi bi-check-circle-fill"></i> ${botonAfirmativo}`,
-      cancelButtonText: `<i class="bi bi-x-circle-fill"></i> ${botonNegativo}`,
+      confirmButtonText:
+         `<i class="bi bi-check-circle-fill"></i> ${botonAfirmativo}`,
+
+      cancelButtonText:
+         `<i class="bi bi-x-circle-fill"></i> ${botonNegativo}`,
+
       customClass: {
          icon: 'contenedor-modal-icon',
          popup: 'contenedor-modal',
@@ -68,15 +91,27 @@ async function confirmarAccion(titulo, mensaje, botonAfirmativo = "Aceptar", bot
          confirmButton: 'contener-modal-boton-confirmar',
          cancelButton: 'contener-modal-boton-cancelar',
       },
+
       didOpen: () => {
-         const actionsContainer = document.querySelector('.swal2-actions');
+
+         const actionsContainer =
+            document.querySelector('.swal2-actions');
+
          if (actionsContainer) {
-            actionsContainer.classList.add('contener-modal-contenedor-botones-min');
+            actionsContainer.classList.add(
+               'contener-modal-contenedor-botones-min'
+            );
          }
-         const htmlContainer = document.querySelector('.swal2-html-container');
+
+         const htmlContainer =
+            document.querySelector('.swal2-html-container');
+
          if (htmlContainer) {
-            htmlContainer.classList.add('contener-modal-contenedor-html');
+            htmlContainer.classList.add(
+               'contener-modal-contenedor-html'
+            );
          }
+
       }
    });
 
@@ -133,7 +168,9 @@ const API_URLS = {
    listarUnidadClinica: urls["listarUnidadClinica"],
    listarAgendaMedicaAPI: urls["listarAgendaMedicaAPI"],
    listarPersonalClinicoAPI: urls["listarPersonalClinicoAPI"],
-   listarJornadaLaboralAPI: urls["listarJornadaLaboralAPI"]
+   listarJornadaLaboralAPI: urls["listarJornadaLaboralAPI"],
+   guardarPeriodoLaboral: urls["guardarPeriodoLaboral"],
+   validarImpactoPeriodoLaboral: urls["validarImpactoPeriodoLaboral"]
 };
 
 /**
