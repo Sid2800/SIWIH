@@ -38,7 +38,7 @@ class RequestService:
 
         try:
             url = f"{settings.IMAGE_SERVER_URL}{BUSCAR_IMAGENES_USUARIO}"
-            token = traer_server_token()
+            token = traer_server_token(timeout=0.3)
 
             payload = {
                 "usuarios_ids": peticion.usuarios_ids,
@@ -53,7 +53,7 @@ class RequestService:
                 url,
                 json=payload,
                 headers=headers,
-                timeout=10
+                timeout=5
             )
 
             response.raise_for_status()

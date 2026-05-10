@@ -1,7 +1,7 @@
 import time
 import requests
 from core.constants.domain_constants import LogApp
-from core.utils.utilidades_logging import *
+from core.utils.utilidades_logging import log_warning, log_error
 from core.constants.image_server_enpoints import OBTENER_TOKEN
 
 from django.conf import settings
@@ -15,7 +15,7 @@ class ImageServerAuthError(Exception):
     pass
 
 
-def _request_new_token():
+def _request_new_token(timeout):
     """
     Solicita un nuevo token  al servidor de imágenes.
     """
@@ -26,9 +26,15 @@ def _request_new_token():
                 "username": settings.IMAGE_SERVER_USER,
                 "password": settings.IMAGE_SERVER_PASSWORD,
             },
-            timeout=5,
+            timeout=(0.1,timeout)
         )
     except requests.RequestException as exc:
+
+        log_error(
+            f"No se pudo conectar al servidor de imágenes: {exc}",
+            app=LogApp.TOKEN
+        )
+
         raise ImageServerAuthError(
             f"No se pudo conectar al servidor de imágenes: {exc}"
         )
@@ -55,7 +61,7 @@ def _request_new_token():
     return data["access"]
 
 
-def traer_server_token():
+def traer_server_token(timeout=5):
     """
     Retorna un token JWT válido para el servidor de imágenes.
     Si existe uno en memoria y no ha expirado, lo reutiliza.
@@ -69,7 +75,7 @@ def traer_server_token():
         return _IMAGE_TOKEN
 
     # Pedir uno nuevo
-    token = _request_new_token()
+    token = _request_new_token(timeout=timeout)
 
     log_warning(
         "Se generó nuevo token para servidor de imágenes",

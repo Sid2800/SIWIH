@@ -40,4 +40,12 @@ class CustomLoginView(LoginView):
       zona = form.cleaned_data.get('zona')
       self.request.session['zona_codigo'] = zona.codigo
       self.request.session['zona_nombre_zona'] = zona.nombre_zona
+
+      url = UsuarioService.obtener_url_imagen_usuario(
+         self.request.user
+      )
+
+      self.request.session["url_imagen_usuario"] = url
+
+
       return super().form_valid(form)   
