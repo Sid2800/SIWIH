@@ -360,6 +360,38 @@ class MapeoSesionCama(models.Model):
 
 
 # =============================================================================
+# MapeoSesionServicio
+# -----------------------------------------------------------------------------
+# Servicios incluidos dentro de una sesion de mapeo de camas.
+# Permite restringir el alcance de una sesion a uno o varios servicios.
+# =============================================================================
+class MapeoSesionServicio(models.Model):
+
+    sesion_mapeo = models.ForeignKey(
+        MapeoSesionCama,
+        on_delete=models.PROTECT,
+        related_name="servicios_incluidos",
+        verbose_name="Sesion de mapeo",
+    )
+    servicio = models.ForeignKey(
+        "servicio.Servicio",
+        on_delete=models.PROTECT,
+        related_name="sesiones_mapeo_incluidas",
+        verbose_name="Servicio",
+    )
+
+    class Meta:
+        db_table = "mapeo_camas_sesion_servicio"
+        verbose_name = "Servicio incluido en sesion de mapeo"
+        verbose_name_plural = "Servicios incluidos en sesiones de mapeo"
+        unique_together = ("sesion_mapeo", "servicio")
+        ordering = ["sesion_mapeo_id", "servicio_id"]
+
+    def __str__(self):
+        return f"Sesion {self.sesion_mapeo_id} | Servicio {self.servicio_id}"
+
+
+# =============================================================================
 # DetalleMapeoCama
 # -----------------------------------------------------------------------------
 # Registro unitario de una cama dentro de una sesion de mapeo.

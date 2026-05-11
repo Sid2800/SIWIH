@@ -19,6 +19,7 @@
           <th>Referencia</th>
           <th>Tipo</th>
           <th>Estado</th>
+          <th>Servicios</th>
           <th>Fecha</th>
           <th>Usuario</th>
         </tr>
@@ -29,6 +30,7 @@
           <th>Referencia</th>
           <th>Tipo</th>
           <th>Estado</th>
+          <th>Servicios</th>
           <th>Fecha</th>
           <th>Usuario</th>
         </tr>
@@ -48,9 +50,25 @@
   #tabla-historiales tbody tr {
     cursor: pointer;
   }
+
+  .hist-servicio-chip {
+    display: inline-block;
+    font-size: 1.05rem;
+    font-weight: 600;
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    background: #dbeafe;
+    color: #1e40af;
+    white-space: nowrap;
+    margin: 0.1rem 0.15rem 0.1rem 0;
+  }
+
+  .hist-sin-servicios {
+    color: #94a3b8;
+  }
 </style>
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'mapeo_camas/scripts/historialesCamas.js' %}?v=20260506g"></script>
+<script src="{% static 'mapeo_camas/scripts/historialesCamas.js' %}?v=20260508b"></script>
 {% endblock %}

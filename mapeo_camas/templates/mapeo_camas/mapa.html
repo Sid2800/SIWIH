@@ -1,5 +1,6 @@
 {% extends 'core/base.html' %}
 {% load static %}
+{% load permisos_unidad %}
 
 {% block title %}{{ titulo }}{% endblock %}
 
@@ -15,24 +16,32 @@
 
   <div class="mapa-acciones-superior">
     <div class="dt-buttons mapa-botones-acciones">
+      {# [2026-05-08] Botones de edición solo para admin/digitador de ADMI #}
+      {% if request.user|tiene_rol:"admin:ADMI,digitador:ADMI" %}
       <button type="button" class="dt-button" id="btn-iniciar-mapeo" title="Iniciar mapeo de camas">
         <i class="bi bi-play-circle boton-exportacion"></i>
       </button>
+      {% endif %}
       <button type="button" class="dt-button" id="btn-copiar-camas" title="Copiar resumen visible">
         <i class="bi bi-clipboard boton-exportacion"></i>
       </button>
       <button type="button" class="dt-button" id="btn-imprimir-camas" title="Imprimir mapa">
         <i class="bi bi-printer boton-exportacion"></i>
       </button>
+      {% if request.user|tiene_rol:"admin:ADMI" %}
       <a href="{% url 'mapeo_camas_historiales' %}" class="dt-button" id="btn-historiales-camas" title="Ver historiales de camas">
         <i class="bi bi-clock-history boton-exportacion"></i>
       </a>
+      {% endif %}
+      {# [2026-05-08] Botones de control de sesión solo para editores #}
+      {% if request.user|tiene_rol:"admin:ADMI,digitador:ADMI" %}
       <button type="button" class="dt-button mapa-control-mapeo--oculto" id="btn-terminar-mapeo" title="Terminar mapeo">
         <i class="bi bi-check2-circle boton-exportacion"></i>
       </button>
       <button type="button" class="dt-button mapa-control-mapeo--oculto" id="btn-cancelar-mapeo" title="Cancelar mapeo">
         <i class="bi bi-x-octagon boton-exportacion"></i>
       </button>
+      {% endif %}
     </div>
 
     <div class="mapa-buscador">
@@ -77,21 +86,36 @@
     <span class="mapa-banner-mapeo__texto">Mapeo en progreso &mdash; revisa cada cama y confirma o corrige su estado</span>
   </div>
 
+  <section class="mapa-indicadores" aria-label="Indicadores de estado de camas">
+    <div class="mapa-indicadores__encabezado">
+      <h3 class="mapa-indicadores__titulo">Indicadores por estado</h3>
+      <p class="mapa-indicadores__ayuda">Haz clic en un estado para filtrar las camas.</p>
+    </div>
+    <div id="mapa-indicadores" class="mapa-indicadores__grid"></div>
+  </section>
+
   <div id="mapa-servicios" class="mapa-grid-servicios"></div>
 
+  {# [2026-05-08] Botón pie de página solo para editores #}
+  {% if request.user|tiene_rol:"admin:ADMI,digitador:ADMI" %}
   <div id="mapa-pie-mapeo" class="mapa-pie-mapeo mapa-control-mapeo--oculto" style="margin-top:1.5rem;">
     <button type="button" class="dt-button" id="btn-terminar-mapeo-pie" title="Terminar mapeo">
       <i class="bi bi-check2-circle boton-exportacion"></i>
       <span style="margin-left:0.4rem;font-size:1.3rem;">Terminar mapeo</span>
     </button>
   </div>
+  {% endif %}
 </div>
 {% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'mapeo_camas/styles/mapaCamas.css' %}?v=20260506a">
+<link rel="stylesheet" href="{% static 'mapeo_camas/styles/mapaCamas.css' %}?v=20260508b">
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'mapeo_camas/scripts/mapaCamasAsignacion.js' %}?v=20260506a"></script>
+{# [2026-05-08] Indica al JS si el usuario puede editar el mapa o es solo lectura #}
+<script>
+  window.MAPA_SOLO_LECTURA = {% if es_editor %}false{% else %}true{% endif %};
+</script>
+<script src="{% static 'mapeo_camas/scripts/mapaCamasAsignacion.js' %}?v=20260508b"></script>
 {% endblock %}

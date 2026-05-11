@@ -225,9 +225,10 @@ document.addEventListener("DOMContentLoaded", function () {
     filtroCama.setAttribute("list", "historiales-camas-list");
     fechasFiltro.appendChild(filtroCama);
 
+    // Datalist fuera del grid para no ocupar celda y desalinear los controles
     var listaCamas = document.createElement("datalist");
     listaCamas.id = "historiales-camas-list";
-    fechasFiltro.appendChild(listaCamas);
+    document.body.appendChild(listaCamas);
 
     var hoyDate = new Date();
     var hace30DiasDate = new Date();
@@ -324,6 +325,23 @@ document.addEventListener("DOMContentLoaded", function () {
         { data: "referencia", defaultContent: "", className: "all" },
         { data: "tipo", defaultContent: "", className: "all" },
         { data: "estado", defaultContent: "", className: "all" },
+        {
+          data: "servicios",
+          defaultContent: "",
+          className: "none",
+          orderable: false,
+          render: function (data, type) {
+            if (type !== "display") {
+              return Array.isArray(data) ? data.join(", ") : "";
+            }
+            if (!data || !data.length) {
+              return '<span class="hist-sin-servicios">—</span>';
+            }
+            return data.map(function (s) {
+              return '<span class="hist-servicio-chip">' + escaparHtml(s) + '</span>';
+            }).join("");
+          }
+        },
         {
           data: "fecha_principal",
           defaultContent: "",

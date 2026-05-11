@@ -166,6 +166,26 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 
+  var notaServiciosEl = document.getElementById("detalle-nota-servicios");
+
+  function renderNotaServicios(servicios) {
+    if (!notaServiciosEl) {
+      return;
+    }
+    if (!servicios || !servicios.length) {
+      notaServiciosEl.style.display = "none";
+      return;
+    }
+    var chips = servicios.map(function (s) {
+      return '<span class="detalle-nota-chip">' + escaparHtml(s) + '</span>';
+    }).join("");
+    notaServiciosEl.innerHTML =
+      '<i class="bi bi-info-circle-fill detalle-nota-icono"></i>' +
+      '<span class="detalle-nota-texto">Servicios incluidos en esta sesión:</span>' +
+      '<span class="detalle-nota-chips">' + chips + '</span>';
+    notaServiciosEl.style.display = "flex";
+  }
+
   function cargarDetalle() {
     var params = new URLSearchParams(window.location.search || "");
     var tipo = (params.get("tipo") || "").toLowerCase();
@@ -191,6 +211,8 @@ document.addEventListener("DOMContentLoaded", function () {
           renderVacio("No se pudo cargar el detalle solicitado.");
           return;
         }
+        // [2026-05-08] Mostrar nota de servicios solo para mapeos
+        renderNotaServicios(tipo === "mapeo" ? (data.servicios_sesion || []) : []);
         estructuraCache = data.estructura || [];
         flatItemsCache = aplanarEstructura(estructuraCache);
         renderEstructuraMapeo(estructuraCache);

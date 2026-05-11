@@ -34,6 +34,8 @@
     <div id="detalle-meta" class="detalle-meta"></div>
   </div>
 
+  <div id="detalle-nota-servicios" class="detalle-nota-servicios" style="display:none;"></div>
+
   <div id="detalle-tabla-filtros" class="fechasfiltro" style="margin-bottom: 0.75rem;">
     <label for="dtf-fecha-inicio">Desde</label>
     <input type="date" id="dtf-fecha-inicio" class="formularioCampo-date">
@@ -67,9 +69,9 @@
 {% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'mapeo_camas/styles/historialesDetalleCamas.css' %}?v=20260506a">
+<link rel="stylesheet" href="{% static 'mapeo_camas/styles/historialesDetalleCamas.css' %}?v=20260508b">
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'mapeo_camas/scripts/historialesDetalleCamas.js' %}?v=20260506c"></script>
+<script src="{% static 'mapeo_camas/scripts/historialesDetalleCamas.js' %}?v=20260508b"></script>
 {% endblock %}

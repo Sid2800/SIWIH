@@ -2,6 +2,50 @@
   overflow-x: hidden;
 }
 
+/* [2026-05-08] Nota de servicios incluidos en la sesión de mapeo */
+.detalle-nota-servicios {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.7rem 0.9rem;
+  margin-bottom: 1rem;
+  border-radius: 10px;
+  background: #eff6ff;
+  color: #1e40af;
+  font-size: 1.2rem;
+}
+
+.detalle-nota-icono {
+  font-size: 1.35rem;
+  margin-top: 0.05rem;
+  flex-shrink: 0;
+}
+
+.detalle-nota-texto {
+  font-weight: 700;
+  white-space: nowrap;
+  align-self: center;
+}
+
+.detalle-nota-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.detalle-nota-chip {
+  display: inline-block;
+  font-size: 1.05rem;
+  font-weight: 600;
+  padding: 0.18rem 0.6rem;
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #1e3a8a;
+  white-space: nowrap;
+}
+
 .historial-cards-grid {
   display: grid;
   gap: 1rem;

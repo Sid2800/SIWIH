@@ -26,6 +26,7 @@ document.addEventListener("DOMContentLoaded", function () {
   ];
 
   var contenedor = document.getElementById("mapa-servicios");
+  var contenedorIndicadores = document.getElementById("mapa-indicadores");
   var inputBusqueda = document.getElementById("mapa-busqueda");
   var tipoBusqueda = document.getElementById("mapa-tipo-busqueda");
   var btnLimpiar = document.getElementById("btn-limpiar-busqueda");
@@ -40,8 +41,20 @@ document.addEventListener("DOMContentLoaded", function () {
   // [2026-05-04 FEATURE] Banner pegajoso de mapeo activo (amarillo con pulso)
   var mapaBannerMapeo = document.getElementById("mapa-banner-mapeo");
   var camasRenderizadas = [];
+  var serviciosDisponiblesMapeo = [];
   var sesionMapeoActivaId = null;
+  var serviciosSesionActivaIds = [];
   var camasMapeadasSesion = new Set();
+  var filtroEstadoIndicador = "";
+
+  var ESTADOS_INDICADORES = [
+    { id: "VACIA", etiqueta: "Vacias", icono: "bi bi-door-open-fill" },
+    { id: "OCUPADA", etiqueta: "Ocupadas", icono: "bi bi-person-fill" },
+    { id: "PRE_ALTA", etiqueta: "Pre alta", icono: "bi bi-hourglass-split" },
+    { id: "FUERA_SERVICIO", etiqueta: "Fuera de servicio", icono: "bi bi-tools" },
+    { id: "CONSULTA_EXTERNA", etiqueta: "Consulta externa", icono: "bi bi-clipboard2-pulse-fill" },
+    { id: "SIN_ASIGNACION", etiqueta: "Sin asignacion", icono: "bi bi-question-circle-fill" }
+  ];
 
   // Constantes de interaccion
   var CLICK_DELAY_MS = 300;  // ms para distinguir simple vs doble clic
@@ -141,6 +154,96 @@ document.addEventListener("DOMContentLoaded", function () {
     camasMapeadasSesion.clear();
   }
 
+  function construirOpcionesServiciosMapeo() {
+    return serviciosDisponiblesMapeo.map(function (servicio) {
+      return (
+        '<label class="ck-formulario modal-mapeo-servicios__item">' +
+          '<input type="checkbox" class="ck-formulario__checkbox modal-mapeo-servicios__checkbox" name="mapeo-servicio" value="' + escaparHtml(servicio.id) + '">' +
+          '<div class="ck-formulario__base"><div class="ck-formulario__bolita"></div></div>' +
+          '<span class="ck-formulario__label modal-mapeo-servicios__texto-item">' +
+            '<span class="modal-mapeo-servicios__nombre">' + escaparHtml(servicio.nombre) + '</span>' +
+            '<span class="modal-mapeo-servicios__codigo">Codigo: ' + escaparHtml(servicio.nombre_corto || "NA") + '</span>' +
+          '</span>' +
+        '</label>'
+      );
+    }).join("");
+  }
+
+  function obtenerServiciosSeleccionadosMapeo() {
+    return Array.from(document.querySelectorAll('input[name="mapeo-servicio"]:checked')).map(function (item) {
+      return Number(item.value);
+    }).filter(function (value) {
+      return !isNaN(value);
+    });
+  }
+
+  function actualizarResumenServiciosMapeo() {
+    var resumen = document.getElementById("modal-servicios-resumen");
+    if (!resumen) {
+      return;
+    }
+    var seleccionados = obtenerServiciosSeleccionadosMapeo().length;
+    var total = serviciosDisponiblesMapeo.length;
+    resumen.textContent = seleccionados
+      ? "Servicios seleccionados: " + seleccionados + " de " + total
+      : "Selecciona al menos un servicio para iniciar la sesion.";
+  }
+
+  async function abrirModalSeleccionServiciosMapeo() {
+    var htmlServicios =
+      '<div class="modal-mapeo-servicios">' +
+        '<div class="modal-mapeo-servicios__intro">' +
+          '<p class="modal-mapeo-servicios__texto">[2026-05-07] Selecciona los servicios que se incluiran en esta sesion de mapeo.</p>' +
+          '<p class="modal-mapeo-servicios__resumen" id="modal-servicios-resumen"></p>' +
+        '</div>' +
+        '<fieldset class="modalAtencionCampos">' +
+          '<legend>Servicios incluidos</legend>' +
+          '<div class="modal-mapeo-servicios__lista">' +
+            construirOpcionesServiciosMapeo() +
+          '</div>' +
+        '</fieldset>' +
+      '</div>';
+
+    return Swal.fire({
+      title: "Iniciar mapeo",
+      html: htmlServicios,
+      showCancelButton: true,
+      showCloseButton: true,
+      confirmButtonText: 'Iniciar',
+      cancelButtonText: 'Cancelar',
+      focusConfirm: false,
+      customClass: {
+        popup: "contener-modal-defuncion",
+        title: "contener-modal-titulo",
+        content: "contener-modal-contenido",
+        confirmButton: "contener-modal-boton-confirmar",
+        cancelButton: "contener-modal-boton-cancelar"
+      },
+      preConfirm: function () {
+        var serviciosSeleccionados = obtenerServiciosSeleccionadosMapeo();
+        if (!serviciosSeleccionados.length) {
+          Swal.showValidationMessage("Debes seleccionar al menos un servicio.");
+          return false;
+        }
+        return { servicio_ids: serviciosSeleccionados };
+      },
+      didOpen: function () {
+        var actionsContainer = document.querySelector(".swal2-actions");
+        if (actionsContainer) {
+          actionsContainer.classList.add("contener-modal-contenedor-botones-min");
+        }
+
+        var checks = Array.from(document.querySelectorAll('input[name="mapeo-servicio"]'));
+
+        checks.forEach(function (check) {
+          check.addEventListener("change", actualizarResumenServiciosMapeo);
+        });
+
+        actualizarResumenServiciosMapeo();
+      }
+    });
+  }
+
   // Reaplica marca visual usando el Set en memoria luego de recargar el mapa.
   function aplicarMarcasSesionEnRender() {
     if (!camasMapeadasSesion.size) {
@@ -163,9 +266,11 @@ document.addEventListener("DOMContentLoaded", function () {
 
       if (data.sesion_activa && data.sesion_activa.id) {
         sesionMapeoActivaId = data.sesion_activa.id;
+        serviciosSesionActivaIds = data.servicio_ids || [];
         establecerModoMapeoActivo(true);
       } else {
         sesionMapeoActivaId = null;
+        serviciosSesionActivaIds = [];
         establecerModoMapeoActivo(false);
       }
 
@@ -247,35 +352,149 @@ document.addEventListener("DOMContentLoaded", function () {
       .replace(/'/g, "&#39;");
   }
 
+  function normalizarEstadoIndicador(estado) {
+    var valor = String(estado || "SIN_ASIGNACION").trim().toUpperCase();
+    if (!valor) {
+      return "SIN_ASIGNACION";
+    }
+    if (valor === "ALTA") {
+      return "PRE_ALTA";
+    }
+    return valor;
+  }
+
+  function estadoCoincideIndicador(estado, filtroEstado) {
+    if (!filtroEstado) {
+      return true;
+    }
+    return normalizarEstadoIndicador(estado) === filtroEstado;
+  }
+
+  function resumenEstadosCamas() {
+    var resumen = { TOTAL: camasRenderizadas.length };
+    camasRenderizadas.forEach(function (camaEl) {
+      var clave = normalizarEstadoIndicador(camaEl.dataset.estado);
+      resumen[clave] = (resumen[clave] || 0) + 1;
+    });
+    return resumen;
+  }
+
+  function actualizarEstadoActivoIndicadores() {
+    if (!contenedorIndicadores) {
+      return;
+    }
+    Array.from(contenedorIndicadores.querySelectorAll(".mapa-indicador")).forEach(function (btn) {
+      var estadoId = btn.dataset.estadoId || "";
+      var activo = estadoId === filtroEstadoIndicador || (!filtroEstadoIndicador && estadoId === "TODAS");
+      btn.classList.toggle("mapa-indicador--activo", activo);
+      btn.setAttribute("aria-pressed", activo ? "true" : "false");
+    });
+  }
+
+  function _porcentaje(cantidad, total) {
+    if (!total) {
+      return "0%";
+    }
+    return Math.round((cantidad / total) * 100) + "%";
+  }
+
+  function _htmlCantidad(cantidad, total) {
+    var pct = _porcentaje(cantidad, total);
+    return (
+      '<span class="mapa-indicador__cantidad">' + String(cantidad) + '</span>' +
+      '<span class="mapa-indicador__pct">' + pct + '</span>'
+    );
+  }
+
+  function renderIndicadoresEstado() {
+    if (!contenedorIndicadores) {
+      return;
+    }
+
+    var resumen = resumenEstadosCamas();
+    var total = resumen.TOTAL || 0;
+    var catalogo = {};
+    ESTADOS_INDICADORES.forEach(function (item) {
+      catalogo[item.id] = item;
+    });
+
+    // Construir lista de estados (conocidos + extras) y ordenar por cantidad desc
+    var listaEstados = ESTADOS_INDICADORES.map(function (item) {
+      return {
+        id: item.id,
+        etiqueta: item.etiqueta,
+        icono: item.icono,
+        cantidad: resumen[item.id] || 0,
+        claseExtra: "mapa-indicador--" + item.id.toLowerCase().replace(/_/g, "-")
+      };
+    });
+
+    Object.keys(resumen).forEach(function (estadoId) {
+      if (estadoId === "TOTAL" || catalogo[estadoId]) {
+        return;
+      }
+      listaEstados.push({
+        id: estadoId,
+        etiqueta: estadoId,
+        icono: "bi bi-tag-fill",
+        cantidad: resumen[estadoId] || 0,
+        claseExtra: ""
+      });
+    });
+
+    // [2026-05-08] Ordenar por cantidad descendente
+    listaEstados.sort(function (a, b) { return b.cantidad - a.cantidad; });
+
+    var html = [
+      '<button type="button" class="mapa-indicador" data-estado-id="TODAS" aria-pressed="false">' +
+        '<span class="mapa-indicador__estado"><i class="bi bi-grid-3x3-gap-fill"></i> Todas</span>' +
+        _htmlCantidad(total, total) +
+      '</button>'
+    ];
+
+    listaEstados.forEach(function (item) {
+      html.push(
+        '<button type="button" class="mapa-indicador ' + item.claseExtra + '" data-estado-id="' + escaparHtml(item.id) + '" aria-pressed="false">' +
+          '<span class="mapa-indicador__estado"><i class="' + item.icono + '"></i> ' + escaparHtml(item.etiqueta) + '</span>' +
+          _htmlCantidad(item.cantidad, total) +
+        '</button>'
+      );
+    });
+
+    contenedorIndicadores.innerHTML = html.join("");
+    actualizarEstadoActivoIndicadores();
+  }
+
   // Filtra las cards renderizadas segun tipo de busqueda y texto escrito.
   function aplicarFiltro() {
     var valor = (inputBusqueda.value || "").trim().toLowerCase();
     var tipo = tipoBusqueda.value || "todo";
 
     camasRenderizadas.forEach(function (item) {
-      if (!valor) {
-        item.style.display = "";
-        return;
+      var coincideBusqueda = true;
+      if (valor) {
+        var campo = "";
+        if (tipo === "cama") {
+          campo = item.dataset.numeroCama || "";
+        } else if (tipo === "dni") {
+          campo = item.dataset.pacienteDni || "";
+        } else if (tipo === "paciente") {
+          campo = item.dataset.paciente || "";
+        } else if (tipo === "estado") {
+          campo = item.dataset.estado || "";
+        } else {
+          campo = textoBusquedaCama(item);
+        }
+        coincideBusqueda = campo.toLowerCase().includes(valor);
       }
 
-      var campo = "";
-      if (tipo === "cama") {
-        campo = item.dataset.numeroCama || "";
-      } else if (tipo === "dni") {
-        campo = item.dataset.pacienteDni || "";
-      } else if (tipo === "paciente") {
-        campo = item.dataset.paciente || "";
-      } else if (tipo === "estado") {
-        campo = item.dataset.estado || "";
-      } else {
-        campo = textoBusquedaCama(item);
-      }
+      var coincideEstado = estadoCoincideIndicador(item.dataset.estado || "", filtroEstadoIndicador);
 
-      item.style.display = campo.toLowerCase().includes(valor) ? "" : "none";
+      item.style.display = coincideBusqueda && coincideEstado ? "" : "none";
     });
 
-    // Si hay búsqueda activa, ocultar salas y servicios que no tengan camas visibles
-    if (valor) {
+    // Si hay filtros activos, ocultar salas y servicios que no tengan camas visibles
+    if (valor || filtroEstadoIndicador) {
       document.querySelectorAll(".mapa-cubiculo").forEach(function (cub) {
         var visible = Array.from(cub.querySelectorAll(".mapa-cama")).some(function (c) { return c.style.display !== "none"; });
         cub.style.display = visible ? "" : "none";
@@ -321,6 +540,9 @@ document.addEventListener("DOMContentLoaded", function () {
     if (dniEl) {
       dniEl.textContent = camaActualizada.paciente ? (camaActualizada.paciente.dni || "") : "";
     }
+
+    renderIndicadoresEstado();
+    aplicarFiltro();
   }
 
   // Rellena un <select> con las camas disponibles (VACIA) para mover un paciente
@@ -963,6 +1185,8 @@ document.addEventListener("DOMContentLoaded", function () {
           var _touchWasLong = false;
 
           camaEl.addEventListener("touchstart", function () {
+            // [2026-05-08] En modo solo lectura no activar acciones tactiles de edicion
+            if (window.MAPA_SOLO_LECTURA) { return; }
             _longTimer = setTimeout(function () {
               _longTimer = null;
               _touchWasLong = true;
@@ -980,6 +1204,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
           camaEl.addEventListener("click", function () {
             if (_touchWasLong) { _touchWasLong = false; return; }
+            // [2026-05-08] En modo solo lectura no abrir modal de edicion
+            if (window.MAPA_SOLO_LECTURA) { return; }
             if (_clickTimer) {
               clearTimeout(_clickTimer);
               _clickTimer = null;
@@ -1041,11 +1267,13 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // Reaplicar marca visual de camas ya mapeadas cuando se vuelve a renderizar.
     aplicarMarcasSesionEnRender();
+    renderIndicadoresEstado();
+    aplicarFiltro();
   }
 
   // Carga inicial del mapa y manejo de errores de red/servidor.
   function cargarMapa() {
-    fetch(API_URLS.mapa)
+    return fetch(API_URLS.mapa)
       .then(function (response) {
         if (!response.ok) {
           throw new Error("No se pudo cargar la informacion del mapa.");
@@ -1053,7 +1281,8 @@ document.addEventListener("DOMContentLoaded", function () {
         return response.json();
       })
       .then(function (data) {
-        renderMapa(data.servicios || []);
+        serviciosDisponiblesMapeo = data.servicios || [];
+        renderMapa(serviciosDisponiblesMapeo);
       })
       .catch(function () {
         contenedor.innerHTML = '<p class="mapa-vacio">Error cargando mapa de camas.</p>';
@@ -1119,24 +1348,44 @@ document.addEventListener("DOMContentLoaded", function () {
     window.print();
   });
 
+  if (contenedorIndicadores) {
+    contenedorIndicadores.addEventListener("click", function (event) {
+      var boton = event.target.closest(".mapa-indicador");
+      if (!boton) {
+        return;
+      }
+      var estadoId = boton.dataset.estadoId || "";
+      if (!estadoId || estadoId === "TODAS") {
+        filtroEstadoIndicador = "";
+      } else if (filtroEstadoIndicador === estadoId) {
+        filtroEstadoIndicador = "";
+      } else {
+        filtroEstadoIndicador = estadoId;
+      }
+      actualizarEstadoActivoIndicadores();
+      aplicarFiltro();
+    });
+  }
+
   if (btnIniciarMapeo) {
     btnIniciarMapeo.addEventListener("click", async function () {
       try {
-        var confirmarInicio = await Swal.fire({
-          title: "Iniciar mapeo",
-          text: "Se iniciara una nueva sesion de mapeo de camas. Desea continuar?",
-          icon: "question",
-          showCancelButton: true,
-          confirmButtonText: "Si, iniciar",
-          cancelButtonText: "Cancelar",
-        });
+        if (!serviciosDisponiblesMapeo.length) {
+          throw new Error("No hay servicios disponibles para iniciar el mapeo.");
+        }
+
+        var confirmarInicio = await abrirModalSeleccionServiciosMapeo();
         if (!confirmarInicio.isConfirmed) {
           return;
         }
 
         var response = await fetch(API_URLS.iniciarMapeo, {
           method: "POST",
-          headers: { "X-CSRFToken": window.CSRF_TOKEN }
+          headers: {
+            "X-CSRFToken": window.CSRF_TOKEN,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ servicio_ids: confirmarInicio.value.servicio_ids })
         });
         var data = await response.json();
         if (!response.ok || !data.ok) {
@@ -1144,10 +1393,12 @@ document.addEventListener("DOMContentLoaded", function () {
         }
 
         sesionMapeoActivaId = data.sesion_id || null;
+        serviciosSesionActivaIds = data.servicio_ids || [];
         camasMapeadasSesion = new Set((data.camas_mapeadas || []).map(function (v) {
           return String(v);
         }));
         establecerModoMapeoActivo(Boolean(sesionMapeoActivaId));
+        await cargarMapa();
         aplicarMarcasSesionEnRender();
         toastr.success(data.mensaje || "Mapeo iniciado.", "Exito");
       } catch (error) {
@@ -1199,8 +1450,10 @@ document.addEventListener("DOMContentLoaded", function () {
         }
 
         sesionMapeoActivaId = null;
+        serviciosSesionActivaIds = [];
         establecerModoMapeoActivo(false);
         limpiarMarcasMapeo();
+        await cargarMapa();
         toastr.success(data.mensaje || "Mapeo finalizado.", "Exito");
       } catch (error) {
         toastr.error(error.message || "Error al terminar mapeo.", "Error");
@@ -1246,8 +1499,10 @@ document.addEventListener("DOMContentLoaded", function () {
         }
 
         sesionMapeoActivaId = null;
+        serviciosSesionActivaIds = [];
         establecerModoMapeoActivo(false);
         limpiarMarcasMapeo();
+        await cargarMapa();
         toastr.success(data.mensaje || "Mapeo cancelado.", "Exito");
       } catch (error) {
         toastr.error(error.message || "Error al cancelar mapeo.", "Error");
