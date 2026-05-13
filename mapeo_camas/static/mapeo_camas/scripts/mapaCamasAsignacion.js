@@ -27,6 +27,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
   var contenedor = document.getElementById("mapa-servicios");
   var contenedorIndicadores = document.getElementById("mapa-indicadores");
+  var contenedorIndicadoresSala = document.getElementById("mapa-indicadores-sala");
+  var filtroEstadoMovil = document.getElementById("mapa-filtro-estado-movil");
+  var filtroSalaMovil = document.getElementById("mapa-filtro-sala-movil");
   var inputBusqueda = document.getElementById("mapa-busqueda");
   var tipoBusqueda = document.getElementById("mapa-tipo-busqueda");
   var btnLimpiar = document.getElementById("btn-limpiar-busqueda");
@@ -46,14 +49,14 @@ document.addEventListener("DOMContentLoaded", function () {
   var serviciosSesionActivaIds = [];
   var camasMapeadasSesion = new Set();
   var filtroEstadoIndicador = "";
+  var filtroSalaIndicador = "";
 
   var ESTADOS_INDICADORES = [
     { id: "VACIA", etiqueta: "Vacias", icono: "bi bi-door-open-fill" },
     { id: "OCUPADA", etiqueta: "Ocupadas", icono: "bi bi-person-fill" },
     { id: "PRE_ALTA", etiqueta: "Pre alta", icono: "bi bi-hourglass-split" },
     { id: "FUERA_SERVICIO", etiqueta: "Fuera de servicio", icono: "bi bi-tools" },
-    { id: "CONSULTA_EXTERNA", etiqueta: "Consulta externa", icono: "bi bi-clipboard2-pulse-fill" },
-    { id: "SIN_ASIGNACION", etiqueta: "Sin asignacion", icono: "bi bi-question-circle-fill" }
+    { id: "CONSULTA_EXTERNA", etiqueta: "Consulta externa", icono: "bi bi-clipboard2-pulse-fill" }
   ];
 
   // Constantes de interaccion
@@ -406,6 +409,86 @@ document.addEventListener("DOMContentLoaded", function () {
     );
   }
 
+  function resumenSalasCamas() {
+    var resumen = { TOTAL: camasRenderizadas.length };
+    camasRenderizadas.forEach(function (camaEl) {
+      var clave = String(camaEl.dataset.sala || "OTROS").trim() || "OTROS";
+      resumen[clave] = (resumen[clave] || 0) + 1;
+    });
+    return resumen;
+  }
+
+  function actualizarEstadoActivoIndicadoresSala() {
+    if (!contenedorIndicadoresSala) {
+      return;
+    }
+    Array.from(contenedorIndicadoresSala.querySelectorAll(".mapa-indicador")).forEach(function (btn) {
+      var salaId = btn.dataset.salaId || "";
+      var activo = salaId === filtroSalaIndicador || (!filtroSalaIndicador && salaId === "TODAS");
+      btn.classList.toggle("mapa-indicador--activo", activo);
+      btn.setAttribute("aria-pressed", activo ? "true" : "false");
+    });
+  }
+
+  function sincronizarFiltrosMoviles() {
+    if (filtroEstadoMovil) {
+      var valorEstado = filtroEstadoIndicador || "TODAS";
+      filtroEstadoMovil.value = valorEstado;
+    }
+    if (filtroSalaMovil) {
+      var valorSala = filtroSalaIndicador || "TODAS";
+      var opcionExiste = Array.from(filtroSalaMovil.options || []).some(function (opt) {
+        return opt.value === valorSala;
+      });
+      filtroSalaMovil.value = opcionExiste ? valorSala : "TODAS";
+    }
+  }
+
+  function actualizarSelectEstadoMovil() {
+    if (!filtroEstadoMovil) {
+      return;
+    }
+    var resumen = resumenEstadosCamas();
+    var etiquetasBase = {};
+    ESTADOS_INDICADORES.forEach(function (item) {
+      etiquetasBase[item.id] = item.etiqueta;
+    });
+
+    var estados = Object.keys(resumen)
+      .filter(function (clave) { return clave !== "TOTAL"; })
+      .sort(function (a, b) {
+        var ca = resumen[a] || 0;
+        var cb = resumen[b] || 0;
+        return cb - ca;
+      });
+
+    var html = ['<option value="TODAS">Todos los estados</option>'];
+    estados.forEach(function (estadoId) {
+      var etiqueta = etiquetasBase[estadoId] || estadoId;
+      html.push('<option value="' + escaparHtml(estadoId) + '">' + escaparHtml(etiqueta) + '</option>');
+    });
+    filtroEstadoMovil.innerHTML = html.join("");
+    sincronizarFiltrosMoviles();
+  }
+
+  function actualizarSelectSalaMovil() {
+    if (!filtroSalaMovil) {
+      return;
+    }
+
+    var resumen = resumenSalasCamas();
+    var salas = Object.keys(resumen)
+      .filter(function (clave) { return clave !== "TOTAL"; })
+      .sort(function (a, b) { return a.localeCompare(b, "es", { sensitivity: "base" }); });
+
+    var html = ['<option value="TODAS">Todas las salas</option>'];
+    salas.forEach(function (sala) {
+      html.push('<option value="' + escaparHtml(sala) + '">' + escaparHtml(sala) + '</option>');
+    });
+    filtroSalaMovil.innerHTML = html.join("");
+    sincronizarFiltrosMoviles();
+  }
+
   function renderIndicadoresEstado() {
     if (!contenedorIndicadores) {
       return;
@@ -463,6 +546,43 @@ document.addEventListener("DOMContentLoaded", function () {
 
     contenedorIndicadores.innerHTML = html.join("");
     actualizarEstadoActivoIndicadores();
+    actualizarSelectEstadoMovil();
+  }
+
+  function renderIndicadoresSala() {
+    if (!contenedorIndicadoresSala) {
+      return;
+    }
+
+    var resumen = resumenSalasCamas();
+    var total = resumen.TOTAL || 0;
+    var listaSalas = Object.keys(resumen)
+      .filter(function (clave) { return clave !== "TOTAL"; })
+      .map(function (clave) {
+        return { id: clave, etiqueta: clave, cantidad: resumen[clave] || 0 };
+      });
+
+    listaSalas.sort(function (a, b) { return b.cantidad - a.cantidad; });
+
+    var html = [
+      '<button type="button" class="mapa-indicador" data-sala-id="TODAS" aria-pressed="false">' +
+        '<span class="mapa-indicador__estado"><i class="bi bi-diagram-3-fill"></i> Todas las salas</span>' +
+        _htmlCantidad(total, total) +
+      '</button>'
+    ];
+
+    listaSalas.forEach(function (item) {
+      html.push(
+        '<button type="button" class="mapa-indicador" data-sala-id="' + escaparHtml(item.id) + '" aria-pressed="false">' +
+          '<span class="mapa-indicador__estado"><i class="bi bi-building"></i> ' + escaparHtml(item.etiqueta) + '</span>' +
+          _htmlCantidad(item.cantidad, total) +
+        '</button>'
+      );
+    });
+
+    contenedorIndicadoresSala.innerHTML = html.join("");
+    actualizarEstadoActivoIndicadoresSala();
+    actualizarSelectSalaMovil();
   }
 
   // Filtra las cards renderizadas segun tipo de busqueda y texto escrito.
@@ -482,6 +602,8 @@ document.addEventListener("DOMContentLoaded", function () {
           campo = item.dataset.paciente || "";
         } else if (tipo === "estado") {
           campo = item.dataset.estado || "";
+        } else if (tipo === "sala") {
+          campo = item.dataset.sala || "";
         } else {
           campo = textoBusquedaCama(item);
         }
@@ -489,12 +611,13 @@ document.addEventListener("DOMContentLoaded", function () {
       }
 
       var coincideEstado = estadoCoincideIndicador(item.dataset.estado || "", filtroEstadoIndicador);
+      var coincideSala = !filtroSalaIndicador || String(item.dataset.sala || "").trim() === filtroSalaIndicador;
 
-      item.style.display = coincideBusqueda && coincideEstado ? "" : "none";
+      item.style.display = coincideBusqueda && coincideEstado && coincideSala ? "" : "none";
     });
 
     // Si hay filtros activos, ocultar salas y servicios que no tengan camas visibles
-    if (valor || filtroEstadoIndicador) {
+    if (valor || filtroEstadoIndicador || filtroSalaIndicador) {
       document.querySelectorAll(".mapa-cubiculo").forEach(function (cub) {
         var visible = Array.from(cub.querySelectorAll(".mapa-cama")).some(function (c) { return c.style.display !== "none"; });
         cub.style.display = visible ? "" : "none";
@@ -1268,6 +1391,7 @@ document.addEventListener("DOMContentLoaded", function () {
     // Reaplicar marca visual de camas ya mapeadas cuando se vuelve a renderizar.
     aplicarMarcasSesionEnRender();
     renderIndicadoresEstado();
+    renderIndicadoresSala();
     aplicarFiltro();
   }
 
@@ -1290,6 +1414,42 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   inputBusqueda.addEventListener("input", aplicarFiltro);
+
+  if (filtroEstadoMovil) {
+    filtroEstadoMovil.addEventListener("change", function () {
+      var valor = filtroEstadoMovil.value || "TODAS";
+      filtroEstadoIndicador = valor === "TODAS" ? "" : valor;
+      // [2026-05-12] En móvil los selects controlan el filtro principal;
+      // limpiar búsqueda de texto evita combinaciones invisibles/confusas.
+      if (inputBusqueda) {
+        inputBusqueda.value = "";
+      }
+      if (tipoBusqueda) {
+        tipoBusqueda.value = "todo";
+        localStorage.setItem(STORAGE_KEY_TIPO, "todo");
+      }
+      actualizarEstadoActivoIndicadores();
+      aplicarFiltro();
+    });
+  }
+
+  if (filtroSalaMovil) {
+    filtroSalaMovil.addEventListener("change", function () {
+      var valor = filtroSalaMovil.value || "TODAS";
+      filtroSalaIndicador = valor === "TODAS" ? "" : valor;
+      // [2026-05-12] En móvil los selects controlan el filtro principal;
+      // limpiar búsqueda de texto evita combinaciones invisibles/confusas.
+      if (inputBusqueda) {
+        inputBusqueda.value = "";
+      }
+      if (tipoBusqueda) {
+        tipoBusqueda.value = "todo";
+        localStorage.setItem(STORAGE_KEY_TIPO, "todo");
+      }
+      actualizarEstadoActivoIndicadoresSala();
+      aplicarFiltro();
+    });
+  }
 
   // [2026-05-05 FEATURE] Persistir tipo de búsqueda en localStorage.
   // Restaura la selección al cargar la página o volver desde otra sección.
@@ -1315,8 +1475,13 @@ document.addEventListener("DOMContentLoaded", function () {
   btnLimpiar.addEventListener("click", function () {
     inputBusqueda.value = "";
     tipoBusqueda.value = "todo";
+    filtroEstadoIndicador = "";
+    filtroSalaIndicador = "";
     // [2026-05-05 FEATURE] Al limpiar, también resetear el valor persistido.
     localStorage.setItem(STORAGE_KEY_TIPO, "todo");
+    actualizarEstadoActivoIndicadores();
+    actualizarEstadoActivoIndicadoresSala();
+    sincronizarFiltrosMoviles();
     aplicarFiltro();
     inputBusqueda.focus();
   });
@@ -1363,6 +1528,27 @@ document.addEventListener("DOMContentLoaded", function () {
         filtroEstadoIndicador = estadoId;
       }
       actualizarEstadoActivoIndicadores();
+      sincronizarFiltrosMoviles();
+      aplicarFiltro();
+    });
+  }
+
+  if (contenedorIndicadoresSala) {
+    contenedorIndicadoresSala.addEventListener("click", function (event) {
+      var boton = event.target.closest(".mapa-indicador");
+      if (!boton) {
+        return;
+      }
+      var salaId = boton.dataset.salaId || "";
+      if (!salaId || salaId === "TODAS") {
+        filtroSalaIndicador = "";
+      } else if (filtroSalaIndicador === salaId) {
+        filtroSalaIndicador = "";
+      } else {
+        filtroSalaIndicador = salaId;
+      }
+      actualizarEstadoActivoIndicadoresSala();
+      sincronizarFiltrosMoviles();
       aplicarFiltro();
     });
   }

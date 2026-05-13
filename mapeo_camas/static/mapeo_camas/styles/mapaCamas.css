@@ -50,6 +50,17 @@
   gap: 0.55rem;
 }
 
+.mapa-filtros-movil {
+  display: none;
+  gap: 0.65rem;
+  margin-bottom: 0.9rem;
+}
+
+.mapa-filtros-movil__campo {
+  display: grid;
+  gap: 0.35rem;
+}
+
 .mapa-indicadores__encabezado {
   display: flex;
   align-items: baseline;
@@ -512,6 +523,21 @@
 }
 
 @media (max-width: 768px) {
+  .mapa-indicadores {
+    display: none;
+  }
+
+  .mapa-filtros-movil {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  #mapa-filtro-estado-movil,
+  #mapa-filtro-sala-movil {
+    width: 100%;
+    min-width: 0;
+  }
+
   .mapa-buscador-label,
   #mapa-tipo-busqueda,
   #mapa-busqueda {

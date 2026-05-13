@@ -97,13 +97,13 @@ ROLES_GLOBALES = ['directivo', 'admin']
 
 # [2026-05-08] Acceso de solo visualización (ver mapa, dashboard)
 MAPEO_CAMAS_VISUALIZACION_ROLES = ["admin", "digitador", "visitante", "directivo"]
-MAPEO_CAMAS_VISUALIZACION_UNIDADES = ["ADMI", "SALA"]
+MAPEO_CAMAS_VISUALIZACION_UNIDADES = ["ADMI"]
 
 # Acceso de edición (mapear, sincronizar, actualizar camas)
-MAPEO_CAMAS_EDITOR_ROLES = ["admin", "digitador", "visitante"]
+MAPEO_CAMAS_EDITOR_ROLES = ["admin"]
 MAPEO_CAMAS_EDITOR_UNIDADES = ["ADMI"]
 
 # Acceso de auditoría (historiales, detalle de historial)
 # [2026-05-11] Visitante habilitado para visualizar templates de historial.
-MAPEO_CAMAS_HISTORIALES_ROLES = ["admin", "visitante"]
-MAPEO_CAMAS_HISTORIALES_UNIDADES = []
+MAPEO_CAMAS_HISTORIALES_ROLES = ["admin", "visitante", "digitador"]
+MAPEO_CAMAS_HISTORIALES_UNIDADES = ["ADMI"]

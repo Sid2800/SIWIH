@@ -28,11 +28,9 @@
       <button type="button" class="dt-button" id="btn-imprimir-camas" title="Imprimir mapa">
         <i class="bi bi-printer boton-exportacion"></i>
       </button>
-      {% if request.user|tiene_rol:"admin:ADMI" %}
       <a href="{% url 'mapeo_camas_historiales' %}" class="dt-button" id="btn-historiales-camas" title="Ver historiales de camas">
         <i class="bi bi-clock-history boton-exportacion"></i>
       </a>
-      {% endif %}
       {# [2026-05-08] Botones de control de sesión solo para editores #}
       {% if request.user|tiene_rol:"admin:ADMI,digitador:ADMI" %}
       <button type="button" class="dt-button mapa-control-mapeo--oculto" id="btn-terminar-mapeo" title="Terminar mapeo">
@@ -52,6 +50,7 @@
         <option value="cama">Numero cama</option>
         <option value="paciente">Paciente</option>
         <option value="estado">Estado</option>
+        <option value="sala">Sala</option>
       </select>
       <input
         type="text"
@@ -86,12 +85,24 @@
     <span class="mapa-banner-mapeo__texto">Mapeo en progreso &mdash; revisa cada cama y confirma o corrige su estado</span>
   </div>
 
-  <section class="mapa-indicadores" aria-label="Indicadores de estado de camas">
+  <section class="mapa-indicadores" aria-label="Indicadores de estado y sala de camas">
     <div class="mapa-indicadores__encabezado">
-      <h3 class="mapa-indicadores__titulo">Indicadores por estado</h3>
-      <p class="mapa-indicadores__ayuda">Haz clic en un estado para filtrar las camas.</p>
+      <h3 class="mapa-indicadores__titulo">Indicadores por estado y sala</h3>
+      <p class="mapa-indicadores__ayuda">Puedes combinar filtros de estado y sala al mismo tiempo.</p>
     </div>
     <div id="mapa-indicadores" class="mapa-indicadores__grid"></div>
+    <div id="mapa-indicadores-sala" class="mapa-indicadores__grid" style="margin-top:0.55rem;"></div>
+  </section>
+
+  <section class="mapa-filtros-movil" aria-label="Filtros moviles por estado y sala">
+    <div class="mapa-filtros-movil__campo">
+      <label for="mapa-filtro-estado-movil" class="mapa-buscador-label">Estado</label>
+      <select id="mapa-filtro-estado-movil" class="formularioCampo-select"></select>
+    </div>
+    <div class="mapa-filtros-movil__campo">
+      <label for="mapa-filtro-sala-movil" class="mapa-buscador-label">Sala</label>
+      <select id="mapa-filtro-sala-movil" class="formularioCampo-select"></select>
+    </div>
   </section>
 
   <div id="mapa-servicios" class="mapa-grid-servicios"></div>
@@ -109,7 +120,7 @@
 {% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'mapeo_camas/styles/mapaCamas.css' %}?v=20260508b">
+<link rel="stylesheet" href="{% static 'mapeo_camas/styles/mapaCamas.css' %}?v=20260512a">
 {% endblock %}
 
 {% block extra_js %}
@@ -117,5 +128,5 @@
 <script>
   window.MAPA_SOLO_LECTURA = {% if es_editor %}false{% else %}true{% endif %};
 </script>
-<script src="{% static 'mapeo_camas/scripts/mapaCamasAsignacion.js' %}?v=20260508b"></script>
+<script src="{% static 'mapeo_camas/scripts/mapaCamasAsignacion.js' %}?v=20260512b"></script>
 {% endblock %}

@@ -4,7 +4,6 @@ from collections import defaultdict
 from functools import lru_cache
 
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.mixins import LoginRequiredMixin
 from usuario.permisos import verificar_permisos_usuario
 from core.constants.permisos import (
     MAPEO_CAMAS_EDITOR_ROLES,
@@ -17,14 +16,50 @@ from core.constants.permisos import (
 from django.db import transaction
 from django.db.models import Count, Exists, OuterRef, Prefetch, Q, Subquery
 from django.http import JsonResponse
-from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 from django.views.generic import TemplateView
 from ingreso.models import Ingreso
 from core.services.mapeo_camas_service import MapeoCamasService
 from core.mixins import UnidadRolRequiredMixin
-from django.views import View
+from usuario.models import PerfilUnidad, AlcanceUsuario
+
+
+from mapeo_camas.models import (
+    AsignacionCamaPaciente,
+    DetalleMapeoCama,
+    EstadoMapeo,
+    HistorialEstadoCama,
+    MapeoSesionCama,
+    MapeoSesionServicio,
+    MovimientoCama,
+)
+from paciente.models import Paciente
+from servicio.models import Cama, Cubiculo, Sala, Servicio
+
+
+# =============================================================================
+# Constantes de configuración operativa
+# -----------------------------------------------------------------------------
+# MAX_CAMBIOS_CAMA: número máximo de movimientos permitidos por sala dentro
+# de la ventana temporal, para usuarios que no son superadmin.
+# VENTANA_LIMITE_CAMBIOS_SALA_HORAS: tamaño de la ventana de tiempo (horas)
+# que se usa para contabilizar los cambios manuales y resetear el conteo.
+# Las constantes OBSERVACION_* son los textos fijos grabados en el historial,
+# usados también como criterio de filtrado al contar cambios por sala.
+# =============================================================================
+MAX_CAMBIOS_CAMA = 5
+# Parametro de ventana para reinicio del limite por sala (horas)
+VENTANA_LIMITE_CAMBIOS_SALA_HORAS = 24
+# Ventana para considerar altas recientes en el buscador de pacientes del mapa.
+VENTANA_ALTAS_RECIENTES_HORAS = 24
+OBSERVACION_CAMBIO_MANUAL_MAPA = "Cambio manual desde mapa"
+OBSERVACION_CAMBIO_MANUAL_MAPA_DETALLE = "Cambio manual desde mapa (detalle)"
+OBSERVACION_MOVIMIENTO_PACIENTE_MAPA = "Movimiento de paciente entre camas (mapa)"
+OBSERVACION_MOVIMIENTO_PACIENTE_MAPA_DETALLE = "Movimiento de paciente entre camas (mapa detalle)"
+# Observacion para traslados de superadmin: queda registrado pero NO cuenta
+# en _contar_cambios_manual_por_sala, por lo que no descuenta del límite.
+OBSERVACION_MOVIMIENTO_PACIENTE_MAPA_SUPERADMIN = "Movimiento de paciente entre camas (superadmin)"
 
 
 # --- Helpers de serialización robustos para el mapa de camas ---
@@ -163,43 +198,6 @@ def sincronizar_camas_superadmin(request):
         "mensaje": f"Sincronización finalizada. {sincronizados} sincronizados, {omitidos} omitidos, {errores} errores."
     })
 
-from mapeo_camas.models import (
-    AsignacionCamaPaciente,
-    DetalleMapeoCama,
-    EstadoMapeo,
-    HistorialEstadoCama,
-    MapeoSesionCama,
-    MapeoSesionServicio,
-    MovimientoCama,
-)
-from paciente.models import Paciente
-from servicio.models import Cama, Cubiculo, Sala, Servicio
-
-
-# =============================================================================
-# Constantes de configuración operativa
-# -----------------------------------------------------------------------------
-# MAX_CAMBIOS_CAMA: número máximo de movimientos permitidos por sala dentro
-# de la ventana temporal, para usuarios que no son superadmin.
-# VENTANA_LIMITE_CAMBIOS_SALA_HORAS: tamaño de la ventana de tiempo (horas)
-# que se usa para contabilizar los cambios manuales y resetear el conteo.
-# Las constantes OBSERVACION_* son los textos fijos grabados en el historial,
-# usados también como criterio de filtrado al contar cambios por sala.
-# =============================================================================
-MAX_CAMBIOS_CAMA = 5
-# Parametro de ventana para reinicio del limite por sala (horas)
-VENTANA_LIMITE_CAMBIOS_SALA_HORAS = 24
-# Ventana para considerar altas recientes en el buscador de pacientes del mapa.
-VENTANA_ALTAS_RECIENTES_HORAS = 24
-OBSERVACION_CAMBIO_MANUAL_MAPA = "Cambio manual desde mapa"
-OBSERVACION_CAMBIO_MANUAL_MAPA_DETALLE = "Cambio manual desde mapa (detalle)"
-OBSERVACION_MOVIMIENTO_PACIENTE_MAPA = "Movimiento de paciente entre camas (mapa)"
-OBSERVACION_MOVIMIENTO_PACIENTE_MAPA_DETALLE = "Movimiento de paciente entre camas (mapa detalle)"
-# Observacion para traslados de superadmin: queda registrado pero NO cuenta
-# en _contar_cambios_manual_por_sala, por lo que no descuenta del límite.
-OBSERVACION_MOVIMIENTO_PACIENTE_MAPA_SUPERADMIN = "Movimiento de paciente entre camas (superadmin)"
-
-
 # =============================================================================
 # MapeoCamasMapaView
 # -----------------------------------------------------------------------------
@@ -213,23 +211,6 @@ class MapeoCamasMapaView(UnidadRolRequiredMixin, TemplateView):
     template_name = "mapeo_camas/mapa.html"
     required_roles = MAPEO_CAMAS_VISUALIZACION_ROLES
     required_unidades = MAPEO_CAMAS_VISUALIZACION_UNIDADES
-
-    def dispatch(self, request, *args, **kwargs):
-        tiene_visualizacion = verificar_permisos_usuario(
-            request.user,
-            MAPEO_CAMAS_VISUALIZACION_ROLES,
-            MAPEO_CAMAS_VISUALIZACION_UNIDADES,
-        )
-        # Compatibilidad temporal: hay usuarios con rol valido pero sin unidad asignada.
-        # En ese caso se permite visualizar el mapa en modo lectura.
-        tiene_visualizacion_sin_unidad = verificar_permisos_usuario(
-            request.user,
-            MAPEO_CAMAS_VISUALIZACION_ROLES,
-            [],
-        )
-        if not (tiene_visualizacion or tiene_visualizacion_sin_unidad):
-            return redirect("acceso_denegado")
-        return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -249,7 +230,6 @@ class MapeoCamasMapaView(UnidadRolRequiredMixin, TemplateView):
         )
         # [2026-05-08] Indica si el usuario tiene permisos de edición sobre el mapa.
         # Se usa en el template para inyectar window.MAPA_SOLO_LECTURA al JS.
-        from usuario.permisos import verificar_permisos_usuario
         context["es_editor"] = verificar_permisos_usuario(
             self.request.user, MAPEO_CAMAS_EDITOR_ROLES, MAPEO_CAMAS_EDITOR_UNIDADES
         )
@@ -262,11 +242,6 @@ class MapeoCamasHistorialView(UnidadRolRequiredMixin, TemplateView):
     template_name = "mapeo_camas/historiales.html"
     required_roles = MAPEO_CAMAS_HISTORIALES_ROLES
     required_unidades = MAPEO_CAMAS_HISTORIALES_UNIDADES
-
-    def dispatch(self, request, *args, **kwargs):
-        if not verificar_permisos_usuario(request.user, MAPEO_CAMAS_HISTORIALES_ROLES, MAPEO_CAMAS_HISTORIALES_UNIDADES):
-            return redirect('acceso_denegado')
-        return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -282,16 +257,69 @@ class MapeoCamasHistorialDetalleView(UnidadRolRequiredMixin, TemplateView):
     required_roles = MAPEO_CAMAS_HISTORIALES_ROLES
     required_unidades = MAPEO_CAMAS_HISTORIALES_UNIDADES
 
-    def dispatch(self, request, *args, **kwargs):
-        if not verificar_permisos_usuario(request.user, MAPEO_CAMAS_HISTORIALES_ROLES, MAPEO_CAMAS_HISTORIALES_UNIDADES):
-            return redirect('acceso_denegado')
-        return super().dispatch(request, *args, **kwargs)
-
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["titulo"] = "Detalle de Historial"
         context["subtitulo"] = "Cards de detalle por registro"
         return context
+
+
+@login_required
+@require_GET
+def debug_permisos_mapa(request):
+    """Diagnostico en vivo de permisos para la vista principal del mapa."""
+    usuario = request.user
+    perfiles = list(
+        PerfilUnidad.objects.filter(usuario=usuario)
+        .select_related("servicio_unidad")
+        .values(
+            "rol",
+            "alcance",
+            "servicio_unidad__nombre_corto_unidad",
+            "servicio_unidad__nombre_unidad",
+        )
+    )
+
+    match_global = PerfilUnidad.objects.filter(
+        usuario=usuario,
+        rol__in=MAPEO_CAMAS_VISUALIZACION_ROLES,
+        alcance=AlcanceUsuario.GLOBAL,
+    ).exists()
+
+    match_unidad = PerfilUnidad.objects.filter(
+        usuario=usuario,
+        rol__in=MAPEO_CAMAS_VISUALIZACION_ROLES,
+        alcance=AlcanceUsuario.UNIDAD,
+        servicio_unidad__nombre_corto_unidad__in=MAPEO_CAMAS_VISUALIZACION_UNIDADES,
+    ).exists()
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "usuario": {
+                "id": usuario.id,
+                "username": usuario.username,
+                "is_authenticated": usuario.is_authenticated,
+                "is_active": usuario.is_active,
+                "is_superuser": usuario.is_superuser,
+            },
+            "requerido_mapa": {
+                "roles": MAPEO_CAMAS_VISUALIZACION_ROLES,
+                "unidades": MAPEO_CAMAS_VISUALIZACION_UNIDADES,
+            },
+            "perfiles": perfiles,
+            "evaluacion": {
+                "verificar_permisos_usuario": verificar_permisos_usuario(
+                    usuario,
+                    MAPEO_CAMAS_VISUALIZACION_ROLES,
+                    MAPEO_CAMAS_VISUALIZACION_UNIDADES,
+                ),
+                "mixin_global": match_global,
+                "mixin_unidad": match_unidad,
+                "mixin_resultado": bool(usuario.is_superuser or match_global or match_unidad),
+            },
+        }
+    )
 
 
 # --- Helpers privados --------------------------------------------------------

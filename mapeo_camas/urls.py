@@ -7,6 +7,7 @@ urlpatterns = [
     path("", views.MapeoCamasMapaView.as_view(), name="mapeo_camas_mapa"),
     path("historiales/", views.MapeoCamasHistorialView.as_view(), name="mapeo_camas_historiales"),
     path("historiales/detalle/", views.MapeoCamasHistorialDetalleView.as_view(), name="mapeo_camas_historiales_detalle"),
+    path("api/debug-permisos-mapa/", views.debug_permisos_mapa, name="mapeo_camas_debug_permisos_mapa"),
     path("api/estado-mapeo/", views.estado_mapeo, name="mapeo_camas_estado_mapeo"),
     path("api/iniciar-mapeo/", views.iniciar_mapeo, name="mapeo_camas_iniciar_mapeo"),
     path("api/terminar-mapeo/", views.terminar_mapeo, name="mapeo_camas_terminar_mapeo"),
