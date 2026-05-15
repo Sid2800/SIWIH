@@ -1,5 +1,6 @@
 from core.validators.main_validator import validar_entero_positivo
 from core.validators.fecha_validator import validar_fecha, validar_rango_fechas
+from core.services.agenda_medica.periodo_laboral_service import PeriodoLaboralService
 from django.core.exceptions import ValidationError
 from datetime import datetime, timedelta, time, date
 from types import SimpleNamespace
@@ -15,30 +16,71 @@ def validarArgumentosPeriodoLaboral(data, usuario):
     id_personal = validar_entero_positivo(data.get('personalSalud'), "Personal de salud" )
     id_jornada = validar_entero_positivo(data.get('jornadaLaboral'),"Jornada Laboral")
     id_periodo = (validar_entero_positivo(data.get('idPeriodo'),"idPeriodo")if data.get('idPeriodo')else None)
+    fecha_modificado = data.get('fechaModificado')
+    fecha_impacto = data.get('fechaModificadoImpacto')
+
+    if fecha_modificado:
+        fecha_modificado = datetime.fromisoformat(
+            fecha_modificado.replace("Z", "+00:00")
+        )
+
+    if fecha_impacto:
+        fecha_impacto = datetime.fromisoformat(
+            fecha_impacto.replace("Z", "+00:00")
+        )
+
+    estado = data.get('estado')
 
     try:
         fecha_inicio = datetime.strptime(
             data.get('fechaInicio'),
             "%Y-%m-%d"
-        )
+        ).date()
 
         fecha_final = datetime.strptime(
             data.get('fechaFinal'),
             "%Y-%m-%d"
-        )
+        ).date()
 
     except ValueError:
         raise ValidationError(
             "Formato de fecha inválido"
         )
 
-    validar_fecha(fecha_final, permitir_futuro=True)
-    validar_fecha(fecha_inicio, permitir_futuro=True)
+    periodo = None
+
+    # Validación para edición
+    if id_periodo:
+        periodo = PeriodoLaboralService.obtener_periodo_laboral(id_periodo)
+
+        if not periodo:
+            raise ValidationError(
+                "El período laboral indicado no existe."
+            )
+
+        estado_temporal = periodo.estado_temporal
+        # Período en ejecución
+        if estado_temporal == EstadoTemporalPeriodo.EN_EJECUCION:
+            validar_fecha( fecha_inicio,permitir_pasado=True)
+            validar_fecha(fecha_final,permitir_futuro=True,permitir_pasado=True)
+        # Período finalizado
+        elif estado_temporal == EstadoTemporalPeriodo.FINALIZADO:
+            validar_fecha(fecha_inicio, permitir_pasado=True)
+            validar_fecha(fecha_final, permitir_pasado=True)
+        # FUTURO
+        else:
+            validar_fecha(fecha_inicio, permitir_futuro=True)
+            validar_fecha(fecha_final, permitir_futuro=True )
+
+
+    # Validación para creación
+    else:
+        validar_fecha(fecha_inicio, permitir_futuro=True)
+        validar_fecha(fecha_final, permitir_futuro=True)
 
     validar_rango_fechas(
         fecha_inicio,
         fecha_final,
-        permitir_inicio_hoy=False,
         permitir_fin_igual_inicio=True
     )
 
@@ -48,7 +90,10 @@ def validarArgumentosPeriodoLaboral(data, usuario):
         fecha_inicio=fecha_inicio,
         fecha_final=fecha_final,
         usuario_id=usuario,
-        id=int(id_periodo) if id_periodo else None,
+        estado=estado,
+        id=id_periodo,
+        fecha_modificado=fecha_modificado,
+        fecha_impacto=fecha_impacto
     )
     
 
@@ -56,7 +101,7 @@ def validarArgumentosPeriodoLaboral(data, usuario):
 def validarReglasCriticasPeriodoLaboral(periodo):
 
     if not periodo:
-        return None
+        return None 
 
     periodo_registro = None
 
@@ -64,10 +109,7 @@ def validarReglasCriticasPeriodoLaboral(periodo):
     if periodo.id:
 
         # Validar que exista y esté activo
-        periodo_registro = Periodo_laboral.objects.filter(
-            id=periodo.id,
-            estado=EstadoRegistro.ACTIVO
-        ).first()
+        periodo_registro = PeriodoLaboralService.obtener_periodo_laboral(periodo.id)
 
         if not periodo_registro:
             raise ValidationError(
@@ -100,20 +142,25 @@ def validarReglasCriticasPeriodoLaboral(periodo):
 
             hoy = timezone.localdate()
 
+            if periodo.estado is False:
+                raise ValidationError(
+                    "No se permite desactivar un periodo en ejecucion"
+                )
+            
             # No permitir modificar fecha inicial
-            if periodo.fecha_inicio.date() != periodo_registro.fecha_inicio:
+            if periodo.fecha_inicio != periodo_registro.fecha_inicio:
                 raise ValidationError(
                     "No se permite modificar la fecha inicial "
                     "de un período en ejecución."
                 )
 
             # Fecha final debe ser mayor a hoy
-            if not periodo.fecha_final.date() > hoy:
+            if periodo.fecha_final <= hoy:
                 raise ValidationError(
                     "La fecha final de un período en ejecución "
                     "debe ser mayor a hoy."
                 )
+                
 
-    return SimpleNamespace(
-        periodo_registro=periodo_registro
-    )
+    return periodo_registro
+    

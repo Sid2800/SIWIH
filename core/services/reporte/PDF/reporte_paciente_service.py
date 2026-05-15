@@ -1348,8 +1348,7 @@ class ReportePacienteService:
 
             ReporteReferenciaService._dibujarEstructuraFormatoReferenciaRespuesta(pdf,ancho,alto)
             ReporteReferenciaService._dibujarEtiquetasEstaticasFormatoRefenciaRespuesta(pdf,ancho,alto)
-      
-            print(paciente)
+
             ReporteReferenciaService._dibujarDatosHospitalizacion(pdf,ancho,alto, paciente, institucion)
             ReporteReferenciaService._dibujarPiePaginaFormatoReferenciaRespuesta(pdf, ancho, alto, usuario)
             #pagina 5

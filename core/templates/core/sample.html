@@ -1,10 +1,164 @@
 {% extends 'core/base.html'%}
 
-{% block title %}Sample{% endblock title %}
+{% block title %}Rifa{% endblock title %}
 
 {% block content %}
-<h1>Sample</h1>
+
+<style>
+    .contenedor-rifa{
+        display:flex;
+        flex-direction:column;
+        justify-content:center;
+        align-items:center;
+        min-height:70vh;
+        text-align:center;
+    }
+
+    .titulo{
+        font-size:3rem;
+        font-weight:bold;
+        margin-bottom:30px;
+    }
+
+    .contador{
+        font-size:8rem;
+        font-weight:bold;
+        color:#dc3545;
+        height:140px;
+    }
+
+    .nombre{
+        font-size:4rem;
+        font-weight:bold;
+        background:#111;
+        color:white;
+        padding:20px 40px;
+        border-radius:15px;
+        min-width:400px;
+        min-height:120px;
+        display:flex;
+        justify-content:center;
+        align-items:center;
+        box-shadow:0 10px 25px rgba(0,0,0,.2);
+    }
+
+    .ganador{
+        animation: ganador 1s infinite alternate;
+    }
+
+    @keyframes ganador{
+        from{
+            transform:scale(1);
+        }
+        to{
+            transform:scale(1.08);
+        }
+    }
+
+    .btn-iniciar{
+        margin-top:30px;
+        padding:15px 30px;
+        border:none;
+        background:black;
+        color:white;
+        border-radius:10px;
+        font-size:1.2rem;
+        cursor:pointer;
+    }
+
+    .btn-iniciar:hover{
+        opacity:.9;
+    }
+</style>
+
+<div class="contenedor-rifa">
+
+    <div class="titulo">
+        🎉 Rifa de Canastas 🎉
+    </div>
+
+    <div id="contador" class="contador"></div>
+
+    <div id="nombre" class="nombre">
+        Presiona iniciar
+    </div>
+
+    <button id="btnIniciar" class="btn-iniciar">
+        Iniciar Rifa
+    </button>
+
+</div>
+
+<script>
+
+    const participantes = [
+        "Cecilia Melgar",
+        "Alba Gonzalez",
+        "Estefani Yaneth",
+        "Fatima Reyes",
+        "Mirtala Rivera",
+        "Sonia Cantarero",
+        "Suany Vasquez",
+        "Ada Giron",
+        "Yolanda Osorio",
+        "Katy Herrera"
+    ];
+
+    const contador = document.getElementById('contador');
+    const nombre = document.getElementById('nombre');
+    const btn = document.getElementById('btnIniciar');
+
+    async function iniciarRifa(){
+
+        btn.disabled = true;
+        nombre.classList.remove('ganador');
+
+        // Cuenta regresiva
+        for(let i = 3; i >= 1; i--){
+            contador.textContent = i;
+            await esperar(1000);
+        }
+
+        contador.textContent = "🎉";
+
+        // Animación de nombres
+        let vueltas = 0;
+
+        const intervalo = setInterval(() => {
+
+            const indice = Math.floor(Math.random() * participantes.length);
+
+            nombre.textContent = participantes[indice];
+
+            vueltas++;
+
+            if(vueltas >= 30){
+
+                clearInterval(intervalo);
+
+                const ganador = participantes[
+                    Math.floor(Math.random() * participantes.length)
+                ];
+
+                nombre.textContent = ganador;
+
+                nombre.classList.add('ganador');
+
+                contador.textContent = "GANADOR";
+
+                btn.disabled = false;
+            }
+
+        }, 100);
+
+    }
+
+    function esperar(ms){
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    btn.addEventListener('click', iniciarRifa);
+
+</script>
 
 {% endblock content %}
-
-

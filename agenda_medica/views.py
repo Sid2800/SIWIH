@@ -8,7 +8,10 @@ from django.db.models import Value, CharField, F, Q, Case, When, Exists, OuterRe
 from django.db.models.functions import Concat, Coalesce, Cast
 from django.http import JsonResponse
 from django.utils import timezone
-from core.constants. permisos import AGENDA_MEDICA_EDITOR_ROLES, AGENDA_MEDICA_EDITOR_UNIDADES
+from core.constants.permisos import AGENDA_MEDICA_EDITOR_ROLES, AGENDA_MEDICA_EDITOR_UNIDADES
+from django.views.decorators.http import require_GET
+
+from core.utils.utilidades_fechas import formatear_fecha_dd_mm_yyyy
 from agenda_medica.models import Periodo_laboral
 from agenda_medica import validators as agenda_validators
 from core.services.agenda_medica.periodo_laboral_service import PeriodoLaboralService
@@ -41,7 +44,7 @@ def listarPeriodosLaboralesAPI(request):
     length = int(request.GET.get('length', 10))
     search_value = request.GET.get('search_value', '').strip()
     order_column = int(request.GET.get('order[0][column]', "0"))
-    order_direction = request.GET.get('order[0][dir]', 'desc')
+    order_direction = request.GET.get('order[0][dir]', 'asc')
     estado = (request.GET.get('estado') or '').strip()
     hoy = timezone.now().date()
     anio = hoy.year
@@ -125,18 +128,18 @@ def listarPeriodosLaboralesAPI(request):
     ]
 
     # Ordenamiento seguro
+    print(f"/////{order_column}")
     if 0 <= order_column < len(columns):
         order_field = columns[order_column]
         if order_direction == 'desc':
             order_field = '-' + order_field
-        periodo_laboral_qs = periodo_laboral_qs.order_by(order_field)
+        periodo_laboral_qs = periodo_laboral_qs.order_by(order_field,'fecha_inicio')
 
     # Conteo de registros después de filtros (búsqueda, estado temporal, etc.)
     filtered_records = periodo_laboral_qs.count()
 
     # Paginación y extracción de valores
     periodos = list(periodo_laboral_qs[start:start + length].values(
-        "id",
         "personal_salud__empleado__primer_nombre",
         "personal_salud__empleado__segundo_nombre",
         "personal_salud__empleado__primer_apellido",
@@ -144,7 +147,8 @@ def listarPeriodosLaboralesAPI(request):
         "personal_salud__especialidad__nombre_especialidad",
         "periodo",
         "jornada_laboral__nombre_jornada_laboral",
-        "estado_temporal"
+        "estado_temporal",
+        "id",
     ))
 
     return JsonResponse({
@@ -155,8 +159,35 @@ def listarPeriodosLaboralesAPI(request):
     })
     
 
+@require_GET
+def obtenerPeriodoLaboral(request):
+    id = request.GET.get('id')
+    if not id:
+        return JsonResponse({'error': 'El parametro id es requerido'}, status=400)
+    
+    periodo = PeriodoLaboralService.obtener_periodo_laboral(id)
+
+    if not periodo:
+        return JsonResponse({"error": "No se encontró un período laboral habilitado."}, status=404)
+    
+    return JsonResponse({
+    "id": periodo.id,
+    "id_personal_clinico": periodo.personal_salud.id,
+    "especialidad": getattr(periodo.personal_salud.especialidad, 'nombre_especialidad', None),
+    "fecha_inicio":periodo.fecha_inicio,
+    "fecha_final":periodo.fecha_fin,
+    "id_jornada": periodo.jornada_laboral.id,
+    "creado_por": periodo.creado_por.username, 
+    "modificado_por": periodo.modificado_por.username, 
+    "fecha_creado": periodo.fecha_creado, 
+    "fecha_modificado": periodo.fecha_modificado,
+    "estado": periodo.estado,
+    "ejecucion": periodo.estado_temporal
+    }, status=200)
+
 
 def guardarPeriodoLaboral(request):
+    
     if not verificar_permisos_usuario(request.user, AGENDA_MEDICA_EDITOR_ROLES, AGENDA_MEDICA_EDITOR_UNIDADES):
         return JsonResponse({'error': 'No tienes permisos para realizar esta accion'}, status=403)
     
@@ -165,7 +196,6 @@ def guardarPeriodoLaboral(request):
     except ValueError as e:
         return JsonResponse({'error': str(e)}, status=400)
     
-    
     try:
         periodo = agenda_validators.validarArgumentosPeriodoLaboral(data, request.user.id)
     except ValueError as e:
@@ -173,7 +203,6 @@ def guardarPeriodoLaboral(request):
             {'error': str(e)},
             status=400
         )
-
     except ValidationError as e:
         return JsonResponse(
             {'error': e.messages[0]},
@@ -181,20 +210,22 @@ def guardarPeriodoLaboral(request):
         )
 
 
-
     try:
-        #resultado = PacienteService.procesar_defuncion(defuncion)
-        print(periodo)
-        if True:
+        #PeriodoLaboralService.analizarImpactoPeriodoLaboral(periodo)
+        resultadoGuardado = PeriodoLaboralService.procesarPeriodoLaboral(periodo,request.user)
+
+        if resultadoGuardado:
             return JsonResponse({'guardo': True}, status=200)
         else:
-            return JsonResponse({'error': 'No se realizaron cambios'}, status=400)
+            return JsonResponse({'guardo': False}, status=200)
 
-    except ValueError as e:
-        return JsonResponse({'error': str(e)}, status=400)
+    except ValidationError as e:
+        return JsonResponse({'error': e.messages[0]}, status=400)
 
     except Exception as e:
-        return JsonResponse({'error': 'No se pudo procesar la defunción'}, status=500)
+        print(e)
+        return JsonResponse({'error': 'No se pudo guardar el periodo'}, status=500)
+
 
 
 def validarImpactoPeriodoLaboral(request):
@@ -204,42 +235,27 @@ def validarImpactoPeriodoLaboral(request):
     try:
         data = parse_json_request(request)
     except ValueError as e:
-        return JsonResponse({'error': str(e)}, status=400)
-    
-    
+        return JsonResponse({'error': e.messages[0]}, status=400)
+
     try:
         periodo = agenda_validators.validarArgumentosPeriodoLaboral(data, request.user.id)
-
-
     except ValueError as e:
         return JsonResponse(
-            {'error': str(e)},
+            {'error': e.messages[0]},
             status=400
         )
-
     except ValidationError as e:
         return JsonResponse(
             {'error': e.messages[0]},
             status=400
         )
 
-
-
     try:
-        #resultado = PacienteService.procesar_defuncion(defuncion)
-        print("////////////////////////////////")
-        print(f"impacto {periodo}")
-
         resultado = PeriodoLaboralService.analizarImpactoPeriodoLaboral(periodo)
-        
         return JsonResponse({'resultado': resultado}, status=200)
-
-
-
     except ValidationError as e:
-        return JsonResponse({'error': str(e)}, status=400)
-
+        return JsonResponse({'error': e.messages[0]}, status=400)
     except Exception as e:
         print(e)
-        return JsonResponse({'error': 'No se pudo procesar la defunción'}, status=500)
+        return JsonResponse({'error': 'No se pudo procesar el periodo'}, status=500)
 

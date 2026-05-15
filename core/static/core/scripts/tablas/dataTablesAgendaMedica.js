@@ -38,15 +38,16 @@ document.addEventListener("DOMContentLoaded", () => {
         {
         text: '<i class="bi bi-plus-square boton-exportacion"></i>',  // Icono o texto para el botón
         titleAttr: 'Agregar Periodo Laboral',
-        action: function ( e, dt, button, config ) {
-            ManejarPeriodoLaboral.open();
+        action: async function ( e, dt, button, config ) {
+            await ManejarPeriodoLaboral.open();
+            table.ajax.reload(null, false);
         }
         },
         {
         text: '<i class="bi bi-pencil boton-exportacion" ></i>',  // Icono o texto para el botón
         titleAttr: 'Editar Periodo Laboral',
-        action: function ( e, dt, button, config ) {
-            editarPeriodo();
+        action: async function ( e, dt, button, config ) {
+            await editarPeriodo();
     
         }
         },  
@@ -171,7 +172,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     { targets: 5, className: 'datatable-agenda-celda-boton' },
 
                 ],*/
-                order: [[0, "desc"]],
+                //order: [[0, "desc"]],
             });
 
             const hoyDate = new Date();
@@ -334,7 +335,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const tbody = document.querySelector('#data_table_agenda_medica tbody');
 
-    tbody.addEventListener('click', function (e) {
+    tbody.addEventListener('click',async function (e) {
         const boton = e.target.closest('.datatable-agenda-boton');
 
         if (!boton) return;
@@ -344,10 +345,13 @@ document.addEventListener("DOMContentLoaded", () => {
         const accion = boton.dataset.action;
         const id = boton.dataset.id;
 
-        console.log('Acción:', accion, 'ID:', id);
-
         if (accion === 'editar') {
-            alert(id);
+            await ManejarPeriodoLaboral.open({
+                titulo: "Editar Periodo Laboral",
+                periodoID: id
+            });
+
+            table.ajax.reload(null, false);
         }
 
         if (accion === 'configurar') {
@@ -357,25 +361,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
     
-    function editarPeriodo(){
+    async function editarPeriodo(){
+
         const selectedRow = table.row('.selected').data();
 
-        if (selectedRow) {
-                
-            ManejarPeriodoLaboral.open({
-                "titulo":"Editar Periodo Laboral",
-                "periodoID": selectedRow.id
-            });
-            /*
-            let nombreSlug = slugify(
-                    `${selectedRow.paciente__primer_nombre}-${selectedRow.paciente__primer_apellido}`
-                ).substring(0, 30);
-                
-            var editarUrl = API_REFERENCIA.editarReferencia.replace('0', selectedRow.id).replace('slug', nombreSlug);
-            window.location.href = editarUrl;*/
-        } else {
+        if (!selectedRow) {
             toastr.error("No hay ninguna fila seleccionada.");
+            return;
         }
+    
+        await ManejarPeriodoLaboral.open({
+            titulo: "Editar Periodo Laboral",
+            periodoID: selectedRow.id
+        });
+
+        table.ajax.reload(null, false);
     }
 
     

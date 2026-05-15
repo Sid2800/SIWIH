@@ -32,6 +32,7 @@ class LogApp:
     REPLICACION = "replicacion"
     EXPEDIENTE = "expediente"
     ATENCION = "atencion"
+    AGENDA = "agenda"
     
 
 class EstadoTemporalPeriodo(str, Enum):
@@ -39,7 +40,16 @@ class EstadoTemporalPeriodo(str, Enum):
     EN_EJECUCION = "EN_EJECUCION"
     FINALIZADO = "FINALIZADO"
 
+class AccionImpactoPeriodoLaboral(str, Enum):
+    FRAGMENTACION_PERIODO = "FRAGMENTACION_PERIODO"
+    REDUCCION_FINAL = "REDUCCION_FINAL"
+    REDUCCION_INICIAL = "REDUCCION_INICIAL"
+    ABSORSION_PERIODO = "ABSORSION_PERIODO"
 
+class TipoCambioFechaPeriodo:
+    SIN_CAMBIO = "SIN_CAMBIO"
+    AMPLIACION = "AMPLIACION"
+    REDUCCION = "REDUCCION"
 """
 # Salas excluidas para reportes / lógica clínica
 SALAS_EXCLUIDAS = [

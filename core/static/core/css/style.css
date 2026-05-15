@@ -1419,6 +1419,7 @@ table.dataTable.dtr-inline.collapsed > tbody > tr > th.dtr-control:before {
    display: flex;
    flex-direction: column;
    align-items: center;
+   padding-top: 1rem;
 }
 
 .tituloFormulario{
@@ -3118,7 +3119,8 @@ button[disabled] {
 .referenciaRespuestaEnvCampos input[disabled],
 .modalSeguimientoTIC select[disabled],
 .modalSeguimientoTIC textarea[disabled],
-.modalPeriodoLaboralCampos input[readonly]{
+.modalPeriodoLaboralCampos input[readonly],
+.modalPeriodoLaboralCampos select[disabled]{
 
    background-color: var(--colorTextBLoqueadoFondo) !important;
    color: var(--colorTextoBloqueado) !important;  
@@ -3165,10 +3167,16 @@ select[disabled] {
    margin-right: 1rem;
 }
 
+.contener-modal-titulo span{
+    font-size: 4.5rem;
+    max-height: 3rem;
+    line-height: 0rem;
+}
+
 .contenedor-modal-sector,
 .contenedor-modal-galeria,
 .contener-modal-defuncion,
-.contenedor-modal-periodo-laboral{
+.contener-modal-atencion{
    background-color: var(--colorContendor);
 
 }
@@ -3266,6 +3274,11 @@ select[disabled] {
 
    .contener-modal-defuncion{
       width: 57rem;
+      display: flex !important;
+   }
+
+   .contener-modal-atencion{
+      width: 50rem;
       display: flex !important;
    }
 
@@ -5023,28 +5036,32 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
 
 .contenedor-modal-galeria,
 .contenedor-modal-obito,
+.contenedor-modal-periodo-laboral,
 .contenedor-modal-procesos{
    background-color: var(--colorContendor);
    width: 98% !important;
 }
 
 
-.contenedor-modal-galeria.swal2-popup{
+.contenedor-modal-galeria.swal2-popup,
+.contenedor-modal-periodo-laboral.swal2-popup{
    grid-template-columns: 1fr;
 }
 
 .contener-modal-titulo{
    width: 100% ;
-   margin-bottom: 0;
+   margin-bottom: .5rem;
 
 }
 
 
 .contenedor-modal-galeria .tituloFormulario-subrallado,
 .contenedor-modal-obito .tituloFormulario-subrallado,
+.contenedor-modal-periodo-laboral .tituloFormulario-subrallado
 .contenedor-modal-procesos .tituloFormulario-subrallado{
    margin-bottom: 1.2rem;
    height: .3rem;
+ 
 }
 
 .html-modal-galeria{
@@ -5107,6 +5124,7 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
    /*modal*/
    .contenedor-modal-galeria,
    .contenedor-modal-obito,
+   .contenedor-modal-periodo-laboral,
    .contenedor-modal-procesos{
       width: 54rem !important
    }
@@ -5148,11 +5166,52 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
       grid-template-columns: 1fr;
    }
 
+   .modalPeriodoLaboralCampos .formularioCampoModalRangoFecha{
+      display: flex;
+      flex-direction: column;
+      row-gap: .3rem;
+   }
+
+   #periodoLaboral__estado{
+      border-bottom: 0.1rem solid var(--colorTextoMenu);
+   }
+
+
+   .estado-indicador{
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 1rem;
+   }
+
+   .estado-indicador span{
+      font-size: 1.6rem;
+      color: var(--colorTextoMenu);
+   }
+
+   .estado-indicador i{
+      font-size: 2.2rem;
+   }
+
+
+   .formularioCampoModalPeriodoEstado{
+      display: flex;
+      flex-direction: row;
+      justify-content: space-around;
+      align-items: center;
+      padding-bottom: 1rem;
+   }
+
+   
+   .periodo-estado-oculto{
+      display: none !important;
+   }
+
+
 @media (min-width: 36rem) {
 
    #formulario-modal-periodo-laboral{
-      margin-top: 1.5rem;
-      row-gap: .5rem;
+      padding-top: 1.5rem;
    }
 
    .contenedor-modal-periodo-laboral{
@@ -5161,8 +5220,20 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
    }
 
       .modalPeriodoLaboralCampos .formularioCampoModal{
-      display: grid;
       grid-template-columns: 1fr 3fr;
+   }
+
+   .modalPeriodoLaboralCampos .formularioCampoModalRangoFecha{
+      display: flex;
+      flex-direction: row;
+      justify-content: center;
+      align-items: center;
+      
+   }
+
+   .modalPeriodoLaboralCampos .formularioCampoModalRangoFecha label{
+      width: 5rem;
+      text-align: center;
    }
 
 

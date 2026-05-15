@@ -63,20 +63,34 @@ async function confirmarAccion(config = {}) {
       botonNegativo = "Cancelar"
    } = config;
 
+   const iconos = {
+      question: "bi-question-circle",
+      warning: "bi-exclamation-triangle",
+      danger: "bi-exclamation-octagon",
+      success: "bi-check-circle",
+      info: "bi-info-circle"
+   };
+
+   const claseIcono =
+   iconos[icono] || "bi-question-circle";
+
    const htmlMensajes = mensajes
       .map(mensaje => `<li>${mensaje}</li>`)
       .join("");
 
    const resultado = await Swal.fire({
-      title: titulo,
+      title: `
+         <i class="bi ${claseIcono}"></i>
+         ${titulo}
+      `,
       html: `
+         <div class="tituloFormulario-subrallado"></div>
          <div class="contener-modal-mensajes-confirmacion">
             <ul class="contener-modal-lista-confirmacion">
                ${htmlMensajes}
             </ul>
          </div>
       `,
-      icon: icono,
       showCancelButton: true,
       confirmButtonText:
          `<i class="bi bi-check-circle-fill"></i> ${botonAfirmativo}`,
@@ -170,7 +184,8 @@ const API_URLS = {
    listarPersonalClinicoAPI: urls["listarPersonalClinicoAPI"],
    listarJornadaLaboralAPI: urls["listarJornadaLaboralAPI"],
    guardarPeriodoLaboral: urls["guardarPeriodoLaboral"],
-   validarImpactoPeriodoLaboral: urls["validarImpactoPeriodoLaboral"]
+   validarImpactoPeriodoLaboral: urls["validarImpactoPeriodoLaboral"],
+   obtenerPeriodoLaboral: urls["obtenerPeriodoLaboral"]
 };
 
 /**
@@ -1208,7 +1223,7 @@ async function AgregarAtencionModal(paciente=null, zona=null, atencionId=null) {
       confirmButtonText: '<i class="bi bi-floppy-fill"></i> Guardar',
       cancelButtonText: '<i class="bi bi-x-circle-fill"></i> Cancelar',
       customClass: {
-         popup: 'contener-modal-defuncion', //usa la misma de defuncion por similitud
+         popup: 'contener-modal-atencion', 
          title: 'contener-modal-titulo',
          confirmButton: 'contener-modal-boton-confirmar',
          cancelButton: 'contener-modal-boton-cancelar'

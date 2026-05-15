@@ -28,11 +28,11 @@ class Periodo_laboral(models.Model):
         hoy = date.today()
 
         if hoy < self.fecha_inicio:
-            return EstadoTemporalPeriodo.FUTURO
+            return EstadoTemporalPeriodo.FUTURO.value
         elif self.fecha_inicio <= hoy <= self.fecha_fin:
-            return EstadoTemporalPeriodo.EN_EJECUCION
+            return EstadoTemporalPeriodo.EN_EJECUCION.value
         else:
-            return  EstadoTemporalPeriodo.FINALIZADO
+            return  EstadoTemporalPeriodo.FINALIZADO.value
 
     def clean(self): 
         if self.fecha_inicio > self.fecha_fin: 
@@ -86,7 +86,6 @@ class Dia_laboral(models.Model):
     def __str__(self): 
         return f"{self.get_dia_semana_display()} - {self.periodo_laboral}"
     
-
 
 class Cupo_atencion(models.Model):
     dia_laboral = models.ForeignKey(Dia_laboral, verbose_name=("Dia laboral"), on_delete=models.CASCADE, related_name="cupos")

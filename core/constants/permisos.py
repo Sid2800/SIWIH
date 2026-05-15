@@ -97,3 +97,15 @@ AGENDA_MEDICA_VISUALIZACION_UNIDADES = ["ADMI"]
 # los usauro de alcance gglbal pueden ser 
 
 ROLES_GLOBALES = ['directivo', 'admin']
+
+
+# -----------------------------
+# PERMISOS APP REFERECINA
+# -----------------------------
+MAPEO_EDITOR_ROLES = ['admin', 'digitador']
+MAPEO_EDITOR_UNIDADES = ['ADMI']
+
+
+# Acceso de solo visualización / edición parcial (Edit, Listar)
+MAPEO_VISUALIZACION_ROLES = ["admin", "digitador", "directivo", "visitante"]
+MAPEO_VISUALIZACION_UNIDADES = ['ADMI']
