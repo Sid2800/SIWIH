@@ -35,6 +35,8 @@ function verificarAlertasGlobales() {
     $.ajax({
         url: window.urls.s_exp_alertas_api,
         method: 'GET',
+        // Header para que este polling NO renueve la sesión del usuario
+        headers: { 'X-Polling-Request': 'true' },
         success: function (resp) {
             if (resp.alertas && resp.alertas.length > 0) {
                 resp.alertas.forEach(function (alerta) {

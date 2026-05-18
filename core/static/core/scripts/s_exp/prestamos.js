@@ -12,6 +12,17 @@ $(document).ready(function () {
     $('#btn-refresh-prestamos').on('click', function () {
         tablaPrestamos.ajax.reload();
     });
+
+    // ===== Auto-refresh en tiempo real (polling cada 3s — cronómetros) =====
+    if (window.RealtimeSExp) {
+        RealtimeSExp.registrar('monitoreo-prestamos', function () {
+            window.__sexp_polling_actual = true;
+            tablaPrestamos.ajax.reload(function () {
+                window.__sexp_polling_actual = false;
+            }, false);
+        }, 3);
+        RealtimeSExp.mostrarIndicador('monitoreo-prestamos', '#btn-refresh-prestamos');
+    }
 });
 
 /**
@@ -25,6 +36,11 @@ function initTabla() {
             url: window.urls.s_exp_prestamos_activos_api,
             data: function (d) {
                 d.estado = estadoFiltro;
+            },
+            beforeSend: function (xhr) {
+                if (window.__sexp_polling_actual) {
+                    xhr.setRequestHeader('X-Polling-Request', 'true');
+                }
             }
         },
         columns: [

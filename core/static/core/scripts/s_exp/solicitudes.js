@@ -60,6 +60,19 @@ $(document).ready(function () {
     $('#btn-refresh-solicitudes').on('click', function () {
         tablaSolicitudes.ajax.reload();
     });
+
+    // ===== Auto-refresh en tiempo real (polling cada 5s) =====
+    if (window.RealtimeSExp) {
+        RealtimeSExp.registrar('gestion-solicitudes', function () {
+            window.__sexp_polling_actual = true;
+            tablaSolicitudes.ajax.reload(function () {
+                window.__sexp_polling_actual = false;
+            }, false);  // false = no resetear paginación
+        }, 5);
+
+        // Indicador visual "Live" junto al título o botón refresh
+        RealtimeSExp.mostrarIndicador('gestion-solicitudes', '#btn-refresh-solicitudes');
+    }
 });
 
 /**
@@ -144,6 +157,13 @@ function initTabla() {
             url: window.urls.s_exp_listar_solicitudes_api,
             data: function (d) {
                 d.estado = estadoFiltro;
+            },
+            // Si el request es disparado por polling automático, añadir el header
+            // para que NO renueve el timer de sesión del usuario.
+            beforeSend: function (xhr) {
+                if (window.__sexp_polling_actual) {
+                    xhr.setRequestHeader('X-Polling-Request', 'true');
+                }
             }
         },
         columns: [

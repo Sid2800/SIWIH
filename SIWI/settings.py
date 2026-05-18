@@ -73,6 +73,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'core.middleware.LoginRequiredMiddleware',  #se requiere login para servir cualquier json o pagina
+    'core.middleware.NoSessionRefreshOnPollingMiddleware',  # Polling no renueva sesión
 ]
 
 ROOT_URLCONF = 'SIWI.urls'

@@ -11,6 +11,14 @@ let fechaFinActual = '';
 $(document).ready(function () {
     cargarMisSolicitudes();
 
+    // ===== Auto-refresh en tiempo real (polling cada 5s) =====
+    if (window.RealtimeSExp) {
+        RealtimeSExp.registrar('mis-solicitudes', function () {
+            // Polling silencioso (sin renovar sesión)
+            cargarMisSolicitudes(filtroActual, fechaInicioActual, fechaFinActual, true);
+        }, 5);
+    }
+
     // Manejadores de botones de filtro
     $(document).on('click', '.sexp-filtro-btn[data-filtro]', function () {
         const filtro = $(this).data('filtro');
@@ -48,21 +56,26 @@ $(document).ready(function () {
  * @param {string} fechaInicio - Fecha inicio (YYYY-MM-DD) cuando filtro='rango'.
  * @param {string} fechaFin - Fecha fin (YYYY-MM-DD) cuando filtro='rango'.
  */
-function cargarMisSolicitudes(filtro = '', fechaInicio = '', fechaFin = '') {
+function cargarMisSolicitudes(filtro = '', fechaInicio = '', fechaFin = '', esPolling = false) {
     const params = {};
     if (filtro) params.filtro = filtro;
     if (fechaInicio) params.fecha_inicio = fechaInicio;
     if (fechaFin) params.fecha_fin = fechaFin;
 
+    const headers = {};
+    if (esPolling) headers['X-Polling-Request'] = 'true';
+
     $.ajax({
         url: window.urls.s_exp_mis_solicitudes_api,
         method: 'GET',
         data: params,
+        headers: headers,
         success: function (resp) {
             renderSolicitudes(resp.data, filtro);
         },
         error: function () {
-            toastr.error("Error al cargar solicitudes");
+            // Solo notificar en cargas iniciales, no en polling silencioso
+            if (!esPolling) toastr.error("Error al cargar solicitudes");
         }
     });
 }

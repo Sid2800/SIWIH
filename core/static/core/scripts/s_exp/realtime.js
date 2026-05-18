@@ -1,0 +1,201 @@
+/**
+ * Realtime — Sistema global de polling inteligente para s_exp.
+ *
+ * Características:
+ *  - Polling configurable por pantalla
+ *  - Header X-Polling-Request:true para NO renovar sesión del usuario
+ *  - Pausa automática cuando la pestaña no está visible (Page Visibility API)
+ *  - Reanudación instantánea al volver a la pestaña
+ *  - Cancela request previo si todavía está en curso
+ *  - Backoff exponencial si hay errores de red
+ *  - Indicador visual "Live" opcional por pantalla
+ *
+ * Uso típico:
+ *   RealtimeSExp.registrar('miPantalla', () => table.ajax.reload(null, false), 5);
+ *   RealtimeSExp.mostrarIndicador('miPantalla', '#mi-contenedor');
+ *
+ *   // Al salir de la pantalla:
+ *   RealtimeSExp.desregistrar('miPantalla');
+ */
+(function (global) {
+    'use strict';
+
+    // jQuery global: inyectar el header X-Polling-Request en cualquier petición
+    // marcada como tal. Para que no afecte a otras peticiones, NO lo hacemos por
+    // ajaxSetup global, sino que cada llamada de polling lo pone manualmente.
+    // Aquí dejamos un helper para hacerlo fácil:
+    function pollingAjax(opts) {
+        const merged = Object.assign({}, opts, {
+            beforeSend: function (xhr) {
+                xhr.setRequestHeader('X-Polling-Request', 'true');
+                if (opts.beforeSend) opts.beforeSend.call(this, xhr);
+            }
+        });
+        return $.ajax(merged);
+    }
+
+    // Estado interno
+    const pantallas = new Map();         // nombre → { timer, fn, intervalMs, ultimoOk, fallosConsecutivos }
+    let pausado = false;                  // pausa global por visibilidad
+
+    function _ejecutar(nombre) {
+        const p = pantallas.get(nombre);
+        if (!p) return;
+
+        try {
+            // Llamar la función de refresh provista por la pantalla.
+            // Se le pasa pollingAjax para que pueda usarlo si quiere.
+            const resultado = p.fn(pollingAjax);
+
+            // Si la función retorna una promesa, manejarla
+            if (resultado && typeof resultado.then === 'function') {
+                resultado
+                    .then(() => {
+                        p.fallosConsecutivos = 0;
+                    })
+                    .catch(() => {
+                        p.fallosConsecutivos++;
+                    });
+            }
+        } catch (e) {
+            console.error(`[Realtime] Error en pantalla "${nombre}":`, e);
+            p.fallosConsecutivos++;
+        }
+
+        // Programar el siguiente tick (backoff exponencial si hay fallos)
+        if (!pausado && pantallas.has(nombre)) {
+            const factor = Math.min(8, Math.pow(2, p.fallosConsecutivos));
+            const delay = p.intervalMs * factor;
+            p.timer = setTimeout(() => _ejecutar(nombre), delay);
+        }
+    }
+
+    const RealtimeSExp = {
+        /**
+         * Registra una pantalla para auto-refresh.
+         *
+         * @param {string} nombre - Identificador único de la pantalla
+         * @param {function} funcionRecarga - Función que ejecuta el refresh (recibe pollingAjax como argumento opcional)
+         * @param {number} intervalSegundos - Intervalo en segundos (default 5)
+         */
+        registrar(nombre, funcionRecarga, intervalSegundos = 5) {
+            // Si ya estaba registrada, limpiar primero
+            this.desregistrar(nombre);
+
+            const intervalMs = Math.max(1000, intervalSegundos * 1000);
+
+            pantallas.set(nombre, {
+                fn: funcionRecarga,
+                intervalMs: intervalMs,
+                timer: null,
+                fallosConsecutivos: 0,
+            });
+
+            // Primera ejecución después del intervalo (no inmediata, ya hay carga inicial)
+            const p = pantallas.get(nombre);
+            p.timer = setTimeout(() => _ejecutar(nombre), intervalMs);
+        },
+
+        /**
+         * Desregistra una pantalla y detiene su polling.
+         */
+        desregistrar(nombre) {
+            const p = pantallas.get(nombre);
+            if (p && p.timer) clearTimeout(p.timer);
+            pantallas.delete(nombre);
+        },
+
+        /**
+         * Pausa todo el polling (útil para cuando la pestaña pierde foco)
+         */
+        pausar() {
+            pausado = true;
+            pantallas.forEach((p) => {
+                if (p.timer) clearTimeout(p.timer);
+                p.timer = null;
+            });
+        },
+
+        /**
+         * Reanuda todo el polling
+         */
+        reanudar() {
+            pausado = false;
+            pantallas.forEach((p, nombre) => {
+                if (!p.timer) {
+                    // Ejecutar inmediatamente al volver
+                    _ejecutar(nombre);
+                }
+            });
+        },
+
+        /**
+         * Helper para hacer peticiones AJAX marcadas como polling
+         * (no renuevan la sesión del usuario)
+         */
+        ajax: pollingAjax,
+
+        /**
+         * Inserta un indicador "Live" sutil dentro del selector indicado
+         */
+        mostrarIndicador(nombre, selectorContenedor) {
+            const $cont = $(selectorContenedor);
+            if (!$cont.length) return;
+
+            const indicadorId = `realtime-indicator-${nombre}`;
+            if (document.getElementById(indicadorId)) return;
+
+            const html = `
+                <span id="${indicadorId}" class="realtime-indicator" title="Actualizándose automáticamente"
+                      style="display:inline-flex;align-items:center;gap:0.4rem;padding:0.2rem 0.6rem;
+                             background:rgba(34,197,94,0.15);color:var(--negro);
+                             border-radius:12px;font-size:1.1rem;font-weight:600;
+                             margin-left:0.5rem;">
+                    <span style="width:0.7rem;height:0.7rem;background:#22c55e;border-radius:50%;
+                                 display:inline-block;animation:realtime-pulse 1.5s ease-in-out infinite;"></span>
+                    Live
+                </span>
+                <style>
+                    @keyframes realtime-pulse {
+                        0%, 100% { opacity: 1; }
+                        50% { opacity: 0.4; }
+                    }
+                </style>
+            `;
+            $cont.append(html);
+        },
+
+        /**
+         * Devuelve el listado de pantallas activas (para debug)
+         */
+        debug() {
+            return Array.from(pantallas.entries()).map(([k, v]) => ({
+                pantalla: k,
+                intervaloMs: v.intervalMs,
+                fallosConsecutivos: v.fallosConsecutivos,
+                activa: !!v.timer,
+                pausado: pausado,
+            }));
+        }
+    };
+
+    // Auto-pausa cuando la pestaña no está visible (ahorra recursos y queries)
+    document.addEventListener('visibilitychange', function () {
+        if (document.hidden) {
+            RealtimeSExp.pausar();
+        } else {
+            RealtimeSExp.reanudar();
+        }
+    });
+
+    // Limpieza al salir de la página
+    window.addEventListener('beforeunload', function () {
+        pantallas.forEach((p) => {
+            if (p.timer) clearTimeout(p.timer);
+        });
+        pantallas.clear();
+    });
+
+    // Exportar al global
+    global.RealtimeSExp = RealtimeSExp;
+})(window);

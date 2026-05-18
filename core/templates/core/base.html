@@ -516,8 +516,9 @@
 
    <script src="{% static 'core/scripts/modals/usuario_modals.js' %}"></script>
 
-   <!-- Notificaciones globales s_exp (alertas de préstamo listo para recoger, vencimientos) -->
+   <!-- Realtime + Notificaciones globales s_exp -->
    {% if user.is_authenticated %}
+   <script src="{% static 'core/scripts/s_exp/realtime.js' %}"></script>
    <script src="{% static 'core/scripts/s_exp/notificaciones_globales.js' %}"></script>
    {% endif %}
 
