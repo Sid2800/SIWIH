@@ -516,6 +516,11 @@
 
    <script src="{% static 'core/scripts/modals/usuario_modals.js' %}"></script>
 
+   <!-- Notificaciones globales s_exp (alertas de préstamo listo para recoger, vencimientos) -->
+   {% if user.is_authenticated %}
+   <script src="{% static 'core/scripts/s_exp/notificaciones_globales.js' %}"></script>
+   {% endif %}
+
 
 
 
