@@ -208,6 +208,8 @@ LOGGING = {
         "standard": {
             "format": "[{asctime}] {levelname} [{name}] [{app}] {message}",
             "style": "{",
+            # Valor por defecto cuando un log no pasa 'app' via extra={'app': ...}
+            "defaults": {"app": "general"},
         },
     },
 
