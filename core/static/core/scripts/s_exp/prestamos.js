@@ -9,10 +9,6 @@ $(document).ready(function () {
     initTabla();
     initFiltros();
 
-    $('#btn-refresh-prestamos').on('click', function () {
-        tablaPrestamos.ajax.reload();
-    });
-
     // ===== Auto-refresh en tiempo real (polling cada 3s — cronómetros) =====
     if (window.RealtimeSExp) {
         RealtimeSExp.registrar('monitoreo-prestamos', function () {
@@ -21,7 +17,7 @@ $(document).ready(function () {
                 window.__sexp_polling_actual = false;
             }, false);
         }, 3);
-        RealtimeSExp.mostrarIndicador('monitoreo-prestamos', '#btn-refresh-prestamos');
+        RealtimeSExp.mostrarIndicador('monitoreo-prestamos', '#indicador-realtime-prestamos');
     }
 });
 

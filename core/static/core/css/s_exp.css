@@ -1128,6 +1128,17 @@ body.darkmode .sexp-exp-tag--pendiente {
     color: #b91c1c;
 }
 
+/* Tarjeta de un expediente YA DEVUELTO en una auditoría previa */
+.sexp-auditoria-card--done {
+    background-color: rgba(34, 197, 94, 0.10);
+    border-color: #16a34a;
+}
+
+.sexp-auditoria-card--done .sexp-auditoria-id,
+.sexp-auditoria-card--done .sexp-auditoria-nombre {
+    color: #166534;
+}
+
 /* Badge de bloqueo cuando un expediente ya fue procesado en una auditoría previa */
 .sexp-auditoria-lock {
     margin-left: auto;

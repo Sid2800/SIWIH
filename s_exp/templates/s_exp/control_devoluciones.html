@@ -41,9 +41,7 @@
     </div>
 
     <div class="sexp-filtros sexp-flex-end">
-        <button id="btn-refresh-devoluciones" class="sexp-nav-link sexp-btn-refresh">
-            <i class="bi bi-arrow-clockwise"></i> Actualizar
-        </button>
+        <span id="indicador-realtime-devoluciones" style="display:inline-flex;align-items:center;"></span>
     </div>
 
     <div id="lista-devoluciones">
@@ -57,16 +55,12 @@
 $(document).ready(function() {
     cargarDevoluciones(false);
 
-    $('#btn-refresh-devoluciones').on('click', function() {
-        cargarDevoluciones(false);
-    });
-
     // ===== Auto-refresh cada 5s (sin renovar sesión) =====
     if (window.RealtimeSExp) {
         RealtimeSExp.registrar('control-devoluciones', function () {
             cargarDevoluciones(true);
         }, 5);
-        RealtimeSExp.mostrarIndicador('control-devoluciones', '#btn-refresh-devoluciones');
+        RealtimeSExp.mostrarIndicador('control-devoluciones', '#indicador-realtime-devoluciones');
     }
 });
 
@@ -158,6 +152,13 @@ function toggleCard(headerEl) {
 function abrirModalAuditoria(prestamoId, detallesEncoded) {
     const detalles = JSON.parse(decodeURIComponent(detallesEncoded));
 
+    // Ordenar: pendientes primero (para que el admin se enfoque en lo que falta), procesados después
+    detalles.sort((a, b) => {
+        const aPend = (a.estado_devolucion || 'pendiente') === 'pendiente' ? 0 : 1;
+        const bPend = (b.estado_devolucion || 'pendiente') === 'pendiente' ? 0 : 1;
+        return aPend - bPend;
+    });
+
     const tarjetasHtml = detalles.map(d => {
         const ident = d.paciente_identidad || 'S/ID';
         const nom = d.paciente_nombre || 'N/A';
@@ -167,19 +168,32 @@ function abrirModalAuditoria(prestamoId, detallesEncoded) {
 
         // Estado pre-seleccionado y clase de la tarjeta
         let valorInicial, clase = '';
-        if (estado === 'devuelto') { valorInicial = 'recibido'; }
+        if (estado === 'devuelto') { valorInicial = 'recibido'; clase = ' sexp-auditoria-card--done'; }
         else if (estado === 'perdido') { valorInicial = 'perdido'; clase = ' sexp-auditoria-card--lost'; }
         else { valorInicial = 'recibido'; }  // pendiente: por defecto recibido
 
         const disabledAttr = yaProcesado ? ' disabled' : '';
-        const lockBadge = yaProcesado
-            ? `<span class="sexp-auditoria-lock" title="Ya procesado en una auditoría previa">
-                  <i class="bi bi-lock-fill"></i> Procesado
-               </span>`
-            : '';
+
+        // Badge superior según estado
+        let lockBadge = '';
+        if (estado === 'devuelto') {
+            lockBadge = `<span class="sexp-auditoria-lock" style="background:rgba(34,197,94,0.25);color:var(--negro);" title="Ya devuelto en auditoría previa">
+                            <i class="bi bi-check-circle-fill"></i> Ya devuelto
+                         </span>`;
+        } else if (estado === 'perdido') {
+            lockBadge = `<span class="sexp-auditoria-lock" style="background:rgba(239,68,68,0.25);color:var(--negro);" title="Marcado como perdido en auditoría previa">
+                            <i class="bi bi-x-circle-fill"></i> Perdido
+                         </span>`;
+        } else {
+            // Pendiente — visible que se puede interactuar
+            lockBadge = `<span class="sexp-auditoria-lock" style="background:rgba(245,158,11,0.25);color:var(--negro);" title="Pendiente de devolver — se puede auditar">
+                            <i class="bi bi-hourglass-split"></i> Pendiente
+                         </span>`;
+        }
 
         return `
-            <div class="sexp-auditoria-card${clase}" id="aud-card-${d.id}" data-estado-prev="${estado}">
+            <div class="sexp-auditoria-card${clase}" id="aud-card-${d.id}" data-estado-prev="${estado}"
+                 ${yaProcesado ? 'style="opacity:0.7;"' : ''}>
                 <div class="sexp-auditoria-card-header">
                     <span class="sexp-exp-tag">#${d.numero}</span>
                     <div class="sexp-auditoria-paciente">
@@ -189,15 +203,15 @@ function abrirModalAuditoria(prestamoId, detallesEncoded) {
                     ${lockBadge}
                 </div>
                 <div class="sexp-auditoria-radios">
-                    <label class="sexp-auditoria-radio sexp-auditoria-radio--ok">
+                    <label class="sexp-auditoria-radio sexp-auditoria-radio--ok"${yaProcesado ? ' style="cursor:not-allowed;opacity:0.6;"' : ''}>
                         <input type="radio" name="estado_exp_${d.id}" value="recibido" data-detalle="${d.id}"${valorInicial==='recibido'?' checked':''}${disabledAttr}>
                         <i class="bi bi-check-circle"></i> Recibido
                     </label>
-                    <label class="sexp-auditoria-radio sexp-auditoria-radio--no">
+                    <label class="sexp-auditoria-radio sexp-auditoria-radio--no"${yaProcesado ? ' style="cursor:not-allowed;opacity:0.6;"' : ''}>
                         <input type="radio" name="estado_exp_${d.id}" value="no_recibido" data-detalle="${d.id}"${disabledAttr}>
                         <i class="bi bi-hourglass-split"></i> No Recibido
                     </label>
-                    <label class="sexp-auditoria-radio sexp-auditoria-radio--lost">
+                    <label class="sexp-auditoria-radio sexp-auditoria-radio--lost"${yaProcesado ? ' style="cursor:not-allowed;opacity:0.6;"' : ''}>
                         <input type="radio" name="estado_exp_${d.id}" value="perdido" data-detalle="${d.id}"${valorInicial==='perdido'?' checked':''}${disabledAttr}>
                         <i class="bi bi-exclamation-triangle"></i> Perdido
                     </label>

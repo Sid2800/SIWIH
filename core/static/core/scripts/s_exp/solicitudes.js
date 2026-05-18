@@ -57,10 +57,6 @@ $(document).ready(function () {
     initTabla();
     initFiltros();
 
-    $('#btn-refresh-solicitudes').on('click', function () {
-        tablaSolicitudes.ajax.reload();
-    });
-
     // ===== Auto-refresh en tiempo real (polling cada 5s) =====
     if (window.RealtimeSExp) {
         RealtimeSExp.registrar('gestion-solicitudes', function () {
@@ -70,8 +66,7 @@ $(document).ready(function () {
             }, false);  // false = no resetear paginación
         }, 5);
 
-        // Indicador visual "Live" junto al título o botón refresh
-        RealtimeSExp.mostrarIndicador('gestion-solicitudes', '#btn-refresh-solicitudes');
+        RealtimeSExp.mostrarIndicador('gestion-solicitudes', '#indicador-realtime-solicitudes');
     }
 });
 
