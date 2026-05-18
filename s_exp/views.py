@@ -222,6 +222,121 @@ def _get_servicio_unidad_from_rrhh(user):
         return None, False
 
 
+def _resolver_ubicacion_expediente(expediente, info_exp=None):
+    """
+    Resuelve la ubicación ACTUAL del expediente.
+
+    Prioridad:
+    1. expediente.localizacion.descripcion_localizacion  (tabla expediente_localizacion via FK en expediente_expediente)
+    2. info_exp.ubicacion_fisica  (ExpedientePrestamo.ubicacion_fisica si existe)
+    3. "ARCHIVO" como último fallback
+
+    Args:
+        expediente: instancia de Expediente
+        info_exp: instancia opcional de ExpedientePrestamo
+
+    Returns:
+        str: descripción de la ubicación actual
+    """
+    try:
+        if expediente.localizacion and expediente.localizacion.descripcion_localizacion:
+            return expediente.localizacion.descripcion_localizacion
+    except Exception:
+        pass
+
+    if info_exp and getattr(info_exp, 'ubicacion_fisica', None):
+        return info_exp.ubicacion_fisica
+
+    return "ARCHIVO"
+
+
+def _set_localizacion_por_solicitud(expediente, solicitud, usuario_admin):
+    """
+    Actualiza expediente.localizacion al entregar un préstamo.
+
+    La nueva ubicación es la unidad del SOLICITANTE, obtenida desde:
+    SolicitudPrestamo.servicio_unidad (capturada via RRHH al crear la solicitud)
+    o, si no existe, se intenta resolver desde la cadena RRHH del usuario.
+
+    Args:
+        expediente: instancia de Expediente
+        solicitud: instancia de SolicitudPrestamo
+        usuario_admin: usuario que aprueba/entrega el préstamo
+
+    Returns:
+        str: descripción de la nueva ubicación asignada
+    """
+    from expediente.models import Localizacion
+
+    nombre_ubicacion = None
+
+    # 1. Intentar tomar de SolicitudPrestamo.servicio_unidad
+    try:
+        if solicitud.servicio_unidad and solicitud.servicio_unidad.nombre_unidad:
+            nombre_ubicacion = solicitud.servicio_unidad.nombre_unidad
+    except Exception:
+        pass
+
+    # 2. Fallback: resolver via cadena RRHH del usuario solicitante
+    if not nombre_ubicacion:
+        try:
+            servicio_unidad, _ok = _get_servicio_unidad_from_rrhh(solicitud.usuario)
+            if servicio_unidad and servicio_unidad.nombre_unidad:
+                nombre_ubicacion = servicio_unidad.nombre_unidad
+        except Exception:
+            pass
+
+    # 3. Fallback final: area_destino o "PRESTADO"
+    if not nombre_ubicacion:
+        nombre_ubicacion = (solicitud.area_destino or 'PRESTADO').strip()
+
+    nombre_ubicacion = nombre_ubicacion.upper()
+
+    try:
+        loc_obj, _ = Localizacion.objects.get_or_create(
+            descripcion_localizacion=nombre_ubicacion,
+            defaults={'estado': True}
+        )
+        expediente.localizacion = loc_obj
+        expediente.modificado_por = usuario_admin
+        expediente.save(update_fields=['localizacion', 'modificado_por', 'fecha_modificado'])
+        return nombre_ubicacion
+    except Exception as e:
+        logger.warning(f"No se pudo actualizar localizacion del expediente #{expediente.numero}: {e}")
+        return nombre_ubicacion
+
+
+def _set_localizacion_archivo(expediente, usuario_admin):
+    """
+    Devuelve expediente.localizacion a 'ARCHIVO' tras una devolución.
+
+    Args:
+        expediente: instancia de Expediente
+        usuario_admin: usuario que recibe la devolución
+
+    Returns:
+        str: "ARCHIVO"
+    """
+    from expediente.models import Localizacion
+
+    try:
+        loc_obj = Localizacion.objects.filter(
+            descripcion_localizacion__iexact='ARCHIVO'
+        ).first()
+        if not loc_obj:
+            loc_obj, _ = Localizacion.objects.get_or_create(
+                descripcion_localizacion='ARCHIVO',
+                defaults={'estado': True}
+            )
+        expediente.localizacion = loc_obj
+        expediente.modificado_por = usuario_admin
+        expediente.save(update_fields=['localizacion', 'modificado_por', 'fecha_modificado'])
+    except Exception as e:
+        logger.warning(f"No se pudo regresar a ARCHIVO el expediente #{expediente.numero}: {e}")
+
+    return 'ARCHIVO'
+
+
 # ============================================
 # MIXIN: Acceso basado en Groups
 # ============================================
@@ -998,10 +1113,21 @@ def marcar_entregado_api(request):
 
         # Solo marcar como prestados los expedientes aprobados
         from .models import ExpedienteEstadoLog
-        for d in prestamo.solicitud.detalles.select_related('expediente_prestamo').filter(aprobado=True):
+        for d in prestamo.solicitud.detalles.select_related('expediente_prestamo__expediente').filter(aprobado=True):
             estado_anterior = d.expediente_prestamo.estado
             d.expediente_prestamo.estado_id = 'EXP_PRESTADO'
             d.expediente_prestamo.save()
+
+            # Actualizar localizacion del expediente a la unidad del solicitante
+            # (cadena RRHH: User -> Empleado -> PersonalNoClinico/PersonalSalud -> servicio_unidad)
+            try:
+                _set_localizacion_por_solicitud(
+                    d.expediente_prestamo.expediente,
+                    prestamo.solicitud,
+                    request.user,
+                )
+            except Exception as _e:
+                logger.warning(f"No se pudo actualizar localizacion al entregar préstamo: {_e}")
 
             ExpedienteEstadoLog.objects.create(
                 expediente=d.expediente_prestamo.expediente,
@@ -1175,7 +1301,13 @@ def procesar_devolucion_api(request):
                 ep.estado_id = 'EXP_DISPONIBLE'
                 ep.ubicacion_fisica = unidad_usuario
                 ep.save()
-                
+
+                # Regresar la localizacion del expediente a ARCHIVO
+                try:
+                    _set_localizacion_archivo(ep.expediente, request.user)
+                except Exception as _e:
+                    logger.warning(f"No se pudo regresar a ARCHIVO al devolver: {_e}")
+
                 ExpedienteEstadoLog.objects.create(
                     expediente=ep.expediente,
                     estado_anterior=estado_ant,
@@ -1332,7 +1464,7 @@ def buscar_expedientes_api(request):
 
                 disponible = exp.id not in expedientes_prestados_ids
                 info_exp = ExpedientePrestamo.objects.filter(expediente=exp).first()
-                ubicacion = info_exp.ubicacion_fisica if info_exp and info_exp.ubicacion_fisica else "Archivo Central"
+                ubicacion = _resolver_ubicacion_expediente(exp, info_exp)
 
                 resultados.append({
                     "expediente_id": exp.id,
@@ -1354,7 +1486,7 @@ def buscar_expedientes_api(request):
                     paciente_nombre = f"{pac.primer_nombre} {pac.segundo_nombre or ''} {pac.primer_apellido} {pac.segundo_apellido or ''}".strip()
                     
                     info_exp = ExpedientePrestamo.objects.filter(expediente=exp).first()
-                    ubicacion = info_exp.ubicacion_fisica if info_exp and info_exp.ubicacion_fisica else "Archivo Central"
+                    ubicacion = _resolver_ubicacion_expediente(exp, info_exp)
 
                     resultados.append({
                         "expediente_id": exp.id,
@@ -1383,7 +1515,7 @@ def buscar_expedientes_api(request):
                     paciente_nombre = f"{pac.primer_nombre} {pac.segundo_nombre or ''} {pac.primer_apellido} {pac.segundo_apellido or ''}".strip()
                     
                     info_exp = ExpedientePrestamo.objects.filter(expediente=exp).first()
-                    ubicacion = info_exp.ubicacion_fisica if info_exp and info_exp.ubicacion_fisica else "Archivo Central"
+                    ubicacion = _resolver_ubicacion_expediente(exp, info_exp)
 
                     resultados.append({
                         "expediente_id": exp.id,
