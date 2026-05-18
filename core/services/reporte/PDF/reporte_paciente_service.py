@@ -101,9 +101,9 @@ class ReportePacienteService:
         estilo += [
             ('GRID', (1, 2), (48, 2), 0.4, colors.black),
 
-            ('SPAN', (1, 2), (12, 2)),
-            ('SPAN', (13, 2), (24, 2)),
-            ('SPAN', (25, 2), (38, 2)),
+            ('SPAN', (1, 2), (10, 2)),
+            ('SPAN', (11, 2), (22, 2)),
+            ('SPAN', (23, 2), (38, 2)),
             ('SPAN', (39, 2), (48, 2)),
         ]
 
@@ -764,9 +764,13 @@ class ReportePacienteService:
     def __dibujarDatosPacienteHojaHospitalizacion2026(pdf, ancho, alto, paciente):
         
         primer_elemento_izquierda = ReportePacienteService.MARGEN_IZQUIERDO
+        
 
         pdf.setFont("Helvetica-Bold", 6.5)
         pdf.drawString(primer_elemento_izquierda + 75, alto - 90,ReportePdfBaseService.texto_seguro(paciente.etnia,24))  
+        if paciente.orden_gemelar:
+            pdf.drawString(primer_elemento_izquierda + 430, alto - 105, f"G#: {paciente.orden_gemelar}")
+
         pdf.setFont("Helvetica-Bold", 14)
         pdf.drawString(primer_elemento_izquierda + 485, alto - 80, formatear_expediente(paciente.expediente))  
         
@@ -774,11 +778,14 @@ class ReportePacienteService:
 
         pdf.setFont("Helvetica-Bold", 13)
         altura_bloque1 = alto - 122
-        pdf.drawCentredString(primer_elemento_izquierda + 67, altura_bloque1, ReportePdfBaseService.texto_seguro(paciente.apellido1, 20))
-        pdf.drawCentredString(primer_elemento_izquierda + 210, altura_bloque1, ReportePdfBaseService.texto_seguro(paciente.apellido2, 20))
-        pdf.drawCentredString(primer_elemento_izquierda + 366, altura_bloque1, ReportePdfBaseService.texto_seguro(paciente.nombres, 21))
+        pdf.drawCentredString(primer_elemento_izquierda + 52, altura_bloque1, ReportePdfBaseService.texto_seguro(paciente.apellido1, 15))
+        pdf.drawCentredString(primer_elemento_izquierda + 185, altura_bloque1, ReportePdfBaseService.texto_seguro(paciente.apellido2, 15))
+        pdf.drawCentredString(primer_elemento_izquierda + 356, altura_bloque1, ReportePdfBaseService.texto_seguro(paciente.nombres, 23))
         pdf.drawCentredString(primer_elemento_izquierda + 510, altura_bloque1, ReportePdfBaseService.texto_seguro(formatear_dni(paciente.dni), 15))
         
+
+
+
         altura_bloque2 = altura_bloque1 - 35
         dia_nac = f"{paciente.fecha_nacimiento.day:02d}" if paciente.fecha_nacimiento else ""
         mes_nac = f"{paciente.fecha_nacimiento.month:02d}" if paciente.fecha_nacimiento else ""
@@ -1249,9 +1256,9 @@ class ReportePacienteService:
         #-------  DATOS DINAMICOS 
         pdf.setFont("Helvetica-Bold", 11)
 
-        pdf.drawString(235,alto-alturaTabla-65, ReportePdfBaseService.texto_seguro(paciente.nombres, 18))
+        pdf.drawString(222,alto-alturaTabla-65, ReportePdfBaseService.texto_seguro(paciente.nombres, 18))
         pdf.drawString(50,alto-alturaTabla-65, ReportePdfBaseService.texto_seguro(paciente.apellido1,10))
-        pdf.drawString(130,alto-alturaTabla-65, ReportePdfBaseService.texto_seguro(paciente.apellido2,10))
+        pdf.drawString(125,alto-alturaTabla-65, ReportePdfBaseService.texto_seguro(paciente.apellido2,10))
 
         #----- MAPEAR LA EDAD
         if paciente.edad_tipo:
@@ -1341,6 +1348,8 @@ class ReportePacienteService:
 
             ReporteReferenciaService._dibujarEstructuraFormatoReferenciaRespuesta(pdf,ancho,alto)
             ReporteReferenciaService._dibujarEtiquetasEstaticasFormatoRefenciaRespuesta(pdf,ancho,alto)
+      
+            print(paciente)
             ReporteReferenciaService._dibujarDatosHospitalizacion(pdf,ancho,alto, paciente, institucion)
             ReporteReferenciaService._dibujarPiePaginaFormatoReferenciaRespuesta(pdf, ancho, alto, usuario)
             #pagina 5

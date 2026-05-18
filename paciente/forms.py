@@ -122,7 +122,7 @@ class PacienteCreateForm(forms.ModelForm):
         nacionalidad_id = getattr(nacionalidad, "id", None)
         
         # Si el tipo de identificación es "IDENTIDAD" (ID = 1) y la nacionalidad es hondureña (ID = 1)
-        regex_dni = r"^([0-3][0-9])([0-9][0-9])-(19|20)[0-9]{2}-[0-9]{5}$"
+        regex_dni = r"^([0-6][0-9])([0-9][0-9])-(19|20)[0-9]{2}-[0-9]{5}$"
         if tipo_id == 1 and nacionalidad_id == 1:
             if dni:
                 if not re.match(regex_dni, dni):

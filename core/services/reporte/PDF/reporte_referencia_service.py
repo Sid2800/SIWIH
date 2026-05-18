@@ -983,7 +983,7 @@ ZONA INFORMES ESTADÍSTICOS
         alto_bloque2 = alto_bloque1-22
         pdf.setFont("Helvetica-Bold", 12)
 
-        pdf.drawString(ancho-480, alto_bloque2, ReporteReferenciaService._texto_seguro(paciente.expediente, 6))
+        pdf.drawString(ancho-480, alto_bloque2, ReporteReferenciaService._texto_seguro(paciente.expediente, 7))
         pdf.drawString(ancho-245, alto_bloque2, ReporteReferenciaService._texto_seguro(paciente.dni, 16))
         pdf.setFont("Helvetica-Bold", 11)
         edad = paciente.edad_texto.split(',')[0] if paciente.edad_texto else ""

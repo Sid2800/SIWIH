@@ -5,7 +5,7 @@ var regexNombreApellido = "^[A-Za-zñÑ.\\-\\s]*$"; // Permite letras mayúscula
 const regexTelefono = "^[2893][0-9]{3}-[0-9]{4}$";
 const formatoTelefono = "____-____";
 
-var regexIdentidad = "^([0-3][0-9])([0-9][0-9])-(1|2)[0-9]{3}-[0-9]{5}$"
+var regexIdentidad = "^([0-6][0-9])([0-9][0-9])-(1|2)[0-9]{3}-[0-9]{5}$"
 //var regexIdentidad = "^([0-3][0-9])([0-8][0-9])-(19[0-9]{0,2}|20[0-9]{0,2})-[0-9]{0,5}$"
 
 var formatoIdentidad = "____-____-_____"

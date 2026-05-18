@@ -4,7 +4,7 @@ from core.constants.domain_constants import UnidadID
 from core.constants.choices_constants import AlcanceUsuario, RolUsuario
 from django.db.models import F
 from django.db.models.functions import Coalesce
-
+from core.services.server_image.media_service import MediaService
 from django.db import connections
 
 class UsuarioService:
@@ -140,3 +140,25 @@ class UsuarioService:
                 botones.add("crear_referencia")
 
         return list(botones)
+    
+
+    @staticmethod
+    def obtener_url_imagen_usuario(user):
+
+        try:
+
+            usuarios = [{"id": user.id}]
+
+            imagenes, _ = (
+                MediaService.obtener_imagenes_usuarios(
+                    usuarios
+                )
+            )
+
+            return (
+                imagenes[0].get("url_imagen")
+                if imagenes else None
+            )
+
+        except Exception:
+            return None
