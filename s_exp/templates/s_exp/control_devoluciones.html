@@ -55,22 +55,34 @@
 {% block extra_js %}
 <script>
 $(document).ready(function() {
-    cargarDevoluciones();
+    cargarDevoluciones(false);
 
     $('#btn-refresh-devoluciones').on('click', function() {
-        cargarDevoluciones();
+        cargarDevoluciones(false);
     });
+
+    // ===== Auto-refresh cada 5s (sin renovar sesión) =====
+    if (window.RealtimeSExp) {
+        RealtimeSExp.registrar('control-devoluciones', function () {
+            cargarDevoluciones(true);
+        }, 5);
+        RealtimeSExp.mostrarIndicador('control-devoluciones', '#btn-refresh-devoluciones');
+    }
 });
 
-function cargarDevoluciones() {
+function cargarDevoluciones(esPolling = false) {
+    const headers = {};
+    if (esPolling) headers['X-Polling-Request'] = 'true';
+
     $.ajax({
         url: window.urls.s_exp_prestamos_devolucion_api,
         method: 'GET',
+        headers: headers,
         success: function(resp) {
             renderDevoluciones(resp.data);
         },
         error: function() {
-            toastr.error("Error al cargar las devoluciones");
+            if (!esPolling) toastr.error("Error al cargar las devoluciones");
         }
     });
 }
