@@ -221,6 +221,57 @@
         },
 
         /**
+         * Registra una pantalla con AUTO-RELOAD cuando hay cambios.
+         *
+         * A diferencia de registrarConTrigger (que muestra banner), esta versión
+         * recarga directamente la UI cuando el backend reporta cambios. Útil para
+         * vistas de usuario donde no hay interacción crítica en curso (ej: Mis Solicitudes).
+         *
+         * @param {string} nombre - Identificador único
+         * @param {string} seccion - 'solicitudes' | 'prestamos' | 'devoluciones' | 'global'
+         * @param {function} funcionRecarga - Función que aplica el refresh
+         * @param {number} intervalSegundos - Default 5
+         */
+        registrarConAutoReload(nombre, seccion, funcionRecarga, intervalSegundos = 5) {
+            let ultimoTs = null;
+            let primeraEjecucion = true;
+
+            const wrapper = function () {
+                if (!window.urls || !window.urls.s_exp_changes_check_api) {
+                    return funcionRecarga();
+                }
+
+                return new Promise(function (resolve) {
+                    pollingAjax({
+                        url: window.urls.s_exp_changes_check_api,
+                        method: 'GET',
+                        timeout: 10000,
+                    }).then(function (resp) {
+                        const tsActual = (resp && resp[seccion]) || '';
+
+                        if (primeraEjecucion) {
+                            ultimoTs = tsActual;
+                            primeraEjecucion = false;
+                            resolve();
+                            return;
+                        }
+
+                        if (tsActual && tsActual !== ultimoTs) {
+                            ultimoTs = tsActual;
+                            try { funcionRecarga(); }
+                            catch (e) { console.error(`[Realtime auto] Error "${nombre}":`, e); }
+                        }
+                        resolve();
+                    }).fail(function () {
+                        resolve();
+                    });
+                });
+            };
+
+            this.registrar(nombre, wrapper, intervalSegundos);
+        },
+
+        /**
          * Registra una pantalla con TRIGGER inteligente.
          *
          * En lugar de recargar siempre, consulta un endpoint ULTRA LIGERO que

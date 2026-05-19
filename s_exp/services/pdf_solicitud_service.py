@@ -72,9 +72,48 @@ class _NumberedCanvas(rl_canvas.Canvas):
 
 
 def _unidad_usuario(user):
-    perfil = PerfilUnidad.objects.filter(usuario=user).select_related('servicio_unidad').first()
-    if perfil and perfil.servicio_unidad:
-        return perfil.servicio_unidad.nombre_unidad
+    """
+    Devuelve el nombre de la unidad del usuario.
+
+    Estrategia de resolución (en orden):
+    1. PerfilUnidad (sistema de roles del módulo s_exp)
+    2. Cadena RRHH: Empleado → PersonalNoClinico → servicio_unidad
+    3. Cadena RRHH: Empleado → PersonalSalud → servicio_unidad
+
+    Esto permite que tanto solicitantes (usualmente con PerfilUnidad) como
+    admins/digitadores (usualmente solo con registro RRHH) aparezcan en el PDF.
+    """
+    if not user:
+        return ''
+
+    # 1) PerfilUnidad
+    try:
+        perfil = PerfilUnidad.objects.filter(usuario=user).select_related('servicio_unidad').first()
+        if perfil and perfil.servicio_unidad:
+            return perfil.servicio_unidad.nombre_unidad
+    except Exception:
+        pass
+
+    # 2) RRHH: PersonalNoClinico
+    try:
+        from rrhh.models import Empleado, PersonalNoClinico, PersonalSalud
+        empleado = Empleado.objects.filter(usuario_id=user.id).first()
+        if empleado:
+            pnc = PersonalNoClinico.objects.filter(
+                empleado_id=empleado.id
+            ).select_related('servicio_unidad').first()
+            if pnc and pnc.servicio_unidad:
+                return pnc.servicio_unidad.nombre_unidad
+
+            # 3) RRHH: PersonalSalud
+            ps = PersonalSalud.objects.filter(
+                empleado_id=empleado.id
+            ).select_related('servicio_unidad').first()
+            if ps and ps.servicio_unidad:
+                return ps.servicio_unidad.nombre_unidad
+    except Exception:
+        pass
+
     return ''
 
 
@@ -294,7 +333,7 @@ def generar_pdf_solicitud(solicitud):
     cabeceras = [
         Paragraph('Fecha salida', st_tabla_head),
         Paragraph('Expediente', st_tabla_head),
-        Paragraph('Recibido', st_tabla_head_sm),
+        Paragraph('Disponible', st_tabla_head_sm),
         Paragraph('Identidad', st_tabla_head),
         Paragraph('Paciente', st_tabla_head),
         Paragraph('Motivo', st_tabla_head),

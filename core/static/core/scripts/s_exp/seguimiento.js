@@ -11,11 +11,14 @@ let fechaFinActual = '';
 $(document).ready(function () {
     cargarMisSolicitudes();
 
-    // ===== Auto-refresh inteligente (banner cuando hay cambios) =====
+    // ===== Auto-refresh AUTOMÁTICO (sin banner) =====
+    // Para los usuarios solicitantes, la tabla se actualiza sola cuando backend
+    // reporta cambios reales — no tienen mucho que "estar revisando" como el admin,
+    // así que el reload directo es más útil que el banner.
     if (window.RealtimeSExp) {
-        RealtimeSExp.registrarConTrigger('mis-solicitudes', 'solicitudes', function () {
+        RealtimeSExp.registrarConAutoReload('mis-solicitudes', 'solicitudes', function () {
             cargarMisSolicitudes(filtroActual, fechaInicioActual, fechaFinActual, true);
-        }, 5, { etiqueta: 'mis solicitudes' });
+        }, 5);
     }
 
     // Manejadores de botones de filtro
