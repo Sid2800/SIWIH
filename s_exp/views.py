@@ -1383,6 +1383,21 @@ def procesar_devolucion_api(request):
             notas_admin=notas
         )
 
+        # Registrar log de auditoría — esto también dispara el changes-check
+        # para que las pantallas conectadas (Mis Solicitudes, etc.) detecten
+        # el cambio y se actualicen automáticamente.
+        descripcion_log = (
+            f"Auditoría de devolución del préstamo #{prestamo.id}: "
+            f"{devueltos_ahora}/{total_exp} expedientes devueltos. "
+            f"Estado solicitud: {solicitud.estado_flujo_id}."
+        )
+        _registrar_log(
+            request.user,
+            'DEVOLUCION_PROCESADA',
+            descripcion_log,
+            'Prestamo', prestamo.id
+        )
+
         return JsonResponse({"success": True, "estado": solicitud.estado_flujo_id})
 
     except Exception as e:
@@ -1854,15 +1869,28 @@ def changes_check_api(request):
         non_null = [t for t in ts_list if t]
         return max(non_null) if non_null else None
 
+    # Para "solicitudes" incluimos también cambios de préstamo y devolución
+    # porque el estado del préstamo cambia el badge/estado mostrado al usuario
+    # en Mis Solicitudes y al admin en Gestión Solicitudes
+    solicitudes_relevantes_ts = _maximo(
+        solic_ts,
+        log_ts,
+        prestamo_aprob_ts,
+        prestamo_entrega_ts,
+        prestamo_dev_ts,
+        dev_ts,
+    )
+
     return JsonResponse({
         # Cambio en cualquier cosa (fallback global)
         'global': _iso(log_ts),
 
         # Por sección:
-        # - solicitudes: cualquier creación/cambio de solicitud (también logs)
+        # - solicitudes: incluye TODO lo que afecta el estado visible al usuario/admin
+        #                (creación, aprobación, entrega, devolución, auditoría)
         # - prestamos: aprobaciones, entregas, devoluciones
         # - devoluciones: cuando se hacen devoluciones
-        'solicitudes': _iso(_maximo(solic_ts, log_ts)),
+        'solicitudes': _iso(solicitudes_relevantes_ts),
         'prestamos': _iso(_maximo(prestamo_aprob_ts, prestamo_entrega_ts, prestamo_dev_ts, log_ts)),
         'devoluciones': _iso(_maximo(dev_ts, prestamo_dev_ts, log_ts)),
     })
