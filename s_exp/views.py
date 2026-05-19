@@ -1813,6 +1813,56 @@ def mis_solicitudes_api(request):
 # ============================================
 
 @require_GET
+def changes_check_api(request):
+    """
+    Endpoint ULTRA LIGERO usado por el polling inteligente del frontend.
+
+    Devuelve los timestamps del último cambio en cada sección del módulo s_exp.
+    El frontend compara estos timestamps con los últimos vistos y solo
+    recarga las tablas si hubo un cambio real (preserva el estado de UI
+    como tarjetas expandidas, scroll, etc).
+
+    Es deliberadamente ligero: solo hace agregaciones MAX(timestamp) sin
+    devolver datos grandes. Se llama cada 3-5s pero su carga es mínima.
+    """
+    from django.db.models import Max
+    from .models import LogHistorico, SolicitudPrestamo, Prestamo, Devolucion
+
+    # Timestamp del log más reciente (cubre todas las acciones registradas)
+    log_ts = LogHistorico.objects.aggregate(ts=Max('timestamp'))['ts']
+
+    # Timestamps específicos por sección (para que cada pantalla compare
+    # solo lo suyo y evite reloads innecesarios)
+    solic_ts = SolicitudPrestamo.objects.aggregate(ts=Max('fecha_creacion'))['ts']
+    prestamo_aprob_ts = Prestamo.objects.aggregate(ts=Max('fecha_aprobacion'))['ts']
+    prestamo_entrega_ts = Prestamo.objects.aggregate(ts=Max('fecha_entrega'))['ts']
+    prestamo_dev_ts = Prestamo.objects.aggregate(ts=Max('fecha_devolucion_real'))['ts']
+    dev_ts = Devolucion.objects.aggregate(ts=Max('fecha_devolucion'))['ts']
+
+    def _iso(dt):
+        return dt.isoformat() if dt else ''
+
+    # Para cada "sección" devolvemos el timestamp más reciente
+    # entre los registros que la afectan
+    def _maximo(*ts_list):
+        non_null = [t for t in ts_list if t]
+        return max(non_null) if non_null else None
+
+    return JsonResponse({
+        # Cambio en cualquier cosa (fallback global)
+        'global': _iso(log_ts),
+
+        # Por sección:
+        # - solicitudes: cualquier creación/cambio de solicitud (también logs)
+        # - prestamos: aprobaciones, entregas, devoluciones
+        # - devoluciones: cuando se hacen devoluciones
+        'solicitudes': _iso(_maximo(solic_ts, log_ts)),
+        'prestamos': _iso(_maximo(prestamo_aprob_ts, prestamo_entrega_ts, prestamo_dev_ts, log_ts)),
+        'devoluciones': _iso(_maximo(dev_ts, prestamo_dev_ts, log_ts)),
+    })
+
+
+@require_GET
 def alertas_usuario_api(request):
     """Retorna alertas para el usuario actual."""
     if not request.user.is_authenticated:

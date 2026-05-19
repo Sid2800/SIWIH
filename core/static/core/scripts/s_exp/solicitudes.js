@@ -57,9 +57,9 @@ $(document).ready(function () {
     initTabla();
     initFiltros();
 
-    // ===== Auto-refresh en tiempo real (polling cada 5s) =====
+    // ===== Auto-refresh inteligente (solo recarga si hay cambios reales) =====
     if (window.RealtimeSExp) {
-        RealtimeSExp.registrar('gestion-solicitudes', function () {
+        RealtimeSExp.registrarConTrigger('gestion-solicitudes', 'solicitudes', function () {
             window.__sexp_polling_actual = true;
             tablaSolicitudes.ajax.reload(function () {
                 window.__sexp_polling_actual = false;

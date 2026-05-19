@@ -52,9 +52,9 @@
 $(document).ready(function() {
     cargarDevoluciones(false);
 
-    // ===== Auto-refresh cada 5s (sin renovar sesión) =====
+    // ===== Auto-refresh inteligente (solo si hay cambios reales) =====
     if (window.RealtimeSExp) {
-        RealtimeSExp.registrar('control-devoluciones', function () {
+        RealtimeSExp.registrarConTrigger('control-devoluciones', 'devoluciones', function () {
             cargarDevoluciones(true);
         }, 5);
     }

@@ -97,6 +97,71 @@
         },
 
         /**
+         * Registra una pantalla con TRIGGER inteligente.
+         *
+         * En lugar de recargar siempre, primero consulta un endpoint ULTRA LIGERO
+         * (s_exp_changes_check_api) que devuelve timestamps por sección. Solo si
+         * el timestamp de la sección indicada cambió desde la última consulta,
+         * ejecuta la función de recarga.
+         *
+         * Beneficio: la tabla no se refresca innecesariamente, preservando estado
+         * de UI (tarjetas expandidas, scroll, etc) cuando no hay cambios reales.
+         *
+         * @param {string} nombre - Identificador único de la pantalla
+         * @param {string} seccion - 'solicitudes' | 'prestamos' | 'devoluciones' | 'global'
+         * @param {function} funcionRecarga - Función que ejecuta el refresh REAL
+         * @param {number} intervalSegundos - Intervalo en segundos (default 5)
+         */
+        registrarConTrigger(nombre, seccion, funcionRecarga, intervalSegundos = 5) {
+            // Estado: último timestamp visto (null = primer ciclo, marca como "ya visto")
+            let ultimoTs = null;
+            let primeraEjecucion = true;
+
+            const wrapper = function () {
+                if (!window.urls || !window.urls.s_exp_changes_check_api) {
+                    // Sin endpoint disponible: fallback a recarga directa
+                    return funcionRecarga();
+                }
+
+                return new Promise(function (resolve) {
+                    pollingAjax({
+                        url: window.urls.s_exp_changes_check_api,
+                        method: 'GET',
+                        timeout: 10000,
+                    }).then(function (resp) {
+                        const tsActual = (resp && resp[seccion]) || '';
+
+                        if (primeraEjecucion) {
+                            // En el primer tick solo registramos el timestamp actual
+                            // sin recargar (la pantalla ya cargó lo más nuevo al abrir)
+                            ultimoTs = tsActual;
+                            primeraEjecucion = false;
+                            resolve();
+                            return;
+                        }
+
+                        if (tsActual && tsActual !== ultimoTs) {
+                            // ¡Hay un cambio real! → recargar la UI
+                            ultimoTs = tsActual;
+                            try {
+                                funcionRecarga();
+                            } catch (e) {
+                                console.error(`[Realtime trigger] Error en recarga "${nombre}":`, e);
+                            }
+                        }
+                        // Si no cambió: no hacemos nada (UI intacta)
+                        resolve();
+                    }).fail(function () {
+                        // Error de red: simplemente ignoramos esta iteración
+                        resolve();
+                    });
+                });
+            };
+
+            this.registrar(nombre, wrapper, intervalSegundos);
+        },
+
+        /**
          * Desregistra una pantalla y detiene su polling.
          */
         desregistrar(nombre) {

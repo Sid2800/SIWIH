@@ -9,9 +9,9 @@ $(document).ready(function () {
     initTabla();
     initFiltros();
 
-    // ===== Auto-refresh en tiempo real (polling cada 3s — cronómetros) =====
+    // ===== Auto-refresh inteligente (solo si hay cambios reales) =====
     if (window.RealtimeSExp) {
-        RealtimeSExp.registrar('monitoreo-prestamos', function () {
+        RealtimeSExp.registrarConTrigger('monitoreo-prestamos', 'prestamos', function () {
             window.__sexp_polling_actual = true;
             tablaPrestamos.ajax.reload(function () {
                 window.__sexp_polling_actual = false;

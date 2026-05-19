@@ -5,10 +5,10 @@
 $(document).ready(function () {
     cargarKPIs(false);
 
-    // ===== Auto-refresh KPIs cada 10s =====
+    // ===== Auto-refresh inteligente (solo si hay cambios reales) =====
     if (window.RealtimeSExp) {
-        RealtimeSExp.registrar('dashboard-kpis', function () {
-            cargarKPIs(true);  // true = es polling, no notifica errores ni renueva sesión
+        RealtimeSExp.registrarConTrigger('dashboard-kpis', 'global', function () {
+            cargarKPIs(true);
         }, 10);
     }
 });

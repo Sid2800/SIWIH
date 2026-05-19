@@ -53,6 +53,7 @@ urlpatterns = [
     # APIs COMUNES / CATÁLOGOS
     # ==========================================
     path('api/alertas/', views.alertas_usuario_api, name='s_exp_alertas_api'),
+    path('api/changes-check/', views.changes_check_api, name='s_exp_changes_check_api'),
     path('api/motivos/', views.motivos_api, name='s_exp_motivos_api'),
     path('api/info-usuario/', views.info_usuario_api, name='s_exp_info_usuario_api'),
     path('api/historial-prestamos-paciente/<int:paciente_id>/',

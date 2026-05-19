@@ -11,9 +11,9 @@ let fechaFinActual = '';
 $(document).ready(function () {
     cargarMisSolicitudes();
 
-    // ===== Auto-refresh en tiempo real (polling cada 5s) =====
+    // ===== Auto-refresh inteligente (solo si hay cambios reales) =====
     if (window.RealtimeSExp) {
-        RealtimeSExp.registrar('mis-solicitudes', function () {
+        RealtimeSExp.registrarConTrigger('mis-solicitudes', 'solicitudes', function () {
             // Polling silencioso (sin renovar sesión)
             cargarMisSolicitudes(filtroActual, fechaInicioActual, fechaFinActual, true);
         }, 5);
