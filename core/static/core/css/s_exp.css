@@ -609,6 +609,26 @@ body.darkmode .sexp-exp-tag--pendiente {
     line-height: 1.2;
 }
 
+.sexp-modal-aprob-item-top {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.7rem;
+}
+
+.sexp-modal-aprob-num {
+    font-size: 1.25rem;
+    font-weight: 600;
+    background: rgba(99, 102, 241, 0.18);
+    color: var(--colorTablacelda);
+    padding: 0.1rem 0.5rem;
+    border-radius: 8px;
+    line-height: 1.4;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
 .sexp-modal-aprob-nombre {
     font-size: 1.35rem;
     line-height: 1.3;

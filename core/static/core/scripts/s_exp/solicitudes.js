@@ -369,19 +369,27 @@ function horasHastaCuatroPM() {
  */
 function _mostrarModalAprobacion(id, expedientes, meta) {
     meta = meta || {};
-    // Solo nombres + identidad — sin checkboxes (la decisión por expediente se hace en Revisión de Entrega)
+    // Nombre + identidad + número de expediente — sin checkboxes
     const expHtml = expedientes.map(function (exp) {
         const nombre = exp.paciente_nombre || '—';
-        const ident = exp.paciente_identidad ? `<span class="sexp-modal-aprob-id">${exp.paciente_identidad}</span>` : '';
-        return `<div class="sexp-modal-aprob-item">${ident}<span class="sexp-modal-aprob-nombre">${nombre}</span></div>`;
+        const ident = exp.paciente_identidad
+            ? `<span class="sexp-modal-aprob-id">${exp.paciente_identidad}</span>`
+            : '';
+        const numExp = exp.numero
+            ? `<span class="sexp-modal-aprob-num"><i class="bi bi-folder2"></i> #${exp.numero}</span>`
+            : '';
+        return `<div class="sexp-modal-aprob-item">
+                    <div class="sexp-modal-aprob-item-top">${ident}${numExp}</div>
+                    <span class="sexp-modal-aprob-nombre">${nombre}</span>
+                </div>`;
     }).join('');
 
-    // Mostrar colapsado por defecto si hay muchos expedientes (>= 9)
-    const esLargo = expedientes.length >= 9;
-    const claseInicial = esLargo ? ' is-collapsed' : '';
-    const claseInicialResumen = esLargo ? ' is-collapsed' : '';
-    const iconoInicial = esLargo ? 'bi-chevron-down' : 'bi-chevron-up';
-    const textoInicial = esLargo ? 'Mostrar' : 'Ocultar';
+    // Mostrar SIEMPRE expandido por defecto (el usuario pidió poder ver todos
+    // los expedientes de la solicitud sin tener que hacer clic en Mostrar)
+    const claseInicial = '';
+    const claseInicialResumen = '';
+    const iconoInicial = 'bi-chevron-up';
+    const textoInicial = 'Ocultar';
 
     // Tiempo sugerido por el solicitante: pre-cargar como valor por defecto
     let prefillValor = 1;
