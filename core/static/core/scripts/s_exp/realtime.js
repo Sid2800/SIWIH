@@ -38,6 +38,130 @@
     const pantallas = new Map();         // nombre → { timer, fn, intervalMs, ultimoOk, fallosConsecutivos }
     let pausado = false;                  // pausa global por visibilidad
 
+    // -----------------------------------------------------------------
+    // Banner flotante "Hay N novedades — Actualizar"
+    // -----------------------------------------------------------------
+    function _asegurarContenedorBanner() {
+        let cont = document.getElementById('realtime-banners');
+        if (!cont) {
+            cont = document.createElement('div');
+            cont.id = 'realtime-banners';
+            cont.style.cssText =
+                'position:fixed;right:1.5rem;bottom:1.5rem;z-index:9000;' +
+                'display:flex;flex-direction:column;gap:0.5rem;pointer-events:none;';
+            document.body.appendChild(cont);
+
+            // Estilos para el banner (una sola vez)
+            if (!document.getElementById('realtime-banner-styles')) {
+                const st = document.createElement('style');
+                st.id = 'realtime-banner-styles';
+                st.textContent = `
+                    .rt-banner {
+                        background: var(--colorFondoModal, #1f2937);
+                        color: var(--colorTextoModal, #fff);
+                        border: 1px solid rgba(255,255,255,0.1);
+                        border-radius: 12px;
+                        padding: 0.8rem 1.1rem;
+                        box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+                        display: flex;
+                        align-items: center;
+                        gap: 0.9rem;
+                        font-size: 1.3rem;
+                        animation: rt-banner-in 0.25s ease-out;
+                        pointer-events: auto;
+                        max-width: 420px;
+                    }
+                    @keyframes rt-banner-in {
+                        from { transform: translateY(20px); opacity: 0; }
+                        to { transform: translateY(0); opacity: 1; }
+                    }
+                    .rt-banner__dot {
+                        width: 0.7rem; height: 0.7rem;
+                        background: #22c55e; border-radius: 50%;
+                        flex-shrink: 0;
+                        animation: rt-pulse 1.4s ease-in-out infinite;
+                    }
+                    @keyframes rt-pulse {
+                        0%, 100% { opacity: 1; transform: scale(1); }
+                        50% { opacity: 0.55; transform: scale(0.85); }
+                    }
+                    .rt-banner__text { flex: 1; line-height: 1.3; }
+                    .rt-banner__btn {
+                        background: var(--colorBoton, #3b82f6);
+                        color: var(--colorTextoBoton, #fff);
+                        border: none;
+                        border-radius: 8px;
+                        padding: 0.45rem 0.9rem;
+                        font-size: 1.2rem;
+                        font-weight: 600;
+                        cursor: pointer;
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 0.4rem;
+                    }
+                    .rt-banner__btn:hover { filter: brightness(1.1); }
+                    .rt-banner__close {
+                        background: transparent;
+                        color: inherit;
+                        border: none;
+                        cursor: pointer;
+                        opacity: 0.6;
+                        font-size: 1.5rem;
+                        line-height: 1;
+                        padding: 0 0.25rem;
+                    }
+                    .rt-banner__close:hover { opacity: 1; }
+                    @media (max-width: 600px) {
+                        #realtime-banners {
+                            left: 1rem; right: 1rem; bottom: 1rem;
+                        }
+                        .rt-banner { max-width: none; font-size: 1.4rem; }
+                    }
+                `;
+                document.head.appendChild(st);
+            }
+        }
+        return cont;
+    }
+
+    function _mostrarBannerActualizacion(nombre, cantidad, etiqueta, onActualizar) {
+        const cont = _asegurarContenedorBanner();
+        const bannerId = 'rt-banner-' + nombre;
+        let banner = document.getElementById(bannerId);
+
+        const palabra = cantidad === 1 ? etiqueta.replace(/s$/, '') : etiqueta;
+        const textoHtml = `<strong>${cantidad}</strong> ${cantidad === 1 ? 'novedad' : 'novedades'}` +
+                          (etiqueta && etiqueta !== 'novedades' ? ` en ${etiqueta}` : '');
+
+        if (banner) {
+            // Actualizar contador (no recrear el banner)
+            const txt = banner.querySelector('.rt-banner__text');
+            if (txt) txt.innerHTML = textoHtml;
+            return;
+        }
+
+        banner = document.createElement('div');
+        banner.id = bannerId;
+        banner.className = 'rt-banner';
+        banner.innerHTML = `
+            <span class="rt-banner__dot"></span>
+            <span class="rt-banner__text">${textoHtml}</span>
+            <button type="button" class="rt-banner__btn"><i class="bi bi-arrow-clockwise"></i> Actualizar</button>
+            <button type="button" class="rt-banner__close" title="Descartar">&times;</button>
+        `;
+
+        const btnRefresh = banner.querySelector('.rt-banner__btn');
+        const btnClose = banner.querySelector('.rt-banner__close');
+
+        btnRefresh.addEventListener('click', function () {
+            try { onActualizar(); } catch (e) { console.error(e); }
+            banner.remove();
+        });
+        btnClose.addEventListener('click', function () { banner.remove(); });
+
+        cont.appendChild(banner);
+    }
+
     function _ejecutar(nombre) {
         const p = pantallas.get(nombre);
         if (!p) return;
@@ -99,27 +223,27 @@
         /**
          * Registra una pantalla con TRIGGER inteligente.
          *
-         * En lugar de recargar siempre, primero consulta un endpoint ULTRA LIGERO
-         * (s_exp_changes_check_api) que devuelve timestamps por sección. Solo si
-         * el timestamp de la sección indicada cambió desde la última consulta,
-         * ejecuta la función de recarga.
+         * En lugar de recargar siempre, consulta un endpoint ULTRA LIGERO que
+         * devuelve timestamps por sección. Si hubo cambios, NO recarga
+         * automáticamente: muestra un BANNER flotante con un botón "Actualizar".
          *
-         * Beneficio: la tabla no se refresca innecesariamente, preservando estado
-         * de UI (tarjetas expandidas, scroll, etc) cuando no hay cambios reales.
+         * El usuario decide cuándo aplicar el refresh, sin interrumpir su trabajo
+         * actual (revisar/aprobar/expandir tarjetas).
          *
          * @param {string} nombre - Identificador único de la pantalla
          * @param {string} seccion - 'solicitudes' | 'prestamos' | 'devoluciones' | 'global'
          * @param {function} funcionRecarga - Función que ejecuta el refresh REAL
          * @param {number} intervalSegundos - Intervalo en segundos (default 5)
+         * @param {object} opts - Opcional: { etiqueta: 'novedades' | 'solicitudes' | ... }
          */
-        registrarConTrigger(nombre, seccion, funcionRecarga, intervalSegundos = 5) {
-            // Estado: último timestamp visto (null = primer ciclo, marca como "ya visto")
+        registrarConTrigger(nombre, seccion, funcionRecarga, intervalSegundos = 5, opts) {
+            opts = opts || {};
             let ultimoTs = null;
             let primeraEjecucion = true;
+            let cambiosPendientes = 0;
 
             const wrapper = function () {
                 if (!window.urls || !window.urls.s_exp_changes_check_api) {
-                    // Sin endpoint disponible: fallback a recarga directa
                     return funcionRecarga();
                 }
 
@@ -132,8 +256,6 @@
                         const tsActual = (resp && resp[seccion]) || '';
 
                         if (primeraEjecucion) {
-                            // En el primer tick solo registramos el timestamp actual
-                            // sin recargar (la pantalla ya cargó lo más nuevo al abrir)
                             ultimoTs = tsActual;
                             primeraEjecucion = false;
                             resolve();
@@ -141,18 +263,24 @@
                         }
 
                         if (tsActual && tsActual !== ultimoTs) {
-                            // ¡Hay un cambio real! → recargar la UI
+                            // Hay cambios — incrementar contador y mostrar banner
                             ultimoTs = tsActual;
-                            try {
-                                funcionRecarga();
-                            } catch (e) {
-                                console.error(`[Realtime trigger] Error en recarga "${nombre}":`, e);
-                            }
+                            cambiosPendientes++;
+                            _mostrarBannerActualizacion(nombre, cambiosPendientes,
+                                opts.etiqueta || 'novedades',
+                                function () {
+                                    // Al hacer clic en "Actualizar":
+                                    try {
+                                        funcionRecarga();
+                                    } catch (e) {
+                                        console.error(`[Realtime] Error en recarga "${nombre}":`, e);
+                                    }
+                                    cambiosPendientes = 0;
+                                }
+                            );
                         }
-                        // Si no cambió: no hacemos nada (UI intacta)
                         resolve();
                     }).fail(function () {
-                        // Error de red: simplemente ignoramos esta iteración
                         resolve();
                     });
                 });

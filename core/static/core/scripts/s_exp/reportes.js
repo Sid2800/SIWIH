@@ -14,6 +14,13 @@ $(document).ready(function () {
     // Cargar con rango mensual por defecto
     aplicarRango('mensual');
     generarReportes();
+
+    // ===== Banner de novedades (no recarga sólo, sino ofrece al usuario) =====
+    if (window.RealtimeSExp) {
+        RealtimeSExp.registrarConTrigger('reportes', 'global', function () {
+            generarReportes();
+        }, 15, { etiqueta: 'eventos' });
+    }
 });
 
 function initTabs() {

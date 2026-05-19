@@ -57,14 +57,14 @@ $(document).ready(function () {
     initTabla();
     initFiltros();
 
-    // ===== Auto-refresh inteligente (solo recarga si hay cambios reales) =====
+    // ===== Auto-refresh inteligente (banner cuando hay cambios) =====
     if (window.RealtimeSExp) {
         RealtimeSExp.registrarConTrigger('gestion-solicitudes', 'solicitudes', function () {
             window.__sexp_polling_actual = true;
             tablaSolicitudes.ajax.reload(function () {
                 window.__sexp_polling_actual = false;
-            }, false);  // false = no resetear paginación
-        }, 5);
+            }, false);
+        }, 5, { etiqueta: 'solicitudes' });
     }
 });
 

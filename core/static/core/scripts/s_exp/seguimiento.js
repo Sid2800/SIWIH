@@ -11,12 +11,11 @@ let fechaFinActual = '';
 $(document).ready(function () {
     cargarMisSolicitudes();
 
-    // ===== Auto-refresh inteligente (solo si hay cambios reales) =====
+    // ===== Auto-refresh inteligente (banner cuando hay cambios) =====
     if (window.RealtimeSExp) {
         RealtimeSExp.registrarConTrigger('mis-solicitudes', 'solicitudes', function () {
-            // Polling silencioso (sin renovar sesión)
             cargarMisSolicitudes(filtroActual, fechaInicioActual, fechaFinActual, true);
-        }, 5);
+        }, 5, { etiqueta: 'mis solicitudes' });
     }
 
     // Manejadores de botones de filtro

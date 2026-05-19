@@ -52,11 +52,11 @@
 $(document).ready(function() {
     cargarDevoluciones(false);
 
-    // ===== Auto-refresh inteligente (solo si hay cambios reales) =====
+    // ===== Auto-refresh inteligente (banner cuando hay cambios) =====
     if (window.RealtimeSExp) {
         RealtimeSExp.registrarConTrigger('control-devoluciones', 'devoluciones', function () {
             cargarDevoluciones(true);
-        }, 5);
+        }, 5, { etiqueta: 'devoluciones' });
     }
 });
 

@@ -9,14 +9,14 @@ $(document).ready(function () {
     initTabla();
     initFiltros();
 
-    // ===== Auto-refresh inteligente (solo si hay cambios reales) =====
+    // ===== Auto-refresh inteligente (banner cuando hay cambios) =====
     if (window.RealtimeSExp) {
         RealtimeSExp.registrarConTrigger('monitoreo-prestamos', 'prestamos', function () {
             window.__sexp_polling_actual = true;
             tablaPrestamos.ajax.reload(function () {
                 window.__sexp_polling_actual = false;
             }, false);
-        }, 3);
+        }, 5, { etiqueta: 'préstamos' });
     }
 });
 
