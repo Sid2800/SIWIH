@@ -65,8 +65,6 @@ $(document).ready(function () {
                 window.__sexp_polling_actual = false;
             }, false);  // false = no resetear paginación
         }, 5);
-
-        RealtimeSExp.mostrarIndicador('gestion-solicitudes', '#indicador-realtime-solicitudes');
     }
 });
 

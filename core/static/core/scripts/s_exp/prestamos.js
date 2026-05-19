@@ -17,7 +17,6 @@ $(document).ready(function () {
                 window.__sexp_polling_actual = false;
             }, false);
         }, 3);
-        RealtimeSExp.mostrarIndicador('monitoreo-prestamos', '#indicador-realtime-prestamos');
     }
 });
 

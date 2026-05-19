@@ -40,9 +40,6 @@
         </a>
     </div>
 
-    <div class="sexp-filtros sexp-flex-end">
-        <span id="indicador-realtime-devoluciones" style="display:inline-flex;align-items:center;"></span>
-    </div>
 
     <div id="lista-devoluciones">
         <p class="sexp-opacity-5 sexp-text-center">Cargando préstamos pendientes de devolución...</p>
@@ -60,7 +57,6 @@ $(document).ready(function() {
         RealtimeSExp.registrar('control-devoluciones', function () {
             cargarDevoluciones(true);
         }, 5);
-        RealtimeSExp.mostrarIndicador('control-devoluciones', '#indicador-realtime-devoluciones');
     }
 });
 
