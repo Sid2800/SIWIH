@@ -2,12 +2,14 @@
  * Notificaciones Globales - s_exp
  * Consulta periódicamente si hay alertas para el usuario (como expedientes listos para recoger).
  *
- * - Polling cada 30 segundos
+ * - Polling cada 5 segundos (rápido para que el usuario reciba el aviso de
+ *   "Listo para recoger" casi al instante de que el admin lo marca)
  * - Modales sticky (no se cierran al hacer click fuera ni con Escape)
+ * - Header X-Polling-Request:true → no renueva el timer de sesión
  * - Se evita duplicar el mismo modal mediante registro en window.__sexp_modales_activos
  */
 (function () {
-    const INTERVALO_POLLING_MS = 30 * 1000; // 30 segundos
+    const INTERVALO_POLLING_MS = 5 * 1000; // 5 segundos para detección casi instantánea
     let pollingTimer = null;
 
     // Registro de modales activos para evitar duplicados al hacer polling
