@@ -646,7 +646,7 @@ document.addEventListener("DOMContentLoaded", function () {
     camaEl.dataset.estado = camaActualizada.estado_visual || "";
     camaEl.dataset.pacienteDni = camaActualizada.paciente ? (camaActualizada.paciente.dni || "") : "";
     camaEl.dataset.cambiosRealizados = String(camaActualizada.cambios_realizados || 0);
-    camaEl.dataset.maxCambios = String(camaActualizada.max_cambios || 5);
+    camaEl.dataset.maxCambios = camaActualizada.max_cambios != null ? String(camaActualizada.max_cambios) : "";
     camaEl.dataset.ultimaActualizacion = camaActualizada.ultima_actualizacion || "";
     camaEl.dataset.usuarioUltimaActualizacion = camaActualizada.usuario_ultima_actualizacion || "";
 
@@ -728,8 +728,8 @@ document.addEventListener("DOMContentLoaded", function () {
     var pacienteActual = camaEl.dataset.paciente || "";
     var dniActual = camaEl.dataset.pacienteDni || "";
     var cambiosRealizados = parseInt(camaEl.dataset.cambiosRealizados || "0", 10);
-    var maxCambios = parseInt(camaEl.dataset.maxCambios || "5", 10);
-    var limiteTexto = cambiosRealizados + " / " + maxCambios;
+    var maxCambios = camaEl.dataset.maxCambios ? parseInt(camaEl.dataset.maxCambios, 10) : null;
+    var limiteTexto = maxCambios === null ? "Sin limite" : (cambiosRealizados + " / " + maxCambios);
     var ultimaActualizacion = formatearFechaHoraCorta(camaEl.dataset.ultimaActualizacion || "");
     var usuarioUltimaActualizacion = camaEl.dataset.usuarioUltimaActualizacion || "Sin registro";
     var estadoActualTexto = estadoActual || "SIN_ASIGNACION";
@@ -754,9 +754,23 @@ document.addEventListener("DOMContentLoaded", function () {
     // Esta bandera define toda la estructura del modal.
     var esOcupada = estadoActual === "OCUPADA" || estadoActual === "PRE_ALTA";
 
+    if (window.MAPA_ROL_INTENTOS_RESTRINGIDO && !esOcupada) {
+      await Swal.fire({
+        icon: "warning",
+        title: "Accion no permitida",
+        text: "Este rol solo puede mover pacientes o manejar pre-altas desde camas ocupadas.",
+        confirmButtonText: "Entendido"
+      });
+      return;
+    }
+
     // ── HTML para cama VACIA (u otro estado sin paciente) ────────────────────
     // Permite cambiar el estado; si se elige OCUPADA aparece busqueda de paciente
-    var opcionesEstado = ESTADOS_CAMA.map(function (e) {
+    var estadosDisponibles = ESTADOS_CAMA.slice();
+    if (window.MAPA_ROL_INTENTOS_RESTRINGIDO && esOcupada) {
+      estadosDisponibles = ["VACIA", "PRE_ALTA"];
+    }
+    var opcionesEstado = estadosDisponibles.map(function (e) {
       var sel = e === estadoActual ? ' selected="selected"' : "";
       return '<option value="' + e + '"' + sel + ">" + e + "</option>";
     }).join("");
@@ -881,6 +895,10 @@ document.addEventListener("DOMContentLoaded", function () {
             var estadoEl = document.getElementById("modal-mapa-estado");
             if (!estadoEl || !estadoEl.value) {
               Swal.showValidationMessage("Debe seleccionar el nuevo estado.");
+              return false;
+            }
+            if (window.MAPA_ROL_INTENTOS_RESTRINGIDO && ["VACIA", "PRE_ALTA"].indexOf(estadoEl.value) === -1) {
+              Swal.showValidationMessage("Este rol solo puede pasar la cama a PRE_ALTA o VACIA desde esta pantalla.");
               return false;
             }
             // Si se mantiene OCUPADA, re-enviar el paciente actual para no romper validacion del backend.
@@ -1275,7 +1293,7 @@ document.addEventListener("DOMContentLoaded", function () {
           camaEl.dataset.servicio = servicio.nombre || "";
           camaEl.dataset.cubiculo = nombreCubiculo || "";
           camaEl.dataset.cambiosRealizados = String(cama.cambios_realizados || 0);
-          camaEl.dataset.maxCambios = String(cama.max_cambios || 5);
+          camaEl.dataset.maxCambios = cama.max_cambios != null ? String(cama.max_cambios) : "";
           camaEl.dataset.ultimaActualizacion = cama.ultima_actualizacion || "";
           camaEl.dataset.usuarioUltimaActualizacion = cama.usuario_ultima_actualizacion || "";
 

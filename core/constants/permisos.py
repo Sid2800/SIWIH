@@ -95,15 +95,19 @@ ROLES_GLOBALES = ['directivo', 'admin']
 # PERMISOS APP MAPEO_CAMAS
 # -----------------------------
 
-# [2026-05-08] Acceso de solo visualización (ver mapa, dashboard)
-MAPEO_CAMAS_VISUALIZACION_ROLES = ["admin", "digitador", "visitante", "directivo"]
-MAPEO_CAMAS_VISUALIZACION_UNIDADES = ["ADMI"]
+# [2026-05-18] Acceso para entrar y ejecutar flujo de mapeo.
+MAPEO_CAMAS_MAPEAR_ROLES = ["admin","digitador"]
+MAPEO_CAMAS_MAPEAR_UNIDADES = ["ADMI"]
 
-# Acceso de edición (mapear, sincronizar, actualizar camas)
-MAPEO_CAMAS_EDITOR_ROLES = ["admin"]
-MAPEO_CAMAS_EDITOR_UNIDADES = ["ADMI"]
+# [2026-05-18] Acceso para cambios manuales en el mapa (edición directa).
+MAPEO_CAMAS_CAMBIOS_ROLES = ["admin"]
+MAPEO_CAMAS_CAMBIOS_UNIDADES = ["ADMI"]
+
+# [2026-05-18] Usuarios a los que se les aplica el límite de 5 io mas ntentos de cambio por sala. Solo Puede Movimientos. Pre-Altas, Vacia
+MAPEO_CAMAS_INTENTOS_CAMBIO_ROLES = [""]
+MAPEO_CAMAS_INTENTOS_CAMBIO_UNIDADES = ["ADMI"]
 
 # Acceso de auditoría (historiales, detalle de historial)
 # [2026-05-11] Visitante habilitado para visualizar templates de historial.
-MAPEO_CAMAS_HISTORIALES_ROLES = ["admin", "visitante", "digitador"]
+MAPEO_CAMAS_HISTORIALES_ROLES = ["admin", "visitante",]
 MAPEO_CAMAS_HISTORIALES_UNIDADES = ["ADMI"]

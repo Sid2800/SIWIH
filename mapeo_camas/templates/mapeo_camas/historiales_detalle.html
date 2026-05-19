@@ -35,6 +35,7 @@
   </div>
 
   <div id="detalle-nota-servicios" class="detalle-nota-servicios" style="display:none;"></div>
+  <div id="detalle-resumen-comun" class="detalle-resumen-comun" style="display:none;"></div>
 
   <div id="detalle-tabla-filtros" class="fechasfiltro" style="margin-bottom: 0.75rem;">
     <label for="dtf-fecha-inicio">Desde</label>
@@ -44,6 +45,33 @@
     <button type="button" class="dt-button" id="dtf-btn-limpiar" title="Limpiar filtros">
       <i class="bi bi-eraser boton-exportacion"></i>
     </button>
+  </div>
+
+  <div id="detalle-paginacion" class="detalle-paginacion" style="display:none;">
+    <div class="detalle-paginacion-nav">
+      <button type="button" class="dt-button detalle-page-btn" id="detalle-page-first" title="Primera página" aria-label="Primera página">
+        <i class="bi bi-chevron-double-left boton-exportacion"></i>
+      </button>
+      <button type="button" class="dt-button detalle-page-btn" id="detalle-page-prev" title="Página anterior" aria-label="Página anterior">
+        <i class="bi bi-chevron-left boton-exportacion"></i>
+      </button>
+      <span id="detalle-page-info" class="detalle-page-info">1-0 de 0</span>
+      <button type="button" class="dt-button detalle-page-btn" id="detalle-page-next" title="Página siguiente" aria-label="Página siguiente">
+        <i class="bi bi-chevron-right boton-exportacion"></i>
+      </button>
+      <button type="button" class="dt-button detalle-page-btn" id="detalle-page-last" title="Última página" aria-label="Última página">
+        <i class="bi bi-chevron-double-right boton-exportacion"></i>
+      </button>
+    </div>
+    <div class="detalle-paginacion-config">
+      <label for="detalle-page-size">Por página</label>
+      <select id="detalle-page-size" class="formularioCampo-select detalle-page-size">
+        <option value="25">25</option>
+        <option value="50" selected>50</option>
+        <option value="100">100</option>
+        <option value="200">200</option>
+      </select>
+    </div>
   </div>
 
   <div id="detalle-estructura-contenedor" class="detalle-estructura"></div>
@@ -58,8 +86,8 @@
           <th>Paciente</th>
           <th>DNI</th>
           <th>Acción / Transición</th>
-          <th>Fecha</th>
-          <th>Usuario</th>
+          <th id="detalle-th-fecha">Fecha</th>
+          <th id="detalle-th-usuario">Usuario</th>
         </tr>
       </thead>
       <tbody id="tabla-detalle-camas-body"></tbody>
@@ -69,9 +97,9 @@
 {% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'mapeo_camas/styles/historialesDetalleCamas.css' %}?v=20260508b">
+<link rel="stylesheet" href="{% static 'mapeo_camas/styles/historialesDetalleCamas.css' %}?v=20260518b">
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'mapeo_camas/scripts/historialesDetalleCamas.js' %}?v=20260508b"></script>
+<script src="{% static 'mapeo_camas/scripts/historialesDetalleCamas.js' %}?v=20260518c"></script>
 {% endblock %}

@@ -16,8 +16,8 @@
 
   <div class="mapa-acciones-superior">
     <div class="dt-buttons mapa-botones-acciones">
-      {# [2026-05-08] Botones de edición solo para admin/digitador de ADMI #}
-      {% if request.user|tiene_rol:"admin:ADMI,digitador:ADMI" %}
+      {# [2026-05-18] Botones de mapeo según permiso de mapear. #}
+      {% if puede_mapear %}
       <button type="button" class="dt-button" id="btn-iniciar-mapeo" title="Iniciar mapeo de camas">
         <i class="bi bi-play-circle boton-exportacion"></i>
       </button>
@@ -28,11 +28,13 @@
       <button type="button" class="dt-button" id="btn-imprimir-camas" title="Imprimir mapa">
         <i class="bi bi-printer boton-exportacion"></i>
       </button>
+      {% if puede_ver_historiales %}
       <a href="{% url 'mapeo_camas_historiales' %}" class="dt-button" id="btn-historiales-camas" title="Ver historiales de camas">
         <i class="bi bi-clock-history boton-exportacion"></i>
       </a>
-      {# [2026-05-08] Botones de control de sesión solo para editores #}
-      {% if request.user|tiene_rol:"admin:ADMI,digitador:ADMI" %}
+      {% endif %}
+      {# [2026-05-18] Botones de control de sesión para usuarios con permiso de mapear. #}
+      {% if puede_mapear %}
       <button type="button" class="dt-button mapa-control-mapeo--oculto" id="btn-terminar-mapeo" title="Terminar mapeo">
         <i class="bi bi-check2-circle boton-exportacion"></i>
       </button>
@@ -107,8 +109,8 @@
 
   <div id="mapa-servicios" class="mapa-grid-servicios"></div>
 
-  {# [2026-05-08] Botón pie de página solo para editores #}
-  {% if request.user|tiene_rol:"admin:ADMI,digitador:ADMI" %}
+  {# [2026-05-18] Botón pie de página para usuarios con permiso de mapear. #}
+  {% if puede_mapear %}
   <div id="mapa-pie-mapeo" class="mapa-pie-mapeo mapa-control-mapeo--oculto" style="margin-top:1.5rem;">
     <button type="button" class="dt-button" id="btn-terminar-mapeo-pie" title="Terminar mapeo">
       <i class="bi bi-check2-circle boton-exportacion"></i>
@@ -127,6 +129,7 @@
 {# [2026-05-08] Indica al JS si el usuario puede editar el mapa o es solo lectura #}
 <script>
   window.MAPA_SOLO_LECTURA = {% if es_editor %}false{% else %}true{% endif %};
+  window.MAPA_ROL_INTENTOS_RESTRINGIDO = {% if es_rol_intentos_restringido %}true{% else %}false{% endif %};
 </script>
 <script src="{% static 'mapeo_camas/scripts/mapaCamasAsignacion.js' %}?v=20260512b"></script>
 {% endblock %}

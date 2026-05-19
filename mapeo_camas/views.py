@@ -1,21 +1,25 @@
 from datetime import datetime, timedelta
 import json 
-from collections import defaultdict
 from functools import lru_cache
 
 from django.contrib.auth.decorators import login_required
 from usuario.permisos import verificar_permisos_usuario
 from core.constants.permisos import (
-    MAPEO_CAMAS_EDITOR_ROLES,
-    MAPEO_CAMAS_EDITOR_UNIDADES,
+    MAPEO_CAMAS_INTENTOS_CAMBIO_ROLES as MAPEO_CAMAS_INTENTO_CAMBIO_ROLES,
+    MAPEO_CAMAS_INTENTOS_CAMBIO_UNIDADES as MAPEO_CAMAS_INTENTO_CAMBIO_UNIDADES,
+    MAPEO_CAMAS_CAMBIOS_ROLES,
+    MAPEO_CAMAS_CAMBIOS_UNIDADES,
     MAPEO_CAMAS_HISTORIALES_ROLES,
     MAPEO_CAMAS_HISTORIALES_UNIDADES,
-    MAPEO_CAMAS_VISUALIZACION_ROLES,
-    MAPEO_CAMAS_VISUALIZACION_UNIDADES,
+    MAPEO_CAMAS_MAPEAR_ROLES,
+    MAPEO_CAMAS_MAPEAR_UNIDADES,
+    
 )
 from django.db import transaction
-from django.db.models import Count, Exists, OuterRef, Prefetch, Q, Subquery
+from django.db.models import Count, Exists, F, OuterRef, Prefetch, Q, Subquery
+from django.db.models.functions import Coalesce
 from django.http import JsonResponse
+from django.shortcuts import redirect
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 from django.views.generic import TemplateView
@@ -57,21 +61,19 @@ OBSERVACION_CAMBIO_MANUAL_MAPA = "Cambio manual desde mapa"
 OBSERVACION_CAMBIO_MANUAL_MAPA_DETALLE = "Cambio manual desde mapa (detalle)"
 OBSERVACION_MOVIMIENTO_PACIENTE_MAPA = "Movimiento de paciente entre camas (mapa)"
 OBSERVACION_MOVIMIENTO_PACIENTE_MAPA_DETALLE = "Movimiento de paciente entre camas (mapa detalle)"
+OBSERVACION_CAMBIO_TRASLADO_MAPEO = "Cambio/traslado desde mapeo"
 # Observacion para traslados de superadmin: queda registrado pero NO cuenta
 # en _contar_cambios_manual_por_sala, por lo que no descuenta del límite.
 OBSERVACION_MOVIMIENTO_PACIENTE_MAPA_SUPERADMIN = "Movimiento de paciente entre camas (superadmin)"
+DETALLE_PAGE_SIZE_DEFAULT = 50
+DETALLE_PAGE_SIZE_MAX = 200
 
 
 # --- Helpers de serialización robustos para el mapa de camas ---
 # [2026-05-07] Helper para serializar datos de paciente
 def _paciente_payload_v2(paciente):
-    if not paciente:
-        return None
-    return {
-        "id": paciente.id,
-        "nombre": str(paciente),
-        "dni": getattr(paciente, "dni", "") or ""
-    }
+    # [2026-05-19] Alias de compatibilidad para evitar duplicar lógica de serialización.
+    return _paciente_payload(paciente)
 
 # [2026-05-07] Helper para serializar datos de cama con asignación actual
 def _cama_payload(cama, asig, cambios_realizados, max_cambios, meta_actualizacion):
@@ -129,7 +131,7 @@ def sincronizar_camas_superadmin(request):
     Solo accesible para administradores de ADMI.
     """
     # [2026-05-08] Solo editores (admin/digitador de ADMI) pueden sincronizar
-    if not verificar_permisos_usuario(request.user, MAPEO_CAMAS_EDITOR_ROLES, MAPEO_CAMAS_EDITOR_UNIDADES):
+    if not _tiene_permiso_cambios_mapa(request.user):
         return JsonResponse({"ok": False, "error": "Acceso denegado."}, status=403)
 
     if request.method != "POST":
@@ -207,13 +209,17 @@ def sincronizar_camas_superadmin(request):
 # =============================================================================
 # [2026-05-07] Vista: Página principal del mapa de camas con sesión de mapeo
 # [2026-05-11] Permisos manejados localmente en mapeo_camas para no afectar mixins globales
+
+# [2026-05-19] El acceso a la vista del mapa es de visualización (HISTORIALES);
+# la edición directa se controla aparte con MAPEO_CAMAS_CAMBIOS_*.
 class MapeoCamasMapaView(UnidadRolRequiredMixin, TemplateView):
     template_name = "mapeo_camas/mapa.html"
-    required_roles = MAPEO_CAMAS_VISUALIZACION_ROLES
-    required_unidades = MAPEO_CAMAS_VISUALIZACION_UNIDADES
+    required_roles = MAPEO_CAMAS_HISTORIALES_ROLES
+    required_unidades = MAPEO_CAMAS_HISTORIALES_UNIDADES
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        es_rol_intentos_restringido = _es_rol_intentos_restringido(self.request.user)
         context["titulo"] = "Mapa de Camas"
         context["subtitulo"] = "Asignacion por paciente y estado de cama"
         # [2026-05-04 FEATURE] Sesion activa de OTRO usuario (para mostrar advertencia a los demas).
@@ -228,11 +234,16 @@ class MapeoCamasMapaView(UnidadRolRequiredMixin, TemplateView):
             .order_by("-fecha_inicio")
             .first()
         )
-        # [2026-05-08] Indica si el usuario tiene permisos de edición sobre el mapa.
-        # Se usa en el template para inyectar window.MAPA_SOLO_LECTURA al JS.
-        context["es_editor"] = verificar_permisos_usuario(
-            self.request.user, MAPEO_CAMAS_EDITOR_ROLES, MAPEO_CAMAS_EDITOR_UNIDADES
-        )
+        # [2026-05-18] Permiso para flujo de mapeo (iniciar/finalizar/cancelar mapeo).
+        context["puede_mapear"] = _puede_gestionar_sesion_mapeo(self.request.user)
+        # [2026-05-18] Permiso para cambios manuales directos en el mapa.
+        context["puede_hacer_cambios_mapa"] = _tiene_permiso_cambios_mapa(self.request.user)
+        context["puede_ver_historiales"] = _tiene_permiso_historiales(self.request.user)
+        context["es_rol_intentos_restringido"] = es_rol_intentos_restringido
+        # Compatibilidad con template/JS existente.
+        # es_editor controla MAPA_SOLO_LECTURA en frontend; debe responder al permiso de cambios,
+        # no al permiso de iniciar/finalizar mapeo.
+        context["es_editor"] = context["puede_hacer_cambios_mapa"]
         return context
 
 
@@ -280,17 +291,17 @@ def debug_permisos_mapa(request):
         )
     )
 
-    match_global = PerfilUnidad.objects.filter(
+    match_global_vista = PerfilUnidad.objects.filter(
         usuario=usuario,
-        rol__in=MAPEO_CAMAS_VISUALIZACION_ROLES,
+        rol__in=MAPEO_CAMAS_HISTORIALES_ROLES,
         alcance=AlcanceUsuario.GLOBAL,
     ).exists()
 
-    match_unidad = PerfilUnidad.objects.filter(
+    match_unidad_vista = PerfilUnidad.objects.filter(
         usuario=usuario,
-        rol__in=MAPEO_CAMAS_VISUALIZACION_ROLES,
+        rol__in=MAPEO_CAMAS_HISTORIALES_ROLES,
         alcance=AlcanceUsuario.UNIDAD,
-        servicio_unidad__nombre_corto_unidad__in=MAPEO_CAMAS_VISUALIZACION_UNIDADES,
+        servicio_unidad__nombre_corto_unidad__in=MAPEO_CAMAS_HISTORIALES_UNIDADES,
     ).exists()
 
     return JsonResponse(
@@ -303,20 +314,28 @@ def debug_permisos_mapa(request):
                 "is_active": usuario.is_active,
                 "is_superuser": usuario.is_superuser,
             },
-            "requerido_mapa": {
-                "roles": MAPEO_CAMAS_VISUALIZACION_ROLES,
-                "unidades": MAPEO_CAMAS_VISUALIZACION_UNIDADES,
+            "requerido_vista_mapa": {
+                "roles": MAPEO_CAMAS_HISTORIALES_ROLES,
+                "unidades": MAPEO_CAMAS_HISTORIALES_UNIDADES,
+            },
+            "requerido_flujo_mapeo": {
+                "roles": MAPEO_CAMAS_MAPEAR_ROLES,
+                "unidades": MAPEO_CAMAS_MAPEAR_UNIDADES,
+            },
+            "requerido_cambios_mapa": {
+                "roles": MAPEO_CAMAS_CAMBIOS_ROLES,
+                "unidades": MAPEO_CAMAS_CAMBIOS_UNIDADES,
             },
             "perfiles": perfiles,
             "evaluacion": {
-                "verificar_permisos_usuario": verificar_permisos_usuario(
-                    usuario,
-                    MAPEO_CAMAS_VISUALIZACION_ROLES,
-                    MAPEO_CAMAS_VISUALIZACION_UNIDADES,
-                ),
-                "mixin_global": match_global,
-                "mixin_unidad": match_unidad,
-                "mixin_resultado": bool(usuario.is_superuser or match_global or match_unidad),
+                "puede_ver_mapa": _tiene_permiso_historiales(usuario),
+                "puede_mapear": _tiene_permiso_mapear(usuario),
+                "puede_gestionar_sesion_mapeo": _puede_gestionar_sesion_mapeo(usuario),
+                "puede_hacer_cambios_mapa": _tiene_permiso_cambios_mapa(usuario),
+                "es_rol_intentos_restringido": _es_rol_intentos_restringido(usuario),
+                "mixin_vista_global": match_global_vista,
+                "mixin_vista_unidad": match_unidad_vista,
+                "mixin_vista_resultado": bool(usuario.is_superuser or match_global_vista or match_unidad_vista),
             },
         }
     )
@@ -357,15 +376,6 @@ def _hora_local_iso(dt):
     return timezone.localtime(dt).isoformat()
 
 
-# [2026-05-07] Helper para extraer código de estado visual de asignación
-def _estado_visual(asignacion):
-    """Devuelve el estado de la asignación para mostrarlo en el mapa.
-    Si la cama no tiene asignación registrada, retorna 'SIN_ASIGNACION'."""
-    if not asignacion or not asignacion.estado:
-        return "SIN_ASIGNACION"
-    return asignacion.estado.codigo
-
-
 # [2026-05-07] Helper para serializar datos de paciente en historiales
 def _paciente_payload(paciente):
     """Serializa los datos mínimos del paciente para el JSON del mapa.
@@ -385,25 +395,135 @@ def _es_superadmin(usuario):
     return bool(usuario and usuario.is_superuser)
 
 
+# [2026-05-19] Helpers de permisos para mantener una sola fuente de verdad.
+def _tiene_permiso_historiales(usuario):
+    """Permite acceso de solo visualización al mapa e historiales."""
+    return verificar_permisos_usuario(
+        usuario,
+        MAPEO_CAMAS_HISTORIALES_ROLES,
+        MAPEO_CAMAS_HISTORIALES_UNIDADES,
+    )
+
+
+def _tiene_permiso_cambios_mapa(usuario):
+    """Permite cambios manuales de estado/movimiento en camas."""
+    return verificar_permisos_usuario(
+        usuario,
+        MAPEO_CAMAS_CAMBIOS_ROLES,
+        MAPEO_CAMAS_CAMBIOS_UNIDADES,
+    )
+
+
+def _tiene_permiso_mapear(usuario):
+    """Permite iniciar/finalizar/cancelar sesiones de mapeo."""
+    return verificar_permisos_usuario(
+        usuario,
+        MAPEO_CAMAS_MAPEAR_ROLES,
+        MAPEO_CAMAS_MAPEAR_UNIDADES,
+    )
+
+
+def _puede_gestionar_sesion_mapeo(usuario):
+    """Permite administrar sesión de mapeo si tiene permiso y no cae en rol restringido."""
+    return _tiene_permiso_mapear(usuario) and (not _es_rol_intentos_restringido(usuario))
+
+
 # [2026-05-07] Helper para calcular inicio de ventana de límite de movimientos
 def _inicio_ventana_limite_sala():
     """Calcula el datetime de inicio de la ventana temporal para el conteo de cambios."""
     return timezone.now() - timedelta(hours=VENTANA_LIMITE_CAMBIOS_SALA_HORAS)
 
 
+def _filtro_observaciones_movimiento_limite():
+    """Filtro común para contar movimientos que consumen límite por sala.
+    Los movimientos de superadmin quedan fuera porque usan otra observación."""
+    return Q(observacion__in=[
+        OBSERVACION_MOVIMIENTO_PACIENTE_MAPA,
+        OBSERVACION_MOVIMIENTO_PACIENTE_MAPA_DETALLE,
+        OBSERVACION_CAMBIO_TRASLADO_MAPEO,
+    ])
+
+
 # [2026-05-07] Helper para contar movimientos manuales recientes por sala
 def _contar_cambios_manual_por_sala(sala_id):
     """Cuenta cuántos movimientos de paciente se han registrado en la sala
     dentro de la ventana temporal activa. Se usa para aplicar el límite
-    MAX_CAMBIOS_CAMA a usuarios no superadmin."""
+    MAX_CAMBIOS_CAMA a usuarios con permiso limitado por intentos."""
     if not sala_id:
         return 0
 
-    return HistorialEstadoCama.objects.filter(
-        cama__sala_id=sala_id,
-        observacion=OBSERVACION_MOVIMIENTO_PACIENTE_MAPA,
-        fecha_hora__gte=_inicio_ventana_limite_sala(),
-    ).count()
+    return (
+        HistorialEstadoCama.objects.annotate(
+            sala_real_id=Coalesce("cama__cubiculo__sala_id", "cama__sala_id")
+        )
+        .filter(
+            sala_real_id=sala_id,
+            fecha_hora__gte=_inicio_ventana_limite_sala(),
+        )
+        .filter(_filtro_observaciones_movimiento_limite())
+        .exclude(estado_anterior=F("estado_nuevo"))
+        .count()
+    )
+
+
+def _sala_real_id_desde_cama(cama):
+    """Retorna la sala real de la cama usando el cubículo cuando exista."""
+    if not cama:
+        return None
+    cubiculo = getattr(cama, "cubiculo", None)
+    return (cubiculo.sala_id if cubiculo else None) or getattr(cama, "sala_id", None)
+
+
+# [2026-05-18] Helper para decidir si aplica límite de intentos al usuario
+def _aplica_limite_intentos(usuario):
+    """Retorna True cuando al usuario se le debe aplicar el límite de cambios por sala."""
+    # [2026-05-19] Regla clave:
+    # - Superadmin nunca entra al rol limitado, aunque cumpla validaciones de perfiles.
+    # - El límite solo aplica a usuarios definidos en MAPEO_CAMAS_INTENTOS_CAMBIO_*.
+    if not usuario or getattr(usuario, "is_superuser", False):
+        return False
+    return verificar_permisos_usuario(
+        usuario,
+        MAPEO_CAMAS_INTENTO_CAMBIO_ROLES,
+        MAPEO_CAMAS_INTENTO_CAMBIO_UNIDADES,
+    )
+
+
+def _max_cambios_para_usuario(usuario):
+    """Retorna el máximo de cambios permitido para el usuario o None si no aplica límite."""
+    return MAX_CAMBIOS_CAMA if _aplica_limite_intentos(usuario) else None
+
+
+def _es_rol_intentos_restringido(usuario):
+    # [2026-05-19] Alias semántico para agrupar todas las restricciones funcionales
+    # del rol MAPEO_CAMAS_INTENTOS_CAMBIO_ROLES en un único punto de lectura.
+    """Identifica al rol que solo puede mover pacientes y manejar pre-altas/altas."""
+    return _aplica_limite_intentos(usuario)
+
+
+def _validar_limite_intentos_salas(usuario, sala_ids):
+    """Valida el límite operativo por sala para usuarios con permiso limitado."""
+    if not _aplica_limite_intentos(usuario):
+        return None
+
+    salas_validas = [sala_id for sala_id in set(sala_ids or []) if sala_id]
+    for sala_id in salas_validas:
+        cambios_realizados = _contar_cambios_manual_por_sala(sala_id)
+        if cambios_realizados >= MAX_CAMBIOS_CAMA:
+            return JsonResponse(
+                {
+                    "ok": False,
+                    "error": (
+                        f"La sala ya alcanzo el maximo de {MAX_CAMBIOS_CAMA} cambios "
+                        f"en las ultimas {VENTANA_LIMITE_CAMBIOS_SALA_HORAS} hora(s)."
+                    ),
+                    "cambios_realizados": cambios_realizados,
+                    "max_cambios": MAX_CAMBIOS_CAMA,
+                },
+                status=400,
+            )
+
+    return None
 
 
 # [2026-05-07] Helper para obtener sesión de mapeo activa del usuario
@@ -428,16 +548,6 @@ def _obtener_servicios_ids_sesion(sesion):
     return list(
         sesion.servicios_incluidos.order_by("servicio_id").values_list("servicio_id", flat=True)
     )
-
-
-# [2026-05-07] Helper para obtener ubicación descriptiva de cama
-def _ubicacion_cama(cama):
-    """Construye una etiqueta compacta de ubicacion: servicio/sala/modulo."""
-    servicio = getattr(getattr(cama, "sala", None), "servicio", None)
-    sala_nombre = getattr(getattr(cama, "sala", None), "nombre_sala", "") or "SIN_SALA"
-    servicio_nombre = getattr(servicio, "nombre_servicio", "") or "SIN_SERVICIO"
-    modulo_nombre = getattr(getattr(cama, "cubiculo", None), "nombre_cubiculo", "") or "SIN_MODULO"
-    return f"{servicio_nombre}/{sala_nombre}/{modulo_nombre}"
 
 
 # [2026-05-07] Helper para registrar detalle de mapeo (auditoría)
@@ -534,29 +644,14 @@ def _ubicacion_desde_cama(cama):
     return f"{servicio_nombre} / {sala_nombre} / {cubiculo_nombre}"
 
 
-def _estado_css_mapa(estado):
-    """Mapea estado de cama a clase visual usada en el mapa."""
-    valor = (getattr(estado, "codigo", estado) or "").strip().upper()
-    if valor == "VACIA":
-        return "mapa-cama--vacia"
-    if valor == "OCUPADA":
-        return "mapa-cama--ocupada"
-    if valor == "ALTA":
-        return "mapa-cama--alta"
-    if valor == "FUERA_SERVICIO":
-        return "mapa-cama--fuera-servicio"
-    if valor == "CONSULTA_EXTERNA":
-        return "mapa-cama--consulta-externa"
-    return "mapa-cama--sin-asignacion"
-
-
 # [2026-05-07] API: Obtener catálogo de camas para filtros de historiales
 @login_required
 @require_GET
 def historiales_camas_filtro(request):
-    if not verificar_permisos_usuario(request.user, MAPEO_CAMAS_HISTORIALES_ROLES, MAPEO_CAMAS_HISTORIALES_UNIDADES):
-        return JsonResponse({"ok": False, "error": "Acceso denegado."}, status=403)
     """Retorna catálogo de camas para el select de filtros."""
+    if not _tiene_permiso_historiales(request.user):
+        return JsonResponse({"ok": False, "error": "Acceso denegado."}, status=403)
+
     camas = (
         Cama.objects.filter(estado=1)
         .select_related("sala__servicio", "cubiculo")
@@ -579,8 +674,9 @@ def historiales_camas_filtro(request):
 @require_GET
 def historiales_data(request):
     """Lista registros según tipo: mapeo, historial o movimiento."""
-    if not verificar_permisos_usuario(request.user, MAPEO_CAMAS_HISTORIALES_ROLES, MAPEO_CAMAS_HISTORIALES_UNIDADES):
+    if not _tiene_permiso_historiales(request.user):
         return JsonResponse({"ok": False, "error": "Acceso denegado."}, status=403)
+
     tipo = (request.GET.get("tipo") or "mapeo").strip().lower()
     cama_id = (request.GET.get("cama_id") or "").strip()
     fecha_inicio = _parse_fecha_filtro(request.GET.get("fecha_inicio"), fin_del_dia=False)
@@ -748,10 +844,21 @@ def historiales_data(request):
 @require_GET
 def historiales_cards_data(request):
     """Devuelve cards de detalle según tipo seleccionado y registro."""
-    if not verificar_permisos_usuario(request.user, MAPEO_CAMAS_HISTORIALES_ROLES, MAPEO_CAMAS_HISTORIALES_UNIDADES):
+    if not _tiene_permiso_historiales(request.user):
         return JsonResponse({"ok": False, "error": "Acceso denegado."}, status=403)
+
     tipo = (request.GET.get("tipo") or "").strip().lower()
     registro_id = (request.GET.get("id") or "").strip()
+
+    try:
+        page = max(int(request.GET.get("page") or 1), 1)
+    except (TypeError, ValueError):
+        page = 1
+    try:
+        page_size = int(request.GET.get("page_size") or DETALLE_PAGE_SIZE_DEFAULT)
+    except (TypeError, ValueError):
+        page_size = DETALLE_PAGE_SIZE_DEFAULT
+    page_size = max(1, min(page_size, DETALLE_PAGE_SIZE_MAX))
 
     if not registro_id:
         return JsonResponse({"ok": False, "error": "Debe indicar id."}, status=400)
@@ -763,18 +870,47 @@ def historiales_cards_data(request):
 
         # [2026-05-04 AUDIT] Bug Fix: Añadir select_related() para estado_actual y tipo_accion
         # para evitar serialización de objetos FK. Asegurar acceso a .codigo para serializar.
+        # [2026-05-18] Orden ascendente para procesar cronológicamente y calcular transiciones
         detalles = (
             DetalleMapeoCama.objects.filter(sesion_mapeo=sesion)
             .select_related("cama__sala__servicio", "cama__cubiculo__sala__servicio", "paciente_actual", "usuario", "estado_actual", "tipo_accion")
-            .order_by("cama__sala__nombre_sala", "cama__cubiculo__numero", "cama__numero_cama", "-fecha_hora")
+            .order_by("cama__sala__nombre_sala", "cama__cubiculo__numero", "cama__numero_cama", "fecha_hora")
         )
+        
+        # [2026-05-18] Convertir a lista, procesar con cache de transiciones, luego reordenar
+        detalles_list = list(detalles)
+        # Cache de último estado visto por cama (en orden cronológico)
+        ultimo_estado_por_cama = {}
+        # Diccionario que mapea (cama_id, fecha_hora) -> tipo_accion_display para renderizar
+        tipo_accion_display_map = {}
+        
+        for item in detalles_list:
+            estado_actual_codigo = item.estado_actual.codigo if item.estado_actual else ""
+            estado_anterior_codigo = ultimo_estado_por_cama.get(item.cama_id, None)
+            
+            # [2026-05-18] Determinar cómo mostrar la transición
+            if estado_anterior_codigo is None:
+                # Es el primer cambio de esta cama en la sesión
+                tipo_accion_display = "Confirmación"
+            else:
+                # Hay un estado anterior, mostrar transición
+                tipo_accion_display = f"{estado_anterior_codigo} \u2192 {estado_actual_codigo}"
+            
+            tipo_accion_display_map[(item.cama_id, item.fecha_hora.isoformat())] = tipo_accion_display
+            # Actualizar cache con el estado actual
+            ultimo_estado_por_cama[item.cama_id] = estado_actual_codigo
+        
+        # [2026-05-18] Re-ordenar detalles por fecha descendente para renderizar (más reciente primero)
+        detalles_list_ordenados = sorted(detalles_list, key=lambda x: x.fecha_hora, reverse=True)
+        
         cards = []
         servicios_map = {}
         # [2026-05-07] Deduplicar por cama dentro de cada cubículo/sala:
         # la consulta ordena por "-fecha_hora" por cama, así que el primer registro
         # por numero_cama es el más reciente. Se omiten los duplicados posteriores.
         camas_vistas_estructura = set()
-        for item in detalles:
+        
+        for item in detalles_list_ordenados:
             paciente = _paciente_payload(item.paciente_actual)
             cama_numero = _nombre_cama(item.cama)
             cubiculo_obj = getattr(item.cama, "cubiculo", None)
@@ -794,6 +930,9 @@ def historiales_cards_data(request):
                     "camas_directas": [],
                 }
 
+            # [2026-05-18] Obtener tipo_accion_display desde el mapa precalculado
+            tipo_accion_display = tipo_accion_display_map.get((item.cama_id, item.fecha_hora.isoformat()), "Confirmación")
+
             # [2026-05-04 AUDIT] Access .codigo for serializable values (EstadoMapeo objects).
             cama_item = {
                 "numero_cama": cama_numero,
@@ -802,7 +941,7 @@ def historiales_cards_data(request):
                 "dni": paciente["dni"] if paciente else "",
                 "usuario": _nombre_usuario(item.usuario),
                 "fecha": _hora_local_iso(item.fecha_hora),
-                "tipo_accion": item.tipo_accion.codigo if item.tipo_accion else "",
+                "tipo_accion": tipo_accion_display,
                 "hubo_cambio": bool(item.hubo_cambio),
                 "fue_validada": bool(item.fue_validada),
                 "observacion": item.observacion or "",
@@ -826,7 +965,7 @@ def historiales_cards_data(request):
             cards.append(
                 {
                     "titulo": f"Cama {item.cama_id}",
-                    "subtitulo": item.tipo_accion.codigo if item.tipo_accion else "",
+                    "subtitulo": tipo_accion_display,
                     "estado": item.estado_actual.codigo if item.estado_actual else "",
                     "paciente": paciente["nombre"] if paciente else "Sin paciente",
                     "usuario": _nombre_usuario(item.usuario),
@@ -860,7 +999,20 @@ def historiales_cards_data(request):
             .order_by("servicio__nombre_servicio")
         ]
 
-        return JsonResponse({"ok": True, "cards": cards, "estructura": estructura, "servicios_sesion": servicios_sesion})
+        return JsonResponse(
+            {
+                "ok": True,
+                "cards": cards,
+                "estructura": estructura,
+                "servicios_sesion": servicios_sesion,
+                "paginacion": {
+                    "page": 1,
+                    "page_size": page_size,
+                    "total_items": len(cards),
+                    "total_pages": 1,
+                },
+            }
+        )
 
     if tipo == "historial":
         # [2026-05-05 FEATURE] Construye estructura servicio>sala>cubiculo igual que mapeo.
@@ -873,11 +1025,18 @@ def historiales_cards_data(request):
             .filter(cama_id=registro_id)
             .order_by("cama__sala__nombre_sala", "cama__cubiculo__numero", "cama__numero_cama", "-fecha_hora")
         )
-        if not timeline_qs.exists():
+        total_items = timeline_qs.count()
+        if total_items == 0:
             return JsonResponse({"ok": False, "error": "Historial no encontrado para esta cama."}, status=404)
 
+        total_pages = max(1, (total_items + page_size - 1) // page_size)
+        if page > total_pages:
+            page = total_pages
+        inicio = (page - 1) * page_size
+        timeline_page = timeline_qs[inicio:inicio + page_size]
+
         servicios_map = {}
-        for item in timeline_qs:
+        for item in timeline_page:
             paciente = _paciente_payload(item.paciente)
             estado_nuevo_codigo = item.estado_nuevo.codigo if hasattr(item.estado_nuevo, "codigo") else str(item.estado_nuevo)
             estado_anterior_codigo = (
@@ -928,7 +1087,19 @@ def historiales_cards_data(request):
                 })
             estructura.append({"nombre": servicio_data["nombre"], "salas": salas_data})
 
-        return JsonResponse({"ok": True, "cards": [], "estructura": estructura})
+        return JsonResponse(
+            {
+                "ok": True,
+                "cards": [],
+                "estructura": estructura,
+                "paginacion": {
+                    "page": page,
+                    "page_size": page_size,
+                    "total_items": total_items,
+                    "total_pages": total_pages,
+                },
+            }
+        )
 
     if tipo == "movimiento":
         # [2026-05-05 FEATURE] Recibe cama_id, muestra todos sus movimientos en estructura mapeo.
@@ -942,8 +1113,15 @@ def historiales_cards_data(request):
             .filter(Q(cama_origen_id=registro_id) | Q(cama_destino_id=registro_id))
             .order_by("-fecha_hora")
         )
-        if not movimientos_qs.exists():
+        total_items = movimientos_qs.count()
+        if total_items == 0:
             return JsonResponse({"ok": False, "error": "No se encontraron movimientos para esta cama."}, status=404)
+
+        total_pages = max(1, (total_items + page_size - 1) // page_size)
+        if page > total_pages:
+            page = total_pages
+        inicio = (page - 1) * page_size
+        movimientos_page = movimientos_qs[inicio:inicio + page_size]
 
         # Determinar la cama de referencia usando el primer movimiento
         primer_mov = movimientos_qs.first()
@@ -971,7 +1149,7 @@ def historiales_cards_data(request):
             }
         }
 
-        for mov in movimientos_qs:
+        for mov in movimientos_page:
             paciente = _paciente_payload(mov.paciente)
             tipo_mov = mov.tipo_movimiento.codigo if hasattr(mov.tipo_movimiento, "codigo") else str(mov.tipo_movimiento)
             es_origen = str(mov.cama_origen_id) == str(registro_id)
@@ -1006,7 +1184,19 @@ def historiales_cards_data(request):
             })
         estructura = [{"nombre": servicio_nombre, "salas": salas_data}]
 
-        return JsonResponse({"ok": True, "cards": [], "estructura": estructura})
+        return JsonResponse(
+            {
+                "ok": True,
+                "cards": [],
+                "estructura": estructura,
+                "paginacion": {
+                    "page": page,
+                    "page_size": page_size,
+                    "total_items": total_items,
+                    "total_pages": total_pages,
+                },
+            }
+        )
 
     return JsonResponse({"ok": False, "error": "Tipo no soportado."}, status=400)
 
@@ -1016,8 +1206,16 @@ def historiales_cards_data(request):
 @require_POST
 def iniciar_mapeo(request):
     """Inicia una sesion de mapeo para el usuario actual."""
-    if not verificar_permisos_usuario(request.user, MAPEO_CAMAS_EDITOR_ROLES, MAPEO_CAMAS_EDITOR_UNIDADES):
+    if not _tiene_permiso_mapear(request.user):
         return JsonResponse({"ok": False, "error": "Acceso denegado."}, status=403)
+
+    # [2026-05-19] El rol de intentos no puede iniciar sesiones de mapeo.
+    # Solo puede operar sobre cambios permitidos cuando el mapa está disponible.
+    if _es_rol_intentos_restringido(request.user):
+        return JsonResponse(
+            {"ok": False, "error": "Este rol no puede iniciar sesiones de mapeo."},
+            status=403,
+        )
     sesion_activa = _obtener_sesion_mapeo_activa(request.user)
     if sesion_activa:
         servicios_ids = _obtener_servicios_ids_sesion(sesion_activa)
@@ -1091,6 +1289,9 @@ def iniciar_mapeo(request):
 @require_GET
 def estado_mapeo(request):
     """Devuelve la sesion de mapeo activa y camas ya procesadas para restaurar UI."""
+    if not _tiene_permiso_historiales(request.user):
+        return JsonResponse({"ok": False, "error": "Acceso denegado."}, status=403)
+
     sesion = _obtener_sesion_mapeo_activa(request.user)
     if not sesion:
         return JsonResponse({"ok": True, "sesion_activa": None, "camas_mapeadas": [], "servicio_ids": []})
@@ -1115,8 +1316,9 @@ def estado_mapeo(request):
 @require_POST
 def terminar_mapeo(request):
     """Finaliza la sesion activa de mapeo del usuario."""
-    if not verificar_permisos_usuario(request.user, MAPEO_CAMAS_EDITOR_ROLES, MAPEO_CAMAS_EDITOR_UNIDADES):
+    if not _puede_gestionar_sesion_mapeo(request.user):
         return JsonResponse({"ok": False, "error": "Acceso denegado."}, status=403)
+
     sesion = _obtener_sesion_mapeo_activa(request.user)
     if not sesion:
         return JsonResponse({"ok": False, "error": "No hay una sesion de mapeo activa."}, status=400)
@@ -1177,8 +1379,9 @@ def terminar_mapeo(request):
 @require_POST
 def cancelar_mapeo(request):
     """Cancela la sesion activa de mapeo del usuario."""
-    if not verificar_permisos_usuario(request.user, MAPEO_CAMAS_EDITOR_ROLES, MAPEO_CAMAS_EDITOR_UNIDADES):
+    if not _puede_gestionar_sesion_mapeo(request.user):
         return JsonResponse({"ok": False, "error": "Acceso denegado."}, status=403)
+
     sesion = _obtener_sesion_mapeo_activa(request.user)
     if not sesion:
         return JsonResponse({"ok": False, "error": "No hay una sesion de mapeo activa."}, status=400)
@@ -1223,44 +1426,44 @@ def cancelar_mapeo(request):
 # [2026-05-07] API: Obtener estructura completa de camas agrupadas por servicio/sala/cub\u00edculo
 @login_required
 def mapa_camas_data(request):
+    if not _tiene_permiso_historiales(request.user):
+        return JsonResponse({"ok": False, "error": "Acceso denegado."}, status=403)
+
     sesion_activa = _obtener_sesion_mapeo_activa(request.user)
     servicios_ids_sesion = _obtener_servicios_ids_sesion(sesion_activa)
 
-    # 1. Cargar todas las asignaciones históricas y quedarse solo con la más
-    #    reciente por cama.
-    #
-    #    Se ordena por:
-    #    - cama_id: para agrupar naturalmente las filas de una misma cama.
-    #    - -fecha_inicio: para que la asignación más nueva quede primero.
-    #    - -id: desempate final si hubiera dos registros con igual fecha.
-    #
-    #    Luego se recorre secuencialmente y se guarda solo la primera vez que
-    #    aparece cada cama, construyendo un diccionario:
-    #        { numero_cama: ultima_asignacion }
-    #
-    #    Este diccionario permite resolver en O(1) el estado actual de una cama
-    #    al momento de armar el árbol del mapa.
-    asignaciones = (
+    # 1. Resolver solo la ultima asignacion por cama en BD.
+    #    Evita iterar todo el historico en Python cuando la tabla crece.
+    ultima_asignacion_id = (
         AsignacionCamaPaciente.objects
-        .select_related("paciente", "estado")
-        .order_by("cama_id", "-fecha_inicio", "-id")
+        .filter(cama_id=OuterRef("cama_id"))
+        .order_by("-fecha_inicio", "-id")
+        .values("id")[:1]
     )
-    asignacion_por_cama = {}
-    for asig in asignaciones.iterator(chunk_size=1000):
-        if asig.cama_id not in asignacion_por_cama:
-            asignacion_por_cama[asig.cama_id] = asig
+    asignacion_por_cama = {
+        asig.cama_id: asig
+        for asig in (
+            AsignacionCamaPaciente.objects
+            .select_related("paciente", "estado")
+            .filter(id=Subquery(ultima_asignacion_id))
+        )
+    }
 
-    # 1.b. Obtener ultima actualizacion registrada por cama para mostrar
-    #      hora y usuario responsable en cada card.
-    historial_por_cama = {}
-    historial_qs = (
+    # 1.b. Resolver ultima actualizacion por cama con el mismo enfoque.
+    ultima_historial_id = (
         HistorialEstadoCama.objects
-        .select_related("usuario")
-        .order_by("cama_id", "-fecha_hora", "-id")
+        .filter(cama_id=OuterRef("cama_id"))
+        .order_by("-fecha_hora", "-id")
+        .values("id")[:1]
     )
-    for historial in historial_qs.iterator(chunk_size=1000):
-        if historial.cama_id not in historial_por_cama:
-            historial_por_cama[historial.cama_id] = historial
+    historial_por_cama = {
+        historial.cama_id: historial
+        for historial in (
+            HistorialEstadoCama.objects
+            .select_related("usuario")
+            .filter(id=Subquery(ultima_historial_id))
+        )
+    }
 
     # 2. Calcular el número de movimientos manuales recientes por sala.
     #
@@ -1272,14 +1475,17 @@ def mapa_camas_data(request):
     #    - mostrar en cada cama cuántos cambios lleva la sala
     #    - permitir que el frontend informe el límite operativo disponible
     cambios_por_sala = {
-        item["cama__sala_id"]: item["total"]
+        item["sala_real_id"]: item["total"]
         for item in HistorialEstadoCama.objects.filter(
-            observacion=OBSERVACION_MOVIMIENTO_PACIENTE_MAPA,
             fecha_hora__gte=_inicio_ventana_limite_sala(),
         )
-        .values("cama__sala_id")
+        .filter(_filtro_observaciones_movimiento_limite())
+        .annotate(sala_real_id=Coalesce("cama__cubiculo__sala_id", "cama__sala_id"))
+        .exclude(estado_anterior=F("estado_nuevo"))
+        .values("sala_real_id")
         .annotate(total=Count("id"))
     }
+    max_cambios_usuario = _max_cambios_para_usuario(request.user)
 
     # 3. Construcción eficiente de la jerarquía física del hospital.
     #
@@ -1361,7 +1567,7 @@ def mapa_camas_data(request):
                         cama,
                         asig,
                         cambios_por_sala.get(sala.id, 0),
-                        MAX_CAMBIOS_CAMA,
+                        max_cambios_usuario,
                         meta_actualizacion
                     ))
                 if camas_data:
@@ -1374,7 +1580,7 @@ def mapa_camas_data(request):
                     cama,
                     asig,
                     cambios_por_sala.get(sala.id, 0),
-                    MAX_CAMBIOS_CAMA,
+                    max_cambios_usuario,
                     meta_actualizacion
                 ))
             if cubiculos_data or camas_directas_data:
@@ -1508,8 +1714,6 @@ def camas_disponibles_mapa(request):
 @login_required
 @require_POST
 def mover_paciente_cama(request):
-    if not verificar_permisos_usuario(request.user, MAPEO_CAMAS_EDITOR_ROLES, MAPEO_CAMAS_EDITOR_UNIDADES):
-        return JsonResponse({"ok": False, "error": "Acceso denegado."}, status=403)
     cama_origen_id = request.POST.get("cama_origen_id")
     cama_destino_id = request.POST.get("cama_destino_id")
 
@@ -1525,8 +1729,12 @@ def mover_paciente_cama(request):
     except Cama.DoesNotExist:
         return JsonResponse({"ok": False, "error": "Una de las camas indicadas no existe."}, status=404)
 
-    sala_origen_id = cama_origen.sala_id
-    sala_destino_id = cama_destino.sala_id
+    sala_origen_id = _sala_real_id_desde_cama(cama_origen)
+    sala_destino_id = _sala_real_id_desde_cama(cama_destino)
+
+    limite_error = _validar_limite_intentos_salas(request.user, [sala_origen_id, sala_destino_id])
+    if limite_error:
+        return limite_error
 
     asig_origen = (
         AsignacionCamaPaciente.objects
@@ -1553,34 +1761,6 @@ def mover_paciente_cama(request):
 
     if asig_destino and (asig_destino.estado is not None and asig_destino.estado.codigo != "VACIA"):
         return JsonResponse({"ok": False, "error": "La cama destino no esta disponible (no esta vacia)."}, status=400)
-
-    if not _es_superadmin(request.user):
-        cambios_sala_origen = _contar_cambios_manual_por_sala(sala_origen_id)
-        if cambios_sala_origen >= MAX_CAMBIOS_CAMA:
-            return JsonResponse(
-                {
-                    "ok": False,
-                    "error": (
-                        f"La sala de la cama origen ya alcanzo el maximo de {MAX_CAMBIOS_CAMA} cambios "
-                        f"en las ultimas {VENTANA_LIMITE_CAMBIOS_SALA_HORAS} hora(s)."
-                    ),
-                },
-                status=400,
-            )
-
-        if sala_destino_id != sala_origen_id:
-            cambios_sala_destino = _contar_cambios_manual_por_sala(sala_destino_id)
-            if cambios_sala_destino >= MAX_CAMBIOS_CAMA:
-                return JsonResponse(
-                    {
-                        "ok": False,
-                        "error": (
-                            f"La sala de la cama destino ya alcanzo el maximo de {MAX_CAMBIOS_CAMA} cambios "
-                            f"en las ultimas {VENTANA_LIMITE_CAMBIOS_SALA_HORAS} hora(s)."
-                        ),
-                    },
-                    status=400,
-                )
 
     estado_anterior_origen = asig_origen.estado
     estado_anterior_destino = asig_destino.estado if asig_destino else estado_vacia
@@ -1672,6 +1852,7 @@ def mover_paciente_cama(request):
 
     cambios_origen_post = _contar_cambios_manual_por_sala(sala_origen_id)
     cambios_destino_post = _contar_cambios_manual_por_sala(sala_destino_id)
+    max_cambios_usuario = _max_cambios_para_usuario(request.user)
 
     return JsonResponse({
         "ok": True,
@@ -1681,7 +1862,7 @@ def mover_paciente_cama(request):
             "estado_visual": estado_vacia.codigo,
             "paciente": None,
             "cambios_realizados": cambios_origen_post,
-            "max_cambios": MAX_CAMBIOS_CAMA,
+            "max_cambios": max_cambios_usuario,
             "ultima_actualizacion": _hora_local_iso(historial_origen.fecha_hora),
             "usuario_ultima_actualizacion": _nombre_usuario(historial_origen.usuario),
         },
@@ -1690,7 +1871,7 @@ def mover_paciente_cama(request):
             "estado_visual": estado_ocupada.codigo,
             "paciente": _paciente_payload(paciente),
             "cambios_realizados": cambios_destino_post,
-            "max_cambios": MAX_CAMBIOS_CAMA,
+            "max_cambios": max_cambios_usuario,
             "ultima_actualizacion": _hora_local_iso(historial_destino.fecha_hora),
             "usuario_ultima_actualizacion": _nombre_usuario(historial_destino.usuario),
         },
@@ -1711,8 +1892,9 @@ def mover_paciente_cama(request):
 @login_required
 @require_POST
 def actualizar_cama_mapa(request):
-    if not verificar_permisos_usuario(request.user, MAPEO_CAMAS_EDITOR_ROLES, MAPEO_CAMAS_EDITOR_UNIDADES):
+    if not _tiene_permiso_cambios_mapa(request.user):
         return JsonResponse({"ok": False, "error": "Acceso denegado."}, status=403)
+
     cama_id = request.POST.get("cama_id")
     estado_codigo = (request.POST.get("estado") or "").strip()
     paciente_id = request.POST.get("paciente_id") or None
@@ -1756,6 +1938,18 @@ def actualizar_cama_mapa(request):
         except Paciente.DoesNotExist:
             return JsonResponse({"ok": False, "error": "El paciente seleccionado no existe."}, status=404)
 
+    # [2026-05-19] Restricción de edición directa para rol de intentos:
+    # solo PRE_ALTA o VACIA desde el modal de cama.
+    if _es_rol_intentos_restringido(request.user):
+        if estado_codigo not in {"PRE_ALTA", "VACIA"}:
+            return JsonResponse(
+                {
+                    "ok": False,
+                    "error": "Este rol solo puede hacer pre-altas o pasar la cama a vacia desde edicion directa.",
+                },
+                status=403,
+            )
+
     # Si el paciente ya tiene otra cama (OCUPADA o PRE_ALTA), detectar para liberar
     asig_previa_paciente = None
     if paciente_nuevo and estado_codigo == "OCUPADA":
@@ -1770,6 +1964,17 @@ def actualizar_cama_mapa(request):
             .exclude(cama_id=cama_id)
             .order_by("-fecha_inicio", "-id")
             .first()
+        )
+
+    # [2026-05-19] El rol de intentos no puede reasignar pacientes desde edición directa.
+    # Debe usar la operación de movimiento entre camas.
+    if _es_rol_intentos_restringido(request.user) and asig_previa_paciente:
+        return JsonResponse(
+            {
+                "ok": False,
+                "error": "Este rol no puede reasignar pacientes desde la edicion directa. Debe usar movimiento de cama.",
+            },
+            status=403,
         )
 
     # Validar que OCUPADA requiere paciente
@@ -1820,7 +2025,8 @@ def actualizar_cama_mapa(request):
         or paciente_anterior_id != (paciente_nuevo.id if paciente_nuevo else None)
     )
 
-    cambios_realizados = _contar_cambios_manual_por_sala(cama.sala_id)
+    cambios_realizados = _contar_cambios_manual_por_sala(_sala_real_id_desde_cama(cama))
+    max_cambios_usuario = _max_cambios_para_usuario(request.user)
 
     if not hubo_cambio:
         _registrar_detalle_mapeo(
@@ -1840,7 +2046,7 @@ def actualizar_cama_mapa(request):
                     "estado_visual": asignacion.estado.codigo,
                     "paciente": _paciente_payload(asignacion.paciente),
                     "cambios_realizados": cambios_realizados,
-                    "max_cambios": MAX_CAMBIOS_CAMA,
+                    "max_cambios": max_cambios_usuario,
                 },
             }
         )
@@ -1928,7 +2134,7 @@ def actualizar_cama_mapa(request):
         observacion="Actualización de cama desde mapa.",
     )
 
-    cambios_realizados = _contar_cambios_manual_por_sala(cama.sala_id)
+    cambios_realizados = _contar_cambios_manual_por_sala(_sala_real_id_desde_cama(cama))
     return JsonResponse(
         {
             "ok": True,
@@ -1938,7 +2144,7 @@ def actualizar_cama_mapa(request):
                 "estado_visual": asignacion.estado.codigo,
                 "paciente": _paciente_payload(asignacion.paciente),
                 "cambios_realizados": cambios_realizados,
-                "max_cambios": MAX_CAMBIOS_CAMA,
+                "max_cambios": max_cambios_usuario,
                 "ultima_actualizacion": _hora_local_iso(historial.fecha_hora),
                 "usuario_ultima_actualizacion": _nombre_usuario(historial.usuario),
             },
@@ -1955,8 +2161,9 @@ def procesar_cama_mapeo(request):
     Ciclo principal de mapeo por cama:
     evaluar -> decidir -> ejecutar -> registrar.
     """
-    if not verificar_permisos_usuario(request.user, MAPEO_CAMAS_EDITOR_ROLES, MAPEO_CAMAS_EDITOR_UNIDADES):
+    if not _tiene_permiso_cambios_mapa(request.user):
         return JsonResponse({"ok": False, "error": "Acceso denegado."}, status=403)
+
     cama_id = request.POST.get("cama_id")
     accion = (request.POST.get("accion") or "").strip().upper()
     observacion = (request.POST.get("observacion") or "").strip()
@@ -1976,6 +2183,19 @@ def procesar_cama_mapeo(request):
     }
     if accion not in acciones_validas:
         return JsonResponse({"ok": False, "error": "Accion de mapeo no valida."}, status=400)
+
+    # [2026-05-19] Whitelist de acciones permitidas para rol de intentos
+    # dentro del flujo de mapeo por cama.
+    if _es_rol_intentos_restringido(request.user):
+        acciones_permitidas_rol = {"CONFIRMAR", "CAMBIO_TRASLADO", "CONFIRMAR_ALTA", "ALTA_FORZADA"}
+        if accion not in acciones_permitidas_rol:
+            return JsonResponse(
+                {
+                    "ok": False,
+                    "error": "Este rol solo puede confirmar, mover pacientes o liberar camas en el flujo de mapeo.",
+                },
+                status=403,
+            )
 
     try:
         cama = Cama.objects.select_related("sala__servicio", "cubiculo__sala__servicio").get(pk=cama_id)
@@ -2124,6 +2344,10 @@ def procesar_cama_mapeo(request):
                     status=400,
                 )
 
+            limite_error = _validar_limite_intentos_salas(request.user, [sala_real.id])
+            if limite_error:
+                return limite_error
+
             if asig_actual and asig_actual.paciente_id == paciente_observado.id:
                 # Auditoria de mapeo: se registra validacion aunque paciente y estado coincidan.
                 HistorialEstadoCama.objects.create(
@@ -2165,7 +2389,7 @@ def procesar_cama_mapeo(request):
                 estado_nuevo=estado_ocupada,
                 paciente=paciente_observado,
                 usuario=request.user,
-                observacion="Cambio/traslado desde mapeo",
+                observacion=OBSERVACION_CAMBIO_TRASLADO_MAPEO,
             )
 
             _registrar_detalle_mapeo(

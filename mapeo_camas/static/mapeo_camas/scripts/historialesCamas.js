@@ -201,9 +201,9 @@ document.addEventListener("DOMContentLoaded", function () {
     filtroTipo.id = "filtro-tipo";
     filtroTipo.className = "formularioCampo-select";
     filtroTipo.innerHTML = [
-      '<option value="mapeo">DetalleMapeoCama</option>',
-      '<option value="historial">HistorialEstadoCama</option>',
-      '<option value="movimiento">MovimientoCama</option>'
+      '<option value="mapeo">Detalle Mapeo</option>',
+      '<option value="historial">Historial Estado</option>',
+      '<option value="movimiento">Movimientos</option>'
     ].join("");
     // Restaurar tipo guardado en sesión anterior
     var tipoGuardado = sessionStorage.getItem("historiales_filtro_tipo");
