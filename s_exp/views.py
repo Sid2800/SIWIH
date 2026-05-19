@@ -1580,15 +1580,21 @@ def crear_solicitud_api(request):
     except MotivoSolicitud.DoesNotExist:
         return JsonResponse({"error": "Motivo no válido"}, status=400)
 
-    # Obtener unidad del usuario desde PerfilUnidad (fallback)
-    area_destino = _get_unidad_usuario(request.user)
-
-    # Obtener unidad de servicio desde RRHH
+    # Obtener unidad de servicio desde RRHH (fuente principal)
     servicio_unidad, es_registrado_rrhh = _get_servicio_unidad_from_rrhh(request.user)
     if not es_registrado_rrhh:
         return JsonResponse({
             "error": "El usuario no está registrado en el sistema RRHH (Recursos Humanos). Contacte al administrador."
         }, status=403)
+
+    # area_destino: snapshot del nombre de la unidad RRHH del usuario AL MOMENTO de la
+    # solicitud. Si después el usuario cambia de unidad, esta solicitud conserva el
+    # valor original (queda en histórico). Las nuevas solicitudes tomarán la unidad nueva.
+    if servicio_unidad and servicio_unidad.nombre_unidad:
+        area_destino = servicio_unidad.nombre_unidad
+    else:
+        # Fallback: PerfilUnidad (solo si por alguna razón no hay servicio_unidad RRHH)
+        area_destino = _get_unidad_usuario(request.user)
 
     try:
         from expediente.models import Expediente, PacienteAsignacion
