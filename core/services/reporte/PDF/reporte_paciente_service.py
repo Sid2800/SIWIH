@@ -1256,9 +1256,9 @@ class ReportePacienteService:
         #-------  DATOS DINAMICOS 
         pdf.setFont("Helvetica-Bold", 11)
 
-        pdf.drawString(235,alto-alturaTabla-65, ReportePdfBaseService.texto_seguro(paciente.nombres, 18))
+        pdf.drawString(222,alto-alturaTabla-65, ReportePdfBaseService.texto_seguro(paciente.nombres, 18))
         pdf.drawString(50,alto-alturaTabla-65, ReportePdfBaseService.texto_seguro(paciente.apellido1,10))
-        pdf.drawString(130,alto-alturaTabla-65, ReportePdfBaseService.texto_seguro(paciente.apellido2,10))
+        pdf.drawString(125,alto-alturaTabla-65, ReportePdfBaseService.texto_seguro(paciente.apellido2,10))
 
         #----- MAPEAR LA EDAD
         if paciente.edad_tipo:
@@ -1348,6 +1348,8 @@ class ReportePacienteService:
 
             ReporteReferenciaService._dibujarEstructuraFormatoReferenciaRespuesta(pdf,ancho,alto)
             ReporteReferenciaService._dibujarEtiquetasEstaticasFormatoRefenciaRespuesta(pdf,ancho,alto)
+      
+            print(paciente)
             ReporteReferenciaService._dibujarDatosHospitalizacion(pdf,ancho,alto, paciente, institucion)
             ReporteReferenciaService._dibujarPiePaginaFormatoReferenciaRespuesta(pdf, ancho, alto, usuario)
             #pagina 5
