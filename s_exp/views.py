@@ -37,6 +37,7 @@ from .models import (
     Prestamo,
     Devolucion,
     LogHistorico,
+    ExpedienteEstadoLog,
 )
 from usuario.models import PerfilUnidad
 
@@ -581,7 +582,6 @@ def aprobar_solicitud_api(request):
         return JsonResponse({"error": "Solicitud no encontrada o ya procesada"}, status=404)
 
     try:
-        from .models import ExpedienteEstadoLog
         detalles = list(solicitud.detalles.select_related('expediente_prestamo__expediente'))
 
         # Verificar que los expedientes aprobados estén disponibles
@@ -823,7 +823,6 @@ def revisar_entrega_api(request):
         return JsonResponse({"error": "Solicitud no encontrada o no está en revisión"}, status=404)
 
     try:
-        from .models import ExpedienteEstadoLog
         mapa = {d.get('detalle_id'): d for d in decisiones if d.get('detalle_id') is not None}
         cambios = 0
         for d in solicitud.detalles.select_related('expediente_prestamo__expediente'):
@@ -954,7 +953,6 @@ def rechazar_solicitud_api(request):
         solicitud.save()
 
         # Liberar expedientes: volver a ponerlos disponibles
-        from .models import ExpedienteEstadoLog
         for detalle in solicitud.detalles.select_related('expediente_prestamo'):
             ep = detalle.expediente_prestamo
             estado_anterior = ep.estado
@@ -1112,7 +1110,6 @@ def marcar_entregado_api(request):
         prestamo.solicitud.save()
 
         # Solo marcar como prestados los expedientes aprobados
-        from .models import ExpedienteEstadoLog
         for d in prestamo.solicitud.detalles.select_related('expediente_prestamo__expediente').filter(aprobado=True):
             estado_anterior = d.expediente_prestamo.estado
             d.expediente_prestamo.estado_id = 'EXP_PRESTADO'
@@ -1281,8 +1278,6 @@ def procesar_devolucion_api(request):
         prestamo = Prestamo.objects.get(id=prestamo_id)
         solicitud = prestamo.solicitud
 
-        from .models import ExpedienteEstadoLog
-
         # 1. Procesar los que llegaron (Disponibles)
         esta_vencido = prestamo.esta_vencido
         unidad_usuario = _get_unidad_usuario(request.user)
@@ -1430,11 +1425,7 @@ def buscar_expedientes_api(request):
         if not query:
             return JsonResponse({"data": []})
 
-        from expediente.models import Expediente, PacienteAsignacion
-        from paciente.models import Paciente
-
         # IDs de expedientes no disponibles (Cualquier estado que no sea disponible)
-        from .models import SolicitudExpedienteDetalle
         expedientes_no_disponibles = set(
             ExpedientePrestamo.objects.exclude(estado_id='EXP_DISPONIBLE')
             .values_list('expediente_id', flat=True)
@@ -1612,10 +1603,8 @@ def crear_solicitud_api(request):
         area_destino = _get_unidad_usuario(request.user)
 
     try:
-        from expediente.models import Expediente, PacienteAsignacion
 
         # Verificar que existan y no estén prestados o en proceso
-        from .models import SolicitudExpedienteDetalle
         prestados = set(
             ExpedientePrestamo.objects.filter(estado_id='EXP_PRESTADO')
             .values_list('expediente_id', flat=True)
@@ -1661,7 +1650,6 @@ def crear_solicitud_api(request):
                 ep.save()
                 
                 # Log transaccional para el apartado
-                from .models import ExpedienteEstadoLog
                 ExpedienteEstadoLog.objects.create(
                     expediente=exp,
                     estado_anterior=estado_anterior,
@@ -1672,7 +1660,6 @@ def crear_solicitud_api(request):
                 )
             else:
                 # Log para creación inicial
-                from .models import ExpedienteEstadoLog
                 ExpedienteEstadoLog.objects.create(
                     expediente=exp,
                     estado_anterior=None,
@@ -2467,7 +2454,6 @@ def historial_solicitud_detalle_api(request, solicitud_id):
         return JsonResponse({"error": "Sin permisos"}, status=403)
 
     try:
-        from .models import ExpedienteEstadoLog
         s = SolicitudPrestamo.objects.select_related(
             'usuario', 'estado_flujo', 'motivo'
         ).get(id=solicitud_id)
