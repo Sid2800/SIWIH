@@ -37,10 +37,8 @@ document.addEventListener("DOMContentLoaded", function () {
   var btnImprimir = document.getElementById("btn-imprimir-camas");
   var btnHistoriales = document.getElementById("btn-historiales-camas");
   var btnIniciarMapeo = document.getElementById("btn-iniciar-mapeo");
-  var btnTerminarMapeo = document.getElementById("btn-terminar-mapeo");
   var btnCancelarMapeo = document.getElementById("btn-cancelar-mapeo");
-  var btnTerminarMapeoPie = document.getElementById("btn-terminar-mapeo-pie");
-  var mapapiemapeo = document.getElementById("mapa-pie-mapeo");
+  // [2026-05-20 OPT] Remover btnTerminarMapeoPie; usar selector unificado con data-action="terminar-mapeo"
   // [2026-05-04 FEATURE] Banner pegajoso de mapeo activo (amarillo con pulso)
   var mapaBannerMapeo = document.getElementById("mapa-banner-mapeo");
   var camasRenderizadas = [];
@@ -63,7 +61,7 @@ document.addEventListener("DOMContentLoaded", function () {
   var CLICK_DELAY_MS = 300;  // ms para distinguir simple vs doble clic
   var LONG_PRESS_MS  = 600;  // ms para activar confirmacion por pulsacion larga (tactil)
 
-  // Controla visibilidad de botones segun exista o no sesion activa de mapeo.
+  // [2026-05-20 OPT] Controla visibilidad de botones según exista o no sesión activa de mapeo.
   function establecerModoMapeoActivo(activo) {
     var ocultar = function (el, debeOcultar) {
       if (!el) {
@@ -86,13 +84,14 @@ document.addEventListener("DOMContentLoaded", function () {
     ocultar(btnCopiar, activo);
     ocultar(btnImprimir, activo);
     ocultar(btnHistoriales, activo);
-    ocultar(btnTerminarMapeo, !activo);
+    
+    // [2026-05-20 OPT] Consolida btnTerminarMapeo y btnTerminarMapeoPie en selector unificado
+    document.querySelectorAll('[data-action="terminar-mapeo"]').forEach(function(btn) {
+      ocultar(btn, !activo);
+    });
     ocultar(btnCancelarMapeo, !activo);
 
-    if (mapapiemapeo) {
-      mapapiemapeo.style.display = activo ? "flex" : "none";
-    }
-    // [2026-05-04 FEATURE] Mostrar/ocultar banner pegajoso segun modo mapeo activo.
+    // [2026-05-20 OPT] Mostrar/ocultar banner pegajoso según modo mapeo activo.
     if (mapaBannerMapeo) {
       mapaBannerMapeo.style.display = activo ? "flex" : "none";
     }
@@ -1665,17 +1664,10 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 
-  if (btnTerminarMapeo) {
-    btnTerminarMapeo.addEventListener("click", function () {
-      _ejecutarTerminarMapeo();
-    });
-  }
-
-  if (btnTerminarMapeoPie) {
-    btnTerminarMapeoPie.addEventListener("click", function () {
-      _ejecutarTerminarMapeo();
-    });
-  }
+  // [2026-05-20 OPT] Consolidar listeners de terminar mapeo (data-action unificado)
+  document.querySelectorAll('[data-action="terminar-mapeo"]').forEach(function(btn) {
+    btn.addEventListener("click", _ejecutarTerminarMapeo);
+  });
 
   if (btnCancelarMapeo) {
     btnCancelarMapeo.addEventListener("click", async function () {

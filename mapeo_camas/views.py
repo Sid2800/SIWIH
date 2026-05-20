@@ -70,18 +70,13 @@ DETALLE_PAGE_SIZE_MAX = 200
 
 
 # --- Helpers de serialización robustos para el mapa de camas ---
-# [2026-05-07] Helper para serializar datos de paciente
-def _paciente_payload_v2(paciente):
-    # [2026-05-19] Alias de compatibilidad para evitar duplicar lógica de serialización.
-    return _paciente_payload(paciente)
-
 # [2026-05-07] Helper para serializar datos de cama con asignación actual
 def _cama_payload(cama, asig, cambios_realizados, max_cambios, meta_actualizacion):
     return {
         "numero_cama": cama.numero_cama,
         "estado_visual": asig.estado.codigo if (asig and asig.estado) else "SIN_ASIGNACION",
         "asignacion_estado": asig.estado.codigo if (asig and asig.estado) else "SIN_ASIGNACION",
-        "paciente": _paciente_payload_v2(asig.paciente) if asig else None,
+        "paciente": _paciente_payload(asig.paciente) if asig else None,
         "cambios_realizados": cambios_realizados,
         "max_cambios": max_cambios,
         "ultima_actualizacion": meta_actualizacion.get("ultima_actualizacion", ""),

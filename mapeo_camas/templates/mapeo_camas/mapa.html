@@ -35,7 +35,7 @@
       {% endif %}
       {# [2026-05-18] Botones de control de sesión para usuarios con permiso de mapear. #}
       {% if puede_mapear %}
-      <button type="button" class="dt-button mapa-control-mapeo--oculto" id="btn-terminar-mapeo" title="Terminar mapeo">
+      <button type="button" class="dt-button mapa-control-mapeo--oculto" data-action="terminar-mapeo" title="Terminar mapeo">
         <i class="bi bi-check2-circle boton-exportacion"></i>
       </button>
       <button type="button" class="dt-button mapa-control-mapeo--oculto" id="btn-cancelar-mapeo" title="Cancelar mapeo">
@@ -109,15 +109,7 @@
 
   <div id="mapa-servicios" class="mapa-grid-servicios"></div>
 
-  {# [2026-05-18] Botón pie de página para usuarios con permiso de mapear. #}
-  {% if puede_mapear %}
-  <div id="mapa-pie-mapeo" class="mapa-pie-mapeo mapa-control-mapeo--oculto" style="margin-top:1.5rem;">
-    <button type="button" class="dt-button" id="btn-terminar-mapeo-pie" title="Terminar mapeo">
-      <i class="bi bi-check2-circle boton-exportacion"></i>
-      <span style="margin-left:0.4rem;font-size:1.3rem;">Terminar mapeo</span>
-    </button>
-  </div>
-  {% endif %}
+
 </div>
 {% endblock %}
 
