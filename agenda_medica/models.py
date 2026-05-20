@@ -33,6 +33,14 @@ class Periodo_laboral(models.Model):
             return EstadoTemporalPeriodo.EN_EJECUCION.value
         else:
             return  EstadoTemporalPeriodo.FINALIZADO.value
+        
+    @property
+    def periodo_formateado(self):
+        return (
+            f"{self.fecha_inicio.strftime('%d/%m/%Y')} "
+            f"al "
+            f"{self.fecha_fin.strftime('%d/%m/%Y')}"
+    )
 
     def clean(self): 
         if self.fecha_inicio > self.fecha_fin: 

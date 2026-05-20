@@ -2,7 +2,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from datetime import date, datetime
 
-def validar_fecha(fecha, anio_minimo=2000, permitir_futuro=False, permitir_pasado=False):
+def validar_fecha(fecha, anio_minimo=2000, permitir_futuro=False, permitir_pasado=True):
     # Convertir a datetime si es date
     if isinstance(fecha, date) and not isinstance(fecha, datetime):
         fecha_dt = datetime.combine(fecha, datetime.min.time())

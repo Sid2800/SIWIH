@@ -136,9 +136,9 @@ document.addEventListener("DOMContentLoaded", () => {
                             <i class="bi bi-pencil"></i>
                         </button>
 
-                        <button class="datatable-agenda-boton" title="Configurar" data-action="configurar" data-id="${data.id}">
+                        <a class="datatable-agenda-boton" title="Configurar" href="${data.url_configuracion}" >
                             <i class="bi-gear-fill"></i>
-                        </button>
+                        </a>
                     </div>
                     `;
             }
@@ -352,10 +352,6 @@ document.addEventListener("DOMContentLoaded", () => {
             });
 
             table.ajax.reload(null, false);
-        }
-
-        if (accion === 'configurar') {
-            alert(id);
         }
     });
 

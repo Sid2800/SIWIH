@@ -61,7 +61,7 @@ def validarArgumentosPeriodoLaboral(data, usuario):
         estado_temporal = periodo.estado_temporal
         # Período en ejecución
         if estado_temporal == EstadoTemporalPeriodo.EN_EJECUCION:
-            validar_fecha( fecha_inicio,permitir_pasado=True)
+            validar_fecha( fecha_inicio,permitir_futuro=False, permitir_pasado=True)
             validar_fecha(fecha_final,permitir_futuro=True,permitir_pasado=True)
         # Período finalizado
         elif estado_temporal == EstadoTemporalPeriodo.FINALIZADO:
@@ -69,14 +69,14 @@ def validarArgumentosPeriodoLaboral(data, usuario):
             validar_fecha(fecha_final, permitir_pasado=True)
         # FUTURO
         else:
-            validar_fecha(fecha_inicio, permitir_futuro=True)
-            validar_fecha(fecha_final, permitir_futuro=True )
+            validar_fecha(fecha_inicio, permitir_futuro=True, permitir_pasado=False)
+            validar_fecha(fecha_final, permitir_futuro=True,permitir_pasado=False )
 
 
     # Validación para creación
     else:
-        validar_fecha(fecha_inicio, permitir_futuro=True)
-        validar_fecha(fecha_final, permitir_futuro=True)
+        validar_fecha(fecha_inicio, permitir_futuro=True, permitir_pasado=False)
+        validar_fecha(fecha_final, permitir_futuro=True, permitir_pasado=False)
 
     validar_rango_fechas(
         fecha_inicio,

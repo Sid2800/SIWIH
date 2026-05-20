@@ -657,7 +657,7 @@ main {
 .icon-morado { color: #5a2ca0; }    /* Morado oscuro */
 .icon-naranja { color: #b45309; }   /* Naranja oscuro */
 .icon-rojo { color: #a71d2a; }      /* Rojo oscuro */
-.icon-verde { color: #146c43; }     /* Verde oscuro */
+.icon-verde { color: #146c43 !important; }     /* Verde oscuro */
 .icon-gris { color: #6c757d; } /* Gris (para null) */
 
 
@@ -1476,7 +1476,7 @@ table.dataTable.dtr-inline.collapsed > tbody > tr > th.dtr-control:before {
 .tituloFormulario-subrallado{
    height: .4rem;
    width: 100%;
-   background-color: var(--negro);
+   background-color: var(--negro-hover);
    border-top-left-radius: 40rem;
    border-top-right-radius: 40rem;
    box-shadow: 10px 10px 15px rgba(0, 0, 0, 0.2);
@@ -1492,6 +1492,7 @@ table.dataTable.dtr-inline.collapsed > tbody > tr > th.dtr-control:before {
 .fieldsetExp,
 .mantenimiento-contenedor-tabla,
 .frmEvaluacionRxCampos,
+.frmConfigurarPeriodo,
 .frmReferenciaCampos{  
    display: flex;
    flex-direction: column;
@@ -1503,7 +1504,8 @@ table.dataTable.dtr-inline.collapsed > tbody > tr > th.dtr-control:before {
    align-items: stretch;
 }
 
-.frmReferenciaCampos{  
+.frmReferenciaCampos,
+.frmConfigurarPeriodo{  
    position: relative; 
    row-gap: 0rem;
 }
@@ -1584,7 +1586,11 @@ legend{
 /*referencia*/ 
 .referenciaPacienteCampos, 
 .referenciaReferenciaCampos,
-.referenciaRespuestaCampos {
+.referenciaRespuestaCampos,
+/*agenda*/
+.configurarPeriodoPersonalCampos,
+.configurarPeriodoPeriodoCampos
+{
    width: 100%;
    border-radius: 1rem;
    padding: 2rem 1rem;
@@ -1715,7 +1721,7 @@ font-size: 1.6rem;
 }
 
 
-.modal-procesos-tabla, .tabla-mantenimiento {
+.modal-procesos-tabla, .tabla-mantenimiento{
    width: 100%;
    border-collapse: collapse;
    font-size: 1.2rem;
@@ -1778,7 +1784,7 @@ font-size: 1.6rem;
 }
 
 .modal-procesos-tabla tbody td i.registrado{
-   color: #146c43;
+   color: var(--verdeOscuro);
 }
 
 .modal-procesos-tabla tbody tr ,
@@ -3120,7 +3126,8 @@ button[disabled] {
 .modalSeguimientoTIC select[disabled],
 .modalSeguimientoTIC textarea[disabled],
 .modalPeriodoLaboralCampos input[readonly],
-.modalPeriodoLaboralCampos select[disabled]{
+.modalPeriodoLaboralCampos select[disabled]
+{
 
    background-color: var(--colorTextBLoqueadoFondo) !important;
    color: var(--colorTextoBloqueado) !important;  
@@ -5182,6 +5189,7 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
       justify-content: center;
       align-items: center;
       gap: 1rem;
+      height: 100%;
    }
 
    .estado-indicador span{
@@ -5277,6 +5285,166 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
    border-radius: 1rem ;
 
 
+}
+
+
+/*
+----------------   FORM CONFIGURACION DE PERIODO LABORAL
+*/
+
+.contenedor-fielsets-configurar-periodo{
+   padding: 2.5rem .7rem 1rem .7rem;
+   position: relative;
+   display: flex;
+   flex-direction: column;
+   row-gap: 1rem;
+   border-radius: 0 0 1rem 1rem;
+   border: .1rem solid var(--colorTablaceldaBorde);
+}
+
+.contenedor-fielsets-configurar-periodo .form-subtitulo-fieldset-falso{
+   top: .21rem;
+}
+
+
+.configurarPeriodoPersonalCampos,
+.configurarPeriodoPeriodoCampos{
+   padding: 1.5rem 1rem;
+}
+
+.configurarPeriodoContenedorTabla{
+   grid-column: 1 / -1;
+   border: .15rem solid var(--color-Scroll-Hover);
+   display: flex;
+   flex-direction: column;
+   border-radius: 1rem 0 1rem 0;
+   /*
+   row-gap: 1rem;
+   margin: 0;
+   margin-top: 0px;*/
+   justify-content: space-evenly;
+   transition: all 0.3s ease;
+}
+
+@media (min-width: 36rem) {
+
+   .configurarPeriodoPeriodoCampos .formularioCampoModal{
+      flex-direction: column;
+   }
+   .configurarPeriodoPeriodoCampos{
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      column-gap: 1rem;
+   }
+
+   .contenedor-fielsets-configurar-periodo{
+      padding: 2.5rem 1rem 1rem 1rem;
+   }
+
+}
+
+@media (min-width: 72rem) {
+
+   .contenedor-fielsets-configurar-periodo{
+      display: grid;
+      grid-template-columns: 2fr 3fr;
+      column-gap: 2rem;
+      padding: 3rem 1.5rem 1.5rem 1.5rem;
+
+   }
+
+   .configurarPeriodoPersonalCampos .formularioCampoModal{
+      flex-direction: column;
+   }
+
+   .configurarPeriodoPersonalCampos{
+      padding: 1.5rem 1.5rem;
+   }
+
+   .configurarPeriodoPeriodoCampos{
+      column-gap: 2rem;
+      padding: 1.5rem 1.5rem;
+   }
+}
+
+@media (min-width: 90rem) {
+
+   .configurarPeriodoPersonalCampos .formularioCampoModal{
+      flex-direction: row;
+   }
+
+   .configurarPeriodoPeriodoCampos .formularioCampoModal{
+      flex-direction: row;
+   }
+
+   .contenedor-fielsets-configurar-periodo{
+      padding: 3rem 2rem 2rem 2rem;
+   }
+}
+
+
+/*TABLA DE RESULTASDO , MUESTRA OPCIONES FIJAS */
+
+
+.tabla-estatica-procesos{
+   width: 100%;
+   border-collapse: collapse;
+   font-size: 1.5rem;
+   background-color: rgba(0, 0, 0, 0.03);
+   border-radius: 1rem;
+   padding: .5rem
+}
+
+.tabla-estatica-procesos thead th{
+   padding: .2rem 2rem .2rem 0rem;
+   text-align: left;
+   padding: 1rem 0 .8rem 1rem;
+   border-bottom: .3rem solid #ccc;
+   font-weight: 600;
+   font-size: 1.5rem;
+   font-family: var(--fuenteTablaTitulo);
+   color: var(--negro);
+   letter-spacing: .03rem;
+}
+
+
+.tabla-estatica-procesos tbody td {
+   font-family: var(--fuenteTablaCuerpo);
+   padding: .7rem .9rem .7rem 1rem;
+   border-bottom: .15rem solid #ccc;
+   text-transform: uppercase;
+}
+
+
+
+.tabla-estatica-procesos tbody tr td span.tabla-procesos-indicador{
+   display: flex;
+   column-gap: 1.5rem;
+   justify-content: center;
+   align-items: center;
+}
+
+
+.tabla-estatica-procesos tbody tr td span.tabla-procesos-indicador i{
+   color: var(--colorTextoBloqueado);
+   font-size: 2.5rem;
+}
+
+
+.tabla-estatica-procesos tbody tr:last-child td {
+   border-bottom: none;
+}
+
+/*perzaolizaciones especificas*/
+
+.tabla-estatica-procesos td:last-child,
+.tabla-estatica-procesos th:last-child{
+   width: 12rem;
+}
+
+.tabla-estatica-procesos td:nth-last-child(2),
+.tabla-estatica-procesos th:nth-last-child(2){
+   width: 12rem;
 }
 
 

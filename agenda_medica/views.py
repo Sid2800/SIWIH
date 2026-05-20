@@ -1,6 +1,7 @@
 from django.shortcuts import render
 from core.mixins import UnidadRolRequiredMixin
 from django.views.generic import TemplateView
+from django.views.generic import DetailView
 from django.core.exceptions import ValidationError
 from core.constants import permisos
 from datetime import datetime, timedelta, time, date
@@ -10,12 +11,13 @@ from django.http import JsonResponse
 from django.utils import timezone
 from core.constants.permisos import AGENDA_MEDICA_EDITOR_ROLES, AGENDA_MEDICA_EDITOR_UNIDADES
 from django.views.decorators.http import require_GET
-
+from django.urls import  reverse
 from core.utils.utilidades_fechas import formatear_fecha_dd_mm_yyyy
 from agenda_medica.models import Periodo_laboral
 from agenda_medica import validators as agenda_validators
 from core.services.agenda_medica.periodo_laboral_service import PeriodoLaboralService
 from usuario.permisos import verificar_permisos_usuario
+from core.utils.utilidades_textos import generar_slug
 
 from core.utils.utilidades_request import parse_json_request
 
@@ -28,7 +30,6 @@ class ListaPeriodoLaborales(UnidadRolRequiredMixin,TemplateView):
     def get_context_data(self,**kwargs):
         context = super().get_context_data(**kwargs)
         usuario = self.request.user
-
         
         context['usuario'] = usuario
         anios = PeriodoLaboralService.anios_periodos()
@@ -36,6 +37,28 @@ class ListaPeriodoLaborales(UnidadRolRequiredMixin,TemplateView):
         context['anios'] = anios
 
         return context
+    
+
+class ConfigurarAgenda(UnidadRolRequiredMixin,DetailView):
+    template_name = "agenda_medica/configurar_agenda.html"
+    required_roles = AGENDA_MEDICA_EDITOR_ROLES
+    required_unidades = AGENDA_MEDICA_EDITOR_UNIDADES
+    model = Periodo_laboral
+    context_object_name = 'periodo' # ejem {{ paciente.estado }}
+
+    def get_context_data(self,**kwargs):
+        context = super().get_context_data(**kwargs)
+        usuario = self.request.user
+
+        
+        context['usuario'] = usuario
+        anios = PeriodoLaboralService.anios_periodos()
+        print(anios)
+        return context
+    
+
+    
+
 
 
 def listarPeriodosLaboralesAPI(request):
@@ -128,7 +151,6 @@ def listarPeriodosLaboralesAPI(request):
     ]
 
     # Ordenamiento seguro
-    print(f"/////{order_column}")
     if 0 <= order_column < len(columns):
         order_field = columns[order_column]
         if order_direction == 'desc':
@@ -150,6 +172,16 @@ def listarPeriodosLaboralesAPI(request):
         "estado_temporal",
         "id",
     ))
+
+    for periodo in periodos:
+        print(periodo)
+        periodo['url_configuracion'] = reverse(
+            'configurar_agenda',
+            kwargs={'pk': periodo['id'],
+                'slug': generar_slug(periodo['personal_salud__empleado__primer_nombre']+" "+periodo['personal_salud__empleado__primer_apellido'])
+                },
+            
+        )
 
     return JsonResponse({
         "draw": draw,

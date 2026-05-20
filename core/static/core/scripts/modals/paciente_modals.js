@@ -157,7 +157,7 @@ const ModalPacienteProcesos = (function () {
 
                 estadoTexto = `
                     <span class="mp-estado is-ok">
-                        <i class="bi bi-check-circle-fill registrado"></i> ${fecha}
+                        <i class="bi bi-check-circle-fill icon-verde"></i> ${fecha}
                     </span>
                 `;
 

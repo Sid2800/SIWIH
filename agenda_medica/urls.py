@@ -10,5 +10,7 @@ urlpatterns = [
     path('validar-impacto-periodo-laboral/', views.validarImpactoPeriodoLaboral, name='validar_impacto-periodo_laboral'),
     path('obtener-periodo-laboral/', views.obtenerPeriodoLaboral, name='obtener_periodo_laboral'),
 
+    path('configurar-agenda/<int:pk>/<slug:slug>/', views.ConfigurarAgenda.as_view(), name='configurar_agenda'),
+
     
 ]

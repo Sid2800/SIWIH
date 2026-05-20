@@ -1,0 +1,335 @@
+{% extends 'core/base.html'%}
+
+
+{% block title %}Agenda{% endblock title %}
+
+{% block content %}
+    <div class="contenedor2"> 
+
+        <div class="tituloFormulario" style="margin-bottom: 1rem;">
+            <div class="tituloFormulario-texto"> 
+                <i class="bi bi-calendar-range"></i>
+                <h2 class="sin-margen">Configuración de Agenda</h2>
+            </div>
+        </div>
+
+        <div class="tituloFormulario-subrallado"></div>
+
+    
+        <div class="contenedor-fielsets-configurar-periodo">
+            <span class="form-subtitulo-fieldset-falso"> Periodo Laboral</span> 
+        
+            <fieldset class="configurarPeriodoPersonalCampos">
+                <legend>Personal de Salud</legend>  
+                    <div class="formularioCampoModal">
+                        <label>Nombre </label>
+                        <input type="text" value="{{ periodo.personal_salud.empleado.nombre_completo}}" class="formularioCampo-text" tabindex="-1" readonly="">
+                    </div>
+
+                    <div class="formularioCampoModal">
+                        <label>Especialidad</label>
+                        <input type="text" value="{{ periodo.personal_salud.especialidad_nombre }}" class="formularioCampo-text" tabindex="-1" readonly="">
+                        
+                    </div>
+            </fieldset>
+
+
+            <fieldset class="configurarPeriodoPeriodoCampos">
+                <legend>Periodo</legend>  
+                    <div class="formularioCampoModal">
+                        <label>Periodo </label>
+                        <input type="text" value="{{ periodo.periodo_formateado}}" class="formularioCampo-text" tabindex="-1" readonly="">
+                    </div>
+
+                    <div class="formularioCampoModal">
+                        <label>Jornada</label>
+                        <input type="text" value="{{ periodo.jornada_laboral}}" class="formularioCampo-text" tabindex="-1" readonly="">
+                        
+                    </div>
+
+                    <div class="formularioCampoModal">
+                        <label>Cupos</label>
+                        <input type="text" value="100" class="formularioCampo-text" tabindex="-1" readonly="">
+                        
+                    </div>
+
+                    <div class="formularioCampoModal">
+                        <label>Estado</label>
+                        <div class="estado-indicador">
+                            <i id="modalPeriodoEstadoIndicarIcono" class="bi bi-circle-fill icon-rojo"></i>
+                            <span id="modalPeriodoEstadoIndicarTexto">Finalizado</span>
+                        </div>
+                    </div>
+            </fieldset>
+
+            {% comment "" %}
+            <fieldset class="configurarPeriodoContenedorTabla">
+            <span class="form-subtitulo-fieldset-falso"> Periodo Laboral</span> 
+
+            </fieldset>
+            {% endcomment %}
+
+            <fieldset class="configurarPeriodoContenedorTabla">
+                <legend>Dia Laboral</legend>
+
+                <table class="tabla-estatica-procesos">
+
+                    <thead>
+                        <tr>
+                            <th>DIA</th>
+                            <th>HORARIO</th>
+                            <th>TIPO ATENCION</th>
+                            <th>CUPOS</th>
+                            <th>ESTADO</th>
+                            <th>ACCIONES</th>
+                        </tr>
+                    </thead>
+
+                    <tbody id="procesosBody">
+
+                        <tr>
+                            <td class="modal-procesos-nombre">
+                                LUNES
+                            </td>
+
+                            <td>
+                                08:00 - 12:00
+                            </td>
+
+                            <td>
+                                3 tipos
+                            </td>
+
+                            <td>
+                                7 cupos
+                            </td>
+
+                            <td >
+                                <span class="tabla-procesos-indicador is-success">
+                                    <i class="bi bi-check-circle-fill"></i>
+                                </span>
+                            </td>
+
+                            <td class="modal-procesos-accion">
+                                <button class="modal-procesos-btn">
+                                    <i class="bi bi-pencil-square"></i>
+                                    Configurar
+                                </button>
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <td class="modal-procesos-nombre">
+                                MARTES
+                            </td>
+
+                            <td>
+                                ---
+                            </td>
+
+                            <td>
+                                0
+                            </td>
+
+                            <td>
+                                0
+                            </td>
+
+                            <td>
+                                <span class="tabla-procesos-indicador is-error">
+                                    <i class="bi bi-exclamation-circle-fill"></i>
+                                </span>
+                            </td>
+
+                            <td class="modal-procesos-accion">
+                                <button class="modal-procesos-btn">
+                                    <i class="bi bi-plus-circle-fill"></i>
+                                    Definir
+                                </button>
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <td class="modal-procesos-nombre">
+                                MIÉRCOLES
+                            </td>
+
+                            <td>
+                                08:00 - 12:00
+                            </td>
+
+                            <td>
+                                2 tipos
+                            </td>
+
+                            <td>
+                                5 cupos
+                            </td>
+
+                            <td>
+                                <span class="tabla-procesos-indicador is-success">
+                                    <i class="bi bi-check-circle-fill"></i>
+                                </span>
+                            </td>
+
+                            <td class="modal-procesos-accion">
+                                <button class="modal-procesos-btn">
+                                    <i class="bi bi-pencil-square"></i>
+                                    Configurar
+                                </button>
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <td class="modal-procesos-nombre">
+                                JUEVES
+                            </td>
+
+                            <td>
+                                ---
+                            </td>
+
+                            <td>
+                                0
+                            </td>
+
+                            <td>
+                                0
+                            </td>
+
+                            <td>
+                                <span class="tabla-procesos-indicador is-error">
+                                    <i class="bi bi-exclamation-circle-fill"></i>
+                                </span>
+                            </td>
+
+                            <td class="modal-procesos-accion">
+                                <button class="modal-procesos-btn">
+                                    <i class="bi bi-plus-circle-fill"></i>
+                                    Definir
+                                </button>
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <td class="modal-procesos-nombre">
+                                VIERNES
+                            </td>
+
+                            <td>
+                                07:00 - 11:00
+                            </td>
+
+                            <td>
+                                4 tipos
+                            </td>
+
+                            <td>
+                                10 cupos
+                            </td>
+
+                            <td>
+                                <span class="tabla-procesos-indicador is-success">
+                                    <i class="bi bi-check-circle-fill"></i>
+                                </span>
+                            </td>
+
+                            <td class="modal-procesos-accion">
+                                <button class="modal-procesos-btn">
+                                    <i class="bi bi-pencil-square"></i>
+                                    Configurar
+                                </button>
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <td class="modal-procesos-nombre">
+                                SÁBADO
+                            </td>
+
+                            <td>
+                                ---
+                            </td>
+
+                            <td>
+                                0
+                            </td>
+
+                            <td>
+                                0
+                            </td>
+
+                            <td>
+                                <span class="tabla-procesos-indicador is-error">
+                                    <i class="bi bi-exclamation-circle-fill"></i>
+                                </span>
+                            </td>
+
+                            <td class="modal-procesos-accion">
+                                <button class="modal-procesos-btn">
+                                    <i class="bi bi-plus-circle-fill"></i>
+                                    Definir
+                                </button>
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <td class="modal-procesos-nombre">
+                                DOMINGO
+                            </td>
+
+                            <td>
+                                ---
+                            </td>
+
+                            <td>
+                                0
+                            </td>
+
+                            <td>
+                                0
+                            </td>
+
+                            <td>
+                                <span class="tabla-procesos-indicador is-error">
+                                    <i class="bi bi-exclamation-circle-fill"></i>
+                                </span>
+                            </td>
+
+                            <td class="modal-procesos-accion">
+                                <button class="modal-procesos-btn">
+                                    <i class="bi bi-plus-circle-fill"></i>
+                                    Definir
+                                </button>
+                            </td>
+                        </tr>
+
+                        
+
+                    </tbody>
+
+                </table>
+            </fieldset>
+            
+        
+        </div>
+
+
+
+        <div class="formularioBotones">
+         <a href="javascript:history.back()" class="formularioBotones-boton" style="width: fit-content; margin: 10px auto;">
+            <i class="bi bi-arrow-left-circle formularioBotones-icono"></i>
+            <span>Volver</span>
+        </a>
+        </div>
+            
+
+    </div>
+    
+{% endblock content %}
+
+{% load static %}
+
+
+{% block extra_js %}
+{% endblock extra_js %}

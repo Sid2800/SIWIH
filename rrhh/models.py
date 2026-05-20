@@ -5,6 +5,7 @@ from django.contrib.auth.models import User
 from paciente.models import Paciente
 from servicio.models import Unidad as ServicioUnidad
 from clinico.models import Tipo_personal_salud, Especialidad
+from core.utils.utilidades_textos import formatear_nombre_completo
 
 
 class Empleado(models.Model):
@@ -60,7 +61,7 @@ class Empleado(models.Model):
 
     @property
     def nombre_completo(self):
-        return f"{self.primer_nombre} {self.primer_apellido}".strip()
+        return formatear_nombre_completo(self.primer_nombre,self.segundo_nombre,self.primer_apellido,self.segundo_apellido)
 
     class Meta:
         indexes = [
@@ -116,8 +117,10 @@ class PersonalSalud(models.Model):
         return str(self.empleado)
 
     @property
-    def area_atencion_nombre(self):
-        return self.area_atencion.nombre_area_atencion if self.area_atencion else ""
+    def especialidad_nombre(self):
+        return self.especialidad.nombre_especialidad if self.especialidad else ""
+
+    
 
     class Meta:
         indexes = [
