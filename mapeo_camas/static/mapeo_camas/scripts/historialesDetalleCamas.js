@@ -140,17 +140,22 @@ document.addEventListener("DOMContentLoaded", function () {
   function configurarTablaSegunTipo() {
     var esMapeo = tipoDetalleActual === "mapeo";
     var thFecha = document.getElementById("detalle-th-fecha");
+    var thTotalMapeadas = document.getElementById("detalle-th-total-mapeadas");
     var thUsuario = document.getElementById("detalle-th-usuario");
 
     if (thFecha) {
       thFecha.textContent = esMapeo ? "Hora" : "Fecha";
+    }
+    if (thTotalMapeadas) {
+      thTotalMapeadas.style.display = esMapeo ? "" : "none";
     }
     if (thUsuario) {
       thUsuario.style.display = esMapeo ? "none" : "";
     }
 
     if (tablaDt) {
-      tablaDt.column(6).visible(!esMapeo, false);
+      tablaDt.column(6).visible(esMapeo, false);
+      tablaDt.column(7).visible(!esMapeo, false);
       tablaDt.columns.adjust().draw(false);
     }
   }
@@ -161,7 +166,12 @@ document.addEventListener("DOMContentLoaded", function () {
     }
     var esMapeo = tipoDetalleActual === "mapeo";
     Array.from(tablaBody.querySelectorAll("tr")).forEach(function (row) {
-      var celdaUsuario = row.children[6];
+      var celdaTotalMapeadas = row.children[6];
+      if (celdaTotalMapeadas) {
+        celdaTotalMapeadas.style.display = esMapeo ? "" : "none";
+      }
+
+      var celdaUsuario = row.children[7];
       if (celdaUsuario) {
         celdaUsuario.style.display = esMapeo ? "none" : "";
       }
@@ -511,6 +521,26 @@ document.addEventListener("DOMContentLoaded", function () {
     return items;
   }
 
+  // [2026-05-21] Total único de camas mapeadas según el conjunto visible en la sección.
+  function calcularTotalCamasMapeadas(items) {
+    var camasUnicas = new Set();
+    (items || []).forEach(function (item) {
+      var cama = String(item.numero_cama || "").trim();
+      if (cama) {
+        camasUnicas.add(cama);
+      }
+    });
+    return camasUnicas.size;
+  }
+
+  // [2026-05-21] Inserta el total de camas mapeadas para mostrarlo en su columna de tabla.
+  function anexarTotalCamasMapeadas(items) {
+    var total = calcularTotalCamasMapeadas(items);
+    return (items || []).map(function (item) {
+      return Object.assign({}, item, { total_camas_mapeadas: total });
+    });
+  }
+
   function inicializarTablaDetalle() {
     if (tablaDt || !(window.$ && $.fn && $.fn.DataTable)) {
       return;
@@ -542,6 +572,7 @@ document.addEventListener("DOMContentLoaded", function () {
             return formatearFechaHoraCorta(data);
           }
         },
+        { data: "total_camas_mapeadas", defaultContent: "" },
         { data: "usuario", defaultContent: "" }
       ],
       language: {
@@ -569,10 +600,12 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function renderTabla(items) {
+    var itemsConTotal = anexarTotalCamasMapeadas(items || []);
+
     if (tablaDt) {
       tablaDt.clear();
-      if (items && items.length) {
-        tablaDt.rows.add(items);
+      if (itemsConTotal.length) {
+        tablaDt.rows.add(itemsConTotal);
       }
       tablaDt.draw();
       return;
@@ -582,8 +615,8 @@ document.addEventListener("DOMContentLoaded", function () {
       return;
     }
 
-    tablaBody.innerHTML = (items || []).length
-      ? (items || []).map(function (item) {
+    tablaBody.innerHTML = itemsConTotal.length
+      ? itemsConTotal.map(function (item) {
           var celdaFecha = tipoDetalleActual === "mapeo"
             ? (extraerFechaHora(item.fecha).hora || "Sin registro")
             : formatearFechaHoraCorta(item.fecha);
@@ -595,11 +628,12 @@ document.addEventListener("DOMContentLoaded", function () {
             "<td>" + escaparHtml(item.dni || "") + "</td>" +
             "<td>" + escaparHtml(item.tipo_accion || "") + "</td>" +
             "<td>" + escaparHtml(celdaFecha) + "</td>" +
+            "<td>" + escaparHtml(item.total_camas_mapeadas || "") + "</td>" +
             "<td>" + escaparHtml(item.usuario || "") + "</td>" +
             "</tr>"
           );
         }).join("")
-      : '<tr><td colspan="' + (tipoDetalleActual === "mapeo" ? "6" : "7") + '">Sin resultados para los filtros seleccionados.</td></tr>';
+      : '<tr><td colspan="' + (tipoDetalleActual === "mapeo" ? "7" : "8") + '">Sin resultados para los filtros seleccionados.</td></tr>';
 
     aplicarVisibilidadUsuarioFallback();
   }

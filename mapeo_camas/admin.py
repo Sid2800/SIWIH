@@ -51,7 +51,7 @@ class HistorialEstadoCamaAdmin(admin.ModelAdmin):
         "paciente__primer_nombre",
         "paciente__primer_apellido",
         "paciente__dni",
-        "observacion",
+        "observacion__codigo",
     )
     # Solo lectura: el historial nunca se modifica manualmente
     def has_add_permission(self, request):
@@ -80,7 +80,7 @@ class MovimientoCamaAdmin(admin.ModelAdmin):
         "paciente__primer_nombre",
         "paciente__primer_apellido",
         "paciente__dni",
-        "observacion",
+        "observacion__codigo",
     )
 
     def has_add_permission(self, request):

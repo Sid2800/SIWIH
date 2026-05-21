@@ -298,6 +298,29 @@ class IngresoEditView(UnidadRolRequiredMixin, UpdateView):
                         paciente_id=self.object.paciente_id,
                         usuario=usuario,
                     )
+                else:
+                    # [2026-05-21] Si cambió el paciente o cambió el vínculo cama/paciente,
+                    # forzar sincronización explícita para evitar desfasajes en mapa de camas.
+                    if paciente_anterior_id and paciente_anterior_id != self.object.paciente_id:
+                        MapeoCamasService.cerrar_asignacion_activa_paciente(
+                            paciente_id=paciente_anterior_id,
+                            usuario=usuario,
+                            cama_id=cama_anterior_id,
+                        )
+
+                    if self.object.cama_id and self.object.paciente_id:
+                        MapeoCamasService.sincronizar_cama_con_ingreso(
+                            cama_id=self.object.cama_id,
+                            paciente_id=self.object.paciente_id,
+                            usuario=usuario,
+                        )
+                    elif self.object.paciente_id and cama_anterior_id:
+                        # Si se quitó la cama en edición, liberar la cama anterior del paciente actual.
+                        MapeoCamasService.cerrar_asignacion_activa_paciente(
+                            paciente_id=self.object.paciente_id,
+                            usuario=usuario,
+                            cama_id=cama_anterior_id,
+                        )
 
                 return JsonResponse({"success": True,"redirect_url": reverse_lazy('listar_ingresos') })
 

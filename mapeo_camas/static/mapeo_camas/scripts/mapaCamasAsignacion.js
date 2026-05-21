@@ -327,21 +327,11 @@ document.addEventListener("DOMContentLoaded", function () {
       return "Sin registro";
     }
 
-    var hh = String(fecha.getHours()).padStart(2, "0");
-    var min = String(fecha.getMinutes()).padStart(2, "0");
-    var ahora = new Date();
-    var esMismoDia =
-      fecha.getFullYear() === ahora.getFullYear() &&
-      fecha.getMonth() === ahora.getMonth() &&
-      fecha.getDate() === ahora.getDate();
-
-    if (esMismoDia) {
-      return "Hoy " + hh + ":" + min;
-    }
-
     var dd = String(fecha.getDate()).padStart(2, "0");
     var mm = String(fecha.getMonth() + 1).padStart(2, "0");
     var yyyy = String(fecha.getFullYear());
+    var hh = String(fecha.getHours()).padStart(2, "0");
+    var min = String(fecha.getMinutes()).padStart(2, "0");
     return dd + "/" + mm + "/" + yyyy + " " + hh + ":" + min;
   }
 
@@ -372,9 +362,17 @@ document.addEventListener("DOMContentLoaded", function () {
     return normalizarEstadoIndicador(estado) === filtroEstado;
   }
 
+  // [2026-05-21] El resumen de estados debe respetar el filtro secundario del mapa.
+  function obtenerCamasBaseResumenEstados() {
+    return camasRenderizadas.filter(function (camaEl) {
+      return !filtroSalaIndicador || String(camaEl.dataset.sala || "").trim() === filtroSalaIndicador;
+    });
+  }
+
   function resumenEstadosCamas() {
-    var resumen = { TOTAL: camasRenderizadas.length };
-    camasRenderizadas.forEach(function (camaEl) {
+    var camasBase = obtenerCamasBaseResumenEstados();
+    var resumen = { TOTAL: camasBase.length };
+    camasBase.forEach(function (camaEl) {
       var clave = normalizarEstadoIndicador(camaEl.dataset.estado);
       resumen[clave] = (resumen[clave] || 0) + 1;
     });
@@ -652,6 +650,7 @@ document.addEventListener("DOMContentLoaded", function () {
     var estadoEl = camaEl.querySelector(".mapa-cama-estado");
     var pacienteEl = camaEl.querySelector(".mapa-cama-paciente");
     var dniEl = camaEl.querySelector(".mapa-cama-dni");
+    var actualizacionEl = camaEl.querySelector(".mapa-cama-actualizacion");
 
     if (estadoEl) {
       estadoEl.textContent = camaActualizada.estado_visual || "SIN_ASIGNACION";
@@ -661,6 +660,10 @@ document.addEventListener("DOMContentLoaded", function () {
     }
     if (dniEl) {
       dniEl.textContent = camaActualizada.paciente ? (camaActualizada.paciente.dni || "") : "";
+    }
+    if (actualizacionEl) {
+      // [2026-05-21] Mostrar fecha y hora en una sola línea en la card.
+      actualizacionEl.textContent = "Ult. act.: " + formatearFechaHoraCorta(camaActualizada.ultima_actualizacion || "");
     }
 
     renderIndicadoresEstado();
@@ -1311,10 +1314,17 @@ document.addEventListener("DOMContentLoaded", function () {
           var dni = document.createElement("span");
           dni.className = "mapa-cama-dni";
           dni.textContent = cama.paciente && cama.paciente.dni ? cama.paciente.dni : "";
+
+          var actualizacion = document.createElement("span");
+          actualizacion.className = "mapa-cama-actualizacion";
+          actualizacion.style.whiteSpace = "nowrap";
+          actualizacion.textContent = " " + formatearFechaHoraCorta(cama.ultima_actualizacion || "");
+
           camaEl.appendChild(numero);
           camaEl.appendChild(estado);
           camaEl.appendChild(paciente);
           camaEl.appendChild(dni);
+          camaEl.appendChild(actualizacion);
 
           // --- Interaccion: doble clic (escritorio) o pulsacion larga (tactil)
           // Simple clic  -> abre modal de edicion
@@ -1463,6 +1473,7 @@ document.addEventListener("DOMContentLoaded", function () {
         tipoBusqueda.value = "todo";
         localStorage.setItem(STORAGE_KEY_TIPO, "todo");
       }
+      renderIndicadoresEstado();
       actualizarEstadoActivoIndicadoresSala();
       aplicarFiltro();
     });
@@ -1496,6 +1507,7 @@ document.addEventListener("DOMContentLoaded", function () {
     filtroSalaIndicador = "";
     // [2026-05-05 FEATURE] Al limpiar, también resetear el valor persistido.
     localStorage.setItem(STORAGE_KEY_TIPO, "todo");
+    renderIndicadoresEstado();
     actualizarEstadoActivoIndicadores();
     actualizarEstadoActivoIndicadoresSala();
     sincronizarFiltrosMoviles();
@@ -1564,6 +1576,7 @@ document.addEventListener("DOMContentLoaded", function () {
       } else {
         filtroSalaIndicador = salaId;
       }
+      renderIndicadoresEstado();
       actualizarEstadoActivoIndicadoresSala();
       sincronizarFiltrosMoviles();
       aplicarFiltro();
@@ -1611,15 +1624,51 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function _ejecutarTerminarMapeo() {
-    var totalCamasMapa = camasRenderizadas.length;
-    var totalCamasMapeadas = camasMapeadasSesion.size;
-    if (totalCamasMapa > 0 && totalCamasMapeadas < totalCamasMapa) {
-      var faltantes = totalCamasMapa - totalCamasMapeadas;
-      toastr.error(
-        "No puede terminar el mapeo. Faltan " + faltantes + " cama(s) por revisar.",
-        "Mapeo incompleto"
-      );
-      return;
+    function _abrirModalCamasFaltantes(data) {
+      var faltantes = Number(data && data.faltantes ? data.faltantes : 0);
+      var listado = Array.isArray(data && data.camas_faltantes) ? data.camas_faltantes : [];
+      var htmlLista = listado.length
+        ? (
+          '<fieldset class="modalAtencionCampos">' +
+            '<legend>Camas pendientes</legend>' +
+            '<div style="max-height: 18rem; overflow:auto; text-align:left;">' +
+              '<table class="tabla-general" style="width:100%; font-size:0.86rem;">' +
+                '<thead><tr><th>Cama</th><th>Servicio</th><th>Sala</th><th>Cubículo</th></tr></thead>' +
+                '<tbody>' +
+                  listado.map(function (item) {
+                    return (
+                      '<tr>' +
+                        '<td>' + escaparHtml(item.numero_cama || '') + '</td>' +
+                        '<td>' + escaparHtml(item.servicio || '') + '</td>' +
+                        '<td>' + escaparHtml(item.sala || '') + '</td>' +
+                        '<td>' + escaparHtml(item.cubiculo || '') + '</td>' +
+                      '</tr>'
+                    );
+                  }).join('') +
+                '</tbody>' +
+              '</table>' +
+            '</div>' +
+          '</fieldset>'
+        )
+        : '<p>No se recibio el detalle de camas pendientes.</p>';
+
+      Swal.fire({
+        title: "Mapeo incompleto",
+        html:
+          '<div class="modal-mapeo-servicios__intro">' +
+            '<p class="modal-mapeo-servicios__texto">Faltan ' + escaparHtml(String(faltantes)) + ' cama(s) por mapear antes de finalizar.</p>' +
+          '</div>' +
+          htmlLista,
+        icon: "warning",
+        confirmButtonText: "Entendido",
+        customClass: {
+          popup: "contener-modal-defuncion",
+          title: "contener-modal-titulo",
+          content: "contener-modal-contenido",
+          confirmButton: "contener-modal-boton-confirmar",
+          cancelButton: "contener-modal-boton-cancelar"
+        }
+      });
     }
 
     Swal.fire({
@@ -1649,6 +1698,10 @@ document.addEventListener("DOMContentLoaded", function () {
         });
         var data = await response.json();
         if (!response.ok || !data.ok) {
+          if (data && Number(data.faltantes || 0) > 0) {
+            _abrirModalCamasFaltantes(data);
+            return;
+          }
           throw new Error(data.error || "No se pudo terminar el mapeo.");
         }
 

@@ -2,7 +2,7 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.utils.timezone import localtime, now
 
-from mapeo_camas.models import AsignacionCamaPaciente, HistorialEstadoCama, EstadoMapeo
+from mapeo_camas.models import AsignacionCamaPaciente, HistorialEstadoCama, EstadoMapeo, get_observacion_mapeo
 from paciente.models import Paciente
 from servicio.models import Cama
 
@@ -33,7 +33,7 @@ class MapeoCamasService:
             estado_nuevo=estado_nuevo,
             paciente_id=paciente_id,
             usuario=usuario,
-            observacion=observacion,
+            observacion=get_observacion_mapeo(observacion),
         )
 
     @staticmethod

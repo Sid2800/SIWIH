@@ -1,4 +1,6 @@
 
+from functools import lru_cache
+
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -16,8 +18,9 @@ class EstadoMapeo(models.Model):
         ESTADO_CAMA = "ESTADO_CAMA", "Estado de cama"
         ESTADO_SESION = "ESTADO_SESION", "Estado de sesion"
         TIPO_ACCION = "TIPO_ACCION", "Tipo de accion"
+        OBSERVACION = "OBSERVACION", "Observacion"
 
-    codigo = models.CharField(max_length=40, unique=True, db_index=True, verbose_name="Código")
+    codigo = models.CharField(max_length=255, unique=True, db_index=True, verbose_name="Código")
     categoria = models.CharField(
         max_length=20,
         choices=Categoria.choices,
@@ -33,6 +36,19 @@ class EstadoMapeo(models.Model):
 
     def __str__(self):
         return f"{self.categoria} | {self.codigo}"
+
+
+@lru_cache(maxsize=512)
+def get_observacion_mapeo(codigo):
+    if hasattr(codigo, "codigo"):
+        codigo = codigo.codigo
+    codigo_normalizado = (codigo or "").strip() or "Sin observaciones"
+    observacion, _ = EstadoMapeo.objects.get_or_create(
+        codigo=codigo_normalizado,
+        categoria=EstadoMapeo.Categoria.OBSERVACION,
+        defaults={"activo": True},
+    )
+    return observacion
     
 
 
@@ -208,11 +224,14 @@ class HistorialEstadoCama(models.Model):
         verbose_name="Fecha y hora",
     )
     # Descripción breve del motivo o contexto del cambio.
-    observacion = models.CharField(
-        max_length=255,
-        default="Ingreso (sync)",
+    observacion = models.ForeignKey(
+        "mapeo_camas.EstadoMapeo",
+        on_delete=models.PROTECT,
+        related_name="historiales_como_observacion",
+        null=True,
         blank=True,
         verbose_name="Observacion",
+        limit_choices_to={"categoria": "OBSERVACION"},
     )
 
     class Meta:
@@ -286,11 +305,14 @@ class MovimientoCama(models.Model):
         verbose_name="Fecha y hora",
     )
     # Nota libre opcional sobre el motivo o contexto del traslado.
-    observacion = models.CharField(
-        max_length=255,
+    observacion = models.ForeignKey(
+        "mapeo_camas.EstadoMapeo",
+        on_delete=models.PROTECT,
+        related_name="movimientos_como_observacion",
+        null=True,
         blank=True,
-        default="",
         verbose_name="Observacion",
+        limit_choices_to={"categoria": "OBSERVACION"},
     )
 
     class Meta:
@@ -452,7 +474,15 @@ class DetalleMapeoCama(models.Model):
         verbose_name="Usuario",
     )
     fecha_hora = models.DateTimeField(auto_now_add=True, db_index=True, verbose_name="Fecha y hora")
-    observacion = models.CharField(max_length=255, blank=True, default="", verbose_name="Observacion")
+    observacion = models.ForeignKey(
+        "mapeo_camas.EstadoMapeo",
+        on_delete=models.PROTECT,
+        related_name="detalles_mapeo_como_observacion",
+        null=True,
+        blank=True,
+        verbose_name="Observacion",
+        limit_choices_to={"categoria": "OBSERVACION"},
+    )
 
     class Meta:
         db_table = "mapeo_camas_detalle_mapeo_cama"

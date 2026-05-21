@@ -37,6 +37,7 @@ from mapeo_camas.models import (
     MapeoSesionCama,
     MapeoSesionServicio,
     MovimientoCama,
+    get_observacion_mapeo,
 )
 from paciente.models import Paciente
 from servicio.models import Cama, Cubiculo, Sala, Servicio
@@ -384,6 +385,13 @@ def _paciente_payload(paciente):
     }
 
 
+def _observacion_codigo(observacion):
+    """Retorna el texto visible de una observacion catalogada."""
+    if not observacion:
+        return ""
+    return getattr(observacion, "codigo", "") or str(observacion)
+
+
 # [2026-05-07] Helper para verificar si usuario es superadmin
 def _es_superadmin(usuario):
     """Indica si el usuario es superadmin, lo que exime del límite de cambios."""
@@ -432,7 +440,7 @@ def _inicio_ventana_limite_sala():
 def _filtro_observaciones_movimiento_limite():
     """Filtro común para contar movimientos que consumen límite por sala.
     Los movimientos de superadmin quedan fuera porque usan otra observación."""
-    return Q(observacion__in=[
+    return Q(observacion__codigo__in=[
         OBSERVACION_MOVIMIENTO_PACIENTE_MAPA,
         OBSERVACION_MOVIMIENTO_PACIENTE_MAPA_DETALLE,
         OBSERVACION_CAMBIO_TRASLADO_MAPEO,
@@ -568,16 +576,86 @@ def _registrar_detalle_mapeo(
     if isinstance(tipo_accion, str):
         tipo_accion = EstadoMapeo.objects.get(codigo=tipo_accion)
 
-    return DetalleMapeoCama.objects.create(
+    observacion_catalogada = get_observacion_mapeo(observacion)
+
+    # [2026-05-21] Si la misma cama vuelve a pasar por la misma sesion,
+    # se conserva un solo registro y se actualiza su ultimo estado.
+    detalle, _ = DetalleMapeoCama.objects.update_or_create(
         sesion_mapeo=sesion,
         cama=cama,
-        fue_validada=fue_validada,
-        hubo_cambio=hubo_cambio,
-        estado_actual=asignacion.estado if asignacion else None,
-        paciente_actual=asignacion.paciente if asignacion else None,
-        tipo_accion=tipo_accion,
+        defaults={
+            "fue_validada": fue_validada,
+            "hubo_cambio": hubo_cambio,
+            "estado_actual": asignacion.estado if asignacion else None,
+            "paciente_actual": asignacion.paciente if asignacion else None,
+            "tipo_accion": tipo_accion,
+            "usuario": usuario,
+            "observacion": observacion_catalogada,
+            "fecha_hora": timezone.now(),
+        },
+    )
+    return detalle
+
+
+def _registrar_historial_mapeo(
+    *,
+    cama,
+    estado_anterior,
+    estado_nuevo,
+    paciente,
+    usuario,
+    observacion,
+    sesion_mapeo=None,
+):
+    """Registra historial de cama; en mapeo activo actualiza el último registro de la sesión."""
+    sesion = sesion_mapeo or _obtener_sesion_mapeo_activa(usuario)
+    observacion_catalogada = get_observacion_mapeo(observacion)
+
+    if not sesion:
+        return HistorialEstadoCama.objects.create(
+            cama=cama,
+            estado_anterior=estado_anterior,
+            estado_nuevo=estado_nuevo,
+            paciente=paciente,
+            usuario=usuario,
+            observacion=observacion_catalogada,
+        )
+
+    # [2026-05-21] Durante la sesión de mapeo se conserva un solo historial por cama.
+    historial = (
+        HistorialEstadoCama.objects.filter(
+            cama=cama,
+            usuario=usuario,
+            fecha_hora__gte=sesion.fecha_inicio,
+        )
+        .order_by("-fecha_hora", "-id")
+        .first()
+    )
+
+    if historial:
+        historial.estado_anterior = estado_anterior
+        historial.estado_nuevo = estado_nuevo
+        historial.paciente = paciente
+        historial.observacion = observacion_catalogada
+        historial.fecha_hora = timezone.now()
+        historial.save(
+            update_fields=[
+                "estado_anterior",
+                "estado_nuevo",
+                "paciente",
+                "observacion",
+                "fecha_hora",
+            ]
+        )
+        return historial
+
+    return HistorialEstadoCama.objects.create(
+        cama=cama,
+        estado_anterior=estado_anterior,
+        estado_nuevo=estado_nuevo,
+        paciente=paciente,
         usuario=usuario,
-        observacion=observacion or "",
+        observacion=observacion_catalogada,
     )
 
 
@@ -939,7 +1017,7 @@ def historiales_cards_data(request):
                 "tipo_accion": tipo_accion_display,
                 "hubo_cambio": bool(item.hubo_cambio),
                 "fue_validada": bool(item.fue_validada),
-                "observacion": item.observacion or "",
+                "observacion": _observacion_codigo(item.observacion),
             }
 
             # [2026-05-07] Solo agregar a la estructura si la cama no fue vista antes.
@@ -968,7 +1046,7 @@ def historiales_cards_data(request):
                     "detalle_1": f"Ubicacion: {_ubicacion_desde_cama(item.cama)}",
                     "detalle_2": f"Validada: {'SI' if item.fue_validada else 'NO'}",
                     "detalle_3": f"Hubo cambio: {'SI' if item.hubo_cambio else 'NO'}",
-                    "observacion": item.observacion or "",
+                    "observacion": _observacion_codigo(item.observacion),
                 }
             )
 
@@ -1060,7 +1138,7 @@ def historiales_cards_data(request):
                 "usuario": _nombre_usuario(item.usuario),
                 "fecha": _hora_local_iso(item.fecha_hora),
                 "tipo_accion": f"{estado_anterior_codigo} \u2192 {estado_nuevo_codigo}",
-                "observacion": item.observacion or "",
+                "observacion": _observacion_codigo(item.observacion),
             }
 
             if cubiculo_nombre == "SIN_CUBICULO":
@@ -1159,7 +1237,7 @@ def historiales_cards_data(request):
                 "usuario": _nombre_usuario(mov.usuario),
                 "fecha": _hora_local_iso(mov.fecha_hora),
                 "tipo_accion": rol,
-                "observacion": mov.observacion or "",
+                "observacion": _observacion_codigo(mov.observacion),
             }
 
             if cubiculo_nombre == "SIN_CUBICULO":
@@ -1319,25 +1397,64 @@ def terminar_mapeo(request):
         return JsonResponse({"ok": False, "error": "No hay una sesion de mapeo activa."}, status=400)
 
     # [2026-05-07] El alcance de cierre se calcula solo sobre los servicios ligados a la sesion activa.
+    # [2026-05-21] Alinear con la lógica del mapa: cuando existe cubículo,
+    # la sala/servicio real se toma desde cubiculo.sala (no desde cama.sala).
     servicios_ids_sesion = _obtener_servicios_ids_sesion(sesion)
     total_camas_qs = Cama.objects.filter(
-        sala__estado=1,
-        sala__servicio__estado=1,
-    ).filter(
-        Q(cubiculo__isnull=True) | Q(cubiculo__estado=1)
+        Q(
+            cubiculo__isnull=True,
+            sala__estado=1,
+            sala__servicio__estado=1,
+        )
+        |
+        Q(
+            cubiculo__isnull=False,
+            cubiculo__estado=1,
+            cubiculo__sala__estado=1,
+            cubiculo__sala__servicio__estado=1,
+        )
     )
     if servicios_ids_sesion:
-        total_camas_qs = total_camas_qs.filter(sala__servicio_id__in=servicios_ids_sesion)
+        total_camas_qs = total_camas_qs.filter(
+            Q(cubiculo__isnull=True, sala__servicio_id__in=servicios_ids_sesion)
+            |
+            Q(cubiculo__isnull=False, cubiculo__sala__servicio_id__in=servicios_ids_sesion)
+        )
     total_camas_objetivo = total_camas_qs.count()
-    total_camas_mapeadas = (
+    camas_mapeadas_ids = list(
         DetalleMapeoCama.objects.filter(sesion_mapeo=sesion)
-        .values("cama_id")
+        .values_list("cama_id", flat=True)
         .distinct()
-        .count()
     )
+    total_camas_mapeadas = len(camas_mapeadas_ids)
 
     if total_camas_mapeadas < total_camas_objetivo:
         faltantes = total_camas_objetivo - total_camas_mapeadas
+        # [2026-05-21] Retornar listado de camas faltantes para mostrarlo en modal frontend.
+        camas_faltantes = []
+        faltantes_qs = (
+            total_camas_qs.exclude(pk__in=camas_mapeadas_ids)
+            .select_related("sala__servicio", "cubiculo__sala__servicio")
+            .order_by("numero_cama")
+        )
+        for cama in faltantes_qs:
+            cubiculo_obj = getattr(cama, "cubiculo", None)
+            sala_real = (cubiculo_obj.sala if cubiculo_obj else None) or getattr(cama, "sala", None)
+            servicio_real = getattr(sala_real, "servicio", None) if sala_real else None
+            camas_faltantes.append(
+                {
+                    "cama_id": cama.pk,
+                    "numero_cama": str(cama.numero_cama),
+                    "servicio": getattr(servicio_real, "nombre_servicio", "") or "SIN_SERVICIO",
+                    "sala": getattr(sala_real, "nombre_sala", "") or "SIN_SALA",
+                    "cubiculo": (
+                        f"{cubiculo_obj.numero} - {cubiculo_obj.nombre_cubiculo}"
+                        if cubiculo_obj
+                        else "SIN_CUBICULO"
+                    ),
+                }
+            )
+
         return JsonResponse(
             {
                 "ok": False,
@@ -1347,6 +1464,7 @@ def terminar_mapeo(request):
                 "faltantes": faltantes,
                 "total_camas": total_camas_objetivo,
                 "camas_mapeadas": total_camas_mapeadas,
+                "camas_faltantes": camas_faltantes,
             },
             status=400,
         )
@@ -1764,19 +1882,20 @@ def mover_paciente_cama(request):
     # para que _contar_cambios_manual_por_sala no lo cuente.
     es_superadmin = _es_superadmin(request.user)
     obs_origen = (
-        OBSERVACION_MOVIMIENTO_PACIENTE_MAPA_SUPERADMIN
+        get_observacion_mapeo(OBSERVACION_MOVIMIENTO_PACIENTE_MAPA_SUPERADMIN)
         if es_superadmin
-        else OBSERVACION_MOVIMIENTO_PACIENTE_MAPA
+        else get_observacion_mapeo(OBSERVACION_MOVIMIENTO_PACIENTE_MAPA)
     )
     obs_destino = (
-        OBSERVACION_MOVIMIENTO_PACIENTE_MAPA_SUPERADMIN
+        get_observacion_mapeo(OBSERVACION_MOVIMIENTO_PACIENTE_MAPA_SUPERADMIN)
         if es_superadmin
         else (
-            OBSERVACION_MOVIMIENTO_PACIENTE_MAPA
+            get_observacion_mapeo(OBSERVACION_MOVIMIENTO_PACIENTE_MAPA)
             if sala_destino_id != sala_origen_id
-            else OBSERVACION_MOVIMIENTO_PACIENTE_MAPA_DETALLE
+            else get_observacion_mapeo(OBSERVACION_MOVIMIENTO_PACIENTE_MAPA_DETALLE)
         )
     )
+    sesion_mapeo_activa = _obtener_sesion_mapeo_activa(request.user)
 
     with transaction.atomic():
         # 1. Liberar cama origen (OCUPADA -> VACIA)
@@ -1801,21 +1920,23 @@ def mover_paciente_cama(request):
         asig_destino.save()
 
         # 3. Registrar historial para ambas camas
-        historial_origen = HistorialEstadoCama.objects.create(
-            cama_id=cama_origen_id,
+        historial_origen = _registrar_historial_mapeo(
+            cama=cama_origen,
             estado_anterior=estado_anterior_origen,
             estado_nuevo=estado_vacia,
             paciente=None,
             usuario=request.user,
             observacion=obs_origen,
+            sesion_mapeo=sesion_mapeo_activa,
         )
-        historial_destino = HistorialEstadoCama.objects.create(
-            cama_id=cama_destino_id,
+        historial_destino = _registrar_historial_mapeo(
+            cama=cama_destino,
             estado_anterior=estado_anterior_destino,
             estado_nuevo=estado_ocupada,
             paciente=paciente,
             usuario=request.user,
             observacion=obs_destino,
+            sesion_mapeo=sesion_mapeo_activa,
         )
 
         MovimientoCama.objects.create(
@@ -1824,7 +1945,7 @@ def mover_paciente_cama(request):
             cama_destino_id=cama_destino_id,
             paciente=paciente,
             usuario=request.user,
-            observacion="Movimiento desde mapa de camas",
+            observacion=get_observacion_mapeo("Movimiento desde mapa de camas"),
         )
 
         # Registro en tiempo real por cama dentro de sesion de mapeo activa.
@@ -1834,7 +1955,7 @@ def mover_paciente_cama(request):
             asignacion=asig_origen,
             tipo_accion=DetalleMapeoCama.TipoAccion.TRASLADO,
             hubo_cambio=True,
-            observacion="Traslado de paciente desde mapa (cama origen).",
+            observacion=get_observacion_mapeo("Traslado de paciente desde mapa (cama origen)."),
         )
         _registrar_detalle_mapeo(
             usuario=request.user,
@@ -1842,7 +1963,7 @@ def mover_paciente_cama(request):
             asignacion=asig_destino,
             tipo_accion=DetalleMapeoCama.TipoAccion.TRASLADO,
             hubo_cambio=True,
-            observacion="Traslado de paciente desde mapa (cama destino).",
+            observacion=get_observacion_mapeo("Traslado de paciente desde mapa (cama destino)."),
         )
 
     cambios_origen_post = _contar_cambios_manual_por_sala(sala_origen_id)
@@ -2030,7 +2151,7 @@ def actualizar_cama_mapa(request):
             asignacion=asignacion,
             tipo_accion=DetalleMapeoCama.TipoAccion.CONFIRMACION,
             hubo_cambio=False,
-            observacion="Confirmacion sin cambios desde mapa.",
+            observacion=get_observacion_mapeo("Confirmacion sin cambios desde mapa."),
         )
         return JsonResponse(
             {
@@ -2046,29 +2167,33 @@ def actualizar_cama_mapa(request):
             }
         )
 
+    sesion_mapeo_activa = _obtener_sesion_mapeo_activa(request.user)
+
     try:
         with transaction.atomic():
             estado_historial_anterior = estado_anterior
 
             if requiere_cierre_prealta:
-                HistorialEstadoCama.objects.create(
-                    cama_id=cama_id,
+                _registrar_historial_mapeo(
+                    cama=cama,
                     estado_anterior=estado_anterior,
                     estado_nuevo=estado_alta,
                     paciente=paciente_anterior,
                     usuario=request.user,
-                    observacion="Alta historica por reasignacion desde PRE_ALTA",
+                    observacion=get_observacion_mapeo("Alta historica por reasignacion desde PRE_ALTA"),
+                    sesion_mapeo=sesion_mapeo_activa,
                 )
                 estado_historial_anterior = estado_vacia
 
             if requiere_registro_alta_a_vacia:
-                HistorialEstadoCama.objects.create(
-                    cama_id=cama_id,
+                _registrar_historial_mapeo(
+                    cama=cama,
                     estado_anterior=estado_anterior,
                     estado_nuevo=estado_alta,
                     paciente=paciente_anterior,
                     usuario=request.user,
-                    observacion="Alta historica por cambio manual a VACIA",
+                    observacion=get_observacion_mapeo("Alta historica por cambio manual a VACIA"),
+                    sesion_mapeo=sesion_mapeo_activa,
                 )
                 estado_historial_anterior = estado_alta
 
@@ -2079,13 +2204,14 @@ def actualizar_cama_mapa(request):
                 asig_previa_paciente.paciente = None
                 asig_previa_paciente.save()
 
-                HistorialEstadoCama.objects.create(
+                _registrar_historial_mapeo(
                     cama=asig_previa_paciente.cama,
                     estado_anterior=estado_anterior_previa,
                     estado_nuevo=estado_vacia,
                     paciente=None,
                     usuario=request.user,
-                    observacion="Cambio de cama: paciente trasladado a otra cama",
+                    observacion=get_observacion_mapeo("Cambio de cama: paciente trasladado a otra cama"),
+                    sesion_mapeo=sesion_mapeo_activa,
                 )
 
                 MovimientoCama.objects.create(
@@ -2094,7 +2220,7 @@ def actualizar_cama_mapa(request):
                     cama_destino=cama,
                     paciente=paciente_nuevo,
                     usuario=request.user,
-                    observacion="Cambio de cama desde mapa",
+                    observacion=get_observacion_mapeo("Cambio de cama desde mapa"),
                 )
 
             # Aplicar cambios finales de la asignacion.
@@ -2104,13 +2230,14 @@ def actualizar_cama_mapa(request):
             asignacion.save()
 
             # Registrar historial final del cambio visible en cama.
-            historial = HistorialEstadoCama.objects.create(
-                cama_id=cama_id,
+            historial = _registrar_historial_mapeo(
+                cama=cama,
                 estado_anterior=estado_historial_anterior,
                 estado_nuevo=estado_nuevo_obj,
                 paciente=asignacion.paciente,
                 usuario=request.user,
-                observacion=OBSERVACION_CAMBIO_MANUAL_MAPA,
+                observacion=get_observacion_mapeo(OBSERVACION_CAMBIO_MANUAL_MAPA),
+                sesion_mapeo=sesion_mapeo_activa,
             )
     except Exception as exc:
         return JsonResponse({"ok": False, "error": str(exc)}, status=400)
@@ -2126,7 +2253,7 @@ def actualizar_cama_mapa(request):
             else DetalleMapeoCama.TipoAccion.CAMBIO
         ),
         hubo_cambio=True,
-        observacion="Actualización de cama desde mapa.",
+        observacion=get_observacion_mapeo("Actualización de cama desde mapa."),
     )
 
     cambios_realizados = _contar_cambios_manual_por_sala(_sala_real_id_desde_cama(cama))
@@ -2251,13 +2378,14 @@ def procesar_cama_mapeo(request):
         # Caso 1: todo correcto (sin cambios en sistema)
         if accion == "CONFIRMAR":
             # Auditoria de mapeo: aunque no haya cambios, se registra la validacion.
-            HistorialEstadoCama.objects.create(
+            _registrar_historial_mapeo(
                 cama=cama,
                 estado_anterior=estado_sistema,
                 estado_nuevo=estado_sistema,
                 paciente=asig_actual.paciente if asig_actual else None,
                 usuario=request.user,
-                observacion="Confirmacion de mapeo sin cambios",
+                observacion=get_observacion_mapeo("Confirmacion de mapeo sin cambios"),
+                sesion_mapeo=sesion,
             )
 
             _registrar_detalle_mapeo(
@@ -2266,7 +2394,7 @@ def procesar_cama_mapeo(request):
                 asignacion=asig_actual,
                 tipo_accion=DetalleMapeoCama.TipoAccion.CONFIRMACION,
                 hubo_cambio=False,
-                observacion=observacion or "Confirmacion de estado sin cambios.",
+                observacion=get_observacion_mapeo(observacion or "Confirmacion de estado sin cambios."),
                 sesion_mapeo=sesion,
             )
             return JsonResponse({"ok": True, "mensaje": "Cama confirmada sin cambios.", "estado_sistema": estado_sistema.codigo})
@@ -2282,13 +2410,14 @@ def procesar_cama_mapeo(request):
             asig_actual.paciente = None
             asig_actual.save()
 
-            HistorialEstadoCama.objects.create(
+            _registrar_historial_mapeo(
                 cama=cama,
                 estado_anterior=estado_anterior,
                 estado_nuevo=estado_vacia,
                 paciente=None,
                 usuario=request.user,
-                observacion="Confirmacion de alta desde mapeo",
+                observacion=get_observacion_mapeo("Confirmacion de alta desde mapeo"),
+                sesion_mapeo=sesion,
             )
 
             _registrar_detalle_mapeo(
@@ -2297,7 +2426,7 @@ def procesar_cama_mapeo(request):
                 asignacion=asig_actual,
                 tipo_accion=DetalleMapeoCama.TipoAccion.ALTA,
                 hubo_cambio=True,
-                observacion=observacion or "Confirmar alta (egreso).",
+                observacion=get_observacion_mapeo(observacion or "Confirmar alta (egreso)."),
                 sesion_mapeo=sesion,
             )
             return JsonResponse({"ok": True, "mensaje": "Alta confirmada. Cama liberada."})
@@ -2311,13 +2440,14 @@ def procesar_cama_mapeo(request):
             asig_actual.estado = estado_ocupada
             asig_actual.save()
 
-            HistorialEstadoCama.objects.create(
+            _registrar_historial_mapeo(
                 cama=cama,
                 estado_anterior=estado_anterior,
                 estado_nuevo=estado_ocupada,
                 paciente=asig_actual.paciente,
                 usuario=request.user,
-                observacion="Cancelar prealta desde mapeo",
+                observacion=get_observacion_mapeo("Cancelar prealta desde mapeo"),
+                sesion_mapeo=sesion,
             )
 
             _registrar_detalle_mapeo(
@@ -2326,7 +2456,7 @@ def procesar_cama_mapeo(request):
                 asignacion=asig_actual,
                 tipo_accion=DetalleMapeoCama.TipoAccion.CORRECCION,
                 hubo_cambio=True,
-                observacion=observacion or "Cancelar prealta, paciente permanece.",
+                observacion=get_observacion_mapeo(observacion or "Cancelar prealta, paciente permanece."),
                 sesion_mapeo=sesion,
             )
             return JsonResponse({"ok": True, "mensaje": "Prealta cancelada. Cama en OCUPADA."})
@@ -2345,13 +2475,14 @@ def procesar_cama_mapeo(request):
 
             if asig_actual and asig_actual.paciente_id == paciente_observado.id:
                 # Auditoria de mapeo: se registra validacion aunque paciente y estado coincidan.
-                HistorialEstadoCama.objects.create(
+                _registrar_historial_mapeo(
                     cama=cama,
                     estado_anterior=estado_sistema,
                     estado_nuevo=estado_sistema,
                     paciente=asig_actual.paciente,
                     usuario=request.user,
-                    observacion="Confirmacion de mapeo sin cambios (paciente coincide)",
+                    observacion=get_observacion_mapeo("Confirmacion de mapeo sin cambios (paciente coincide)"),
+                    sesion_mapeo=sesion,
                 )
 
                 _registrar_detalle_mapeo(
@@ -2360,7 +2491,7 @@ def procesar_cama_mapeo(request):
                     asignacion=asig_actual,
                     tipo_accion=DetalleMapeoCama.TipoAccion.CONFIRMACION,
                     hubo_cambio=False,
-                    observacion=observacion or "Paciente coincide con sistema.",
+                    observacion=get_observacion_mapeo(observacion or "Paciente coincide con sistema."),
                     sesion_mapeo=sesion,
                 )
                 return JsonResponse({"ok": True, "mensaje": "Sin cambios: paciente ya coincide con sistema."})
@@ -2378,13 +2509,14 @@ def procesar_cama_mapeo(request):
                 usuario_asignacion=request.user,
             )
 
-            HistorialEstadoCama.objects.create(
+            _registrar_historial_mapeo(
                 cama=cama,
                 estado_anterior=estado_anterior,
                 estado_nuevo=estado_ocupada,
                 paciente=paciente_observado,
                 usuario=request.user,
-                observacion=OBSERVACION_CAMBIO_TRASLADO_MAPEO,
+                observacion=get_observacion_mapeo(OBSERVACION_CAMBIO_TRASLADO_MAPEO),
+                sesion_mapeo=sesion,
             )
 
             _registrar_detalle_mapeo(
@@ -2393,7 +2525,7 @@ def procesar_cama_mapeo(request):
                 asignacion=nueva_asig,
                 tipo_accion=DetalleMapeoCama.TipoAccion.CAMBIO,
                 hubo_cambio=True,
-                observacion=observacion or "Cambio/traslado de paciente.",
+                observacion=get_observacion_mapeo(observacion or "Cambio/traslado de paciente."),
                 sesion_mapeo=sesion,
             )
             return JsonResponse({"ok": True, "mensaje": "Cambio/traslado aplicado correctamente."})
@@ -2426,13 +2558,14 @@ def procesar_cama_mapeo(request):
                     usuario_asignacion=request.user,
                 )
 
-            HistorialEstadoCama.objects.create(
+            _registrar_historial_mapeo(
                 cama=cama,
                 estado_anterior=estado_vacia,
                 estado_nuevo=estado_ocupada,
                 paciente=paciente_observado,
                 usuario=request.user,
-                observacion="Asignacion detectada durante mapeo",
+                observacion=get_observacion_mapeo("Asignacion detectada durante mapeo"),
+                sesion_mapeo=sesion,
             )
 
             _registrar_detalle_mapeo(
@@ -2441,7 +2574,7 @@ def procesar_cama_mapeo(request):
                 asignacion=asignacion_obj,
                 tipo_accion=DetalleMapeoCama.TipoAccion.CAMBIO,
                 hubo_cambio=True,
-                observacion=observacion or "Sistema libre, paciente presente (asignacion).",
+                observacion=get_observacion_mapeo(observacion or "Sistema libre, paciente presente (asignacion)."),
                 sesion_mapeo=sesion,
             )
             return JsonResponse({"ok": True, "mensaje": "Asignacion aplicada correctamente."})
@@ -2459,13 +2592,14 @@ def procesar_cama_mapeo(request):
             asig_actual.paciente = None
             asig_actual.save()
 
-            HistorialEstadoCama.objects.create(
+            _registrar_historial_mapeo(
                 cama=cama,
                 estado_anterior=estado_ocupada,
                 estado_nuevo=estado_vacia,
                 paciente=None,
                 usuario=request.user,
-                observacion="Alta forzada desde mapeo",
+                observacion=get_observacion_mapeo("Alta forzada desde mapeo"),
+                sesion_mapeo=sesion,
             )
 
             _registrar_detalle_mapeo(
@@ -2474,7 +2608,7 @@ def procesar_cama_mapeo(request):
                 asignacion=asig_actual,
                 tipo_accion=DetalleMapeoCama.TipoAccion.ALTA,
                 hubo_cambio=True,
-                observacion=observacion or "Sistema ocupado, cama vacia (alta forzada).",
+                observacion=get_observacion_mapeo(observacion or "Sistema ocupado, cama vacia (alta forzada)."),
                 sesion_mapeo=sesion,
             )
             return JsonResponse({"ok": True, "mensaje": "Alta forzada aplicada. Cama liberada."})
