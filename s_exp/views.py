@@ -40,6 +40,8 @@ from .models import (
     ExpedienteEstadoLog,
 )
 from usuario.models import PerfilUnidad
+from expediente.models import Expediente, PacienteAsignacion
+from paciente.models import Paciente
 
 logger = logging.getLogger("s_exp")
 
