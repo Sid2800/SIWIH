@@ -33,6 +33,12 @@
         <i class="bi bi-clock-history boton-exportacion"></i>
       </a>
       {% endif %}
+      {% if es_superusuario %}
+      {# [2026-05-25] Sincronización masiva inicial de ingresos->camas, solo para superusuario. #}
+      <button type="button" class="dt-button" id="btn-sincronizar-camas" title="Sincronizar camas de ingresos activos">
+        <i class="bi bi-arrow-repeat boton-exportacion"></i>
+      </button>
+      {% endif %}
       {# [2026-05-18] Botones de control de sesión para usuarios con permiso de mapear. #}
       {% if puede_mapear %}
       <button type="button" class="dt-button mapa-control-mapeo--oculto" data-action="terminar-mapeo" title="Terminar mapeo">
@@ -123,5 +129,5 @@
   window.MAPA_SOLO_LECTURA = {% if es_editor %}false{% else %}true{% endif %};
   window.MAPA_ROL_INTENTOS_RESTRINGIDO = {% if es_rol_intentos_restringido %}true{% else %}false{% endif %};
 </script>
-<script src="{% static 'mapeo_camas/scripts/mapaCamasAsignacion.js' %}?v=20260512b"></script>
+<script src="{% static 'mapeo_camas/scripts/mapaCamasAsignacion.js' %}?v=20260525b"></script>
 {% endblock %}

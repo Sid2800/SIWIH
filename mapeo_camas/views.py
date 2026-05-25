@@ -73,10 +73,13 @@ DETALLE_PAGE_SIZE_MAX = 200
 # --- Helpers de serialización robustos para el mapa de camas ---
 # [2026-05-07] Helper para serializar datos de cama con asignación actual
 def _cama_payload(cama, asig, cambios_realizados, max_cambios, meta_actualizacion):
+    # [2026-05-25] Regla operativa: si no hay asignacion/estado explicito,
+    # la cama se muestra con estado primario VACIA.
+    estado_codigo = asig.estado.codigo if (asig and asig.estado) else "VACIA"
     return {
         "numero_cama": cama.numero_cama,
-        "estado_visual": asig.estado.codigo if (asig and asig.estado) else "SIN_ASIGNACION",
-        "asignacion_estado": asig.estado.codigo if (asig and asig.estado) else "SIN_ASIGNACION",
+        "estado_visual": estado_codigo,
+        "asignacion_estado": estado_codigo,
         "paciente": _paciente_payload(asig.paciente) if asig else None,
         "cambios_realizados": cambios_realizados,
         "max_cambios": max_cambios,
@@ -118,16 +121,17 @@ def _servicio_payload(servicio, salas_data):
 def get_estado_mapeo(codigo, categoria):
     return EstadoMapeo.objects.get(codigo=codigo, categoria=categoria)
 # =============================================================================
-# [2026-05-07] API: Sincronizar camas con ingresos activos (solo admin ADMI)
+# [2026-05-07] API: Sincronizar camas con ingresos activos
+# [2026-05-25] Restringida nuevamente solo a superusuario.
 # =============================================================================
 @login_required
 def sincronizar_camas_superadmin(request):
     """
     Sincroniza AsignacionCamaPaciente para todos los ingresos activos con cama asignada.
-    Solo accesible para administradores de ADMI.
+    Solo accesible para superusuario.
     """
-    # [2026-05-08] Solo editores (admin/digitador de ADMI) pueden sincronizar
-    if not _tiene_permiso_cambios_mapa(request.user):
+    # [2026-05-25] Seguridad: sincronización masiva inicial permitida solo a superusuario.
+    if not getattr(request.user, "is_superuser", False):
         return JsonResponse({"ok": False, "error": "Acceso denegado."}, status=403)
 
     if request.method != "POST":
@@ -151,11 +155,25 @@ def sincronizar_camas_superadmin(request):
     ingresos = Ingreso.objects.filter(pk__in=camas_ultimos_ingresos).values(
         "id", "cama_id", "paciente_id"
     )
-    
-    if not ingresos.exists():
-        return JsonResponse({"ok": True, "mensaje": "No hay ingresos activos con cama asignada."})
+
+    # [2026-05-25] Conjunto de camas con ingreso activo (ocupadas reales).
+    camas_con_ingreso_activo = set(ingresos.values_list("cama_id", flat=True))
 
     from mapeo_camas.models import AsignacionCamaPaciente
+    # [2026-05-25] Saneamiento previo: normaliza registros sin estado válido
+    # para evitar que el flujo de ingreso falle por asignaciones huérfanas.
+    estado_vacia = get_estado_mapeo("VACIA", "ESTADO_CAMA")
+    estado_valido_subquery = EstadoMapeo.objects.filter(
+        pk=OuterRef("estado_id"),
+        categoria="ESTADO_CAMA",
+    )
+    asignaciones_reparadas = (
+        AsignacionCamaPaciente.objects
+        .annotate(estado_valido=Exists(estado_valido_subquery))
+        .filter(Q(estado_id__isnull=True) | Q(estado_valido=False))
+        .update(estado_id=estado_vacia.pk, paciente_id=None)
+    )
+
     estado_ocupada = get_estado_mapeo("OCUPADA", "ESTADO_CAMA")
     ocupadas = set(
         AsignacionCamaPaciente.objects.filter(
@@ -187,13 +205,70 @@ def sincronizar_camas_superadmin(request):
             errores += 1
             errores_detalle.append(f"Ingreso #{ingreso_id} — cama #{cama_id}: {exc}")
 
+    # [2026-05-25] Registrar también camas desocupadas en VACIA.
+    # Si una cama activa no tiene ingreso activo, debe quedar persistida como VACIA.
+    camas_activas_ids = set(Cama.objects.filter(estado=1).values_list("pk", flat=True))
+    camas_desocupadas_ids = camas_activas_ids - camas_con_ingreso_activo
+    vacias_creadas = 0
+    vacias_actualizadas = 0
+    if camas_desocupadas_ids:
+        asignaciones_desocupadas = (
+            AsignacionCamaPaciente.objects
+            .select_related("estado")
+            .filter(cama_id__in=camas_desocupadas_ids)
+            .order_by("cama_id", "-fecha_inicio", "-id")
+        )
+        ultima_asignacion_por_cama = {}
+        for asig in asignaciones_desocupadas:
+            if asig.cama_id not in ultima_asignacion_por_cama:
+                ultima_asignacion_por_cama[asig.cama_id] = asig
+
+        camas_para_crear = []
+        asignaciones_para_actualizar = []
+        for cama_id in camas_desocupadas_ids:
+            asig = ultima_asignacion_por_cama.get(cama_id)
+            if not asig:
+                camas_para_crear.append(cama_id)
+                continue
+            estado_codigo = getattr(asig.estado, "codigo", None)
+            if estado_codigo == "VACIA" and asig.paciente_id is None:
+                continue
+            if estado_codigo == "OCUPADA" or asig.paciente_id is not None or estado_codigo is None:
+                asig.estado = estado_vacia
+                asig.paciente = None
+                asig.usuario_asignacion = request.user
+                asignaciones_para_actualizar.append(asig)
+
+        if camas_para_crear:
+            AsignacionCamaPaciente.objects.bulk_create([
+                AsignacionCamaPaciente(
+                    cama_id=cama_id,
+                    estado=estado_vacia,
+                    paciente=None,
+                    usuario_asignacion=request.user,
+                )
+                for cama_id in camas_para_crear
+            ])
+            vacias_creadas = len(camas_para_crear)
+
+        for asig in asignaciones_para_actualizar:
+            asig.save(update_fields=["estado", "paciente", "usuario_asignacion"])
+        vacias_actualizadas = len(asignaciones_para_actualizar)
+
     return JsonResponse({
         "ok": True,
+        "asignaciones_reparadas": asignaciones_reparadas,
+        "vacias_creadas": vacias_creadas,
+        "vacias_actualizadas": vacias_actualizadas,
         "sincronizados": sincronizados,
         "omitidos": omitidos,
         "errores": errores,
         "errores_detalle": errores_detalle,
-        "mensaje": f"Sincronización finalizada. {sincronizados} sincronizados, {omitidos} omitidos, {errores} errores."
+        "mensaje": (
+            f"Sincronizacion finalizada. {asignaciones_reparadas} reparadas a VACIA, "
+            f"{vacias_creadas} vacias creadas, {vacias_actualizadas} vacias actualizadas, "
+            f"{sincronizados} sincronizados, {omitidos} omitidos, {errores} errores."
+        )
     })
 
 # =============================================================================
@@ -235,6 +310,8 @@ class MapeoCamasMapaView(UnidadRolRequiredMixin, TemplateView):
         # [2026-05-18] Permiso para cambios manuales directos en el mapa.
         context["puede_hacer_cambios_mapa"] = _tiene_permiso_cambios_mapa(self.request.user)
         context["puede_ver_historiales"] = _tiene_permiso_historiales(self.request.user)
+        # [2026-05-25] Control de UI: acciones de sincronización masiva visibles solo para superusuario.
+        context["es_superusuario"] = bool(getattr(self.request.user, "is_superuser", False))
         context["es_rol_intentos_restringido"] = es_rol_intentos_restringido
         # Compatibilidad con template/JS existente.
         # es_editor controla MAPA_SOLO_LECTURA en frontend; debe responder al permiso de cambios,
@@ -457,7 +534,8 @@ def _contar_cambios_manual_por_sala(sala_id):
 
     return (
         HistorialEstadoCama.objects.annotate(
-            sala_real_id=Coalesce("cama__cubiculo__sala_id", "cama__sala_id")
+            # [2026-05-22] Usar siempre cama.sala; el cubículo es solo ubicación física.
+            sala_real_id=F("cama__sala_id")
         )
         .filter(
             sala_real_id=sala_id,
@@ -470,11 +548,12 @@ def _contar_cambios_manual_por_sala(sala_id):
 
 
 def _sala_real_id_desde_cama(cama):
-    """Retorna la sala real de la cama usando el cubículo cuando exista."""
+    # [2026-05-22] Regla de negocio: la sala/servicio de la cama es siempre cama.sala.
+    # El cubículo solo determina ubicación física, no propiedad operativa.
+    """Retorna la sala a la que pertenece la cama (siempre cama.sala)."""
     if not cama:
         return None
-    cubiculo = getattr(cama, "cubiculo", None)
-    return (cubiculo.sala_id if cubiculo else None) or getattr(cama, "sala_id", None)
+    return getattr(cama, "sala_id", None)
 
 
 # [2026-05-18] Helper para decidir si aplica límite de intentos al usuario
@@ -657,6 +736,34 @@ def _registrar_historial_mapeo(
         usuario=usuario,
         observacion=observacion_catalogada,
     )
+
+
+# [2026-05-21] Helper de consistencia entre mapeo de camas e ingreso activo.
+def _sincronizar_cama_en_ingreso_activo(*, paciente_id, cama_id):
+    """Alinea la cama del ingreso activo del paciente con el estado resultante del mapeo."""
+    if not paciente_id:
+        return None
+
+    ingreso_activo = (
+        Ingreso.objects.filter(
+            paciente_id=paciente_id,
+            estado=1,
+            fecha_egreso__isnull=True,
+        )
+        .order_by("-fecha_ingreso", "-id")
+        .first()
+    )
+    if not ingreso_activo:
+        return None
+
+    if ingreso_activo.cama_id == cama_id:
+        return ingreso_activo
+
+    # [2026-05-21] Regla de consistencia: cada cambio de cama en mapeo
+    # debe reflejarse en el ingreso activo del paciente.
+    ingreso_activo.cama_id = cama_id
+    ingreso_activo.save(update_fields=["cama"])
+    return ingreso_activo
 
 
 # [2026-05-07] Helper para obtener IDs de camas mapeadas en sesión
@@ -1397,29 +1504,15 @@ def terminar_mapeo(request):
         return JsonResponse({"ok": False, "error": "No hay una sesion de mapeo activa."}, status=400)
 
     # [2026-05-07] El alcance de cierre se calcula solo sobre los servicios ligados a la sesion activa.
-    # [2026-05-21] Alinear con la lógica del mapa: cuando existe cubículo,
-    # la sala/servicio real se toma desde cubiculo.sala (no desde cama.sala).
+    # [2026-05-22] La pertenencia de la cama al servicio se determina siempre por cama.sala;
+    # el cubículo es solo su ubicación física, puede estar en otra sala.
     servicios_ids_sesion = _obtener_servicios_ids_sesion(sesion)
     total_camas_qs = Cama.objects.filter(
-        Q(
-            cubiculo__isnull=True,
-            sala__estado=1,
-            sala__servicio__estado=1,
-        )
-        |
-        Q(
-            cubiculo__isnull=False,
-            cubiculo__estado=1,
-            cubiculo__sala__estado=1,
-            cubiculo__sala__servicio__estado=1,
-        )
+        sala__estado=1,
+        sala__servicio__estado=1,
     )
     if servicios_ids_sesion:
-        total_camas_qs = total_camas_qs.filter(
-            Q(cubiculo__isnull=True, sala__servicio_id__in=servicios_ids_sesion)
-            |
-            Q(cubiculo__isnull=False, cubiculo__sala__servicio_id__in=servicios_ids_sesion)
-        )
+        total_camas_qs = total_camas_qs.filter(sala__servicio_id__in=servicios_ids_sesion)
     total_camas_objetivo = total_camas_qs.count()
     camas_mapeadas_ids = list(
         DetalleMapeoCama.objects.filter(sesion_mapeo=sesion)
@@ -1439,7 +1532,8 @@ def terminar_mapeo(request):
         )
         for cama in faltantes_qs:
             cubiculo_obj = getattr(cama, "cubiculo", None)
-            sala_real = (cubiculo_obj.sala if cubiculo_obj else None) or getattr(cama, "sala", None)
+            # [2026-05-22] Sala/servicio siempre desde cama.sala; cubiculo solo es ubicación física.
+            sala_real = getattr(cama, "sala", None)
             servicio_real = getattr(sala_real, "servicio", None) if sala_real else None
             camas_faltantes.append(
                 {
@@ -1593,7 +1687,9 @@ def mapa_camas_data(request):
             fecha_hora__gte=_inicio_ventana_limite_sala(),
         )
         .filter(_filtro_observaciones_movimiento_limite())
-        .annotate(sala_real_id=Coalesce("cama__cubiculo__sala_id", "cama__sala_id"))
+        # [2026-05-22] La pertenencia operativa de la cama se toma desde su sala,
+        # aunque el cubículo apunte a otra sala por inconsistencia histórica.
+        .annotate(sala_real_id=F("cama__sala_id"))
         .exclude(estado_anterior=F("estado_nuevo"))
         .values("sala_real_id")
         .annotate(total=Count("id"))
@@ -1674,6 +1770,8 @@ def mapa_camas_data(request):
             for cubiculo in sala.cubiculos.all():
                 camas_data = []
                 for cama in cubiculo.camas.all():
+                    if cama.sala_id != sala.id:
+                        continue
                     asig = asignacion_por_cama.get(cama.numero_cama)
                     meta_actualizacion = _meta_ultima_actualizacion(historial_por_cama.get(cama.numero_cama))
                     camas_data.append(_cama_payload(
@@ -1685,6 +1783,41 @@ def mapa_camas_data(request):
                     ))
                 if camas_data:
                     cubiculos_data.append(_cubiculo_payload(cubiculo, camas_data))
+
+            # [2026-05-22] Cubiculos cruzados: si una cama pertenece a esta sala,
+            # pero su cubiculo apunta a otra sala, se conserva dentro del cubiculo
+            # correspondiente para no perder la ubicacion fisica en el mapa.
+            cubiculos_cruzados = {}
+            camas_cruzadas_qs = (
+                Cama.objects.filter(sala_id=sala.id, cubiculo__isnull=False)
+                .exclude(cubiculo__sala_id=sala.id)
+                .select_related("cubiculo")
+                .order_by("cubiculo__numero", "numero_cama")
+            )
+            for cama in camas_cruzadas_qs:
+                cubiculo = cama.cubiculo
+                if not cubiculo:
+                    continue
+                cubiculo_bucket = cubiculos_cruzados.setdefault(
+                    cubiculo.pk,
+                    {"cubiculo": cubiculo, "camas": []},
+                )
+                asig = asignacion_por_cama.get(cama.numero_cama)
+                meta_actualizacion = _meta_ultima_actualizacion(historial_por_cama.get(cama.numero_cama))
+                cubiculo_bucket["camas"].append(_cama_payload(
+                    cama,
+                    asig,
+                    cambios_por_sala.get(sala.id, 0),
+                    max_cambios_usuario,
+                    meta_actualizacion
+                ))
+
+            for cubiculo_bucket in cubiculos_cruzados.values():
+                cubiculos_data.append(_cubiculo_payload(
+                    cubiculo_bucket["cubiculo"],
+                    cubiculo_bucket["camas"],
+                ))
+
             camas_directas_data = []
             for cama in sala.camas_sala.all():
                 asig = asignacion_por_cama.get(cama.numero_cama)
@@ -1706,13 +1839,11 @@ def mapa_camas_data(request):
 # =============================================================================
 # buscar_pacientes_mapa
 # -----------------------------------------------------------------------------
-# API GET de autocompletado. Busca pacientes activos que NO tienen una cama
-# OCUPADA actualmente, para poder asignarlos desde el mapa.
+# API GET de autocompletado. Busca pacientes con ingreso activo para
+# operaciones del mapa/mapeo.
 #
 # Regla de negocio:
-# - Solo mostrar pacientes con ingreso activo sin cama asignada, o
-# - pacientes con alta reciente.
-# En ambos casos, se excluyen pacientes que mantengan ocupacion activa.
+# - Solo mostrar pacientes con ingreso activo.
 # Acepta el parámetro ?q= para filtrar por nombre o DNI.
 # Retorna un máximo de 20 resultados.
 # =============================================================================
@@ -1723,9 +1854,16 @@ def buscar_pacientes_mapa(request):
     termino = (request.GET.get("q") or "").strip()
     tipo_busqueda = (request.GET.get("tipo") or "dni").strip().lower()
 
-    # --- 1. Base: pacientes activos o pendientes; aplica filtro de texto primero
-    #        (rápido: usa índices de la tabla paciente).
-    pacientes_qs = Paciente.objects.filter(estado__in=["A", "P"])
+    # [2026-05-21] Optimizacion de buscadores mapa/mapeo:
+    # limitar la base a pacientes con ingreso activo para reducir ruido y costo.
+    ingreso_activo = Exists(
+        Ingreso.objects.filter(
+            paciente_id=OuterRef("pk"),
+            estado=1,
+            fecha_egreso__isnull=True,
+        )
+    )
+    pacientes_qs = Paciente.objects.filter(estado__in=["A", "P"]).filter(ingreso_activo)
 
     if termino:
         if tipo_busqueda == "dni":
@@ -1745,17 +1883,6 @@ def buscar_pacientes_mapa(request):
                 | Q(primer_apellido__icontains=termino)
                 | Q(segundo_apellido__icontains=termino)
             )
-
-    # --- 2. Regla de negocio: excluir pacientes que ya tienen una cama OCUPADA.
-    #        Evita duplicados en el mapa. Usa EXISTS para mayor rendimiento.
-    ya_ocupando_cama = Exists(
-        AsignacionCamaPaciente.objects.filter(
-            paciente_id=OuterRef("pk"),
-            estado__codigo="OCUPADA",
-            estado__categoria="ESTADO_CAMA",
-        )
-    )
-    pacientes_qs = pacientes_qs.exclude(ya_ocupando_cama)
 
     pacientes = pacientes_qs.order_by("primer_nombre", "primer_apellido")[:20]
     resultados = [_paciente_payload(p) for p in pacientes]
@@ -1918,6 +2045,12 @@ def mover_paciente_cama(request):
             asig_destino.fecha_fin = None
             asig_destino.usuario_cierre = None
         asig_destino.save()
+
+        # [2026-05-21] Reflejar traslado en ingreso activo del paciente.
+        _sincronizar_cama_en_ingreso_activo(
+            paciente_id=paciente.id,
+            cama_id=cama_destino.pk,
+        )
 
         # 3. Registrar historial para ambas camas
         historial_origen = _registrar_historial_mapeo(
@@ -2229,6 +2362,17 @@ def actualizar_cama_mapa(request):
             asignacion.usuario_asignacion = request.user
             asignacion.save()
 
+            # [2026-05-22] Regla de negocio: al liberar cama en mapa por cambio de paciente,
+            # el ingreso del paciente anterior conserva su última cama registrada.
+
+            cama_ingreso_nueva = cama.pk if paciente_nuevo else None
+            if paciente_nuevo:
+                # [2026-05-21] Vincular cama final al ingreso activo del paciente actual.
+                _sincronizar_cama_en_ingreso_activo(
+                    paciente_id=paciente_nuevo.id,
+                    cama_id=cama_ingreso_nueva,
+                )
+
             # Registrar historial final del cambio visible en cama.
             historial = _registrar_historial_mapeo(
                 cama=cama,
@@ -2342,8 +2486,9 @@ def procesar_cama_mapeo(request):
         )
 
     servicios_ids_sesion = _obtener_servicios_ids_sesion(sesion)
-    # [2026-05-07] Usar sala del cubículo cuando existe para evitar error con FKs inconsistentes.
-    sala_real = (cama.cubiculo.sala if cama.cubiculo else None) or cama.sala
+    # [2026-05-22] La cama pertenece al servicio de su sala (cama.sala), no al del cubículo.
+    # Un cubículo puede estar físicamente en otra sala sin cambiar la propiedad de la cama.
+    sala_real = cama.sala
     if servicios_ids_sesion and sala_real.servicio_id not in servicios_ids_sesion:
         # [2026-05-07] La cama debe pertenecer a uno de los servicios seleccionados en la sesion.
         return JsonResponse(
@@ -2404,11 +2549,13 @@ def procesar_cama_mapeo(request):
             if not asig_actual:
                 return JsonResponse({"ok": False, "error": "No hay asignacion activa para confirmar alta."}, status=400)
 
-            paciente_mov = asig_actual.paciente
             estado_anterior = asig_actual.estado
             asig_actual.estado = estado_vacia
             asig_actual.paciente = None
             asig_actual.save()
+
+            # [2026-05-22] Regla de negocio: confirmar alta no limpia cama en ingreso;
+            # el ingreso debe conservar la última cama histórica.
 
             _registrar_historial_mapeo(
                 cama=cama,
@@ -2439,6 +2586,12 @@ def procesar_cama_mapeo(request):
             estado_anterior = asig_actual.estado
             asig_actual.estado = estado_ocupada
             asig_actual.save()
+
+            # [2026-05-21] Cancelar prealta restablece cama en ingreso activo.
+            _sincronizar_cama_en_ingreso_activo(
+                paciente_id=asig_actual.paciente.id,
+                cama_id=cama.pk,
+            )
 
             _registrar_historial_mapeo(
                 cama=cama,
@@ -2497,6 +2650,7 @@ def procesar_cama_mapeo(request):
                 return JsonResponse({"ok": True, "mensaje": "Sin cambios: paciente ya coincide con sistema."})
 
             estado_anterior = asig_actual.estado if asig_actual else estado_vacia
+            paciente_previo_id = asig_actual.paciente_id if asig_actual else None
             if asig_actual and asig_actual.paciente:
                 asig_actual.estado = estado_vacia
                 asig_actual.paciente = None
@@ -2507,6 +2661,13 @@ def procesar_cama_mapeo(request):
                 paciente=paciente_observado,
                 estado=estado_ocupada,
                 usuario_asignacion=request.user,
+            )
+
+            # [2026-05-22] Regla de negocio: el paciente previo conserva su última cama
+            # en ingreso, por lo que no se limpia la referencia al liberar en mapa.
+            _sincronizar_cama_en_ingreso_activo(
+                paciente_id=paciente_observado.id,
+                cama_id=cama.pk,
             )
 
             _registrar_historial_mapeo(
@@ -2558,6 +2719,12 @@ def procesar_cama_mapeo(request):
                     usuario_asignacion=request.user,
                 )
 
+            # [2026-05-21] Asignacion detectada en mapeo: persistir cama en ingreso activo.
+            _sincronizar_cama_en_ingreso_activo(
+                paciente_id=paciente_observado.id,
+                cama_id=cama.pk,
+            )
+
             _registrar_historial_mapeo(
                 cama=cama,
                 estado_anterior=estado_vacia,
@@ -2591,6 +2758,9 @@ def procesar_cama_mapeo(request):
             asig_actual.estado = estado_vacia
             asig_actual.paciente = None
             asig_actual.save()
+
+            # [2026-05-22] Regla de negocio: en alta forzada la cama del ingreso
+            # activo no se modifica; el ingreso debe conservar su cama histórica.
 
             _registrar_historial_mapeo(
                 cama=cama,

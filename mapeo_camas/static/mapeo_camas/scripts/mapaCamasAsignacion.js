@@ -9,6 +9,7 @@ document.addEventListener("DOMContentLoaded", function () {
     iniciarMapeo: "/mapeo-camas/api/iniciar-mapeo/",
     terminarMapeo: "/mapeo-camas/api/terminar-mapeo/",
     cancelarMapeo: "/mapeo-camas/api/cancelar-mapeo/",
+    sincronizarCamas: "/mapeo-camas/api/sincronizar-camas/",
     mapa: "/mapeo-camas/api/mapa-camas/",
     buscarPacientes: "/mapeo-camas/api/buscar-pacientes/",
     actualizarCama: "/mapeo-camas/api/actualizar-cama/",
@@ -36,6 +37,7 @@ document.addEventListener("DOMContentLoaded", function () {
   var btnCopiar = document.getElementById("btn-copiar-camas");
   var btnImprimir = document.getElementById("btn-imprimir-camas");
   var btnHistoriales = document.getElementById("btn-historiales-camas");
+  var btnSincronizarCamas = document.getElementById("btn-sincronizar-camas");
   var btnIniciarMapeo = document.getElementById("btn-iniciar-mapeo");
   var btnCancelarMapeo = document.getElementById("btn-cancelar-mapeo");
   // [2026-05-20 OPT] Remover btnTerminarMapeoPie; usar selector unificado con data-action="terminar-mapeo"
@@ -345,9 +347,10 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function normalizarEstadoIndicador(estado) {
-    var valor = String(estado || "SIN_ASIGNACION").trim().toUpperCase();
+    // [2026-05-25] Fallback unificado: sin estado explicito se considera VACIA.
+    var valor = String(estado || "VACIA").trim().toUpperCase();
     if (!valor) {
-      return "SIN_ASIGNACION";
+      return "VACIA";
     }
     if (valor === "ALTA") {
       return "PRE_ALTA";
@@ -653,7 +656,7 @@ document.addEventListener("DOMContentLoaded", function () {
     var actualizacionEl = camaEl.querySelector(".mapa-cama-actualizacion");
 
     if (estadoEl) {
-      estadoEl.textContent = camaActualizada.estado_visual || "SIN_ASIGNACION";
+      estadoEl.textContent = camaActualizada.estado_visual || "VACIA";
     }
     if (pacienteEl) {
       pacienteEl.textContent = camaActualizada.paciente ? camaActualizada.paciente.nombre : "Sin paciente";
@@ -726,7 +729,7 @@ document.addEventListener("DOMContentLoaded", function () {
     // 2) decidir el flujo (ocupada vs vacia),
     // 3) mostrar el contador de limite.
     var numeroCama = camaEl.dataset.numeroCama || "";
-    var estadoActual = camaEl.dataset.estado || "SIN_ASIGNACION";
+    var estadoActual = camaEl.dataset.estado || "VACIA";
     var pacienteActual = camaEl.dataset.paciente || "";
     var dniActual = camaEl.dataset.pacienteDni || "";
     var cambiosRealizados = parseInt(camaEl.dataset.cambiosRealizados || "0", 10);
@@ -734,7 +737,7 @@ document.addEventListener("DOMContentLoaded", function () {
     var limiteTexto = maxCambios === null ? "Sin limite" : (cambiosRealizados + " / " + maxCambios);
     var ultimaActualizacion = formatearFechaHoraCorta(camaEl.dataset.ultimaActualizacion || "");
     var usuarioUltimaActualizacion = camaEl.dataset.usuarioUltimaActualizacion || "Sin registro";
-    var estadoActualTexto = estadoActual || "SIN_ASIGNACION";
+    var estadoActualTexto = estadoActual || "VACIA";
     var htmlInformacion =
       '<fieldset class="modalAtencionCampos">' +
       "  <legend>Informacion</legend>" +
@@ -1541,6 +1544,49 @@ document.addEventListener("DOMContentLoaded", function () {
     // La vista ya define estilos @media print para exportar el estado visual actual.
     window.print();
   });
+
+  if (btnSincronizarCamas) {
+    btnSincronizarCamas.addEventListener("click", async function () {
+      // [2026-05-25] Acción administrativa para sincronización inicial masiva.
+      var confirmacion = await Swal.fire({
+        title: "Sincronizar camas",
+        text: "Esto sincronizara asignaciones para ingresos activos con cama. Deseas continuar?",
+        icon: "question",
+        showCancelButton: true,
+        confirmButtonText: "Sincronizar",
+        cancelButtonText: "Cancelar",
+        customClass: {
+          popup: "contener-modal-defuncion",
+          title: "contener-modal-titulo",
+          content: "contener-modal-contenido",
+          confirmButton: "contener-modal-boton-confirmar",
+          cancelButton: "contener-modal-boton-cancelar"
+        }
+      });
+      if (!confirmacion.isConfirmed) {
+        return;
+      }
+
+      btnSincronizarCamas.disabled = true;
+      try {
+        var response = await fetch(API_URLS.sincronizarCamas, {
+          method: "POST",
+          headers: { "X-CSRFToken": window.CSRF_TOKEN }
+        });
+        var data = await response.json();
+        if (!response.ok || !data.ok) {
+          throw new Error(data.error || "No se pudo ejecutar la sincronizacion.");
+        }
+
+        toastr.success(data.mensaje || "Sincronizacion completada.", "Exito");
+        await cargarMapa();
+      } catch (error) {
+        toastr.error(error.message || "Error al sincronizar camas.", "Error");
+      } finally {
+        btnSincronizarCamas.disabled = false;
+      }
+    });
+  }
 
   if (contenedorIndicadores) {
     contenedorIndicadores.addEventListener("click", function (event) {
