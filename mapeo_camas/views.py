@@ -25,7 +25,7 @@ from django.views.decorators.http import require_GET, require_POST
 from django.views.generic import TemplateView
 from ingreso.models import Ingreso
 from core.services.mapeo_camas_service import MapeoCamasService
-from core.mixins import UnidadRolRequiredMixin
+from core.mixins import UnfadRolRequiredMixin
 from usuario.models import PerfilUnidad, AlcanceUsuario
 
 
