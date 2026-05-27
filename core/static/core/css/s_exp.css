@@ -2796,3 +2796,22 @@ body.darkmode .sexp-sugerir-tiempo {
         grid-template-columns: 1fr;
     }
 }
+
+/* Botón del modal sticky (Listo para recoger / Vencimiento)
+   Texto en una sola línea, padding adecuado, no se rompe */
+.sexp-sticky-btn {
+    white-space: nowrap !important;
+    padding: 0.6rem 1.4rem !important;
+    font-size: 1.4rem !important;
+    line-height: 1.2 !important;
+    min-width: auto !important;
+    max-width: 90% !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 0.5rem !important;
+}
+
+.sexp-sticky-btn i {
+    font-size: 1.5rem !important;
+}

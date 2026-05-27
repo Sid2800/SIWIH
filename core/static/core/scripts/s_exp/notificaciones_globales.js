@@ -99,12 +99,12 @@ function mostrarModalAlertaSticky(alerta) {
         title: `<span style="color:#f1f5f9;">${alerta.titulo || '¡Aviso!'}</span>`,
         html: `<div style="font-size:clamp(1.6rem, 2.4vw, 2.2rem);line-height:1.45;padding:0 0.5rem;color:#f1f5f9;">${alerta.mensaje}</div>`,
         icon: 'info',
-        confirmButtonText: '<i class="bi bi-check-circle"></i> Entendido, pasaré por ellos',
+        confirmButtonText: '<i class="bi bi-check-circle"></i> Entendido',
         allowOutsideClick: false,
         allowEscapeKey: false,
         customClass: {
             popup: 'contener-modal',
-            confirmButton: 'contener-modal-boton-confirmar',
+            confirmButton: 'contener-modal-boton-confirmar sexp-sticky-btn',
         },
     }).then((result) => {
         if (window.__sexp_modales_activos) {
@@ -148,12 +148,12 @@ function mostrarModalAlertaVencimiento(alerta) {
         title: `<span style="color:#f1f5f9;">${alerta.titulo || '¡ATENCIÓN!'}</span>`,
         html: `<div style="font-size:clamp(1.6rem, 2.4vw, 2.2rem);line-height:1.45;padding:0 0.5rem;color:#f1f5f9;">${alerta.mensaje}</div>`,
         icon: 'error',
-        confirmButtonText: '<i class="bi bi-exclamation-triangle"></i> Entendido, devolveré los expedientes',
+        confirmButtonText: '<i class="bi bi-exclamation-triangle"></i> Entendido',
         allowOutsideClick: false,
         allowEscapeKey: false,
         customClass: {
             popup: 'contener-modal',
-            confirmButton: 'contener-modal-boton-confirmar',
+            confirmButton: 'contener-modal-boton-confirmar sexp-sticky-btn',
         },
     }).then((result) => {
         if (window.__sexp_modales_activos) {

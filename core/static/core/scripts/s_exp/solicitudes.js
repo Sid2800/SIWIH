@@ -246,11 +246,23 @@ function initTabla() {
                     if (data.estado_flujo === 'SOL_APROBADA_ORGANIZANDO') {
                         const haImpreso = sexpFlujoLocal.haImpreso(data.id);
                         const haRevisado = sexpFlujoLocal.haRevisado(data.id);
+                        // Revisión es DEFINITIVA: una vez hecha, el botón se bloquea.
+                        // Si después aparece un expediente no encontrado, el usuario debe
+                        // crear una NUEVA solicitud (no rehabilitar la revisión).
+                        let revisarDisabled = '';
+                        let revisarTitle = '';
+                        if (!haImpreso) {
+                            revisarDisabled = 'disabled';
+                            revisarTitle = 'title="Primero imprima la solicitud"';
+                        } else if (haRevisado) {
+                            revisarDisabled = 'disabled';
+                            revisarTitle = 'title="Ya realizó la revisión de entrega. Una vez hecha es definitiva."';
+                        }
                         const btnRevisar = `
                             <button class="sexp-action-btn sexp-action-btn--revisar"
-                                    ${haImpreso ? '' : 'disabled title="Primero imprima la solicitud"'}
+                                    ${revisarDisabled} ${revisarTitle}
                                     onclick="revisarEntrega(${data.id})">
-                                <i class="bi bi-clipboard-check"></i> Revisión de Entrega
+                                <i class="bi bi-clipboard-check"></i> ${haRevisado ? 'Revisión Realizada' : 'Revisión de Entrega'}
                             </button>`;
                         const btnListo = `
                             <button class="sexp-action-btn sexp-action-btn--listo"
