@@ -1,16 +1,21 @@
 /**
  * Notificaciones Globales - s_exp
- * Consulta periódicamente si hay alertas para el usuario (como expedientes listos para recoger).
  *
- * - Polling cada 5 segundos (rápido para que el usuario reciba el aviso de
- *   "Listo para recoger" casi al instante de que el admin lo marca)
+ * Sistema event-driven en lugar de polling ciego:
+ *   1. Al cargar la página → consulta inicial /api/alertas/
+ *   2. Después → usa RealtimeSExp con trigger (changes-check) para detectar
+ *      cuando hay cambios reales en backend. Solo entonces consulta /api/alertas/.
+ *
+ * Beneficio: si NO hay cambios en backend, NO se hacen requests a /api/alertas/.
+ * Cuando alguien notifica una solicitud → el timestamp 'global' cambia → trigger
+ * dispara verificarAlertasGlobales() casi instantáneamente.
+ *
  * - Modales sticky (no se cierran al hacer click fuera ni con Escape)
  * - Header X-Polling-Request:true → no renueva el timer de sesión
- * - Se evita duplicar el mismo modal mediante registro en window.__sexp_modales_activos
+ * - Anti-duplicado por solicitud_id / prestamo_id
  */
 (function () {
-    const INTERVALO_POLLING_MS = 5 * 1000; // 5 segundos para detección casi instantánea
-    let pollingTimer = null;
+    let pollingFallback = null;
 
     // Registro de modales activos para evitar duplicados al hacer polling
     if (!window.__sexp_modales_activos) {
@@ -18,16 +23,27 @@
     }
 
     $(document).ready(function () {
-        // Consulta inicial al cargar la página
+        // Consulta inicial al cargar la página (por si hay alertas pendientes al abrir)
         verificarAlertasGlobales();
 
-        // Polling periódico cada 30 segundos
-        pollingTimer = setInterval(verificarAlertasGlobales, INTERVALO_POLLING_MS);
+        // Sistema event-driven con changes-check (PREFERIDO)
+        // Solo dispara verificarAlertasGlobales cuando 'global' cambia en backend
+        if (window.RealtimeSExp && window.RealtimeSExp.registrarConAutoReload) {
+            window.RealtimeSExp.registrarConAutoReload(
+                'notificaciones-globales',
+                'global',
+                verificarAlertasGlobales,
+                5  // cada 5s consulta changes-check (ligero), pero solo llama a /alertas/ si hay cambios
+            );
+        } else {
+            // Fallback: si realtime.js no está cargado, polling tradicional cada 30s
+            pollingFallback = setInterval(verificarAlertasGlobales, 30 * 1000);
+        }
     });
 
-    // Limpiar el polling si la página se cierra/navega
+    // Limpiar el polling fallback si la página se cierra/navega
     $(window).on('beforeunload', function () {
-        if (pollingTimer) clearInterval(pollingTimer);
+        if (pollingFallback) clearInterval(pollingFallback);
     });
 })();
 
