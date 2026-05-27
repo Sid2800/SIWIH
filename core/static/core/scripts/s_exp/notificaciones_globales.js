@@ -97,7 +97,7 @@ function mostrarModalAlertaSticky(alerta) {
 
     Swal.fire({
         title: alerta.titulo || '¡Aviso!',
-        html: `<div style="font-size:clamp(1.6rem, 2.4vw, 2.2rem);line-height:1.45;padding:0 0.5rem;">${alerta.mensaje}</div>`,
+        html: `<div style="font-size:clamp(1.6rem, 2.4vw, 2.2rem);line-height:1.45;padding:0 0.5rem;color:#f1f5f9;">${alerta.mensaje}</div>`,
         icon: 'info',
         confirmButtonText: '<i class="bi bi-check-circle"></i> Entendido, pasaré por ellos',
         allowOutsideClick: false,
@@ -147,7 +147,7 @@ function mostrarModalAlertaVencimiento(alerta) {
 
     Swal.fire({
         title: alerta.titulo || '¡ATENCIÓN!',
-        html: `<div style="font-size:clamp(1.6rem, 2.4vw, 2.2rem);line-height:1.45;padding:0 0.5rem;">${alerta.mensaje}</div>`,
+        html: `<div style="font-size:clamp(1.6rem, 2.4vw, 2.2rem);line-height:1.45;padding:0 0.5rem;color:#f1f5f9;">${alerta.mensaje}</div>`,
         icon: 'error',
         confirmButtonText: '<i class="bi bi-exclamation-triangle"></i> Entendido, devolveré los expedientes',
         allowOutsideClick: false,
