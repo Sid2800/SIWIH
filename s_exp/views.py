@@ -1842,80 +1842,64 @@ def changes_check_api(request):
     from django.db.models import Max
     from .models import LogHistorico, SolicitudPrestamo, Prestamo, Devolucion
 
-    # IMPORTANTE: separamos los logs según el TIPO de acción:
-    #
-    # - Acciones ADMINISTRATIVAS (aprobar, rechazar, listo, entregar, procesar
-    #   devolución, revisión): excluimos las del usuario actual para que no
-    #   se auto-notifique al hacer clic en sus propios botones.
-    #
-    # - Acciones de USUARIO (crear solicitud, solicitar devolución): SIEMPRE
-    #   se incluyen porque son "novedades" que el admin necesita ver para
-    #   procesar, sin importar quién las generó (incluso si admin = solicitante
-    #   en pruebas con cuenta única).
+    # GRANULARIDAD POR TIPO DE ACCIÓN:
+    # Cada sección (pantalla del admin) solo se notifica de los eventos que
+    # le incumben directamente. Esto evita que el admin reciba un banner en
+    # "Gestión Solicitudes" cuando lo que cambió es una devolución, etc.
     user = request.user
 
-    ACCIONES_USUARIO = [
-        'SOLICITUD_CREADA',
-        'SOLICITUD_DEVOLUCION_INICIADA',
+    # ----- Eventos por sección (vía LogHistorico) -----
+    # Gestión Solicitudes (admin) → nuevas solicitudes creadas por usuarios
+    gestion_acciones = ['SOLICITUD_CREADA']
+
+    # Control de Devoluciones (admin) → usuario pide devolver expedientes
+    devoluciones_acciones = ['SOLICITUD_DEVOLUCION_INICIADA']
+
+    # Monitoreo Préstamos (admin) → préstamos entregados/devueltos por OTROS admins
+    # (no tiene un tipo de log "de usuario", solo cambios de estado por admins)
+    monitoreo_acciones = ['PRESTAMO_ENTREGADO', 'DEVOLUCION_PROCESADA']
+
+    # Mis Solicitudes (usuario) → cualquier cambio en sus propias solicitudes
+    # hecho por un admin (aprobada, lista, etc).
+    mis_solic_acciones = [
+        'SOLICITUD_APROBADA', 'SOLICITUD_RECHAZADA', 'SOLICITUD_LISTA',
+        'PRESTAMO_ENTREGADO', 'DEVOLUCION_PROCESADA',
     ]
 
-    # Logs administrativos (excluyendo los del usuario actual)
-    log_admin_ts = (
-        LogHistorico.objects
-        .exclude(accion__in=ACCIONES_USUARIO)
-        .exclude(usuario=user)
-        .aggregate(ts=Max('timestamp'))['ts']
-    )
-    # Logs de acciones de usuario (siempre incluidos)
-    log_usuario_ts = (
-        LogHistorico.objects
-        .filter(accion__in=ACCIONES_USUARIO)
-        .aggregate(ts=Max('timestamp'))['ts']
-    )
-    # log_ts general = el más reciente de ambos
-    log_ts = max([t for t in [log_admin_ts, log_usuario_ts] if t], default=None)
+    def _max_log(acciones, excluir_self=True):
+        """MAX(timestamp) de logs filtrados por tipo. Opcional: excluir al user actual."""
+        qs = LogHistorico.objects.filter(accion__in=acciones)
+        if excluir_self:
+            qs = qs.exclude(usuario=user)
+        return qs.aggregate(ts=Max('timestamp'))['ts']
 
-    # Solicitudes nuevas (creadas por otros) — ya cubiertas por log_usuario_ts
-    # pero mantenemos por compatibilidad / fallback
-    solic_ts = SolicitudPrestamo.objects.exclude(usuario=user).aggregate(ts=Max('fecha_creacion'))['ts']
+    # Gestión y Devoluciones: NO excluir al usuario (acciones de "usuario"
+    # siempre deben notificar al admin, incluso si admin = solicitante en pruebas).
+    gestion_ts = _max_log(gestion_acciones, excluir_self=False)
+    devoluciones_ts = _max_log(devoluciones_acciones, excluir_self=False)
 
-    # Préstamos aprobados/entregados/devueltos por OTROS admins
-    prestamo_aprob_ts = Prestamo.objects.exclude(admin_aprobador=user).aggregate(ts=Max('fecha_aprobacion'))['ts']
-    prestamo_entrega_ts = Prestamo.objects.exclude(admin_aprobador=user).aggregate(ts=Max('fecha_entrega'))['ts']
-    prestamo_dev_ts = Prestamo.objects.exclude(admin_aprobador=user).aggregate(ts=Max('fecha_devolucion_real'))['ts']
+    # Monitoreo: SÍ excluir al usuario (acciones admin no deben auto-notificarse)
+    monitoreo_ts = _max_log(monitoreo_acciones, excluir_self=True)
 
-    # Devoluciones procesadas por OTROS (vía LogHistorico ya excluido arriba).
-    # Devolucion no tiene FK directa a usuario, pero el log de DEVOLUCION_PROCESADA
-    # se filtra por log_ts. Mantenemos dev_ts solo como referencia general.
-    dev_ts = Devolucion.objects.aggregate(ts=Max('fecha_devolucion'))['ts']
+    # Mis Solicitudes: estos son cambios sobre las solicitudes del usuario.
+    # No excluir nada (necesita ver TODO cambio que afecte sus solicitudes).
+    mis_solic_ts = _max_log(mis_solic_acciones, excluir_self=False)
+
+    # Global: cualquier log (excluyendo los del propio usuario para no spam)
+    global_ts = LogHistorico.objects.exclude(usuario=user).aggregate(ts=Max('timestamp'))['ts']
 
     def _iso(dt):
         return dt.isoformat() if dt else ''
 
-    def _maximo(*ts_list):
-        non_null = [t for t in ts_list if t]
-        return max(non_null) if non_null else None
-
-    # 'solicitudes' = cualquier cambio AJENO que afecte lo que ve el admin/usuario
-    solicitudes_relevantes_ts = _maximo(
-        solic_ts,
-        log_ts,
-        prestamo_aprob_ts,
-        prestamo_entrega_ts,
-        prestamo_dev_ts,
-    )
-
     return JsonResponse({
-        # Cambio AJENO en cualquier cosa (fallback global)
-        'global': _iso(log_ts),
+        # Fallback general (para Dashboard / Reportes)
+        'global': _iso(global_ts),
 
-        # Por sección — todos excluyen acciones del propio usuario:
-        # - solicitudes: novedades para Gestión / Mis Solicitudes
-        # - prestamos: novedades para Monitoreo
-        # - devoluciones: novedades para Control de Devoluciones
-        'solicitudes': _iso(solicitudes_relevantes_ts),
-        'prestamos': _iso(_maximo(prestamo_aprob_ts, prestamo_entrega_ts, prestamo_dev_ts, log_ts)),
-        'devoluciones': _iso(_maximo(dev_ts, prestamo_dev_ts, log_ts)),
+        # Cada sección solo recibe sus eventos específicos:
+        'solicitudes': _iso(gestion_ts),       # Gestión Solicitudes (admin)
+        'mis_solicitudes': _iso(mis_solic_ts), # Mis Solicitudes (usuario)
+        'prestamos': _iso(monitoreo_ts),       # Monitoreo
+        'devoluciones': _iso(devoluciones_ts), # Control de Devoluciones
     })
 
 

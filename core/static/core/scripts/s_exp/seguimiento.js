@@ -12,11 +12,11 @@ $(document).ready(function () {
     cargarMisSolicitudes();
 
     // ===== Auto-refresh AUTOMÁTICO (sin banner) =====
-    // Para los usuarios solicitantes, la tabla se actualiza sola cuando backend
-    // reporta cambios reales — no tienen mucho que "estar revisando" como el admin,
-    // así que el reload directo es más útil que el banner.
+    // Para los usuarios solicitantes, la tabla se actualiza sola cuando un
+    // admin hace algo con SUS solicitudes (aprobar, marcar listo, entregar,
+    // procesar devolución). Sección 'mis_solicitudes' es específica para esto.
     if (window.RealtimeSExp) {
-        RealtimeSExp.registrarConAutoReload('mis-solicitudes', 'solicitudes', function () {
+        RealtimeSExp.registrarConAutoReload('mis-solicitudes', 'mis_solicitudes', function () {
             cargarMisSolicitudes(filtroActual, fechaInicioActual, fechaFinActual, true);
         }, 5);
     }
