@@ -25,11 +25,25 @@
     // ajaxSetup global, sino que cada llamada de polling lo pone manualmente.
     // Aquí dejamos un helper para hacerlo fácil:
     function pollingAjax(opts) {
+        // Seguridad: si ya detectamos sesión expirada, no enviar más requests
+        if (sesionExpirada) {
+            return $.Deferred().reject({ status: 401 }).promise();
+        }
+        const userError = opts.error;
         const merged = Object.assign({}, opts, {
             beforeSend: function (xhr) {
                 xhr.setRequestHeader('X-Polling-Request', 'true');
                 if (opts.beforeSend) opts.beforeSend.call(this, xhr);
-            }
+            },
+            error: function (xhr, status, err) {
+                // Si la sesión expiró (401/403 o redirect a login), detener TODO el polling
+                if (xhr && (xhr.status === 401 || xhr.status === 403)) {
+                    sesionExpirada = true;
+                    RealtimeSExp.pausar();
+                    pantallas.clear();
+                }
+                if (userError) userError.call(this, xhr, status, err);
+            },
         });
         return $.ajax(merged);
     }
@@ -37,6 +51,7 @@
     // Estado interno
     const pantallas = new Map();         // nombre → { timer, fn, intervalMs, ultimoOk, fallosConsecutivos }
     let pausado = false;                  // pausa global por visibilidad
+    let sesionExpirada = false;           // si se pierde la sesión, deja de hacer requests
 
     // -----------------------------------------------------------------
     // Banner flotante "Hay N novedades — Actualizar"

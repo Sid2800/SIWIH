@@ -1835,6 +1835,10 @@ def changes_check_api(request):
     Es deliberadamente ligero: solo hace agregaciones MAX(timestamp) sin
     devolver datos grandes. Se llama cada 3-5s pero su carga es mínima.
     """
+    # Validación de seguridad: solo usuarios autenticados (sin sesión = sin polling)
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "No autenticado"}, status=401)
+
     from django.db.models import Max
     from .models import LogHistorico, SolicitudPrestamo, Prestamo, Devolucion
 

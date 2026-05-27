@@ -52,6 +52,15 @@ function verificarAlertasGlobales() {
                     }
                 });
             }
+        },
+        error: function (xhr) {
+            // Si la sesión expiró (401/403) o backend redirige a login,
+            // detener el polling para no hacer requests innecesarios
+            if (xhr.status === 401 || xhr.status === 403 || xhr.status === 0) {
+                if (typeof pollingTimer !== 'undefined' && pollingTimer) {
+                    clearInterval(pollingTimer);
+                }
+            }
         }
     });
 }
