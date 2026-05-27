@@ -8,7 +8,7 @@ class AsignacionCamaPacienteAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "cama",
-        "paciente",
+        "ingreso",
         "estado",
         "fecha_inicio",
         "usuario_asignacion",
@@ -16,9 +16,7 @@ class AsignacionCamaPacienteAdmin(admin.ModelAdmin):
     list_filter = ("estado", "fecha_inicio")
     search_fields = (
         "cama__numero_cama",
-        "paciente__primer_nombre",
-        "paciente__primer_apellido",
-        "paciente__dni",
+        "ingreso__id",
     )
     
     # PROTECCIÓN: Esta tabla es histórica y nunca debe modificarse manualmente
@@ -40,7 +38,7 @@ class HistorialEstadoCamaAdmin(admin.ModelAdmin):
         "cama",
         "estado_anterior",
         "estado_nuevo",
-        "paciente",
+        "ingreso",
         "usuario",
         "fecha_hora",
         "observacion",
@@ -48,9 +46,7 @@ class HistorialEstadoCamaAdmin(admin.ModelAdmin):
     list_filter = ("estado_nuevo", "estado_anterior", "fecha_hora")
     search_fields = (
         "cama__numero_cama",
-        "paciente__primer_nombre",
-        "paciente__primer_apellido",
-        "paciente__dni",
+        "ingreso__id",
         "observacion__codigo",
     )
     # Solo lectura: el historial nunca se modifica manualmente
@@ -68,7 +64,7 @@ class MovimientoCamaAdmin(admin.ModelAdmin):
         "tipo_movimiento",
         "cama_origen",
         "cama_destino",
-        "paciente",
+        "ingreso",
         "usuario",
         "fecha_hora",
         "observacion",
@@ -77,9 +73,7 @@ class MovimientoCamaAdmin(admin.ModelAdmin):
     search_fields = (
         "cama_origen__numero_cama",
         "cama_destino__numero_cama",
-        "paciente__primer_nombre",
-        "paciente__primer_apellido",
-        "paciente__dni",
+        "ingreso__id",
         "observacion__codigo",
     )
 

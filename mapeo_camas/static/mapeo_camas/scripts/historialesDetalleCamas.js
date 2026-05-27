@@ -285,8 +285,9 @@ document.addEventListener("DOMContentLoaded", function () {
         : '<div class="detalle-cama-usuario-txt">Usuario: Sin registro</div>';
     }
     
+    // [2026-05-26 AUDIT] La observacion se muestra visible en el detalle de mapeo.
     var obsHtml = cama.observacion
-      ? '<div class="detalle-cama-obs-txt">' + escaparHtml(cama.observacion) + "</div>"
+      ? '<div class="detalle-cama-obs-txt">Obs: ' + escaparHtml(cama.observacion) + "</div>"
       : "";
     var esExpandible = !!obsHtml;
     var extraHtml = obsHtml
@@ -299,6 +300,7 @@ document.addEventListener("DOMContentLoaded", function () {
       '<div class="detalle-cama-paciente-txt">' + escaparHtml(cama.paciente || "Sin paciente") + "</div>" +
       dniHtml +
       '<div class="detalle-cama-accion-txt">' + escaparHtml(cama.tipo_accion || "") + "</div>" +
+      obsHtml +
       usuarioTextoHtml +
       fechaTextoHtml +
       extraHtml +
@@ -422,6 +424,11 @@ document.addEventListener("DOMContentLoaded", function () {
         }
         // [2026-05-08] Mostrar nota de servicios solo para mapeos
         renderNotaServicios(tipo === "mapeo" ? (data.servicios_sesion || []) : []);
+        if (tipo === "mapeo" && metaEl) {
+          var sesionObs = (data.sesion_observacion || "").trim();
+          metaEl.innerHTML = '<span>' + escaparHtml(labelTipo + (id ? " — #" + id : "")) + '</span>' +
+            (sesionObs ? '<span><strong>Observación:</strong> ' + escaparHtml(sesionObs) + '</span>' : '');
+        }
         actualizarPaginacion(data.paginacion || null);
         estructuraCache = data.estructura || [];
         flatItemsCache = aplanarEstructura(estructuraCache);

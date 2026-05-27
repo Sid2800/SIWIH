@@ -71,14 +71,15 @@ class AsignacionCamaPaciente(models.Model):
         related_name="asignaciones_cama",
         verbose_name="Cama",
     )
-    # Paciente asignado. Puede ser nulo cuando la cama está en estado VACIA.
-    paciente = models.ForeignKey(
-        "paciente.Paciente",
+    # [2026-05-26 REFACTOR FINAL] Ingreso es el pivote operativo único.
+    # En próxima versión será null=False. Por ahora es nullable para rollback de backfill.
+    ingreso = models.ForeignKey(
+        "ingreso.Ingreso",
         on_delete=models.PROTECT,
         null=True,
         blank=True,
         related_name="asignaciones_cama",
-        verbose_name="Paciente",
+        verbose_name="Ingreso (pivote operativo)",
     )
     # Momento en que se creó esta asignación (automático).
     fecha_inicio = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de inicio")
@@ -103,14 +104,14 @@ class AsignacionCamaPaciente(models.Model):
 
     class Meta:
         db_table = "mapeo_camas_asignacion_cama_paciente"
-        verbose_name = "Asignacion de cama por paciente"
-        verbose_name_plural = "Asignaciones de cama por paciente"
+        verbose_name = "Asignacion de cama"
+        verbose_name_plural = "Asignaciones de cama"
         ordering = ["-fecha_inicio"]
         indexes = [
             # Optimiza la consulta del mapa por cama y estado.
             models.Index(fields=["cama", "estado"], name="idx_asig_cama_estado"),
-            # Optimiza la búsqueda de la cama activa de un paciente.
-            models.Index(fields=["paciente", "estado"], name="idx_asig_paciente_estado"),
+            # [2026-05-26 AUDIT] Consulta operativa por ingreso activo y estado.
+            models.Index(fields=["ingreso", "estado"], name="idx_asig_ingreso_estado"),
         ]
 
     def clean(self):
@@ -122,9 +123,9 @@ class AsignacionCamaPaciente(models.Model):
 
         # Se asume que los códigos de estado siguen el catálogo de EstadoMapeo
         if self.estado and self.estado.codigo == "OCUPADA":
-            # Una cama OCUPADA debe tener paciente.
-            if self.paciente is None:
-                errors["paciente"] = "Una asignacion ocupada debe tener paciente."
+            # [2026-05-26 REFACTOR FINAL] Ingreso_id es obligatorio para OCUPADA (sin fallback a paciente).
+            if not self.ingreso_id:
+                errors["ingreso"] = "Una asignacion ocupada debe tener un ingreso activo válido."
 
             # Impide que una misma cama tenga dos asignaciones OCUPADA al mismo tiempo.
             cama_ocupada = AsignacionCamaPaciente.objects.filter(
@@ -134,18 +135,18 @@ class AsignacionCamaPaciente(models.Model):
             if cama_ocupada.exists():
                 errors["cama"] = "La cama ya tiene una asignacion ocupada."
 
-            # Impide que un mismo paciente esté en dos camas OCUPADA al mismo tiempo.
-            if self.paciente_id is not None:
-                paciente_con_cama = AsignacionCamaPaciente.objects.filter(
-                    paciente=self.paciente,
+            # Impide que un mismo ingreso esté en dos camas OCUPADA al mismo tiempo.
+            if self.ingreso_id is not None:
+                ingreso_con_cama = AsignacionCamaPaciente.objects.filter(
+                    ingreso_id=self.ingreso_id,
                     estado__codigo="OCUPADA",
                 ).exclude(pk=self.pk)
-                if paciente_con_cama.exists():
-                    errors["paciente"] = "El paciente ya tiene una asignacion ocupada."
+                if ingreso_con_cama.exists():
+                    errors["ingreso"] = "El ingreso ya tiene una asignacion ocupada en otra cama."
 
         if self.estado and self.estado.codigo == "VACIA":
-            # Regla de negocio: cama vacia implica asignacion sin paciente.
-            self.paciente = None
+            # Regla de negocio: cama vacia implica asignacion sin ingreso.
+            self.ingreso = None
 
         # (Eliminado: validación de fecha_fin)
 
@@ -153,14 +154,17 @@ class AsignacionCamaPaciente(models.Model):
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
-        # Garantiza integridad antes de persistir, independientemente del origen.
+        # [2026-05-26 REFACTOR FINAL] Ingreso_id es el pivote operativo único.
         if self.estado and self.estado.codigo == "VACIA":
-            self.paciente = None
+            self.ingreso = None
         self.full_clean()
         return super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"Cama {self.cama_id} - Paciente {self.paciente_id} ({self.estado.codigo if self.estado else ''})"
+        return (
+            f"Cama {self.cama_id} | Ingreso {self.ingreso_id} | "
+            f"Estado {self.estado.codigo if self.estado else 'SIN_ESTADO'}"
+        )
 
 
 # =============================================================================
@@ -202,13 +206,14 @@ class HistorialEstadoCama(models.Model):
         limit_choices_to={"categoria": "ESTADO_CAMA"},
     )
     # Paciente involucrado en el cambio, si aplica (p.ej. ingreso o alta).
-    paciente = models.ForeignKey(
-        "paciente.Paciente",
+    # [2026-05-26 AUDIT] Ingreso como referencia operativa principal del evento.
+    ingreso = models.ForeignKey(
+        "ingreso.Ingreso",
         on_delete=models.PROTECT,
         null=True,
         blank=True,
         related_name="historial_camas",
-        verbose_name="Paciente",
+        verbose_name="Ingreso",
     )
     # Usuario que ejecutó el cambio de estado.
     usuario = models.ForeignKey(
@@ -285,11 +290,14 @@ class MovimientoCama(models.Model):
         verbose_name="Cama destino",
     )
     # Paciente trasladado.
-    paciente = models.ForeignKey(
-        "paciente.Paciente",
+    # [2026-05-26 AUDIT] Ingreso como pivote clínico del traslado.
+    ingreso = models.ForeignKey(
+        "ingreso.Ingreso",
         on_delete=models.PROTECT,
+        null=True,
+        blank=True,
         related_name="movimientos_cama",
-        verbose_name="Paciente",
+        verbose_name="Ingreso",
     )
     # Usuario que ejecutó el traslado en el sistema.
     usuario = models.ForeignKey(
@@ -325,15 +333,15 @@ class MovimientoCama(models.Model):
             models.Index(fields=["fecha_hora"], name="idx_mov_cama_fecha"),
             # Análisis de flujo: qué camas intercambian pacientes con qué frecuencia.
             models.Index(fields=["cama_origen", "cama_destino"], name="idx_mov_origen_destino"),
-            # Historial de movimientos de un paciente en particular.
-            models.Index(fields=["paciente", "fecha_hora"], name="idx_mov_paciente_fecha"),
+            # [2026-05-26 AUDIT] Historial por ingreso para reingresos y trazabilidad.
+            models.Index(fields=["ingreso", "fecha_hora"], name="idx_mov_ingreso_fecha"),
         ]
 
     def __str__(self):
         hora_local = timezone.localtime(self.fecha_hora)
         return (
             f"{self.tipo_movimiento}: {self.cama_origen_id} -> {self.cama_destino_id}"
-            f" | Paciente {self.paciente_id} | {hora_local:%d/%m/%Y %H:%M}"
+            f" | Ingreso {self.ingreso_id} | {hora_local:%d/%m/%Y %H:%M}"
         )
 
 
@@ -363,11 +371,21 @@ class MapeoSesionCama(models.Model):
         db_index=True,
         limit_choices_to={"categoria": "ESTADO_SESION"},
     )
-    observacion = models.CharField(
-        max_length=500,
+    observacion = models.ForeignKey(
+        "mapeo_camas.EstadoMapeo",
+        on_delete=models.PROTECT,
+        related_name="sesiones_mapeo_como_observacion",
+        null=True,
         blank=True,
-        default="Sin Observaciones",
         verbose_name="Observacion",
+        limit_choices_to={"categoria": "OBSERVACION"},
+    )
+    observacion_texto = models.CharField(
+        max_length=500,
+        null=True,
+        blank=True,
+        default=None,
+        verbose_name="Observacion libre",
     )
 
     class Meta:
@@ -378,7 +396,11 @@ class MapeoSesionCama(models.Model):
 
     def __str__(self):
         hora_local = timezone.localtime(self.fecha_inicio)
-        return f"Sesion {self.id} | {self.estado.codigo if self.estado else ''} | {hora_local:%d/%m/%Y %H:%M}"
+        observacion_visible = self.observacion_texto or (self.observacion.codigo if self.observacion else "")
+        return (
+            f"Sesion {self.id} | {self.estado.codigo if self.estado else ''} | "
+            f"{observacion_visible} | {hora_local:%d/%m/%Y %H:%M}"
+        )
 
 
 # =============================================================================
@@ -452,13 +474,14 @@ class DetalleMapeoCama(models.Model):
         verbose_name="Estado actual",
         limit_choices_to={"categoria": "ESTADO_CAMA"},
     )
-    paciente_actual = models.ForeignKey(
-        "paciente.Paciente",
+    # [2026-05-26 AUDIT] Referencia operativa para detalle de mapeo.
+    ingreso_actual = models.ForeignKey(
+        "ingreso.Ingreso",
         on_delete=models.PROTECT,
         null=True,
         blank=True,
         related_name="detalles_mapeo_actual",
-        verbose_name="Paciente actual",
+        verbose_name="Ingreso actual",
     )
     tipo_accion = models.ForeignKey(
         "mapeo_camas.EstadoMapeo",

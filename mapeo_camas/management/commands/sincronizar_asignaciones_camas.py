@@ -2,11 +2,11 @@
 Management command: sincronizar_asignaciones_camas
 ---------------------------------------------------
 Recorre todos los ingresos activos (estado=1, sin fecha_egreso) que tienen
-cama y paciente asignados, y verifica que exista el registro correspondiente
+cama asignada, y verifica que exista el registro correspondiente
 en AsignacionCamaPaciente con estado OCUPADA.
 
-Si el registro falta o está cerrado lo crea / reactiva mediante
-MapeoCamasService.sincronizar_cama_con_ingreso().
+Si el registro falta o está cerrado lo crea / reactiva directamente usando
+ingreso_id como pivote operativo.
 
 Uso:
     py manage.py sincronizar_asignaciones_camas
@@ -16,11 +16,11 @@ Uso:
 
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
-from django.db.models import Exists, OuterRef, Q
+from django.db import transaction
+from django.db.models import Exists, Max, OuterRef, Q
 
 from ingreso.models import Ingreso
-from mapeo_camas.models import AsignacionCamaPaciente, EstadoMapeo
-from core.services.mapeo_camas_service import MapeoCamasService
+from mapeo_camas.models import AsignacionCamaPaciente, EstadoMapeo, HistorialEstadoCama, get_observacion_mapeo
 from servicio.models import Cama
 
 User = get_user_model()
@@ -94,7 +94,7 @@ class Command(BaseCommand):
         elif asignaciones_candidatas_reparacion:
             asignaciones_reparadas = asignaciones_invalidas_qs.update(
                 estado_id=estado_vacia.pk,
-                paciente_id=None,
+                ingreso_id=None,
             )
             self.stdout.write(
                 self.style.SUCCESS(
@@ -103,28 +103,36 @@ class Command(BaseCommand):
                 )
             )
 
-        # --- Obtener ingresos activos con cama y paciente ---------------------
-        # estado=1 significa activo; fecha_egreso nula confirma que sigue hospitalizado
-        ingresos = (
+        # --- Obtener el último ingreso activo por cama ---------------------
+        # [2026-05-26 AUDIT] Evita pisar una cama con ingresos activos históricos de la misma cama.
+        camas_ultimos_ingresos = (
             Ingreso.objects.filter(
                 estado=1,
                 fecha_egreso__isnull=True,
                 cama_id__isnull=False,
-                paciente_id__isnull=False,
             )
-            .values("id", "cama_id", "paciente_id")
+            .values("cama_id")
+            .annotate(ingreso_id=Max("id"))
+            .values_list("ingreso_id", flat=True)
+        )
+        ingresos = (
+            Ingreso.objects.filter(pk__in=camas_ultimos_ingresos)
+            .values("id", "cama_id")
         )
 
         # [2026-05-25] Camas con ingreso activo para diferenciar ocupadas reales.
         camas_con_ingreso_activo = set(ingresos.values_list("cama_id", flat=True))
 
-        # Obtener camas que ya tienen asignación OCUPADA (para no duplicar)
         estado_ocupada = get_estado_mapeo("OCUPADA")
-        ocupadas = set(
-            AsignacionCamaPaciente.objects.filter(
-                estado=estado_ocupada
-            ).values_list("cama_id", flat=True)
+        asignaciones_actuales_qs = (
+            AsignacionCamaPaciente.objects
+            .select_related("estado")
+            .order_by("cama_id", "-fecha_inicio", "-id")
         )
+        ultima_asignacion_por_cama = {}
+        for asig in asignaciones_actuales_qs:
+            if asig.cama_id not in ultima_asignacion_por_cama:
+                ultima_asignacion_por_cama[asig.cama_id] = asig
 
         sincronizados = 0
         omitidos = 0
@@ -132,11 +140,16 @@ class Command(BaseCommand):
 
         for ingreso in ingresos:
             cama_id = ingreso["cama_id"]
-            paciente_id = ingreso["paciente_id"]
             ingreso_id = ingreso["id"]
+            asig_actual = ultima_asignacion_por_cama.get(cama_id)
 
-            # Si la cama ya tiene asignación activa, no hacer nada
-            if cama_id in ocupadas:
+            # Si la última asignación ya está OCUPADA para el mismo ingreso, no hacer nada.
+            if (
+                asig_actual
+                and asig_actual.estado
+                and asig_actual.estado.codigo == "OCUPADA"
+                and asig_actual.ingreso_id == ingreso_id
+            ):
                 omitidos += 1
                 self.stdout.write(
                     f"  [OMITIDO] Ingreso #{ingreso_id} — cama #{cama_id} ya está sincronizada."
@@ -146,7 +159,7 @@ class Command(BaseCommand):
             if dry_run:
                 self.stdout.write(
                     self.style.WARNING(
-                        f"  [DRY-RUN] Ingreso #{ingreso_id} — cama #{cama_id} / paciente #{paciente_id} "
+                        f"  [DRY-RUN] Ingreso #{ingreso_id} — cama #{cama_id} "
                         "necesita sincronización."
                     )
                 )
@@ -154,14 +167,55 @@ class Command(BaseCommand):
                 continue
 
             try:
-                MapeoCamasService.sincronizar_cama_con_ingreso(
-                    cama_id=cama_id,
-                    paciente_id=paciente_id,
-                    usuario=usuario,
-                )
-                # Agregar al set para no intentar sincronizar dos ingresos sobre
-                # la misma cama en la misma ejecución
-                ocupadas.add(cama_id)
+                # [2026-05-26 AUDIT] Sincronización ingreso-only para evitar dependencia del flujo legacy por paciente_id.
+                with transaction.atomic():
+                    asig_bloqueada = (
+                        AsignacionCamaPaciente.objects
+                        .select_for_update()
+                        .filter(cama_id=cama_id)
+                        .order_by("-fecha_inicio", "-id")
+                        .first()
+                    )
+                    if (
+                        asig_bloqueada
+                        and asig_bloqueada.estado
+                        and asig_bloqueada.estado.codigo == "OCUPADA"
+                        and asig_bloqueada.ingreso_id == ingreso_id
+                    ):
+                        omitidos += 1
+                        self.stdout.write(
+                            f"  [OMITIDO] Ingreso #{ingreso_id} — cama #{cama_id} ya quedó sincronizada."
+                        )
+                        ultima_asignacion_por_cama[cama_id] = asig_bloqueada
+                        continue
+
+                    estado_anterior = asig_bloqueada.estado if asig_bloqueada else estado_vacia
+
+                    if asig_bloqueada:
+                        asig_bloqueada.estado = estado_ocupada
+                        asig_bloqueada.ingreso_id = ingreso_id
+                        asig_bloqueada.usuario_asignacion = usuario
+                        asig_bloqueada.save(update_fields=["estado", "ingreso", "usuario_asignacion"])
+                        asig_sync = asig_bloqueada
+                    else:
+                        asig_sync = AsignacionCamaPaciente.objects.create(
+                            cama_id=cama_id,
+                            estado=estado_ocupada,
+                            ingreso_id=ingreso_id,
+                            usuario_asignacion=usuario,
+                        )
+
+                    HistorialEstadoCama.objects.create(
+                        cama_id=cama_id,
+                        estado_anterior=estado_anterior,
+                        estado_nuevo=estado_ocupada,
+                        ingreso_id=ingreso_id,
+                        usuario=usuario,
+                        observacion=get_observacion_mapeo("Ingreso (sync masivo)"),
+                    )
+
+                    ultima_asignacion_por_cama[cama_id] = asig_sync
+
                 sincronizados += 1
                 self.stdout.write(
                     self.style.SUCCESS(
@@ -202,10 +256,10 @@ class Command(BaseCommand):
                     continue
 
                 estado_codigo = getattr(asig.estado, "codigo", None)
-                if estado_codigo == "VACIA" and asig.paciente_id is None:
+                if estado_codigo == "VACIA" and asig.ingreso_id is None:
                     continue
 
-                if estado_codigo == "OCUPADA" or asig.paciente_id is not None or estado_codigo is None:
+                if estado_codigo == "OCUPADA" or asig.ingreso_id is not None or estado_codigo is None:
                     asignaciones_para_actualizar.append(asig)
 
             if dry_run:
@@ -223,7 +277,7 @@ class Command(BaseCommand):
                         AsignacionCamaPaciente(
                             cama_id=cama_id,
                             estado=estado_vacia,
-                            paciente=None,
+                            ingreso=None,
                             usuario_asignacion=usuario,
                         )
                         for cama_id in camas_para_crear
@@ -232,9 +286,9 @@ class Command(BaseCommand):
 
                 for asig in asignaciones_para_actualizar:
                     asig.estado = estado_vacia
-                    asig.paciente = None
+                    asig.ingreso = None
                     asig.usuario_asignacion = usuario
-                    asig.save(update_fields=["estado", "paciente", "usuario_asignacion"])
+                    asig.save(update_fields=["estado", "ingreso", "usuario_asignacion"])
                 vacias_actualizadas = len(asignaciones_para_actualizar)
 
                 if vacias_creadas or vacias_actualizadas:

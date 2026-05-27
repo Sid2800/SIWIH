@@ -160,13 +160,16 @@ document.addEventListener("DOMContentLoaded", function () {
 
   function construirOpcionesServiciosMapeo() {
     return serviciosDisponiblesMapeo.map(function (servicio) {
+      var bloqueado = Boolean(servicio && servicio.mapeo_bloqueado);
+      var clasesItem = bloqueado
+        ? "ck-formulario modal-mapeo-servicios__item modal-mapeo-servicios__item--bloqueado"
+        : "ck-formulario modal-mapeo-servicios__item";
       return (
-        '<label class="ck-formulario modal-mapeo-servicios__item">' +
-          '<input type="checkbox" class="ck-formulario__checkbox modal-mapeo-servicios__checkbox" name="mapeo-servicio" value="' + escaparHtml(servicio.id) + '">' +
+        '<label class="' + clasesItem + '">' +
+          '<input type="checkbox" class="ck-formulario__checkbox modal-mapeo-servicios__checkbox" name="mapeo-servicio" value="' + escaparHtml(servicio.id) + '" ' + (bloqueado ? 'disabled aria-disabled="true"' : '') + '>' +
           '<div class="ck-formulario__base"><div class="ck-formulario__bolita"></div></div>' +
           '<span class="ck-formulario__label modal-mapeo-servicios__texto-item">' +
             '<span class="modal-mapeo-servicios__nombre">' + escaparHtml(servicio.nombre) + '</span>' +
-            '<span class="modal-mapeo-servicios__codigo">Codigo: ' + escaparHtml(servicio.nombre_corto || "NA") + '</span>' +
           '</span>' +
         '</label>'
       );
@@ -187,17 +190,58 @@ document.addEventListener("DOMContentLoaded", function () {
       return;
     }
     var seleccionados = obtenerServiciosSeleccionadosMapeo().length;
-    var total = serviciosDisponiblesMapeo.length;
+    var total = serviciosDisponiblesMapeo.filter(function (servicio) {
+      return !Boolean(servicio && servicio.mapeo_bloqueado);
+    }).length;
     resumen.textContent = seleccionados
       ? "Servicios seleccionados: " + seleccionados + " de " + total
       : "Selecciona al menos un servicio para iniciar la sesion.";
+
+    actualizarAvisoConflictoServiciosMapeo();
+  }
+
+  // [2026-05-26 FEATURE] Aviso inferior unificado con quién mapea y qué servicio está bloqueado.
+  function actualizarAvisoConflictoServiciosMapeo() {
+    var contenedor = document.getElementById("modal-servicios-conflicto");
+    if (!contenedor) {
+      return;
+    }
+
+    var conflictos = serviciosDisponiblesMapeo.filter(function (servicio) {
+      return Boolean(servicio && servicio.mapeo_bloqueado);
+    });
+
+    if (!conflictos.length) {
+      contenedor.innerHTML = "";
+      contenedor.style.display = "none";
+      return;
+    }
+
+    contenedor.style.display = "block";
+    contenedor.innerHTML =
+      '<p class="modal-mapeo-servicios__texto">Hay servicios con mapeo en curso por otros usuarios.</p>' +
+      '<div style="max-height: 10rem; overflow:auto;">' +
+        '<table class="tabla-general modal-mapeo-servicios__tabla-conflicto" style="width:100%;">' +
+          '<thead><tr><th>Usuario</th><th>Servicio</th></tr></thead>' +
+          '<tbody>' +
+            conflictos.map(function (servicio) {
+              return (
+                '<tr>' +
+                  '<td>' + escaparHtml(servicio.mapeo_usuario || "Otro usuario") + '</td>' +
+                  '<td>' + escaparHtml(servicio.nombre || "") + '</td>' +
+                '</tr>'
+              );
+            }).join("") +
+          '</tbody>' +
+        '</table>' +
+      '</div>';
   }
 
   async function abrirModalSeleccionServiciosMapeo() {
     var htmlServicios =
       '<div class="modal-mapeo-servicios">' +
         '<div class="modal-mapeo-servicios__intro">' +
-          '<p class="modal-mapeo-servicios__texto">[2026-05-07] Selecciona los servicios que se incluiran en esta sesion de mapeo.</p>' +
+          '<p class="modal-mapeo-servicios__texto">[2026-05-26 FEATURE] Selecciona los servicios para iniciar esta sesion de mapeo.</p>' +
           '<p class="modal-mapeo-servicios__resumen" id="modal-servicios-resumen"></p>' +
         '</div>' +
         '<fieldset class="modalAtencionCampos">' +
@@ -206,6 +250,7 @@ document.addEventListener("DOMContentLoaded", function () {
             construirOpcionesServiciosMapeo() +
           '</div>' +
         '</fieldset>' +
+        '<fieldset id="modal-servicios-conflicto" class="modalAtencionCampos" style="display:none"></fieldset>' +
       '</div>';
 
     return Swal.fire({
@@ -226,7 +271,7 @@ document.addEventListener("DOMContentLoaded", function () {
       preConfirm: function () {
         var serviciosSeleccionados = obtenerServiciosSeleccionadosMapeo();
         if (!serviciosSeleccionados.length) {
-          Swal.showValidationMessage("Debes seleccionar al menos un servicio.");
+          Swal.showValidationMessage("Debes seleccionar al menos un servicio disponible.");
           return false;
         }
         return { servicio_ids: serviciosSeleccionados };
@@ -642,7 +687,7 @@ document.addEventListener("DOMContentLoaded", function () {
   function actualizarCardDesdeRespuesta(camaEl, camaActualizada) {
     camaEl.className = "mapa-cama " + claseEstado(camaActualizada.estado_visual);
     camaEl.dataset.paciente = camaActualizada.paciente ? camaActualizada.paciente.nombre : "";
-    camaEl.dataset.pacienteId = camaActualizada.paciente ? String(camaActualizada.paciente.id) : "";
+    camaEl.dataset.ingresoId = camaActualizada.paciente && camaActualizada.paciente.ingreso_id ? String(camaActualizada.paciente.ingreso_id) : "";
     camaEl.dataset.estado = camaActualizada.estado_visual || "";
     camaEl.dataset.pacienteDni = camaActualizada.paciente ? (camaActualizada.paciente.dni || "") : "";
     camaEl.dataset.cambiosRealizados = String(camaActualizada.cambios_realizados || 0);
@@ -715,8 +760,10 @@ document.addEventListener("DOMContentLoaded", function () {
     return (pacientes || []).map(function (paciente) {
       var etiqueta = (paciente.nombre || "Sin nombre") + (paciente.dni ? " (" + paciente.dni + ")" : "");
       return {
-        id: String(paciente.id),
-        text: etiqueta
+        // [2026-05-26 AUDIT] Pivote operativo: el selector retorna ingreso_id.
+        id: String(paciente.ingreso_id || ""),
+        text: etiqueta,
+        ingreso_id: String(paciente.ingreso_id || "")
       };
     });
   }
@@ -906,12 +953,12 @@ document.addEventListener("DOMContentLoaded", function () {
               Swal.showValidationMessage("Este rol solo puede pasar la cama a PRE_ALTA o VACIA desde esta pantalla.");
               return false;
             }
-            // Si se mantiene OCUPADA, re-enviar el paciente actual para no romper validacion del backend.
-            var pacienteIdActual = camaEl.dataset.pacienteId || "";
+            // Si se mantiene OCUPADA, re-enviar el ingreso actual para no romper validacion del backend.
+            var ingresoIdActual = camaEl.dataset.ingresoId || "";
             return {
               tipo: "cambiar_estado",
               estado: estadoEl.value,
-              paciente_id: estadoEl.value === "OCUPADA" ? pacienteIdActual : ""
+              ingreso_id: estadoEl.value === "OCUPADA" ? ingresoIdActual : ""
             };
           } else {
             // Rama B: mover el paciente actual a una cama destino.
@@ -928,12 +975,12 @@ document.addEventListener("DOMContentLoaded", function () {
           var estadoEl = document.getElementById("modal-mapa-estado");
           var estado = estadoEl ? estadoEl.value : "";
           var pacienteSelectEl = document.getElementById("modal-mapa-paciente");
-          var pacienteId = pacienteSelectEl ? (pacienteSelectEl.value || "") : "";
-          if (estado === "OCUPADA" && !pacienteId) {
-            Swal.showValidationMessage("Para estado OCUPADA debe seleccionar un paciente.");
+          var ingresoId = pacienteSelectEl ? (pacienteSelectEl.value || "") : "";
+          if (estado === "OCUPADA" && !ingresoId) {
+            Swal.showValidationMessage("Para estado OCUPADA debe seleccionar un ingreso activo.");
             return false;
           }
-          return { tipo: "cambiar_estado", estado: estado, paciente_id: pacienteId };
+          return { tipo: "cambiar_estado", estado: estado, ingreso_id: ingresoId };
         }
       },
       didOpen: function () {
@@ -1216,8 +1263,8 @@ document.addEventListener("DOMContentLoaded", function () {
         var payload = new FormData();
         payload.append("cama_id", numeroCama);
         payload.append("estado", modal.value.estado);
-        if (modal.value.paciente_id) {
-          payload.append("paciente_id", modal.value.paciente_id);
+        if (modal.value.ingreso_id) {
+          payload.append("ingreso_id", modal.value.ingreso_id);
         }
 
         var response = await fetch(API_URLS.actualizarCama, {
@@ -1291,7 +1338,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
           camaEl.dataset.numeroCama = String(cama.numero_cama || "");
           camaEl.dataset.paciente = cama.paciente ? cama.paciente.nombre : "";
-          camaEl.dataset.pacienteId = cama.paciente ? String(cama.paciente.id) : "";
+          camaEl.dataset.ingresoId = cama.paciente && cama.paciente.ingreso_id ? String(cama.paciente.ingreso_id) : "";
           camaEl.dataset.pacienteDni = cama.paciente ? (cama.paciente.dni || "") : "";
           camaEl.dataset.estado = cama.estado_visual || "";
           camaEl.dataset.sala = sala.nombre || "";
@@ -1651,6 +1698,14 @@ document.addEventListener("DOMContentLoaded", function () {
         });
         var data = await response.json();
         if (!response.ok || !data.ok) {
+          if (response.status === 409) {
+            // [2026-05-26 FEATURE] Mantiene un único modal: ante conflicto,
+            // recarga estado de servicios y permite reintentar en la misma UI.
+            await cargarMapa();
+            toastr.warning(data.error || "Hay servicios que ya están siendo mapeados por otro usuario.", "Mapeo en curso");
+            await abrirModalSeleccionServiciosMapeo();
+            return;
+          }
           throw new Error(data.error || "No se pudo iniciar el mapeo.");
         }
 

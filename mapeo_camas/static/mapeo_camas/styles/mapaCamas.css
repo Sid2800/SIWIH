@@ -1,3 +1,9 @@
+:root {
+  --mapa-font-std: 1.12rem;
+  --mapa-font-strong: 1.22rem;
+  --mapa-font-banner: 1.38rem;
+}
+
 .mapa-acciones-superior {
   display: flex;
   justify-content: space-between;
@@ -332,7 +338,7 @@
 /* [2026-05-04 AUDIT] Estilos para banner de advertencia (otro usuario en mapeo) */
 .mapa-banner-advertencia {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.6rem;
   position: sticky;
   top: 0;
@@ -340,10 +346,27 @@
   background: #fee2e2;
   color: #991b1b;
   font-weight: 600;
-  font-size: 1.05rem;
+  font-size: var(--mapa-font-std);
   padding: 0.6rem 1rem;
   margin-bottom: 0.5rem;
   border-radius: 0.4rem;
+}
+
+.mapa-banner-advertencia__contenido {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.mapa-banner-advertencia__texto {
+  font-size: var(--mapa-font-banner);
+  line-height: 1.2;
+}
+
+.mapa-banner-advertencia__lista {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: var(--mapa-font-strong);
+  line-height: 1.3;
 }
 
 .mapa-banner-advertencia__icono {
@@ -362,7 +385,7 @@
   background: #fef9c3;
   color: #854d0e;
   font-weight: 600;
-  font-size: 1.05rem;
+  font-size: var(--mapa-font-std);
   padding: 0.6rem 1rem;
   margin-bottom: 0.5rem;
   border-radius: 0.4rem;
@@ -374,7 +397,7 @@
 }
 
 .mapa-banner-mapeo__texto {
-  font-size: 1.35rem;
+  font-size: var(--mapa-font-banner);
   line-height: 1.25;
 }
 
@@ -449,7 +472,7 @@
 .modal-mapeo-servicios__texto {
   margin: 0;
   color: var(--modalTextoSecundario, #475569);
-  font-size: 1.14rem;
+  font-size: var(--mapa-font-strong);
   line-height: 1.65;
   font-weight: 600;
 }
@@ -457,7 +480,7 @@
 .modal-mapeo-servicios__resumen {
   margin: 0;
   color: var(--modalTexto, #0f172a);
-  font-size: 0.98rem;
+  font-size: var(--mapa-font-strong);
   font-weight: 700;
 }
 
@@ -498,6 +521,24 @@
   border-radius: 14px;
 }
 
+.modal-mapeo-servicios__item--bloqueado {
+  background: color-mix(in srgb, #fee2e2 84%, white 16%);
+  opacity: 0.92;
+}
+
+.modal-mapeo-servicios__item--bloqueado .ck-formulario__base {
+  cursor: not-allowed;
+  background: color-mix(in srgb, #fecaca 72%, white 28%);
+}
+
+.modal-mapeo-servicios__item--bloqueado .ck-formulario__bolita {
+  background: color-mix(in srgb, #b91c1c 64%, white 36%);
+}
+
+.modal-mapeo-servicios__item--bloqueado .ck-formulario__label {
+  cursor: not-allowed;
+}
+
 .modal-mapeo-servicios__item .ck-formulario__base {
   margin-top: 0.1rem;
 }
@@ -505,14 +546,18 @@
 .modal-mapeo-servicios__texto-item {
   display: grid;
   gap: 0.15rem;
-  font-size: 1rem;
+  font-size: var(--mapa-font-strong);
 }
 
 .modal-mapeo-servicios__nombre {
   display: block;
   color: var(--modalTexto, #0f172a);
-  font-size: 0.98rem;
+  font-size: var(--mapa-font-strong);
   font-weight: 700;
+}
+
+.modal-mapeo-servicios__tabla-conflicto {
+  font-size: var(--mapa-font-strong);
 }
 
 .modal-mapeo-servicios__codigo {

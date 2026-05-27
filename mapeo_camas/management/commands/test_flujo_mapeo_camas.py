@@ -130,14 +130,14 @@ class Command(BaseCommand):
             from core.services.mapeo_camas_service import MapeoCamasService
             MapeoCamasService.sincronizar_cama_con_ingreso(
                 cama_id=ingreso.cama_id,
-                paciente_id=ingreso.paciente_id,
+                ingreso_id=ingreso.id,
                 usuario=usuario
             )
         
         # Verificar resultados
         estado_ocupada = get_estado_mapeo("OCUPADA")
         asignacion = AsignacionCamaPaciente.objects.get(
-            paciente=paciente,
+            ingreso=ingreso,
             estado=estado_ocupada
         )
         historial = HistorialEstadoCama.objects.filter(
@@ -160,7 +160,7 @@ class Command(BaseCommand):
         cama_anterior = ingreso.cama
         estado_ocupada = get_estado_mapeo("OCUPADA")
         asignacion_id_anterior = AsignacionCamaPaciente.objects.filter(
-            paciente=ingreso.paciente,
+            ingreso=ingreso,
             estado=estado_ocupada
         ).first().id
         
@@ -173,13 +173,13 @@ class Command(BaseCommand):
             MapeoCamasService.sincronizar_cambio_cama_en_ingreso(
                 cama_anterior_id=cama_anterior.id,
                 cama_nueva_id=cama_nueva.id,
-                paciente_id=ingreso.paciente_id,
+                ingreso_id=ingreso.id,
                 usuario=usuario
             )
         
         # Verificar resultados
         asignacion_actualizada = AsignacionCamaPaciente.objects.get(
-            paciente=ingreso.paciente,
+            ingreso=ingreso,
             estado=estado_ocupada
         )
         
@@ -220,7 +220,8 @@ class Command(BaseCommand):
         
         # Verificar resultados
         asignacion_cerrada = AsignacionCamaPaciente.objects.get(
-            paciente=ingreso.paciente,
+            ingreso__isnull=True,
+            cama=cama,
             estado=estado_vacia
         )
         
@@ -231,6 +232,6 @@ class Command(BaseCommand):
         
         self.stdout.write(self.style.SUCCESS('  ✓ Ingreso inactivado'))
         self.stdout.write(f'    - AsignacionCamaPaciente: Estado VACIA')
-        self.stdout.write(f'    - Fecha fin: {asignacion_cerrada.fecha_fin}')
+        self.stdout.write(f'    - Ingreso asociado: {asignacion_cerrada.ingreso_id}')
         self.stdout.write(f'    - HistorialEstadoCama: Cama {cama.numero_cama} → VACIA')
         self.stdout.write(f'    - Historial registrado: {historial_vacia.fecha_hora}')

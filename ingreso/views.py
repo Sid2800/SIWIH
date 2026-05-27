@@ -101,9 +101,10 @@ class IngresoAddView(UnidadRolRequiredMixin, CreateView):
                 # si el ingreso se guarda con cama y paciente, sincroniza la tabla
                 # de asignacion para reutilizar o activar el registro de esa cama.
                 if self.object.cama_id and self.object.paciente_id:
+                    # [2026-05-26 AUDIT] Pivote operativo de sincronización: ingreso_id.
                     MapeoCamasService.sincronizar_cama_con_ingreso(
                         cama_id=self.object.cama_id,
-                        paciente_id=self.object.paciente_id,
+                        ingreso_id=self.object.id,
                         usuario=self.request.user,
                     )
 
@@ -292,10 +293,11 @@ class IngresoEditView(UnidadRolRequiredMixin, UpdateView):
                 # solo sincronizamos camas si el paciente sigue siendo el mismo.
                 # En ese caso la cama anterior se cierra y la cama nueva se activa.
                 if paciente_anterior_id == self.object.paciente_id and self.object.paciente_id:
+                    # [2026-05-26 AUDIT] Cambio de cama por ingreso_id para evitar filtros legacy por paciente.
                     MapeoCamasService.sincronizar_cambio_cama_en_ingreso(
                         cama_anterior_id=cama_anterior_id,
                         cama_nueva_id=self.object.cama_id,
-                        paciente_id=self.object.paciente_id,
+                        ingreso_id=self.object.id,
                         usuario=usuario,
                     )
                 else:
@@ -303,7 +305,7 @@ class IngresoEditView(UnidadRolRequiredMixin, UpdateView):
                     # forzar sincronización explícita para evitar desfasajes en mapa de camas.
                     if paciente_anterior_id and paciente_anterior_id != self.object.paciente_id:
                         MapeoCamasService.cerrar_asignacion_activa_paciente(
-                            paciente_id=paciente_anterior_id,
+                            ingreso_id=self.object.id,
                             usuario=usuario,
                             cama_id=cama_anterior_id,
                         )
@@ -311,13 +313,13 @@ class IngresoEditView(UnidadRolRequiredMixin, UpdateView):
                     if self.object.cama_id and self.object.paciente_id:
                         MapeoCamasService.sincronizar_cama_con_ingreso(
                             cama_id=self.object.cama_id,
-                            paciente_id=self.object.paciente_id,
+                            ingreso_id=self.object.id,
                             usuario=usuario,
                         )
                     elif self.object.paciente_id and cama_anterior_id:
                         # Si se quitó la cama en edición, liberar la cama anterior del paciente actual.
                         MapeoCamasService.cerrar_asignacion_activa_paciente(
-                            paciente_id=self.object.paciente_id,
+                            ingreso_id=self.object.id,
                             usuario=usuario,
                             cama_id=cama_anterior_id,
                         )

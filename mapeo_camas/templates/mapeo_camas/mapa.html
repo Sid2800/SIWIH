@@ -77,13 +77,26 @@
   [2026-05-04 FEATURE] Banner de advertencia para otros usuarios.
   Muestra si otro usuario tiene un mapeo activo (EN_PROGRESO).
   {% endcomment %}
-  {% if sesion_ajena %}
+  {% if sesiones_ajenas %}
   <div class="mapa-banner-advertencia">
     <i class="bi bi-exclamation-triangle-fill mapa-banner-advertencia__icono"></i>
-    <span class="mapa-banner-advertencia__texto">
-      Mapeo en progreso por <strong>{{ sesion_ajena.usuario.get_full_name|default:sesion_ajena.usuario.username }}</strong>
-      &mdash; evita modificar camas durante esta sesión
-    </span>
+    <div class="mapa-banner-advertencia__contenido">
+      <span class="mapa-banner-advertencia__texto">
+        Mapeos en progreso detectados. Evita modificar camas de estos servicios:
+      </span>
+      <ul class="mapa-banner-advertencia__lista">
+        {% for sesion in sesiones_ajenas %}
+        <li>
+          <strong>{{ sesion.usuario }}</strong>
+          {% if sesion.servicios %}
+            &mdash; {{ sesion.servicios|join:", " }}
+          {% else %}
+            &mdash; Sin servicios asociados
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
   </div>
   {% endif %}
 
@@ -120,7 +133,7 @@
 {% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'mapeo_camas/styles/mapaCamas.css' %}?v=20260512a">
+<link rel="stylesheet" href="{% static 'mapeo_camas/styles/mapaCamas.css' %}?v=20260526c">
 {% endblock %}
 
 {% block extra_js %}

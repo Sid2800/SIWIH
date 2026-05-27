@@ -458,11 +458,12 @@ class IngresoService:
                 ingreso.estado = 2
                 ingreso.save(update_fields=["estado"])
 
-                # Paso 2: liberar la cama - cierra la asignación activa del paciente
+                # Paso 2: liberar la cama - cierra la asignación activa del ingreso
                 # y registra OCUPADA → LIBRE en HistorialEstadoCama
-                if ingreso.paciente_id:  # [2026-05-07] Bloque nuevo: liberación atómica de cama al inactivar
+                if ingreso.id:  # [2026-05-07] Bloque nuevo: liberación atómica de cama al inactivar
+                    # [2026-05-26 AUDIT] Liberación por ingreso_id para evitar pivote paciente_id.
                     MapeoCamasService.cerrar_asignacion_activa_paciente(
-                        paciente_id=ingreso.paciente_id,
+                        ingreso_id=ingreso.id,
                         usuario=usuario,
                         cama_id=ingreso.cama_id,
                     )
