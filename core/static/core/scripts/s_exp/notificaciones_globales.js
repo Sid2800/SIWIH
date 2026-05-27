@@ -96,7 +96,7 @@ function mostrarModalAlertaSticky(alerta) {
     }
 
     Swal.fire({
-        title: alerta.titulo || '¡Aviso!',
+        title: `<span style="color:#f1f5f9;">${alerta.titulo || '¡Aviso!'}</span>`,
         html: `<div style="font-size:clamp(1.6rem, 2.4vw, 2.2rem);line-height:1.45;padding:0 0.5rem;color:#f1f5f9;">${alerta.mensaje}</div>`,
         icon: 'info',
         confirmButtonText: '<i class="bi bi-check-circle"></i> Entendido, pasaré por ellos',
@@ -104,7 +104,6 @@ function mostrarModalAlertaSticky(alerta) {
         allowEscapeKey: false,
         customClass: {
             popup: 'contener-modal',
-            title: 'contener-modal-titulo',
             confirmButton: 'contener-modal-boton-confirmar',
         },
     }).then((result) => {
@@ -146,7 +145,7 @@ function mostrarModalAlertaVencimiento(alerta) {
     }
 
     Swal.fire({
-        title: alerta.titulo || '¡ATENCIÓN!',
+        title: `<span style="color:#f1f5f9;">${alerta.titulo || '¡ATENCIÓN!'}</span>`,
         html: `<div style="font-size:clamp(1.6rem, 2.4vw, 2.2rem);line-height:1.45;padding:0 0.5rem;color:#f1f5f9;">${alerta.mensaje}</div>`,
         icon: 'error',
         confirmButtonText: '<i class="bi bi-exclamation-triangle"></i> Entendido, devolveré los expedientes',
@@ -154,7 +153,6 @@ function mostrarModalAlertaVencimiento(alerta) {
         allowEscapeKey: false,
         customClass: {
             popup: 'contener-modal',
-            title: 'contener-modal-titulo',
             confirmButton: 'contener-modal-boton-confirmar',
         },
     }).then((result) => {
