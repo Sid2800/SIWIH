@@ -1842,18 +1842,44 @@ def changes_check_api(request):
     from django.db.models import Max
     from .models import LogHistorico, SolicitudPrestamo, Prestamo, Devolucion
 
-    # IMPORTANTE: para evitar que el banner aparezca cuando el MISMO usuario
-    # realizó la acción (ej: admin aprueba → no debería ver "1 novedad" porque
-    # él fue el causante), excluimos los cambios donde el actor es el propio usuario.
+    # IMPORTANTE: separamos los logs según el TIPO de acción:
+    #
+    # - Acciones ADMINISTRATIVAS (aprobar, rechazar, listo, entregar, procesar
+    #   devolución, revisión): excluimos las del usuario actual para que no
+    #   se auto-notifique al hacer clic en sus propios botones.
+    #
+    # - Acciones de USUARIO (crear solicitud, solicitar devolución): SIEMPRE
+    #   se incluyen porque son "novedades" que el admin necesita ver para
+    #   procesar, sin importar quién las generó (incluso si admin = solicitante
+    #   en pruebas con cuenta única).
     user = request.user
 
-    # Logs hechos por OTROS usuarios (los del usuario actual no son "novedad")
-    log_ts = LogHistorico.objects.exclude(usuario=user).aggregate(ts=Max('timestamp'))['ts']
+    ACCIONES_USUARIO = [
+        'SOLICITUD_CREADA',
+        'SOLICITUD_DEVOLUCION_INICIADA',
+    ]
 
-    # Solicitudes creadas por OTROS usuarios (las del usuario actual no son "novedad")
+    # Logs administrativos (excluyendo los del usuario actual)
+    log_admin_ts = (
+        LogHistorico.objects
+        .exclude(accion__in=ACCIONES_USUARIO)
+        .exclude(usuario=user)
+        .aggregate(ts=Max('timestamp'))['ts']
+    )
+    # Logs de acciones de usuario (siempre incluidos)
+    log_usuario_ts = (
+        LogHistorico.objects
+        .filter(accion__in=ACCIONES_USUARIO)
+        .aggregate(ts=Max('timestamp'))['ts']
+    )
+    # log_ts general = el más reciente de ambos
+    log_ts = max([t for t in [log_admin_ts, log_usuario_ts] if t], default=None)
+
+    # Solicitudes nuevas (creadas por otros) — ya cubiertas por log_usuario_ts
+    # pero mantenemos por compatibilidad / fallback
     solic_ts = SolicitudPrestamo.objects.exclude(usuario=user).aggregate(ts=Max('fecha_creacion'))['ts']
 
-    # Préstamos aprobados por OTROS admins
+    # Préstamos aprobados/entregados/devueltos por OTROS admins
     prestamo_aprob_ts = Prestamo.objects.exclude(admin_aprobador=user).aggregate(ts=Max('fecha_aprobacion'))['ts']
     prestamo_entrega_ts = Prestamo.objects.exclude(admin_aprobador=user).aggregate(ts=Max('fecha_entrega'))['ts']
     prestamo_dev_ts = Prestamo.objects.exclude(admin_aprobador=user).aggregate(ts=Max('fecha_devolucion_real'))['ts']
