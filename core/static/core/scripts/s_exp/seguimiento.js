@@ -213,7 +213,7 @@ function renderSolicitudes(data, filtro = '') {
                         <i class="bi bi-arrow-return-left"></i> Solicitar Devolución
                     </button>`;
                 } else if (s.estado_flujo === 'SOL_EN_DEVOLUCION') {
-                    html += `<div style="margin-top:0.5rem;font-size:1.2rem;opacity:0.7;"><i class="bi bi-hourglass-split"></i> Devolución en proceso de revisión por el administrador.</div>`;
+                    html += `<div style="margin-top:0.6rem;font-size:1.5rem;opacity:0.85;display:flex;align-items:center;gap:0.5rem;"><i class="bi bi-hourglass-split" style="font-size:1.6rem;"></i><span>Devolución en proceso de revisión por el administrador.</span></div>`;
                 }
             }
             // Solicitud incompleta: hay expedientes sin devolver

@@ -52,11 +52,13 @@
 $(document).ready(function() {
     cargarDevoluciones(false);
 
-    // ===== Auto-refresh inteligente (banner cuando hay cambios) =====
+    // ===== Auto-refresh AUTOMÁTICO (sin banner) =====
+    // Para Control de Devoluciones, conviene auto-reload porque el admin
+    // necesita ver las nuevas devoluciones inmediatamente y procesarlas.
     if (window.RealtimeSExp) {
-        RealtimeSExp.registrarConTrigger('control-devoluciones', 'devoluciones', function () {
+        RealtimeSExp.registrarConAutoReload('control-devoluciones', 'devoluciones', function () {
             cargarDevoluciones(true);
-        }, 5, { etiqueta: 'devoluciones' });
+        }, 5);
     }
 });
 
