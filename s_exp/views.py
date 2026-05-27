@@ -1842,47 +1842,51 @@ def changes_check_api(request):
     from django.db.models import Max
     from .models import LogHistorico, SolicitudPrestamo, Prestamo, Devolucion
 
-    # Timestamp del log más reciente (cubre todas las acciones registradas)
-    log_ts = LogHistorico.objects.aggregate(ts=Max('timestamp'))['ts']
+    # IMPORTANTE: para evitar que el banner aparezca cuando el MISMO usuario
+    # realizó la acción (ej: admin aprueba → no debería ver "1 novedad" porque
+    # él fue el causante), excluimos los cambios donde el actor es el propio usuario.
+    user = request.user
 
-    # Timestamps específicos por sección (para que cada pantalla compare
-    # solo lo suyo y evite reloads innecesarios)
-    solic_ts = SolicitudPrestamo.objects.aggregate(ts=Max('fecha_creacion'))['ts']
-    prestamo_aprob_ts = Prestamo.objects.aggregate(ts=Max('fecha_aprobacion'))['ts']
-    prestamo_entrega_ts = Prestamo.objects.aggregate(ts=Max('fecha_entrega'))['ts']
-    prestamo_dev_ts = Prestamo.objects.aggregate(ts=Max('fecha_devolucion_real'))['ts']
+    # Logs hechos por OTROS usuarios (los del usuario actual no son "novedad")
+    log_ts = LogHistorico.objects.exclude(usuario=user).aggregate(ts=Max('timestamp'))['ts']
+
+    # Solicitudes creadas por OTROS usuarios (las del usuario actual no son "novedad")
+    solic_ts = SolicitudPrestamo.objects.exclude(usuario=user).aggregate(ts=Max('fecha_creacion'))['ts']
+
+    # Préstamos aprobados por OTROS admins
+    prestamo_aprob_ts = Prestamo.objects.exclude(admin_aprobador=user).aggregate(ts=Max('fecha_aprobacion'))['ts']
+    prestamo_entrega_ts = Prestamo.objects.exclude(admin_aprobador=user).aggregate(ts=Max('fecha_entrega'))['ts']
+    prestamo_dev_ts = Prestamo.objects.exclude(admin_aprobador=user).aggregate(ts=Max('fecha_devolucion_real'))['ts']
+
+    # Devoluciones procesadas por OTROS (vía LogHistorico ya excluido arriba).
+    # Devolucion no tiene FK directa a usuario, pero el log de DEVOLUCION_PROCESADA
+    # se filtra por log_ts. Mantenemos dev_ts solo como referencia general.
     dev_ts = Devolucion.objects.aggregate(ts=Max('fecha_devolucion'))['ts']
 
     def _iso(dt):
         return dt.isoformat() if dt else ''
 
-    # Para cada "sección" devolvemos el timestamp más reciente
-    # entre los registros que la afectan
     def _maximo(*ts_list):
         non_null = [t for t in ts_list if t]
         return max(non_null) if non_null else None
 
-    # Para "solicitudes" incluimos también cambios de préstamo y devolución
-    # porque el estado del préstamo cambia el badge/estado mostrado al usuario
-    # en Mis Solicitudes y al admin en Gestión Solicitudes
+    # 'solicitudes' = cualquier cambio AJENO que afecte lo que ve el admin/usuario
     solicitudes_relevantes_ts = _maximo(
         solic_ts,
         log_ts,
         prestamo_aprob_ts,
         prestamo_entrega_ts,
         prestamo_dev_ts,
-        dev_ts,
     )
 
     return JsonResponse({
-        # Cambio en cualquier cosa (fallback global)
+        # Cambio AJENO en cualquier cosa (fallback global)
         'global': _iso(log_ts),
 
-        # Por sección:
-        # - solicitudes: incluye TODO lo que afecta el estado visible al usuario/admin
-        #                (creación, aprobación, entrega, devolución, auditoría)
-        # - prestamos: aprobaciones, entregas, devoluciones
-        # - devoluciones: cuando se hacen devoluciones
+        # Por sección — todos excluyen acciones del propio usuario:
+        # - solicitudes: novedades para Gestión / Mis Solicitudes
+        # - prestamos: novedades para Monitoreo
+        # - devoluciones: novedades para Control de Devoluciones
         'solicitudes': _iso(solicitudes_relevantes_ts),
         'prestamos': _iso(_maximo(prestamo_aprob_ts, prestamo_entrega_ts, prestamo_dev_ts, log_ts)),
         'devoluciones': _iso(_maximo(dev_ts, prestamo_dev_ts, log_ts)),
