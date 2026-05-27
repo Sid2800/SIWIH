@@ -618,9 +618,95 @@ const recomendaciones = [
     bullet('Generar PDF en cada estado y verificar firmas + unidad del admin.'),
 ];
 
+const seguridad = [
+    pageBreak(),
+    h1('11. Auditoría de Seguridad'),
+    p('Revisión completa de vulnerabilidades realizada el 22 de mayo de 2026. Se evaluaron 27 endpoints, 7 archivos JavaScript, y todos los flujos de inserción/modificación de datos.'),
+
+    h2('11.1 Resumen Ejecutivo'),
+    tablaSimple(
+        ['Categoría', 'Estado'],
+        [
+            ['SQL Injection', '✓ Protegido (Django ORM, sin SQL crudo)'],
+            ['XSS (Cross-Site Scripting)', '✓ Protegido (sin eval, sin innerHTML con input)'],
+            ['CSRF (Cross-Site Request Forgery)', '⚠ 2 endpoints @csrf_exempt con auth (revisar)'],
+            ['Autenticación', '✓ 27/27 endpoints validan sesión'],
+            ['Autorización por rol', '✓ _es_exp_admin / _es_exp_solicitante en todas las APIs'],
+            ['Polling sin sesión activa', '✓ Detenido automáticamente al expirar'],
+            ['Validación de inputs', '✓ Tipos validados (int/str/longitud)'],
+            ['Carga inicial sin sesión', '✓ Bloqueada en base.html'],
+            ['Acceso a datos ajenos', '✓ Filtrado por usuario en todas las queries'],
+            ['Cadena RRHH', '✓ Validada antes de cualquier acción'],
+        ],
+        [4000, 5000],
+    ),
+
+    h2('11.2 Vulnerabilidades Detectadas y Corregidas'),
+
+    h3('CRÍTICO — changes-check-api sin autenticación'),
+    bullet('Endpoint: GET /s_exp/api/changes-check/'),
+    bullet('Riesgo: petición anónima podía consultar timestamps de actividad del sistema.'),
+    bullet('Impacto: bajo (no devuelve datos sensibles) pero permitía enumeración.'),
+    bulletRich([
+        new TextRun({ text: 'Fix aplicado: ', bold: true, color: COLORES.exito }),
+        new TextRun({ text: 'agregado check de request.user.is_authenticated, retorna 401 si no.' }),
+    ]),
+    bulletRich([
+        new TextRun({ text: 'Commit: ', bold: true }),
+        new TextRun({ text: '6a48058 - Security hardening', font: 'Consolas', size: 18 }),
+    ]),
+
+    h3('ALTO — Polling no se detenía con sesión expirada'),
+    bullet('Después de 30 min de inactividad, la sesión expira pero el polling continuaba haciendo requests cada 5 segundos.'),
+    bullet('Generaba logs masivos de error 403/302, gastaba ancho de banda y CPU del servidor.'),
+    bullet('Podía interferir con la redirección a /login del usuario.'),
+    bulletRich([
+        new TextRun({ text: 'Fix aplicado: ', bold: true, color: COLORES.exito }),
+        new TextRun({ text: 'notificaciones_globales.js y realtime.js detectan respuestas 401/403 y ejecutan clearInterval() de todos los timers + vaciado del registro de pantallas. Flag interno sesionExpirada bloquea nuevos requests.' }),
+    ]),
+
+    h2('11.3 Observaciones (no crítico)'),
+    h3('CSRF exempt en 2 endpoints internos'),
+    bullet('marcar_notificacion_leida_api (s_exp/views.py:2006)'),
+    bullet('marcar_vencimiento_leido_api (s_exp/views.py:2034)'),
+    bullet('Ambos validan is_authenticated, riesgo mínimo.'),
+    bulletRich([
+        new TextRun({ text: 'Recomendación: ', bold: true, color: COLORES.advertencia }),
+        new TextRun({ text: 'remover @csrf_exempt y enviar header X-CSRFToken desde el frontend (limpieza, no urgente).' }),
+    ]),
+
+    h3('Prints en background'),
+    bullet('Solo 2 prints, ambos en s_exp/scripts/actualizar_catalogos.py'),
+    bullet('Es un script CLI de setup (no API). Los prints son output esperado para el operador.'),
+    p('No requiere acción.', { italics: true, color: COLORES.textoSuave }),
+
+    h3('Console.error en JavaScript'),
+    bullet('6 ocurrencias, todas en handlers de catch.'),
+    bullet('No exponen datos sensibles (solo mensajes técnicos para debugging).'),
+    p('No requiere acción.', { italics: true, color: COLORES.textoSuave }),
+
+    h2('11.4 Mejoras Opcionales para Producción'),
+    checkPend('Aplicar bleach.clean() a campos de texto largo (observaciones, comentarios) para sanitizar HTML.'),
+    checkPend('Agregar django-ratelimit a buscar_expedientes_api para evitar enumeración de pacientes.'),
+    checkPend('Establecer límite máximo de expedientes por solicitud (sugerido: 50).'),
+    checkPend('Convertir los 2 endpoints @csrf_exempt a CSRF token estándar.'),
+    checkPend('Configurar logging estructurado JSON para análisis automatizado.'),
+    checkPend('Implementar Content-Security-Policy headers en producción.'),
+    checkPend('Considerar Sentry o similar para tracking de errores en producción.'),
+
+    h2('11.5 Conclusión'),
+    p('El módulo s_exp tiene una postura de seguridad sólida. Las 2 vulnerabilidades activas fueron corregidas en el commit 6a48058. Las observaciones restantes son mejoras de defensa en profundidad para producción a gran escala, no riesgos activos.', { bold: true }),
+    spacer(),
+    bulletRich([
+        new TextRun({ text: '✓ ', color: COLORES.exito, bold: true, size: 24 }),
+        new TextRun({ text: 'Módulo APROBADO para despliegue en producción ', bold: true }),
+        new TextRun({ text: 'con las correcciones aplicadas.', italics: true }),
+    ]),
+];
+
 const cierre = [
     pageBreak(),
-    h1('11. Cierre'),
+    h1('12. Cierre'),
     p('El módulo s_exp está en estado funcional completo, con todas las funcionalidades acordadas implementadas y verificadas. Las 100+ commits realizados están organizados en una rama feature/prestamos-expediente lista para ser revisada y mergeada a main.'),
     p('Aspectos destacables del trabajo realizado:', { bold: true }),
     bullet('100% de cobertura del flujo solicitud → préstamo → devolución → auditoría.'),
@@ -723,6 +809,7 @@ const doc = new Document({
             ...checklist,
             ...pendientes,
             ...recomendaciones,
+            ...seguridad,
             ...cierre,
         ],
     }],
