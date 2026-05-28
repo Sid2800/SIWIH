@@ -303,8 +303,13 @@ def generar_pdf_solicitud(solicitud):
         fecha_salida_dt = ahora
     fecha_salida = _fmt_fecha(fecha_salida_dt, con_hora=True)
 
-    responsable = f"{solicitud.usuario.first_name} {solicitud.usuario.last_name}".strip() or solicitud.usuario.username
-    unidad = _unidad_usuario(solicitud.usuario) or solicitud.area_destino or '—'
+    # Datos del solicitante: usamos los servicios para que sean consistentes
+    # con el resto del sistema (consulta en vivo, no snapshots).
+    from s_exp.services.datos_solicitud import DatosSolicitud
+    responsable = DatosSolicitud.usuario_nombre_completo(solicitud)
+    # Unidad: prioridad a la FK servicio_unidad (capturada al crear la solicitud).
+    # Si por alguna razón no hay FK, caemos al resolver via RRHH del usuario.
+    unidad = DatosSolicitud.unidad_nombre(solicitud) or _unidad_usuario(solicitud.usuario) or '—'
 
     datos_tabla = [
         [Paragraph('Fecha de salida:', st_dato_lbl), Paragraph(fecha_salida, st_dato_val)],
@@ -343,7 +348,11 @@ def generar_pdf_solicitud(solicitud):
     ]
 
     filas = [cabeceras]
-    detalles_list = list(solicitud.detalles.select_related('expediente_prestamo__expediente').order_by('id'))
+    # Optimizamos joins: traemos expediente_prestamo + expediente + paciente
+    # de un solo, evita N+1 queries dentro del loop.
+    detalles_list = list(solicitud.detalles.select_related(
+        'expediente_prestamo__expediente', 'paciente'
+    ).order_by('id'))
 
     # Estado del flujo: si la solicitud está finalizada/incompleta/etc., los comentarios
     # de devolución y rechazo individual ya tienen sentido y deben imprimirse.
@@ -358,11 +367,15 @@ def generar_pdf_solicitud(solicitud):
     # Filas que NO se prestaron — para resaltar en rojo pastel
     filas_no_prestadas = []  # índices de fila (1-based porque cabecera es fila 0)
 
-    # Agregar filas de detalles
+    from s_exp.services.datos_solicitud import DatosDetalleSolicitud
+
+    # Agregar filas de detalles.
+    # IMPORTANTE: número de expediente, identidad y nombre del paciente se
+    # obtienen vía servicio (consulta en vivo desde FK), no desde snapshots.
     for idx, d in enumerate(detalles_list, start=1):
-        num_exp = d.expediente_prestamo.expediente.numero
-        identidad = d.paciente_identidad or ''
-        paciente = d.paciente_nombre or ''
+        num_exp = DatosDetalleSolicitud.numero_expediente(d)
+        identidad = DatosDetalleSolicitud.paciente_dni(d)
+        paciente = DatosDetalleSolicitud.paciente_nombre_completo(d)
 
         # Observaciones de entrega:
         #   - Si NO se prestó (aprobado=False) y hay revisión, mostrar el motivo del rechazo

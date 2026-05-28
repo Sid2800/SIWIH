@@ -289,9 +289,12 @@ def _set_localizacion_por_solicitud(expediente, solicitud, usuario_admin):
         except Exception:
             pass
 
-    # 3. Fallback final: area_destino o "PRESTADO"
+    # 3. Fallback final: el nombre de la unidad si está, o el texto genérico "PRESTADO".
     if not nombre_ubicacion:
-        nombre_ubicacion = (solicitud.area_destino or 'PRESTADO').strip()
+        if solicitud.servicio_unidad_id and solicitud.servicio_unidad:
+            nombre_ubicacion = (solicitud.servicio_unidad.nombre_unidad or '').strip()
+        if not nombre_ubicacion:
+            nombre_ubicacion = 'PRESTADO'
 
     nombre_ubicacion = nombre_ubicacion.upper()
 
@@ -468,9 +471,11 @@ def listar_solicitudes_api(request):
         search_value = request.GET.get('search[value]', '').strip()
         estado_filtro = request.GET.get('estado', '')
 
-        qs = SolicitudPrestamo.objects.select_related('usuario', 'servicio_unidad').annotate(
-            cant_expedientes=Count('detalles')
-        )
+        # Optimizamos joins para reducir queries N+1: traemos en una sola consulta
+        # todas las relaciones necesarias para construir la respuesta.
+        qs = SolicitudPrestamo.objects.select_related(
+            'usuario', 'servicio_unidad', 'motivo', 'estado_flujo'
+        ).annotate(cant_expedientes=Count('detalles'))
 
         if estado_filtro:
             qs = qs.filter(estado_flujo_id=estado_filtro)
@@ -487,22 +492,20 @@ def listar_solicitudes_api(request):
 
         solicitudes = qs.order_by('-fecha_creacion')[start:start + length]
 
+        # Importamos los servicios de acceso a datos.
+        # Toda la lectura de DNI/nombre/etc. pasa por aquí, NO se accede a
+        # campos snapshot deprecados directamente.
+        from s_exp.services.datos_solicitud import DatosDetalleSolicitud, DatosSolicitud
+
         data = []
         for s in solicitudes:
-            # Obtener expedientes y su estado de entrega
+            # Cada detalle se enriquece con datos vivos del paciente/expediente
             detalles_info = []
-            for d in s.detalles.select_related('expediente_prestamo__expediente'):
-                detalles_info.append({
-                    "detalle_id": d.id,
-                    "numero": d.expediente_prestamo.expediente.numero,
-                    "devuelto": d.devuelto,
-                    "fuera_de_tiempo": d.fuera_de_tiempo,
-                    "aprobado": d.aprobado,
-                    "motivo_rechazo_individual": d.motivo_rechazo_individual or "",
-                    "comentario_devolucion": d.comentario_devolucion or "",
-                    "paciente_identidad": d.paciente_identidad or "",
-                    "paciente_nombre": d.paciente_nombre or "",
-                })
+            for d in s.detalles.select_related(
+                'expediente_prestamo__expediente', 'paciente'
+            ):
+                info = DatosDetalleSolicitud.enriquecer(d)
+                detalles_info.append(info)
 
             prestamo_id = None
             try:
@@ -510,18 +513,23 @@ def listar_solicitudes_api(request):
             except Exception:
                 prestamo_id = None
 
+            # Construimos el dict de respuesta usando los servicios
             data.append({
                 "id": s.id,
                 "prestamo_id": prestamo_id,
-                "usuario": s.usuario.username,
-                "usuario_nombre": f"{s.usuario.first_name} {s.usuario.last_name}".strip() or s.usuario.username,
+                "usuario": DatosSolicitud.usuario_username(s),
+                "usuario_nombre": DatosSolicitud.usuario_nombre_completo(s),
                 "fecha_creacion": s.fecha_creacion.strftime("%d/%m/%Y %H:%M"),
-                "estado_flujo": s.estado_flujo_id,
-                "estado_flujo_nombre": s.estado_flujo.nombre,
-                "motivo": s.motivo.nombre if s.motivo else "",
+                "estado_flujo": DatosSolicitud.estado_codigo(s),
+                "estado_flujo_nombre": DatosSolicitud.estado_nombre(s),
+                "motivo": DatosSolicitud.motivo_nombre(s),
                 "observaciones": s.observaciones or "",
-                "area_destino": s.area_destino or "",
-                "servicio_unidad": s.servicio_unidad.nombre_unidad if s.servicio_unidad else "",
+                # 'unidad' reemplaza tanto area_destino como servicio_unidad antiguos
+                "unidad": DatosSolicitud.unidad_nombre(s),
+                "unidad_id": DatosSolicitud.unidad_id(s),
+                # Mantenemos 'area_destino' como alias para compatibilidad con
+                # frontend existente que aún lee ese key (se removerá luego).
+                "area_destino": DatosSolicitud.unidad_nombre(s),
                 "cant_expedientes": s.cant_expedientes,
                 "expedientes": detalles_info,
                 "tiempo_sugerido_horas": s.tiempo_sugerido_horas,
@@ -719,13 +727,18 @@ def expedientes_revision_api(request, solicitud_id):
     except SolicitudPrestamo.DoesNotExist:
         return JsonResponse({"error": "Solicitud no encontrada o no está en revisión"}, status=404)
 
+    from s_exp.services.datos_solicitud import DatosDetalleSolicitud
+
     expedientes = []
-    for d in solicitud.detalles.select_related('expediente_prestamo__expediente').filter(aprobado=True):
+    for d in solicitud.detalles.select_related(
+        'expediente_prestamo__expediente', 'paciente'
+    ).filter(aprobado=True):
         expedientes.append({
             "detalle_id": d.id,
-            "numero": d.expediente_prestamo.expediente.numero,
-            "paciente_nombre": d.paciente_nombre or "",
-            "paciente_identidad": d.paciente_identidad or "",
+            "numero": DatosDetalleSolicitud.numero_expediente(d),
+            "paciente_id": DatosDetalleSolicitud.paciente_id(d),
+            "paciente_nombre": DatosDetalleSolicitud.paciente_nombre_completo(d),
+            "paciente_identidad": DatosDetalleSolicitud.paciente_dni(d),
         })
     return JsonResponse({"expedientes": expedientes})
 
@@ -742,13 +755,19 @@ def expedientes_solicitud_api(request, solicitud_id):
         return JsonResponse({"error": "Solicitud no encontrada o ya procesada"}, status=404)
 
     try:
+        # Importamos los servicios — sin acceso directo a snapshots
+        from s_exp.services.datos_solicitud import DatosDetalleSolicitud
+
         expedientes = []
-        for d in solicitud.detalles.select_related('expediente_prestamo__expediente'):
+        for d in solicitud.detalles.select_related(
+            'expediente_prestamo__expediente', 'paciente'
+        ):
             expedientes.append({
                 "detalle_id": d.id,
-                "numero": d.expediente_prestamo.expediente.numero,
-                "paciente_nombre": d.paciente_nombre or "",
-                "paciente_identidad": d.paciente_identidad or "",
+                "numero": DatosDetalleSolicitud.numero_expediente(d),
+                "paciente_id": DatosDetalleSolicitud.paciente_id(d),
+                "paciente_nombre": DatosDetalleSolicitud.paciente_nombre_completo(d),
+                "paciente_identidad": DatosDetalleSolicitud.paciente_dni(d),
                 "estado_fisico": d.expediente_prestamo.estado_id,
             })
         return JsonResponse({
@@ -1009,7 +1028,7 @@ def prestamos_activos_api(request):
         estado_filtro = request.GET.get('estado', '')
 
         qs = Prestamo.objects.select_related(
-            'solicitud__usuario', 'solicitud__motivo'
+            'solicitud__usuario', 'solicitud__motivo', 'solicitud__servicio_unidad'
         ).filter(
             estado__in=['Activo', 'Entregado', 'Vencido', 'DevolucionParcial', 'DevueltoVencido']
         )
@@ -1040,13 +1059,18 @@ def prestamos_activos_api(request):
                 .values_list('expediente_prestamo__expediente__numero', flat=True)
             )
 
+            # Usamos los servicios para evitar acceso directo a snapshots
+            from s_exp.services.datos_solicitud import DatosSolicitud
             data.append({
                 "id": p.id,
                 "solicitud_id": p.solicitud.id,
-                "usuario": p.solicitud.usuario.username,
-                "usuario_nombre": f"{p.solicitud.usuario.first_name} {p.solicitud.usuario.last_name}".strip() or p.solicitud.usuario.username,
-                "area_destino": p.solicitud.area_destino or "",
-                "motivo": str(p.solicitud.motivo.nombre) if p.solicitud.motivo else "",
+                "usuario": DatosSolicitud.usuario_username(p.solicitud),
+                "usuario_nombre": DatosSolicitud.usuario_nombre_completo(p.solicitud),
+                # 'area_destino' es alias retrocompat — el valor viene de la unidad FK
+                "area_destino": DatosSolicitud.unidad_nombre(p.solicitud),
+                "unidad": DatosSolicitud.unidad_nombre(p.solicitud),
+                "unidad_id": DatosSolicitud.unidad_id(p.solicitud),
+                "motivo": DatosSolicitud.motivo_nombre(p.solicitud),
                 "estado": p.estado,
                 "fecha_aprobacion": p.fecha_aprobacion.strftime("%d/%m/%Y %H:%M"),
                 "fecha_entrega": p.fecha_entrega.strftime("%d/%m/%Y %H:%M") if p.fecha_entrega else None,
@@ -1172,14 +1196,18 @@ def prestamos_para_devolucion_api(request):
             estado__in=['Entregado', 'Vencido', 'DevolucionParcial']
         ).order_by('fecha_limite')
 
+        # Importamos los servicios — acceso unificado a datos del detalle
+        from s_exp.services.datos_solicitud import DatosDetalleSolicitud, DatosSolicitud
+
         data = []
         for p in qs:
             detalles = []
             # Mostrar TODOS los expedientes aprobados (devueltos y pendientes)
-            # — los devueltos se muestran como ya recibidos / perdidos / etc.
-            for d in p.solicitud.detalles.select_related('expediente_prestamo__expediente').filter(aprobado=True):
+            for d in p.solicitud.detalles.select_related(
+                'expediente_prestamo__expediente', 'expediente_prestamo__estado', 'paciente'
+            ).filter(aprobado=True):
                 estado_fisico_id = d.expediente_prestamo.estado_id or ''
-                # Etiqueta para el front:
+                # Estado de devolución para el front:
                 #   - 'pendiente'  : aún no devuelto
                 #   - 'devuelto'   : devuelto correctamente (EXP_DISPONIBLE)
                 #   - 'perdido'    : marcado como perdido (EXP_PERDIDO)
@@ -1192,20 +1220,22 @@ def prestamos_para_devolucion_api(request):
 
                 detalles.append({
                     "id": d.id,
-                    "numero": d.expediente_prestamo.expediente.numero,
+                    "numero": DatosDetalleSolicitud.numero_expediente(d),
                     "estado_fisico": d.expediente_prestamo.estado.nombre,
                     "estado_devolucion": estado_devolucion,
                     "devuelto": bool(d.devuelto),
-                    "paciente_identidad": d.paciente_identidad or '',
-                    "paciente_nombre": d.paciente_nombre or '',
+                    "paciente_id": DatosDetalleSolicitud.paciente_id(d),
+                    "paciente_identidad": DatosDetalleSolicitud.paciente_dni(d),
+                    "paciente_nombre": DatosDetalleSolicitud.paciente_nombre_completo(d),
                     "comentario_devolucion": d.comentario_devolucion or '',
                 })
 
             data.append({
                 "id": p.id,
                 "solicitud_id": p.solicitud.id,
-                "usuario": p.solicitud.usuario.username,
-                "usuario_nombre": f"{p.solicitud.usuario.first_name} {p.solicitud.usuario.last_name}".strip() or p.solicitud.usuario.username,
+                "usuario": DatosSolicitud.usuario_username(p.solicitud),
+                "usuario_nombre": DatosSolicitud.usuario_nombre_completo(p.solicitud),
+                "unidad": DatosSolicitud.unidad_nombre(p.solicitud),
                 "estado": p.estado,
                 "detalles_expedientes": detalles,
                 "cant_expedientes": p.solicitud.detalles.filter(aprobado=True).count(),
@@ -1443,10 +1473,29 @@ def buscar_expedientes_api(request):
         )
         expedientes_prestados_ids = expedientes_no_disponibles | en_proceso
 
+        # Usamos el servicio DatosPaciente para formatear nombres de manera consistente.
+        # IMPORTANTE: aquí SÍ devolvemos paciente_id porque el frontend lo guarda
+        # en el carrito y lo envía al backend al crear la solicitud (ya no captura
+        # texto, solo IDs).
+        from s_exp.services.datos_solicitud import DatosPaciente
+
+        def _construir_resultado(exp, paciente):
+            """Helper interno: dado un Expediente y un Paciente, arma el dict de respuesta."""
+            info_exp = ExpedientePrestamo.objects.filter(expediente=exp).first()
+            return {
+                "expediente_id": exp.id,
+                "numero_expediente": exp.numero,
+                "paciente_id": paciente.id if paciente else None,
+                "paciente_nombre": DatosPaciente.nombre_completo(paciente),
+                "paciente_dni": DatosPaciente.dni(paciente),
+                "disponible": exp.id not in expedientes_prestados_ids,
+                "ubicacion_fisica": _resolver_ubicacion_expediente(exp, info_exp),
+            }
+
         resultados = []
 
         if tipo == 'expediente':
-            # Buscar por número de expediente  — Top 5 resultados
+            # Buscar por número de expediente — Top 5 resultados
             expedientes_encontrados = set()
             try:
                 numero_int = int(query.lstrip("0") or "0")
@@ -1455,6 +1504,7 @@ def buscar_expedientes_api(request):
             except ValueError:
                 pass
 
+            # También permite buscar via Paciente.expediente_numero (vínculo viejo)
             pacientes_por_exp = Paciente.objects.filter(expediente_numero__icontains=query)[:5]
             for pac in pacientes_por_exp:
                 asig = PacienteAsignacion.objects.filter(paciente=pac).select_related('expediente').first()
@@ -1462,48 +1512,21 @@ def buscar_expedientes_api(request):
                     expedientes_encontrados.add(asig.expediente.id)
 
             for exp in Expediente.objects.filter(id__in=expedientes_encontrados)[:5]:
-                asignacion = PacienteAsignacion.objects.filter(expediente=exp).select_related('paciente').order_by('-estado').first()
-                paciente_nombre = ""
-                paciente_dni = ""
-                if asignacion:
-                    p = asignacion.paciente
-                    paciente_nombre = f"{p.primer_nombre} {p.segundo_nombre or ''} {p.primer_apellido} {p.segundo_apellido or ''}".strip()
-                    paciente_dni = p.dni or ""
-
-                disponible = exp.id not in expedientes_prestados_ids
-                info_exp = ExpedientePrestamo.objects.filter(expediente=exp).first()
-                ubicacion = _resolver_ubicacion_expediente(exp, info_exp)
-
-                resultados.append({
-                    "expediente_id": exp.id,
-                    "numero_expediente": exp.numero,
-                    "paciente_nombre": paciente_nombre,
-                    "paciente_dni": paciente_dni,
-                    "disponible": disponible,
-                    "ubicacion_fisica": ubicacion,
-                })
+                asignacion = PacienteAsignacion.objects.filter(
+                    expediente=exp
+                ).select_related('paciente').order_by('-estado').first()
+                paciente = asignacion.paciente if asignacion else None
+                resultados.append(_construir_resultado(exp, paciente))
 
         elif tipo == 'identidad':
             query_limpio = query.replace("-", "").replace(" ", "")
             pacientes = Paciente.objects.filter(dni__icontains=query_limpio, estado='A')[:5]
             for pac in pacientes:
-                asignaciones = PacienteAsignacion.objects.filter(paciente=pac, estado='1').select_related('expediente')
+                asignaciones = PacienteAsignacion.objects.filter(
+                    paciente=pac, estado='1'
+                ).select_related('expediente')
                 for asig in asignaciones:
-                    exp = asig.expediente
-                    disponible = exp.id not in expedientes_prestados_ids
-                    paciente_nombre = f"{pac.primer_nombre} {pac.segundo_nombre or ''} {pac.primer_apellido} {pac.segundo_apellido or ''}".strip()
-                    
-                    info_exp = ExpedientePrestamo.objects.filter(expediente=exp).first()
-                    ubicacion = _resolver_ubicacion_expediente(exp, info_exp)
-
-                    resultados.append({
-                        "expediente_id": exp.id,
-                        "numero_expediente": exp.numero,
-                        "paciente_nombre": paciente_nombre,
-                        "paciente_dni": pac.dni or "",
-                        "disponible": disponible,
-                        "ubicacion_fisica": ubicacion,
-                    })
+                    resultados.append(_construir_resultado(asig.expediente, pac))
                     if len(resultados) >= 5:
                         break
                 if len(resultados) >= 5:
@@ -1513,26 +1536,19 @@ def buscar_expedientes_api(request):
             palabras = query.split()
             filtro = Q(estado='A')
             for palabra in palabras:
-                filtro &= (Q(primer_nombre__icontains=palabra) | Q(segundo_nombre__icontains=palabra) | Q(primer_apellido__icontains=palabra) | Q(segundo_apellido__icontains=palabra))
+                filtro &= (
+                    Q(primer_nombre__icontains=palabra) |
+                    Q(segundo_nombre__icontains=palabra) |
+                    Q(primer_apellido__icontains=palabra) |
+                    Q(segundo_apellido__icontains=palabra)
+                )
             pacientes = Paciente.objects.filter(filtro)[:5]
             for pac in pacientes:
-                asignaciones = PacienteAsignacion.objects.filter(paciente=pac, estado='1').select_related('expediente')
+                asignaciones = PacienteAsignacion.objects.filter(
+                    paciente=pac, estado='1'
+                ).select_related('expediente')
                 for asig in asignaciones:
-                    exp = asig.expediente
-                    disponible = exp.id not in expedientes_prestados_ids
-                    paciente_nombre = f"{pac.primer_nombre} {pac.segundo_nombre or ''} {pac.primer_apellido} {pac.segundo_apellido or ''}".strip()
-                    
-                    info_exp = ExpedientePrestamo.objects.filter(expediente=exp).first()
-                    ubicacion = _resolver_ubicacion_expediente(exp, info_exp)
-
-                    resultados.append({
-                        "expediente_id": exp.id,
-                        "numero_expediente": exp.numero,
-                        "paciente_nombre": paciente_nombre,
-                        "paciente_dni": pac.dni or "",
-                        "disponible": disponible,
-                        "ubicacion_fisica": ubicacion,
-                    })
+                    resultados.append(_construir_resultado(asig.expediente, pac))
                     if len(resultados) >= 5:
                         break
                 if len(resultados) >= 5:
@@ -1595,14 +1611,9 @@ def crear_solicitud_api(request):
             "error": "El usuario no está registrado en el sistema RRHH (Recursos Humanos). Contacte al administrador."
         }, status=403)
 
-    # area_destino: snapshot del nombre de la unidad RRHH del usuario AL MOMENTO de la
-    # solicitud. Si después el usuario cambia de unidad, esta solicitud conserva el
-    # valor original (queda en histórico). Las nuevas solicitudes tomarán la unidad nueva.
-    if servicio_unidad and servicio_unidad.nombre_unidad:
-        area_destino = servicio_unidad.nombre_unidad
-    else:
-        # Fallback: PerfilUnidad (solo si por alguna razón no hay servicio_unidad RRHH)
-        area_destino = _get_unidad_usuario(request.user)
+    # Nota: ya no calculamos area_destino como texto. La unidad queda referenciada
+    # por FK en `servicio_unidad`. Para mostrar el nombre, los servicios consultan
+    # en vivo (ver s_exp/services/datos_solicitud.py → DatosSolicitud.unidad_nombre).
 
     try:
 
@@ -1629,19 +1640,20 @@ def crear_solicitud_api(request):
                     "error": f"El expediente #{exp.numero} ya no está disponible"
                 }, status=400)
 
-        # Crear solicitud
+        # Crear solicitud (sin snapshots de texto; solo referencia FK)
         solicitud = SolicitudPrestamo.objects.create(
             usuario=request.user,
             motivo=motivo,
             observaciones=observaciones or None,
-            area_destino=area_destino or None,
-            servicio_unidad=servicio_unidad,
+            servicio_unidad=servicio_unidad,  # ubicación del solicitante (FK a servicio.Unidad)
             tiempo_sugerido_horas=tiempo_sugerido_horas,
         )
 
-        # Crear detalles con datos históricos
+        # Crear detalles guardando SOLO el paciente_id (FK).
+        # Los datos del paciente (DNI/nombre) se consultan en vivo cuando se
+        # muestran, usando DatosDetalleSolicitud.
         for exp in expedientes:
-            # Obtener o crear ExpedientePrestamo
+            # Obtener o crear ExpedientePrestamo (estado físico actual)
             ep, created_ep = ExpedientePrestamo.objects.get_or_create(
                 expediente=exp,
                 defaults={'estado_id': 'EXP_APARTADO'}
@@ -1650,8 +1662,6 @@ def crear_solicitud_api(request):
                 estado_anterior = ep.estado
                 ep.estado_id = 'EXP_APARTADO'
                 ep.save()
-                
-                # Log transaccional para el apartado
                 ExpedienteEstadoLog.objects.create(
                     expediente=exp,
                     estado_anterior=estado_anterior,
@@ -1661,7 +1671,6 @@ def crear_solicitud_api(request):
                     observacion="Expediente apartado por solicitud"
                 )
             else:
-                # Log para creación inicial
                 ExpedienteEstadoLog.objects.create(
                     expediente=exp,
                     estado_anterior=None,
@@ -1670,24 +1679,18 @@ def crear_solicitud_api(request):
                     solicitud=solicitud
                 )
 
-            # Obtener datos del paciente para el snapshot
+            # Buscar el paciente asignado AL MOMENTO de la solicitud.
+            # Si después el expediente se reasigna a otro paciente, esta
+            # solicitud conserva el paciente original via FK.
             asig = PacienteAsignacion.objects.filter(
                 expediente=exp, estado='1'
             ).select_related('paciente').first()
-
-            pac_nombre = ""
-            pac_dni = ""
-            if asig:
-                p = asig.paciente
-                pac_nombre = f"{p.primer_nombre} {p.segundo_nombre or ''} {p.primer_apellido} {p.segundo_apellido or ''}".strip()
-                pac_dni = p.dni or ""
+            paciente_actual = asig.paciente if asig else None
 
             SolicitudExpedienteDetalle.objects.create(
                 solicitud=solicitud,
                 expediente_prestamo=ep,
-                paciente_identidad=pac_dni,
-                paciente_nombre=pac_nombre,
-                numero_expediente=exp.numero,
+                paciente=paciente_actual,  # FK al paciente (no snapshot)
             )
 
         _registrar_log(
@@ -1766,19 +1769,15 @@ def mis_solicitudes_api(request):
         # Si filtro está vacío retorna todas las solicitudes
         data = []
         for s in qs:
-            # Obtener expedientes y su estado de entrega
+            # Importamos los servicios para acceso unificado a datos
+            from s_exp.services.datos_solicitud import DatosDetalleSolicitud, DatosSolicitud
+
+            # Cada detalle se enriquece desde el FK paciente (no desde snapshots)
             detalles_info = []
-            for d in s.detalles.select_related('expediente_prestamo__expediente'):
-                detalles_info.append({
-                    "numero": d.expediente_prestamo.expediente.numero,
-                    "devuelto": d.devuelto,
-                    "fuera_de_tiempo": d.fuera_de_tiempo,
-                    "aprobado": d.aprobado,
-                    "motivo_rechazo_individual": d.motivo_rechazo_individual or "",
-                    "comentario_devolucion": d.comentario_devolucion or "",
-                    "paciente_identidad": d.paciente_identidad or "",
-                    "paciente_nombre": d.paciente_nombre or "",
-                })
+            for d in s.detalles.select_related(
+                'expediente_prestamo__expediente', 'paciente'
+            ):
+                detalles_info.append(DatosDetalleSolicitud.enriquecer(d))
 
             prestamo_info = None
             try:
@@ -1800,12 +1799,14 @@ def mis_solicitudes_api(request):
             data.append({
                 "id": s.id,
                 "fecha_creacion": s.fecha_creacion.strftime("%d/%m/%Y %H:%M"),
-                "estado_flujo": s.estado_flujo_id,
-                "estado_flujo_nombre": s.estado_flujo.nombre,
-                "motivo": s.motivo.nombre if s.motivo else "",
+                "estado_flujo": DatosSolicitud.estado_codigo(s),
+                "estado_flujo_nombre": DatosSolicitud.estado_nombre(s),
+                "motivo": DatosSolicitud.motivo_nombre(s),
                 "observaciones": s.observaciones or "",
-                "area_destino": s.area_destino or "",
-                "servicio_unidad": s.servicio_unidad.nombre_unidad if s.servicio_unidad else "",
+                "unidad": DatosSolicitud.unidad_nombre(s),
+                "unidad_id": DatosSolicitud.unidad_id(s),
+                # Alias para retrocompatibilidad con frontend actual
+                "area_destino": DatosSolicitud.unidad_nombre(s),
                 "expedientes": detalles_info,
                 "cant_expedientes": len(detalles_info),
                 "prestamo": prestamo_info,
@@ -2203,14 +2204,16 @@ def reportes_data_api(request):
             estado__in=['Entregado', 'Vencido'],
             fecha_limite__lt=ahora,
             **filtros_prestamo
-        ).select_related('solicitud__usuario')
+        ).select_related('solicitud__usuario', 'solicitud__servicio_unidad')
 
+        from s_exp.services.datos_solicitud import DatosSolicitud
         morosidad = []
         for p in morosos:
             morosidad.append({
                 "prestamo_id": p.id,
-                "usuario": p.solicitud.usuario.username,
-                "area": p.solicitud.area_destino or "",
+                "usuario": DatosSolicitud.usuario_username(p.solicitud),
+                # 'area' viene de la FK unidad (deprecado area_destino texto)
+                "area": DatosSolicitud.unidad_nombre(p.solicitud),
                 "fecha_limite": p.fecha_limite.strftime("%d/%m/%Y %H:%M") if p.fecha_limite else "",
                 "dias_vencido": (ahora - p.fecha_limite).days if p.fecha_limite else 0,
             })
@@ -2316,8 +2319,12 @@ def historial_prestamos_paciente_api(request, paciente_id):
             expediente_prestamo__expediente_id__in=expediente_ids
         ).select_related(
             'solicitud', 'solicitud__usuario', 'solicitud__motivo',
-            'expediente_prestamo', 'expediente_prestamo__expediente'
+            'solicitud__estado_flujo', 'solicitud__servicio_unidad',
+            'expediente_prestamo', 'expediente_prestamo__expediente', 'paciente'
         ).order_by('-solicitud__fecha_creacion')
+
+        # Servicios para acceso unificado (sin snapshots)
+        from s_exp.services.datos_solicitud import DatosDetalleSolicitud, DatosSolicitud
 
         data = []
         en_prestamo_actual = False
@@ -2329,13 +2336,14 @@ def historial_prestamos_paciente_api(request, paciente_id):
                 en_prestamo_actual = True
 
             data.append({
-                "numero_expediente": d.numero_expediente or d.expediente_prestamo.expediente.numero,
+                "numero_expediente": DatosDetalleSolicitud.numero_expediente(d),
                 "fecha_solicitud": s.fecha_creacion.strftime("%d/%m/%Y %H:%M"),
-                "motivo": s.motivo.nombre if s.motivo else "",
-                "solicitante": f"{s.usuario.first_name} {s.usuario.last_name}".strip() or s.usuario.username,
-                "estado": s.estado_flujo.nombre,
+                "motivo": DatosSolicitud.motivo_nombre(s),
+                "solicitante": DatosSolicitud.usuario_nombre_completo(s),
+                "estado": DatosSolicitud.estado_nombre(s),
                 "devuelto": d.devuelto,
-                "area_destino": s.area_destino or "",
+                # alias de retrocompat (frontend espera 'area_destino')
+                "area_destino": DatosSolicitud.unidad_nombre(s),
             })
 
         return JsonResponse({"data": data, "en_prestamo": en_prestamo_actual})
@@ -2357,8 +2365,11 @@ def historial_prestamos_expediente_api(request, expediente_id):
             expediente_prestamo__expediente_id=expediente_id
         ).select_related(
             'solicitud', 'solicitud__usuario', 'solicitud__motivo',
-            'expediente_prestamo', 'expediente_prestamo__expediente'
+            'solicitud__estado_flujo', 'solicitud__servicio_unidad',
+            'expediente_prestamo', 'expediente_prestamo__expediente', 'paciente'
         ).order_by('-solicitud__fecha_creacion')
+
+        from s_exp.services.datos_solicitud import DatosDetalleSolicitud, DatosSolicitud
 
         data = []
         en_prestamo_actual = False
@@ -2370,13 +2381,13 @@ def historial_prestamos_expediente_api(request, expediente_id):
                 en_prestamo_actual = True
 
             data.append({
-                "numero_expediente": d.numero_expediente or d.expediente_prestamo.expediente.numero,
+                "numero_expediente": DatosDetalleSolicitud.numero_expediente(d),
                 "fecha_solicitud": s.fecha_creacion.strftime("%d/%m/%Y %H:%M"),
-                "motivo": s.motivo.nombre if s.motivo else "",
-                "solicitante": f"{s.usuario.first_name} {s.usuario.last_name}".strip() or s.usuario.username,
-                "estado": s.estado_flujo.nombre,
+                "motivo": DatosSolicitud.motivo_nombre(s),
+                "solicitante": DatosSolicitud.usuario_nombre_completo(s),
+                "estado": DatosSolicitud.estado_nombre(s),
                 "devuelto": d.devuelto,
-                "area_destino": s.area_destino or "",
+                "area_destino": DatosSolicitud.unidad_nombre(s),
             })
 
         return JsonResponse({"data": data, "en_prestamo": en_prestamo_actual})
@@ -2443,15 +2454,16 @@ def historial_solicitudes_api(request):
             elif s.estado_flujo_id == 'SOL_FINALIZADA':
                 evento = "✅ Finalizada correctamente"
 
+            from s_exp.services.datos_solicitud import DatosSolicitud
             data.append({
                 "id": s.id,
-                "usuario": s.usuario.username,
-                "usuario_nombre": f"{s.usuario.first_name} {s.usuario.last_name}".strip() or s.usuario.username,
+                "usuario": DatosSolicitud.usuario_username(s),
+                "usuario_nombre": DatosSolicitud.usuario_nombre_completo(s),
                 "fecha_creacion": s.fecha_creacion.strftime("%d/%m/%Y %H:%M"),
-                "estado_flujo": s.estado_flujo_id,
-                "estado_flujo_nombre": s.estado_flujo.nombre,
-                "motivo": s.motivo.nombre if s.motivo else "",
-                "area_destino": s.area_destino or "",
+                "estado_flujo": DatosSolicitud.estado_codigo(s),
+                "estado_flujo_nombre": DatosSolicitud.estado_nombre(s),
+                "motivo": DatosSolicitud.motivo_nombre(s),
+                "area_destino": DatosSolicitud.unidad_nombre(s),
                 "expedientes": numeros,
                 "evento_resumen": evento,
             })
@@ -2475,16 +2487,20 @@ def historial_solicitud_detalle_api(request, solicitud_id):
 
     try:
         s = SolicitudPrestamo.objects.select_related(
-            'usuario', 'estado_flujo', 'motivo'
+            'usuario', 'estado_flujo', 'motivo', 'servicio_unidad'
         ).get(id=solicitud_id)
 
-        # Expedientes con estado físico actual
+        from s_exp.services.datos_solicitud import DatosDetalleSolicitud, DatosSolicitud
+
+        # Expedientes con estado físico actual (nombre del paciente vía FK)
         expedientes_data = []
-        for d in s.detalles.select_related('expediente_prestamo__expediente', 'expediente_prestamo__estado'):
+        for d in s.detalles.select_related(
+            'expediente_prestamo__expediente', 'expediente_prestamo__estado', 'paciente'
+        ):
             ep = d.expediente_prestamo
             expedientes_data.append({
-                "numero": ep.expediente.numero,
-                "paciente": d.paciente_nombre or "",
+                "numero": DatosDetalleSolicitud.numero_expediente(d),
+                "paciente": DatosDetalleSolicitud.paciente_nombre_completo(d),
                 "estado_fisico": ep.estado.nombre if ep.estado else "—",
                 "devuelto": d.devuelto,
             })
@@ -2504,13 +2520,13 @@ def historial_solicitud_detalle_api(request, solicitud_id):
         prestamo = s.prestamos.first()
         return JsonResponse({"data": {
             "id": s.id,
-            "usuario": s.usuario.username,
-            "usuario_nombre": f"{s.usuario.first_name} {s.usuario.last_name}".strip() or s.usuario.username,
+            "usuario": DatosSolicitud.usuario_username(s),
+            "usuario_nombre": DatosSolicitud.usuario_nombre_completo(s),
             "fecha_creacion": s.fecha_creacion.strftime("%d/%m/%Y %H:%M"),
-            "estado_flujo": s.estado_flujo_id,
-            "estado_flujo_nombre": s.estado_flujo.nombre,
-            "motivo": s.motivo.nombre if s.motivo else "",
-            "area_destino": s.area_destino or "",
+            "estado_flujo": DatosSolicitud.estado_codigo(s),
+            "estado_flujo_nombre": DatosSolicitud.estado_nombre(s),
+            "motivo": DatosSolicitud.motivo_nombre(s),
+            "area_destino": DatosSolicitud.unidad_nombre(s),
             "expedientes": expedientes_data,
             "logs": logs_data,
             "prestamo": {"id": prestamo.id, "estado": prestamo.estado} if prestamo else None,

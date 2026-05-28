@@ -148,12 +148,15 @@ class SolicitudPrestamo(models.Model):
         null=True,
         verbose_name='Observaciones'
     )
-    area_destino = models.CharField(
-        max_length=100,
-        blank=True,
-        null=True,
-        verbose_name='Área de Destino'
-    )
+    # ============================================================
+    # Ubicación del solicitante (FK a la unidad de servicio donde trabaja)
+    # ============================================================
+    # Esta es la "ubicación física" del usuario que pidió el préstamo.
+    # Se obtiene en cascada via RRHH:
+    #   1. PersonalNoClinico.servicio_unidad
+    #   2. PersonalSalud.servicio_unidad (si no está en no-clínico)
+    # Para mostrar el nombre se usa servicio_unidad.nombre_unidad
+    # via los servicios (s_exp/services/datos_solicitud.py).
     servicio_unidad = models.ForeignKey(
         'servicio.Unidad',
         on_delete=models.PROTECT,
@@ -161,8 +164,12 @@ class SolicitudPrestamo(models.Model):
         blank=True,
         related_name='solicitudes_prestamo',
         verbose_name='Unidad de Servicio del Solicitante',
-        help_text='Obtenida automáticamente del registro en RRHH del usuario solicitante'
+        help_text='FK a servicio.Unidad. Capturada del registro RRHH al crear la solicitud.'
     )
+
+    # El campo area_destino (texto) fue eliminado en migración 0015.
+    # El acceso a la unidad del solicitante ahora se hace vía
+    # s_exp/services/datos_solicitud.py → DatosSolicitud.unidad_nombre.
     expedientes = models.ManyToManyField(
         ExpedientePrestamo,
         through='SolicitudExpedienteDetalle',
@@ -239,19 +246,30 @@ class SolicitudExpedienteDetalle(models.Model):
         related_name='detalle_solicitudes',
         verbose_name='Expediente'
     )
-    # Campos historiales: se guardan al crear la solicitud
-    paciente_identidad = models.CharField(
-        max_length=50, blank=True, null=True,
-        verbose_name='Identidad del Paciente'
-    )
-    paciente_nombre = models.CharField(
-        max_length=300, blank=True, null=True,
-        verbose_name='Nombre del Paciente'
-    )
-    numero_expediente = models.PositiveIntegerField(
+
+    # ============================================================
+    # Paciente vinculado al expediente AL MOMENTO de crear la solicitud.
+    # ============================================================
+    # Antes guardábamos texto duplicado (paciente_identidad + paciente_nombre).
+    # Ahora solo guardamos el ID y consultamos en vivo via los servicios
+    # (ver s_exp/services/datos_solicitud.py).
+    #
+    # ¿Por qué guardar el paciente y no inferirlo de la asignación actual?
+    # Porque PacienteAsignacion puede cambiar (un expediente se puede reasignar
+    # a otro paciente). Necesitamos conservar la referencia al paciente que
+    # tenía el expediente AL MOMENTO del préstamo, para auditoría histórica.
+    paciente = models.ForeignKey(
+        'paciente.Paciente',
+        on_delete=models.PROTECT,
         null=True, blank=True,
-        verbose_name='N° Expediente (snapshot)'
+        related_name='solicitudes_expediente_detalle',
+        verbose_name='Paciente vinculado al momento de la solicitud',
+        help_text='FK al paciente. Para mostrar nombre/identidad se consulta en vivo.'
     )
+
+    # Los campos snapshot fueron eliminados en migración 0015.
+    # El acceso a paciente_dni, paciente_nombre y numero_expediente ahora
+    # se hace vía s_exp/services/datos_solicitud.py → DatosDetalleSolicitud.
     aprobado = models.BooleanField(
         default=True,
         verbose_name='Expediente Aprobado para préstamo'
