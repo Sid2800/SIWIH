@@ -109,5 +109,5 @@ MAPEO_CAMAS_INTENTOS_CAMBIO_UNIDADES = ["ADMI"]
 
 # Acceso de auditoría (historiales, detalle de historial)
 # [2026-05-11] Visitante habilitado para visualizar templates de historial.
-MAPEO_CAMAS_HISTORIALES_ROLES = ["admin", "visitante","digitador"]
+MAPEO_CAMAS_HISTORIALES_ROLES = ["admin","digitador"]
 MAPEO_CAMAS_HISTORIALES_UNIDADES = ["ADMI"]

@@ -1309,16 +1309,42 @@ document.addEventListener("DOMContentLoaded", function () {
       var cardServicio = document.createElement("section");
       cardServicio.className = "mapa-servicio-card";
 
+      var encabezadoServicio = document.createElement("div");
+      encabezadoServicio.className = "mapa-servicio-encabezado";
+
       var tituloServicio = document.createElement("h3");
       tituloServicio.className = "mapa-servicio-titulo";
       tituloServicio.textContent = servicio.nombre + " (" + (servicio.nombre_corto || "NA") + ")";
-      cardServicio.appendChild(tituloServicio);
+      encabezadoServicio.appendChild(tituloServicio);
+
+      var botonColapsarServicio = document.createElement("button");
+      botonColapsarServicio.type = "button";
+      botonColapsarServicio.className = "mapa-servicio-colapsar";
+      botonColapsarServicio.setAttribute("aria-expanded", "true");
+      botonColapsarServicio.title = "Colapsar servicio";
+      botonColapsarServicio.innerHTML = '<i class="bi bi-chevron-up"></i> Colapsar';
+      encabezadoServicio.appendChild(botonColapsarServicio);
+
+      cardServicio.appendChild(encabezadoServicio);
+
+      var contenidoServicio = document.createElement("div");
+      contenidoServicio.className = "mapa-servicio-contenido";
+
+      botonColapsarServicio.addEventListener("click", function () {
+        var colapsado = cardServicio.classList.toggle("mapa-servicio-card--colapsado");
+        contenidoServicio.style.display = colapsado ? "none" : "block";
+        botonColapsarServicio.setAttribute("aria-expanded", colapsado ? "false" : "true");
+        botonColapsarServicio.title = colapsado ? "Expandir servicio" : "Colapsar servicio";
+        botonColapsarServicio.innerHTML = colapsado
+          ? '<i class="bi bi-chevron-down"></i> Expandir'
+          : '<i class="bi bi-chevron-up"></i> Colapsar';
+      });
 
       if (!servicio.salas.length) {
         var sinSalas = document.createElement("p");
         sinSalas.className = "mapa-vacio";
         sinSalas.textContent = "Sin salas activas.";
-        cardServicio.appendChild(sinSalas);
+        contenidoServicio.appendChild(sinSalas);
       }
 
       servicio.salas.forEach(function (sala) {
@@ -1459,8 +1485,10 @@ document.addEventListener("DOMContentLoaded", function () {
           bloqueSala.appendChild(gridDirectas);
         }
 
-        cardServicio.appendChild(bloqueSala);
+        contenidoServicio.appendChild(bloqueSala);
       });
+
+      cardServicio.appendChild(contenidoServicio);
 
       contenedor.appendChild(cardServicio);
     });

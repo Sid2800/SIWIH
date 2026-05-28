@@ -184,12 +184,44 @@
   padding: 0;
 }
 
-.mapa-servicio-titulo {
-  margin: 0;
-  font-weight: 700;
+.mapa-servicio-encabezado {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
   padding: 0.6rem 0.8rem;
   background: #f3f6fb;
   border-bottom: 1px solid #d9e3f5;
+}
+
+.mapa-servicio-titulo {
+  margin: 0;
+  font-weight: 700;
+  padding: 0;
+  background: transparent;
+  border-bottom: 0;
+}
+
+.mapa-servicio-colapsar {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  border-radius: 999px;
+  padding: 0.25rem 0.7rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+}
+
+.mapa-servicio-colapsar:hover {
+  background: #f8fafc;
+}
+
+.mapa-servicio-contenido {
+  display: block;
 }
 
 .mapa-sala {
@@ -407,7 +439,17 @@
 }
 
 .darkmode .mapa-servicio-titulo {
+  color: rgb(220, 220, 220);
+}
+
+.darkmode .mapa-servicio-encabezado {
   background: rgba(255, 255, 255, 0.06);
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+.darkmode .mapa-servicio-colapsar {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.16);
   color: rgb(220, 220, 220);
 }
 
