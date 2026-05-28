@@ -169,3 +169,12 @@ function fechaManana() {
 function formatearHora(hora) {
     return hora.slice(0, 5); // "13:00"
 }
+
+
+function convertirHoraMinutos(hora){
+
+    const [horas, minutos] =
+        hora.split(':').map(Number);
+
+    return (horas * 60) + minutos;
+}

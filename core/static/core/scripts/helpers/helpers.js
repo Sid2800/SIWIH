@@ -185,7 +185,9 @@ const API_URLS = {
    listarJornadaLaboralAPI: urls["listarJornadaLaboralAPI"],
    guardarPeriodoLaboral: urls["guardarPeriodoLaboral"],
    validarImpactoPeriodoLaboral: urls["validarImpactoPeriodoLaboral"],
-   obtenerPeriodoLaboral: urls["obtenerPeriodoLaboral"]
+   obtenerPeriodoLaboral: urls["obtenerPeriodoLaboral"],
+   listarTiposAtencion: urls["listarTiposAtencion"],
+
 };
 
 /**

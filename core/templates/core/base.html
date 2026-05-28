@@ -151,7 +151,7 @@
                </li>
             {% endif %}
 
-
+            
             <li>  
                <a href="{% url 'generador_reporte' %}" class="bn-navegacion__enlace">
                   <i class="bi bi-journal-text bn-navegacion-enlace__logo"></i>
@@ -437,6 +437,11 @@
 
       /* ---------------- MEDIA ---------------- */
       obtenerImagenesEvaluacion: "{% url 'obtener_imagenes_evaluacion'%}",
+
+      /* ---------------- CLINICA  ---------------- */
+      listarTiposAtencion: "{% url 'listar_tipos_atencion'%}",
+
+
 
       /* ---------------- AGENDA MEDICA ---------------- */
       listarAgendaMedicaAPI: "{% url 'listar_agenda_medica_API'%}",

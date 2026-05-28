@@ -4,15 +4,15 @@
    --negro: #000;
 
    --negro-suave: #1a1a1a;
-   --negro-hover: #2a2a2a;
+   --negro-hover: #302d2d;
 
    --blanco-suave: #f5f5f5;
    --blanco-apagado: #e0e0e0;
 
 
 
-   --colorTextoMenu: rgb(134, 136, 144);
-   --colorBoton: #1f1f1f;         
+   --colorTextoMenu: rgb(117, 118, 122);
+   --colorBoton: #2e2d2d;         
    --colorTextoBoton: #f2f2f2; 
 
 
@@ -47,8 +47,8 @@
    --colorTextoSololectura: rgb(60, 60, 60);
 
    /*Colores controles desactivados*/
-   --colorTextoBloqueado: rgb(70,70,70);
-   --colorTextBLoqueadoFondo: rgb(242, 242, 222);
+   --colorInputReadonlyTexto: rgb(70,70,70);
+   --colorInputReadonlyFondo: rgb(242, 242, 222);
 
 
    --fuenteMenu: 'Fredoka', sans-serif;
@@ -76,9 +76,9 @@
    --blanco-suave: #1a1a1a;
    --blanco-apagado: #2a2a2a;
 
-   --colorTextoMenu: rgb(120, 120, 127);
+   --colorTextoMenu: rgb(185, 185, 196);
 
-   --colorBoton: #e4e4e4;         
+   --colorBoton: #d4dfe4;         
    --colorTextoBoton: #1a1a1a;
 
    --colorMenuHover: rgb(0, 0, 0);
@@ -110,8 +110,8 @@
 
 
    /*Colores controles desactivados*/
-   --colorTextoBloqueado: rgb(70,70,70);
-   --colorTextBLoqueadoFondo: rgb(242, 242, 222);
+   --colorInputReadonlyTexto: rgb(70,70,70);
+   --colorInputReadonlyFondo: rgb(242, 242, 222);
    
 }
 
@@ -132,7 +132,7 @@ html {
 .cuerpo {
    /*cuer´p*/
    background-color: darkcyan;
-   height: 100%;
+   
    width: 100%;
    font-size: 1.6rem;
    padding: 0;
@@ -652,7 +652,7 @@ main {
 /*Tabla  MODALES*/  
 
 /*Colores para la clasifiacion*/
-.icon-amarillo { color: #d39e00; }  /* Amarillo oscuro */
+.icon-amarillo { color: #c9a227; }  /* Amarillo oscuro */
 .icon-azul { color: #0a58ca; }      /* Azul oscuro */
 .icon-morado { color: #5a2ca0; }    /* Morado oscuro */
 .icon-naranja { color: #b45309; }   /* Naranja oscuro */
@@ -667,7 +667,7 @@ main {
    border-radius: 2rem;
    color: var(--colorTablacelda);
    width: 100%;
-   margin: 3rem 0 3rem 0;
+   margin: 2rem 0 2rem 0;
    transition: background-color 0.3s ease;
 }
 
@@ -1793,6 +1793,7 @@ font-size: 1.6rem;
 }
 
 .modal-procesos-tabla tbody tr:hover ,
+.tabla-estatica-procesos  tbody tr:hover ,
 .tabla-mantenimiento tbody tr:hover {
    background-color: var(--colorTablaceldaBorde);
 }
@@ -1800,6 +1801,9 @@ font-size: 1.6rem;
 /*BOTONDE OTROS PROCESSOS DE PACIENTE*/
 .modal-procesos-btn,
 .tabla-mantenimiento-boton,
+.configurar-periodo-dia-tarjeta-boton,
+.agregar-editar-cupo-dia-boton,
+.tabla-estatica-boton,
 .datatable-agenda-boton{
    font-size: 1.2rem;
    font-weight: 600;
@@ -1825,6 +1829,13 @@ font-size: 1.6rem;
    font-size: 2.5rem;
 }
 
+.tabla-estatica-boton{
+   width: 3.4rem;
+   height: 3.4rem;
+   font-size: 2.2rem;
+}
+
+.tabla-estatica-boton:hover,
 .datatable-agenda-boton:hover {
    background-color: var(--colorTextoMenu);
    color: var(--negro);
@@ -1832,7 +1843,7 @@ font-size: 1.6rem;
 
 .datatable-agenda-acciones-wrapper{
    display: inline-flex;
-   gap: 6px;
+   gap: .5rem;
 }
 
 #data_table_agenda_medica .dtr-data {
@@ -1854,11 +1865,15 @@ font-size: 1.6rem;
 
 
 .modal-procesos-btn i,
+.configurar-periodo-dia-tarjeta-boton i,
+.agregar-editar-cupo-dia-boton i,
 .tabla-mantenimiento-boton i{
    font-size: 2rem;
 }
 
 .modal-procesos-btn:hover,
+.configurar-periodo-dia-tarjeta-boton:hover,
+.agregar-editar-cupo-dia-boton:hover,
 .tabla-mantenimiento-boton:hover{
    background-color: var(--colorTextoBoton);
    color: var(--colorBoton) !important;
@@ -3126,23 +3141,23 @@ button[disabled] {
 .modalSeguimientoTIC select[disabled],
 .modalSeguimientoTIC textarea[disabled],
 .modalPeriodoLaboralCampos input[readonly],
-.modalPeriodoLaboralCampos select[disabled]
-{
+.modalPeriodoLaboralCampos select[disabled],
+.contenedor-fielsets-configurar-periodo input[readonly]{
 
-   background-color: var(--colorTextBLoqueadoFondo) !important;
-   color: var(--colorTextoBloqueado) !important;  
+   background-color: var(--colorInputReadonlyFondo) !important;
+   color: var(--colorInputReadonlyTexto) !important;  
    font-style: italic !important;    
 }
 
 .modalSeguimientoTIC select[disabled],
 .modalSeguimientoTIC textarea[disabled]{
-   color: var(--colorTextBLoqueadoFondo) !important;
+   color: var(--colorInputReadonlyFondo) !important;
    cursor: not-allowed !important;
 }
 
 .ts-wrapper.formularioCampo-select.disabled .ts-control {
-   background-color: var(--colorTextBLoqueadoFondo) !important;
-   color: var(--colorTextoBloqueado) !important;  
+   background-color: var(--colorInputReadonlyFondo) !important;
+   color: var(--colorInputReadonlyTexto) !important;  
    font-style: italic !important;    
 }
 
@@ -3156,8 +3171,8 @@ input[readonly], textarea[readonly] {
 .identificacionCampos input[readonly],
 .generalesCampos select[readonly],
 .modalCadaverDefuncionPacienteCampos input[disabled]{
-   background-color: var(--colorTextBLoqueadoFondo);
-   color: var(--colorTextoBloqueado);
+   background-color: var(--colorInputReadonlyFondo);
+   color: var(--colorInputReadonlyTexto);
 }
 
 select[disabled] {
@@ -3192,6 +3207,9 @@ select[disabled] {
 .modalDefuncionCampos,
 .modalObitoCampos,
 .modalPeriodoLaboralCampos,
+.modalDiaLaboralCampos,
+.modalDiaLaboralControlesCupos,
+.modalDiaLaboralContenedorCupos,
 .modalAtencionCampos,
 .sectorCamposModal,
 .modalCadaverDefuncionPacienteCampos,
@@ -3213,8 +3231,7 @@ select[disabled] {
    font-family: var(--fuenteTablaTitulo);
 }
 .modalObitoCampos,
-.modalDefuncionCampos,
-.modalPeriodoLaboralCampos{
+.modalDefuncionCampos{
    padding: 1.5rem;
    row-gap: 1rem;
 }
@@ -3743,12 +3760,14 @@ select[disabled] {
 
 
 
-.estudio-grid-tarjeta:hover {
+.estudio-grid-tarjeta:hover,
+.configurar-periodo-dia-tarjeta:hover {
    box-shadow: 0 .4rem .5rem var(--colorTablaceldaBorde);
    transform: translateY(-.1rem);
 }
 
-.estudio-grid-tarjeta:active {
+.estudio-grid-tarjeta:active,
+.configurar-periodo-dia-tarjeta:active {
    transform: translateY(0);
    box-shadow: 0 .2rem .4rem var(--colorTablaceldaBorde);
    background-color: var(--color-Scroll);
@@ -5044,9 +5063,10 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
 .contenedor-modal-galeria,
 .contenedor-modal-obito,
 .contenedor-modal-periodo-laboral,
+.contenedor-modal-dia-laboral,
 .contenedor-modal-procesos{
    background-color: var(--colorContendor);
-   width: 98% !important;
+   width: 98%;
 }
 
 
@@ -5115,7 +5135,7 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
 
 .modal-dato-label{
    font-weight: 400;
-   color: var(--colorTextoBloqueado);
+   color: var(--colorInputReadonlyTexto);
    opacity: .8;
    min-width: 8rem;
 }
@@ -5227,7 +5247,13 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
       display: flex !important;
    }
 
-      .modalPeriodoLaboralCampos .formularioCampoModal{
+   .contenedor-modal-dia-laboral{
+      width: 55rem;
+      display: flex !important;
+   }
+   
+
+   .modalPeriodoLaboralCampos .formularioCampoModal{
       grid-template-columns: 1fr 3fr;
    }
 
@@ -5291,7 +5317,6 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
 /*
 ----------------   FORM CONFIGURACION DE PERIODO LABORAL
 */
-
 .contenedor-fielsets-configurar-periodo{
    padding: 2.5rem .7rem 1rem .7rem;
    position: relative;
@@ -5312,19 +5337,11 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
    padding: 1.5rem 1rem;
 }
 
-.configurarPeriodoContenedorTabla{
-   grid-column: 1 / -1;
-   border: .15rem solid var(--color-Scroll-Hover);
-   display: flex;
-   flex-direction: column;
-   border-radius: 1rem 0 1rem 0;
-   /*
-   row-gap: 1rem;
-   margin: 0;
-   margin-top: 0px;*/
-   justify-content: space-evenly;
-   transition: all 0.3s ease;
+.configurarPeriodoPeriodoCampos .formularioCampoModal label{
+   width: 9rem;
 }
+
+
 
 @media (min-width: 36rem) {
 
@@ -5362,7 +5379,7 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
    }
 
    .configurarPeriodoPeriodoCampos{
-      column-gap: 2rem;
+      column-gap: 3rem;
       padding: 1.5rem 1.5rem;
    }
 }
@@ -5376,32 +5393,324 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
    .configurarPeriodoPeriodoCampos .formularioCampoModal{
       flex-direction: row;
    }
-
-   .contenedor-fielsets-configurar-periodo{
-      padding: 3rem 2rem 2rem 2rem;
-   }
 }
 
 
+/*  CONFIGURAR PERIODO LABROAL */
+
+.configurarPeriodoContenedorTarjetaDiasSemana{
+   grid-column: 1 / -1;
+   border: .15rem solid var(--color-Scroll-Hover);
+   border: .15rem solid #ccc;
+   border-radius: 1rem 0 1rem 0;
+   transition: all 0.3s ease;
+}
+
+.contenedor-dias-semana{
+   display: grid;
+   grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+   gap: 1.4rem;
+   justify-items: center;
+   padding: .5rem;
+}
+
+.configurar-periodo-dia-tarjeta{
+   padding: .8rem .8rem 1rem .8rem;
+   border: var(--colorTablaceldaBorde) solid .25rem;
+   border-radius: .5rem;
+   display: flex;
+   flex-direction: column;
+   height: 19rem;
+   width: 100%;
+   max-width: 16rem;
+   transition: box-shadow 0.2s ease, transform 0.15s ease, opacity 0.2s ease;
+   cursor: pointer;
+   row-gap: 1.8rem;
+
+}
+
+.configurar-periodo-dia-tarjeta.tarjeta-no-configurada{
+   background-color: var(--colorTablaHover);
+}
+
+.configurar-periodo-dia-tarjeta-header{
+   display: flex;
+   justify-content: space-between;
+   position: relative;
+}
+
+.configurar-periodo-dia-tarjeta-header-titulo{
+   font-weight: 600;
+   font-family: var(--fuenteTablaCuerpo);
+   font-size: 1.8rem;
+   letter-spacing: .07rem;
+   padding-left: .3rem;
+}
+
+.configurar-periodo-dia-tarjeta-header-estado{
+   font-size: 2.2rem;
+   position: absolute;
+   right: -.6rem;
+   top: -.5rem;
+   padding: .4rem;
+}
+
+.configurar-periodo-dia-tarjeta-body{
+   display: flex;
+   justify-content: center;
+   flex-direction: column;
+   row-gap: 1rem;
+   padding-left: .5rem;
+   height: 7.5rem;
+}
+
+
+.dia-info-item{
+   display: flex;
+   flex-direction: row;
+   justify-content: flex-start;
+   column-gap: .8rem;
+}
+.dia-info-item span{
+   white-space: nowrap;
+}
+
+
+
+.dia-info-item i{
+   color: var(--colorTextoMenu);
+}
+
+.configurar-periodo-dia-tarjeta-body.tarjeta-no-configurada .dia-info-item{
+   flex-direction: column;
+   justify-content: center;
+   align-items: center;
+   row-gap: 1rem;
+   color: var(--colorTextoMenu);
+}
+
+.configurar-periodo-dia-tarjeta-body.tarjeta-no-configurada .dia-info-item i{
+   font-size: 2rem;
+}
+
+.configurar-periodo-dia-tarjeta-footer{
+   display: flex;
+   justify-content: center;
+   align-items: center;
+}
+
+.configurar-periodo-dia-tarjeta-boton{
+   width: 12rem;
+}
+
+.configurar-periodo-dia-tarjeta-boton i{
+   font-size: 1.8rem;
+}
+
+.configurar-periodo-dia-tarjeta-boton span{
+   font-size: 1.2rem;
+}
+
+
+/*  MODAL  CONFIGURAR DIA LABORAL */
+
+.modalDiaLaboralCampos{
+   display: grid;
+   grid-template-columns: repeat(2, 1fr);
+   column-gap: 2rem;
+   padding: 1.5rem 1rem;
+   row-gap: 1rem;
+}
+
+.contenedor-modal-dia-laboral .swal2-validation-message{
+   color: var(--negro);
+   font-size: 1.3rem;
+   font-weight: 500;
+   background-color: transparent;
+   font-family: var(--fuenteTablaCuerpo);
+   text-decoration: underline;
+   padding: .3rem 0;
+}
+
+
+.modalDiaLaboralCampos .formularioCampoModal {
+   justify-content: center;
+}
+
+.modalDiaLaboralCampos > :last-child {
+   flex-direction: row;
+   justify-content: left;
+   align-items: center;
+   column-gap: 1rem;
+
+}
+
+#modal-dia-laboral-horario-cupos{
+   text-align: center;
+}
+
+
+.modalDiaLaboralControlesCupos{
+   grid-column: 1 / -1;
+   display: grid;
+   grid-template-columns: repeat(6, 1fr);
+   row-gap: 1.1rem;
+   column-gap: 2rem;
+   padding: 1.5rem 1rem;
+}
+
+.modalDiaLaboralControlesCupos .formularioCampoModal  label {
+   white-space: nowrap;
+}
+
+.modalDiaLaboralControlesCupos > :nth-child(2) {
+   grid-column: 1 / -1;
+}
+
+.modalDiaLaboralControlesCupos > :nth-child(3) {
+   grid-column: 1 / 3;
+}
+
+.modalDiaLaboralControlesCupos > :nth-child(4) {
+   grid-column: 3 / 5;
+}
+
+.modalDiaLaboralControlesCupos > :nth-child(5){
+   grid-column: 5 / -1;
+   display: flex;
+   justify-content: center;
+   align-items:flex-end;
+}
+
+.modalDiaLaboralContenedorCupos{
+   display: flex;
+   padding: 1.5rem 1rem;
+}
+
+
+
+.tabla-estatica-columna-responsive{
+   display: none;
+}
+
+
+
+
+
+
+@media (min-width: 36rem) {
+
+   .tabla-estatica-columna-responsive{
+      display: table-cell;
+   }
+  
+   .modalDiaLaboralContenedorCupos{
+      min-height: 27rem;
+   }
+
+   .modalDiaLaboralCampos .formularioCampoModal label{
+      width: 5rem;
+
+   }
+   .modalDiaLaboralControlesCupos .formularioCampoModal label{
+      width: 7rem;
+   }
+
+   .modalDiaLaboralControlesCupos > :nth-child(2){
+      column-gap: 1.3rem;
+   }
+
+   .modalDiaLaboralControlesCupos .formularioCampoModal {
+      justify-content: center;
+      align-items: center;
+   }
+
+   .modalDiaLaboralControlesCupos > :last-child{
+      justify-content: flex-end;
+   }
+
+
+}
+
+
+
+
+@media (min-width: 42rem) {
+   .modalDiaLaboralCampos{
+      grid-template-columns: repeat(3, 1fr);
+   }
+
+   .modalDiaLaboralCampos .formularioCampoModal {
+      align-items: flex-start;
+      justify-content: center;
+      flex-direction: column;
+}
+
+   .modalDiaLaboralCampos .formularioCampoModal label{
+      width: 5rem;
+   }
+
+}
+
+
+@media (min-width: 60rem) {
+   .modalDiaLaboralCampos .formularioCampoModal {
+         align-items: center;
+         justify-content: left;
+         flex-direction: row;
+   }
+
+}
+
 /*TABLA DE RESULTASDO , MUESTRA OPCIONES FIJAS */
+
+
+.contenedor-tabla-estatica-procesos{
+   grid-column: 1 / -1;
+   display: flex;
+   flex-direction: column;
+   border-radius: 1rem 0 1rem 0;
+   justify-content: space-evenly;
+   position: relative;
+
+}
+
+.indicador-tabla-estatica{
+   position: absolute;
+   top: -2.3rem;
+   right: 0;
+   font-weight: 700;
+   font-size: 1.9rem;
+   opacity: .9;
+}
+
+.indicador-tabla-estatica.oculto{
+   opacity: 0;
+   pointer-events: none;
+}
+
 
 
 .tabla-estatica-procesos{
    width: 100%;
    border-collapse: collapse;
-   font-size: 1.5rem;
+   font-size: 1.4rem;
    background-color: rgba(0, 0, 0, 0.03);
    border-radius: 1rem;
    padding: .5rem
 }
 
+
+
+
+
 .tabla-estatica-procesos thead th{
-   padding: .2rem 2rem .2rem 0rem;
    text-align: left;
+   text-transform: uppercase;
    padding: 1rem 0 .8rem 1rem;
    border-bottom: .3rem solid #ccc;
    font-weight: 600;
-   font-size: 1.5rem;
+   font-size: 1.6rem;
    font-family: var(--fuenteTablaTitulo);
    color: var(--negro);
    letter-spacing: .03rem;
@@ -5410,41 +5719,31 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
 
 .tabla-estatica-procesos tbody td {
    font-family: var(--fuenteTablaCuerpo);
-   padding: .7rem .9rem .7rem 1rem;
+   padding: .4rem .9rem .4rem 1rem;
    border-bottom: .15rem solid #ccc;
    text-transform: uppercase;
+   vertical-align: middle;
 }
 
-
-
-.tabla-estatica-procesos tbody tr td span.tabla-procesos-indicador{
-   display: flex;
-   column-gap: 1.5rem;
-   justify-content: center;
-   align-items: center;
+.tabla-estatica-procesos th:last-child,
+.tabla-estatica-procesos td:last-child{
+   width: 1%;
+   white-space: nowrap;
 }
 
-
-.tabla-estatica-procesos tbody tr td span.tabla-procesos-indicador i{
-   color: var(--colorTextoBloqueado);
-   font-size: 2.5rem;
-}
-
-
+/*quitar la ultima linea*/
 .tabla-estatica-procesos tbody tr:last-child td {
    border-bottom: none;
 }
 
-/*perzaolizaciones especificas*/
 
-.tabla-estatica-procesos td:last-child,
-.tabla-estatica-procesos th:last-child{
-   width: 12rem;
+
+.tabla-estatica-acciones-wrapper{
+   display: flex;
+   column-gap: .5rem;
 }
 
-.tabla-estatica-procesos td:nth-last-child(2),
-.tabla-estatica-procesos th:nth-last-child(2){
-   width: 12rem;
+.tabla-estatica-tabla-vacia{
+   text-align: center;
+   line-height: 4rem;
 }
-
-

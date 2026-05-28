@@ -74,6 +74,8 @@ class Condicion_paciente(models.Model):
 
 class Tipo_atencion(models.Model):
     nombre_tipo_atencion =  models.CharField(max_length=100, unique=True)
+    nombre_corto_tipo_atencion = models.CharField(max_length=20, unique=True, blank=True, null=True, verbose_name="Nombre corto")
+
     prioridad = models.PositiveSmallIntegerField(
             choices=PrioridadAtencion.choices,
             default=PrioridadAtencion.ORDINARIA,

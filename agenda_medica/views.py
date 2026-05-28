@@ -49,17 +49,12 @@ class ConfigurarAgenda(UnidadRolRequiredMixin,DetailView):
     def get_context_data(self,**kwargs):
         context = super().get_context_data(**kwargs)
         usuario = self.request.user
-
-        
         context['usuario'] = usuario
-        anios = PeriodoLaboralService.anios_periodos()
-        print(anios)
+        id_periodo = self.kwargs["pk"]
+        dias_configurados = (PeriodoLaboralService.construir_dias_semana_ui(id_periodo))
+        context['dias_configurados'] = dias_configurados
         return context
     
-
-    
-
-
 
 def listarPeriodosLaboralesAPI(request):
     draw = int(request.GET.get('draw', 0))
@@ -174,7 +169,6 @@ def listarPeriodosLaboralesAPI(request):
     ))
 
     for periodo in periodos:
-        print(periodo)
         periodo['url_configuracion'] = reverse(
             'configurar_agenda',
             kwargs={'pk': periodo['id'],
@@ -257,7 +251,6 @@ def guardarPeriodoLaboral(request):
     except Exception as e:
         print(e)
         return JsonResponse({'error': 'No se pudo guardar el periodo'}, status=500)
-
 
 
 def validarImpactoPeriodoLaboral(request):

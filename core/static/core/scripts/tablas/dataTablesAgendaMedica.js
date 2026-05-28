@@ -106,19 +106,19 @@ document.addEventListener("DOMContentLoaded", () => {
                     if (data === "F") {
                         return `
                             <span title="Finalizado" class="DatatableIconoAgendaEstado">
-                                <i class="bi bi-circle-fill icon-rojo"></i> FINALIZADO
+                                <i class="bi bi-circle-fill icon-gris"></i> FINALIZADO
                             </span>
                         `;
                     } else if (data === "E") {
                         return `
                             <span title="Ejecucion" class="DatatableIconoAgendaEstado">
-                                <i class="bi bi-circle-fill icon-amarillo"></i> EJECUCION
+                                <i class="bi bi-circle-fill icon-verde"></i> EJECUCION
                             </span>
                         `;
                     } else if (data === "U") {
                         return `
                             <span title="Futuro" class="DatatableIconoAgendaEstado">
-                                <i class="bi bi-circle-fill icon-verde"></i> FUTURO
+                                <i class="bi bi-circle-fill icon-amarillo"></i> FUTURO
                             </span>
                         `;
                     }

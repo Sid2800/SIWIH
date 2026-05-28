@@ -7,6 +7,7 @@ from core.constants.domain_constants import EstadoTemporalPeriodo
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 
+
 # Create your models here.
 class Periodo_laboral(models.Model):
     personal_salud = models.ForeignKey(PersonalSalud, on_delete=models.PROTECT)
@@ -71,6 +72,7 @@ class Dia_laboral(models.Model):
         default=EstadoRegistro.ACTIVO
     )
 
+    
     class Meta: 
         unique_together = ("periodo_laboral", "dia_semana") 
         ordering = ["dia_semana"]

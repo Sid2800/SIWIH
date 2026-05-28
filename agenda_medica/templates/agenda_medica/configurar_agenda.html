@@ -1,7 +1,7 @@
 {% extends 'core/base.html'%}
 
 
-{% block title %}Agenda{% endblock title %}
+{% block title %}Agenda {% endblock title %}
 
 {% block content %}
     <div class="contenedor2"> 
@@ -9,7 +9,7 @@
         <div class="tituloFormulario" style="margin-bottom: 1rem;">
             <div class="tituloFormulario-texto"> 
                 <i class="bi bi-calendar-range"></i>
-                <h2 class="sin-margen">Configuración de Agenda</h2>
+                <h2 class="sin-margen">Configuración de Agenda  {{ periodo.jornada_laboral.duracion_minutos }}</h2>
             </div>
         </div>
 
@@ -53,263 +53,124 @@
                         
                     </div>
 
-                    <div class="formularioCampoModal">
-                        <label>Estado</label>
-                        <div class="estado-indicador">
-                            <i id="modalPeriodoEstadoIndicarIcono" class="bi bi-circle-fill icon-rojo"></i>
-                            <span id="modalPeriodoEstadoIndicarTexto">Finalizado</span>
-                        </div>
+                    <div class="estado-indicador">
+
+                        {% if periodo.estado_temporal == 'FUTURO' %}
+                            <i class="bi bi-circle-fill icon-amarillo"></i>
+                            <span>FUTURO</span>
+
+                        {% elif periodo.estado_temporal == 'EN_EJECUCION' %}
+                            <i class="bi bi-circle-fill icon-verde"></i>
+                            <span>EN EJECUCIÓN</span>
+
+                        {% elif periodo.estado_temporal == 'FINALIZADO' %}
+                            <i class="bi bi-circle-fill icon-gris"></i>
+                            <span>FINALIZADO</span>
+                        {% endif %}
+
                     </div>
-            </fieldset>
 
-            {% comment "" %}
-            <fieldset class="configurarPeriodoContenedorTabla">
-            <span class="form-subtitulo-fieldset-falso"> Periodo Laboral</span> 
 
             </fieldset>
-            {% endcomment %}
 
-            <fieldset class="configurarPeriodoContenedorTabla">
-                <legend>Dia Laboral</legend>
+            <fieldset class="configurarPeriodoContenedorTarjetaDiasSemana">
+            <legend>Días de la Semana</legend>
 
-                <table class="tabla-estatica-procesos">
+            <div class="contenedor-dias-semana">
+                {% for dia in dias_configurados %}
+                    {% if dia.configurado %}
+                        <div class="configurar-periodo-dia-tarjeta"  data-dia-semana="{{ dia.numero_dia }}"
+                                    data-id-dia-laboral="{{ dia.id }}">
 
-                    <thead>
-                        <tr>
-                            <th>DIA</th>
-                            <th>HORARIO</th>
-                            <th>TIPO ATENCION</th>
-                            <th>CUPOS</th>
-                            <th>ESTADO</th>
-                            <th>ACCIONES</th>
-                        </tr>
-                    </thead>
+                            <div class="configurar-periodo-dia-tarjeta-header">
+                                <div class="configurar-periodo-dia-tarjeta-header-titulo">
+                                    {{ dia.nombre_dia }}
+                                </div>
 
-                    <tbody id="procesosBody">
+                                <div class="configurar-periodo-dia-tarjeta-header-estado" >
 
-                        <tr>
-                            <td class="modal-procesos-nombre">
-                                LUNES
-                            </td>
+                                    <i class="bi bi-circle-fill icon-verde" title="Día configurado"></i>
+                                </div>
+                            </div>
 
-                            <td>
-                                08:00 - 12:00
-                            </td>
+                            <div class="configurar-periodo-dia-tarjeta-body">
 
-                            <td>
-                                3 tipos
-                            </td>
+                                <div class="dia-info-item">
+                                    <i class="bi bi-clock-fill"></i>
+                                    <span>{{ dia.hora_inicio|time:"H:i" }} - {{ dia.hora_fin|time:"H:i" }}</span>
+                                </div>
 
-                            <td>
-                                7 cupos
-                            </td>
+                                <div class="dia-info-item">
+                                    <i class="bi bi-people-fill"></i>
+                                    <span>{{ dia.total_cupos }} Cupos</span>
+                                </div>
 
-                            <td >
-                                <span class="tabla-procesos-indicador is-success">
-                                    <i class="bi bi-check-circle-fill"></i>
-                                </span>
-                            </td>
+                                <div class="dia-info-item">
+                                    <i class="bi bi-grid-fill"></i>
+                                    <span>{{ dia.total_tipos }} Tipos Atención</span>
+                                </div>
 
-                            <td class="modal-procesos-accion">
-                                <button class="modal-procesos-btn">
-                                    <i class="bi bi-pencil-square"></i>
-                                    Configurar
+                            </div>
+
+                            <div class="configurar-periodo-dia-tarjeta-footer">
+                                <button type="button"
+                                        class="configurar-periodo-dia-tarjeta-boton">
+                                    <i class="bi bi-pencil-fill"></i>
+                                    <span>Editar</span>
                                 </button>
-                            </td>
-                        </tr>
+                            </div>
 
-                        <tr>
-                            <td class="modal-procesos-nombre">
-                                MARTES
-                            </td>
+                        </div>
+                    {% else %}
+                        <!-- TARJETA VACIA -->
+                        <div class="configurar-periodo-dia-tarjeta tarjeta-no-configurada" data-dia-semana="{{ dia.numero_dia }}"
+                                    data-id-dia-laboral="">
 
-                            <td>
-                                ---
-                            </td>
+                            <div class="configurar-periodo-dia-tarjeta-header">
+                                <div class="configurar-periodo-dia-tarjeta-header-titulo">
+                                    {{ dia.nombre_dia }}
+                                </div>
 
-                            <td>
-                                0
-                            </td>
+                                <div class="configurar-periodo-dia-tarjeta-header-estado">
+                                    <i class="bi bi-circle-fill icon-amarillo" title="Día configurado"></i>
+                                </div>
+                            </div>
 
-                            <td>
-                                0
-                            </td>
+                            <div class="configurar-periodo-dia-tarjeta-body tarjeta-no-configurada">
 
-                            <td>
-                                <span class="tabla-procesos-indicador is-error">
-                                    <i class="bi bi-exclamation-circle-fill"></i>
-                                </span>
-                            </td>
+                                <div class="dia-info-item">
+                                    <i class="bi bi-exclamation-triangle-fill"></i>
+                                    <span>SIN CONFIGURAR</span>
+                                </div>
 
-                            <td class="modal-procesos-accion">
-                                <button class="modal-procesos-btn">
-                                    <i class="bi bi-plus-circle-fill"></i>
-                                    Definir
+                            
+                            </div>
+
+                            <div class="configurar-periodo-dia-tarjeta-footer">
+                                <button type="button"
+                                        class="configurar-periodo-dia-tarjeta-boton">
+                                    <i class="bi bi-gear-fill"></i>
+                                    <span>Definir</span>
                                 </button>
-                            </td>
-                        </tr>
+                            </div>
 
-                        <tr>
-                            <td class="modal-procesos-nombre">
-                                MIÉRCOLES
-                            </td>
-
-                            <td>
-                                08:00 - 12:00
-                            </td>
-
-                            <td>
-                                2 tipos
-                            </td>
-
-                            <td>
-                                5 cupos
-                            </td>
-
-                            <td>
-                                <span class="tabla-procesos-indicador is-success">
-                                    <i class="bi bi-check-circle-fill"></i>
-                                </span>
-                            </td>
-
-                            <td class="modal-procesos-accion">
-                                <button class="modal-procesos-btn">
-                                    <i class="bi bi-pencil-square"></i>
-                                    Configurar
-                                </button>
-                            </td>
-                        </tr>
-
-                        <tr>
-                            <td class="modal-procesos-nombre">
-                                JUEVES
-                            </td>
-
-                            <td>
-                                ---
-                            </td>
-
-                            <td>
-                                0
-                            </td>
-
-                            <td>
-                                0
-                            </td>
-
-                            <td>
-                                <span class="tabla-procesos-indicador is-error">
-                                    <i class="bi bi-exclamation-circle-fill"></i>
-                                </span>
-                            </td>
-
-                            <td class="modal-procesos-accion">
-                                <button class="modal-procesos-btn">
-                                    <i class="bi bi-plus-circle-fill"></i>
-                                    Definir
-                                </button>
-                            </td>
-                        </tr>
-
-                        <tr>
-                            <td class="modal-procesos-nombre">
-                                VIERNES
-                            </td>
-
-                            <td>
-                                07:00 - 11:00
-                            </td>
-
-                            <td>
-                                4 tipos
-                            </td>
-
-                            <td>
-                                10 cupos
-                            </td>
-
-                            <td>
-                                <span class="tabla-procesos-indicador is-success">
-                                    <i class="bi bi-check-circle-fill"></i>
-                                </span>
-                            </td>
-
-                            <td class="modal-procesos-accion">
-                                <button class="modal-procesos-btn">
-                                    <i class="bi bi-pencil-square"></i>
-                                    Configurar
-                                </button>
-                            </td>
-                        </tr>
-
-                        <tr>
-                            <td class="modal-procesos-nombre">
-                                SÁBADO
-                            </td>
-
-                            <td>
-                                ---
-                            </td>
-
-                            <td>
-                                0
-                            </td>
-
-                            <td>
-                                0
-                            </td>
-
-                            <td>
-                                <span class="tabla-procesos-indicador is-error">
-                                    <i class="bi bi-exclamation-circle-fill"></i>
-                                </span>
-                            </td>
-
-                            <td class="modal-procesos-accion">
-                                <button class="modal-procesos-btn">
-                                    <i class="bi bi-plus-circle-fill"></i>
-                                    Definir
-                                </button>
-                            </td>
-                        </tr>
-
-                        <tr>
-                            <td class="modal-procesos-nombre">
-                                DOMINGO
-                            </td>
-
-                            <td>
-                                ---
-                            </td>
-
-                            <td>
-                                0
-                            </td>
-
-                            <td>
-                                0
-                            </td>
-
-                            <td>
-                                <span class="tabla-procesos-indicador is-error">
-                                    <i class="bi bi-exclamation-circle-fill"></i>
-                                </span>
-                            </td>
-
-                            <td class="modal-procesos-accion">
-                                <button class="modal-procesos-btn">
-                                    <i class="bi bi-plus-circle-fill"></i>
-                                    Definir
-                                </button>
-                            </td>
-                        </tr>
-
+                        </div>
                         
 
-                    </tbody>
+                    {% endif %}
 
-                </table>
-            </fieldset>
+
+
+                {% endfor %}
+                <!-- TARJETA -->
+                
+
+                
+
+    
+
+            </div>
+        </fieldset>
             
         
         </div>
@@ -317,8 +178,8 @@
 
 
         <div class="formularioBotones">
-         <a href="javascript:history.back()" class="formularioBotones-boton" style="width: fit-content; margin: 10px auto;">
-            <i class="bi bi-arrow-left-circle formularioBotones-icono"></i>
+            <a href="javascript:history.back()" class="formularioBotones-boton" style="width: fit-content; margin: 10px auto;">
+                <i class="bi bi-arrow-left-circle formularioBotones-icono"></i>
             <span>Volver</span>
         </a>
         </div>
@@ -332,4 +193,29 @@
 
 
 {% block extra_js %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js"></script>
+
+
+
+
+
+<script>
+    const contextoAgenda = {
+    personalClinicoNombre: "{{ periodo.personal_salud.empleado.nombre_completo|escapejs }}",
+    periodoTexto: "{{ periodo.periodo_formateado|escapejs }}",
+    jornada: {
+        nombre: "{{ periodo.jornada_laboral.nombre_jornada_laboral|escapejs }}",
+        horaInicio: "{{ periodo.jornada_laboral.hora_inicio }}",
+        horaFin: "{{ periodo.jornada_laboral.hora_fin }}",
+        duracion: "{{ periodo.jornada_laboral.duracion_minutos }}"
+    }
+};
+</script>
+<script src="{% static 'core/scripts/helpers/clinico_helpers.js' %}"></script>
+<script src="{% static 'core/scripts/modals/agenda_medica_modals.js' %}"></script>
+<script src="{% static 'core/scripts/features/configurarDialaboral.js' %}"></script>
+
+
 {% endblock extra_js %}

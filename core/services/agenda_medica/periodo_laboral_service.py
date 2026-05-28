@@ -1,15 +1,17 @@
 
 from django.db.models.functions import ExtractYear
-from agenda_medica.models import Periodo_laboral
+from agenda_medica.models import Periodo_laboral, Dia_laboral
 from agenda_medica import validators as agenda_validator
 from datetime import date, timedelta
-from core.constants.choices_constants import EstadoRegistro
+from core.constants.choices_constants import EstadoRegistro, DiaSemana
 from django.core.exceptions import ValidationError
 from core.constants.domain_constants import AccionImpactoPeriodoLaboral, TipoCambioFechaPeriodo
 from django.db import transaction
 from core.constants.domain_constants import LogApp
 from core.utils.utilidades_logging import *
 from types import SimpleNamespace
+from django.db.models import Sum, Count, Value
+from django.db.models.functions import Coalesce
 
 
 class PeriodoLaboralService :
@@ -42,6 +44,66 @@ class PeriodoLaboralService :
         except Periodo_laboral.DoesNotExist:
             return None
 
+    @staticmethod
+    def obtener_dias_configurados(id_periodo):
+        dias_laborales = (
+            Dia_laboral.objects
+            .filter(
+                periodo_laboral_id=id_periodo,
+                estado=EstadoRegistro.ACTIVO
+            )
+            .annotate(
+                total_cupos=Coalesce(
+                    Sum("cupos__cupos"),
+                    Value(0)
+                ),
+
+                total_tipos=Coalesce(
+                    Count("cupos"),
+                    Value(0)
+                )
+            )
+            .order_by("dia_semana")
+        )
+        return dias_laborales
+    
+
+    @staticmethod
+    def construir_dias_semana_ui(id_periodo):
+
+
+        dias_laborales_qs = PeriodoLaboralService.obtener_dias_configurados(id_periodo)
+        # Convertir queryset a mapa:
+        # {1: objeto_lunes, 5: objeto_viernes}
+        dias_map = {
+            dia.dia_semana: dia
+            for dia in dias_laborales_qs
+        }
+
+
+        dias_semana = []
+
+        for ndia, nombredia in DiaSemana.choices:
+            dia = dias_map.get(ndia)
+            if dia:
+                dias_semana.append({
+                "numero_dia": ndia,
+                "id":dia.id,
+                "nombre_dia": nombredia,
+                "configurado": True,
+                "hora_inicio": dia.hora_inicio,
+                "hora_fin": dia.hora_fin,
+                "total_cupos": dia.total_cupos,
+                "total_tipos": dia.total_tipos,
+            })
+                
+            else:
+                dias_semana.append({
+                "numero_dia": ndia,
+                "nombre_dia": nombredia,
+                "configurado": False,
+            })
+        return dias_semana
 
 
     @staticmethod

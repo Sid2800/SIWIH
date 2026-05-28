@@ -6,7 +6,7 @@ from paciente.models import Paciente
 from servicio.models import Unidad as ServicioUnidad
 from clinico.models import Tipo_personal_salud, Especialidad
 from core.utils.utilidades_textos import formatear_nombre_completo
-
+from datetime import datetime, date
 
 class Empleado(models.Model):
     dni = models.CharField(max_length=50, unique=True, db_index=True)
@@ -166,6 +166,18 @@ class Jornada_laboral(models.Model):
         choices=EstadoRegistro.choices,
         default=EstadoRegistro.ACTIVO
     )
+
+    @property
+    def duracion_minutos(self):
+
+        fecha_base = date.today()
+        hora_inicio = datetime.combine( fecha_base, self.hora_inicio )
+        hora_fin = datetime.combine( fecha_base, self.hora_fin )
+        diferencia = hora_fin - hora_inicio
+
+        return int(
+            diferencia.total_seconds() / 60
+        )
 
     def clean(self):
         if self.hora_inicio >= self.hora_fin:
