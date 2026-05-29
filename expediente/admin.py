@@ -33,7 +33,26 @@ class PacienteAsignacionAdmin(admin.ModelAdmin):
         return f"{obj.paciente.primer_nombre or ''} {obj.paciente.primer_apellido or ''}".strip()
     get_paciente.short_description = 'Paciente'
 
+class ExpedienteUbicacionAdmin(admin.ModelAdmin):
+    """
+    Admin del catálogo unificado de ubicaciones.
+    Muestra la descripción resuelta en vivo (clínica o no clínica).
+    """
+    list_display = ('id', 'get_descripcion', 'get_tipo', 'estado')
+    list_filter = ('tipo', 'estado')
+    raw_id_fields = ('unidad_clinica', 'unidad_no_clinica')
+
+    def get_descripcion(self, obj):
+        return obj.descripcion
+    get_descripcion.short_description = 'Ubicación'
+
+    def get_tipo(self, obj):
+        return obj.get_tipo_display()
+    get_tipo.short_description = 'Tipo'
+
+
 # Registro de modelos en la interfaz de administración
 admin.site.register(Localizacion, LocalizacionAdmin)
 admin.site.register(Expediente, ExpedienteAdmin)
 admin.site.register(PacienteAsignacion, PacienteAsignacionAdmin)
+admin.site.register(ExpedienteUbicacion, ExpedienteUbicacionAdmin)
