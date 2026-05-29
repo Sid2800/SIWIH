@@ -7,6 +7,16 @@ urlpatterns = [
     path("", views.MapeoCamasMapaView.as_view(), name="mapeo_camas_mapa"),
     path("historiales/", views.MapeoCamasHistorialView.as_view(), name="mapeo_camas_historiales"),
     path("historiales/detalle/", views.MapeoCamasHistorialDetalleView.as_view(), name="mapeo_camas_historiales_detalle"),
+
+    # [2026-05-28] Dashboard de KPIs en tiempo real
+    path("dashboard/", views.DashboardMapeoCamasView.as_view(), name="mapeo_camas_dashboard"),
+    path("dashboard/api/kpis/", views.dashboard_kpis, name="mapeo_camas_dashboard_kpis"),
+    path("dashboard/api/ocupacion-servicio/", views.dashboard_ocupacion_servicio, name="mapeo_camas_dashboard_ocupacion_servicio"),
+    path("dashboard/api/distribucion-camas/", views.dashboard_distribucion_camas, name="mapeo_camas_dashboard_distribucion_camas"),
+    path("dashboard/api/ocupacion-hora/", views.dashboard_ocupacion_hora, name="mapeo_camas_dashboard_ocupacion_hora"),
+    path("dashboard/api/saturacion-sala/", views.dashboard_saturacion_sala, name="mapeo_camas_dashboard_saturacion_sala"),
+    path("dashboard/api/ultimos-movimientos/", views.dashboard_ultimos_movimientos, name="mapeo_camas_dashboard_ultimos_movimientos"),
+
     path("api/debug-permisos-mapa/", views.debug_permisos_mapa, name="mapeo_camas_debug_permisos_mapa"),
     path("api/estado-mapeo/", views.estado_mapeo, name="mapeo_camas_estado_mapeo"),
     path("api/iniciar-mapeo/", views.iniciar_mapeo, name="mapeo_camas_iniciar_mapeo"),

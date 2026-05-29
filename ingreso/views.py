@@ -58,6 +58,15 @@ class IngresoAddView(UnidadRolRequiredMixin, CreateView):
         #paceinte validaddo en form clean 
         pacienteId = form.cleaned_data.get('idPaciente') or self.request.POST.get('idPaciente')
 
+        # [2026-05-29] Bloqueo si hay sesion de mapeo de camas EN_PROGRESO sobre el servicio destino.
+        sala_destino = form.cleaned_data.get("sala")
+        sala_destino_id = getattr(sala_destino, "pk", None) or self.request.POST.get("sala")
+        mensaje_bloqueo = MapeoCamasService.validar_ingreso_no_bloqueado_por_mapeo(
+            sala_id=sala_destino_id,
+        )
+        if mensaje_bloqueo:
+            messages.warning(self.request, mensaje_bloqueo)
+            return JsonResponse({"success": False, "error": mensaje_bloqueo}, status=409)
 
         if pacienteId or zona:
             # Buscar el tipo del paciente (por eficiencia: values_list y first)
@@ -252,6 +261,18 @@ class IngresoEditView(UnidadRolRequiredMixin, UpdateView):
             INGRESO_EDITOR_ROLES,
             INGRESO_EDITOR_UNIDADES):
             return JsonResponse({"success": False, "error": f"No tiene permiso para editar el ingreso"})
+
+        # [2026-05-29] Bloqueo si hay sesion de mapeo de camas EN_PROGRESO sobre el servicio actual
+        # del ingreso o sobre el servicio destino (cambio de sala/cama/traslado).
+        sala_destino = form.cleaned_data.get("sala")
+        sala_destino_id = getattr(sala_destino, "pk", None) or self.request.POST.get("sala")
+        mensaje_bloqueo = MapeoCamasService.validar_ingreso_no_bloqueado_por_mapeo(
+            ingreso_id=self.object.pk,
+            sala_id=sala_destino_id,
+        )
+        if mensaje_bloqueo:
+            messages.warning(self.request, mensaje_bloqueo)
+            return JsonResponse({"success": False, "error": mensaje_bloqueo}, status=409)
         
 
         if usuario.id:
@@ -812,6 +833,12 @@ def inactivarIngreso(request):
             idIngreso = data.get('id')
             if idIngreso:
                 if Ingreso.objects.filter(id=idIngreso).exists():
+                    # [2026-05-29] Bloqueo si hay sesion de mapeo de camas EN_PROGRESO sobre el servicio del ingreso.
+                    mensaje_bloqueo = MapeoCamasService.validar_ingreso_no_bloqueado_por_mapeo(
+                        ingreso_id=idIngreso,
+                    )
+                    if mensaje_bloqueo:
+                        return JsonResponse({"success": False, "error": mensaje_bloqueo}, status=409)
                     # La inactivacion delega el cierre de cama al servicio para que
                     # el ingreso y la asignacion queden consistentes en una sola operacion.
                     resultado = IngresoService.inactivar_ingreso(idIngreso, request.user)

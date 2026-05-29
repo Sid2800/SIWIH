@@ -884,6 +884,13 @@ document.addEventListener("DOMContentLoaded", function () {
       '      <div class="ck-formulario__base"><div class="ck-formulario__bolita"></div></div>' +
       '      <span class="ck-formulario__label">Mover paciente a otra cama disponible</span>' +
       "    </label>" +
+      // [2026-05-29] Tercera opcion: reasignar la cama directamente a otro paciente,
+      // sin necesidad de pasarla a VACIA antes. El backend conserva el historial del anterior.
+      '    <label class="ck-formulario" for="modal-accion-reasignar-paciente">' +
+      '      <input type="checkbox" id="modal-accion-reasignar-paciente" class="ck-formulario__checkbox" hidden>' +
+      '      <div class="ck-formulario__base"><div class="ck-formulario__bolita"></div></div>' +
+      '      <span class="ck-formulario__label">Asignar otro paciente a esta cama</span>' +
+      "    </label>" +
       "  </div>" +
       "</fieldset>" +
       '<fieldset id="bloque-cambiar-estado" class="modalAtencionCampos">' +
@@ -893,6 +900,24 @@ document.addEventListener("DOMContentLoaded", function () {
       '    <select id="modal-mapa-estado" class="formularioCampo-select">' +
       opcionesEstado +
       "    </select>" +
+      "  </div>" +
+      "</fieldset>" +
+      // [2026-05-29] Bloque para reasignar paciente en cama OCUPADA (reutiliza estructura
+      // del buscador usado en cama VACIA, pero con ids propios para no chocar).
+      '<fieldset id="bloque-reasignar-paciente" class="modalAtencionCampos" style="display:none">' +
+      "  <legend>Nuevo paciente para esta cama</legend>" +
+      '  <div class="formularioCampoModal">' +
+      '    <label for="modal-tipo-busqueda-paciente-reasignar">Buscar por</label>' +
+      '    <select id="modal-tipo-busqueda-paciente-reasignar" class="formularioCampo-select">' +
+      '      <option value="dni" selected>DNI</option>' +
+      '      <option value="nombre">Nombre</option>' +
+      "    </select>" +
+      "  </div>" +
+      '  <div class="formularioCampoModal">' +
+      '    <label for="modal-mapa-paciente-reasignar">Buscar paciente</label>' +
+      '    <select id="modal-mapa-paciente-reasignar" class="formularioCampo-select">' +
+      '      <option value="">-- Seleccionar paciente --</option>' +
+      '    </select>' +
       "  </div>" +
       "</fieldset>" +
       '<fieldset id="bloque-mover-cama" class="modalAtencionCampos" style="display:none">' +
@@ -935,9 +960,11 @@ document.addEventListener("DOMContentLoaded", function () {
         if (esOcupada) {
           var accionCambiarEstado = document.getElementById("modal-accion-cambiar-estado");
           var accionMoverCama = document.getElementById("modal-accion-mover-cama");
+          // [2026-05-29] Tercer modo: reasignar la cama a otro paciente sin pasar por VACIA.
+          var accionReasignarPaciente = document.getElementById("modal-accion-reasignar-paciente");
 
           // Seguridad defensiva: si no existen controles, el modal no puede continuar.
-          if (!accionCambiarEstado || !accionMoverCama) {
+          if (!accionCambiarEstado || !accionMoverCama || !accionReasignarPaciente) {
             Swal.showValidationMessage("No se pudo leer la accion seleccionada.");
             return false;
           }
@@ -960,15 +987,42 @@ document.addEventListener("DOMContentLoaded", function () {
               estado: estadoEl.value,
               ingreso_id: estadoEl.value === "OCUPADA" ? ingresoIdActual : ""
             };
-          } else {
-            // Rama B: mover el paciente actual a una cama destino.
-            var camaDestinoEl = document.getElementById("modal-cama-destino");
-            if (!camaDestinoEl || !camaDestinoEl.value) {
-              Swal.showValidationMessage("Debe seleccionar la cama destino.");
+          }
+
+          // [2026-05-29] Rama C: reasignar paciente directamente. Se envia como
+          // "cambiar_estado" hacia OCUPADA con el ingreso_id del nuevo paciente;
+          // el backend detecta OCUPADA->OCUPADA con paciente distinto y registra
+          // el historial de alta del paciente saliente automaticamente.
+          if (accionReasignarPaciente.checked) {
+            if (window.MAPA_ROL_INTENTOS_RESTRINGIDO) {
+              Swal.showValidationMessage("Este rol no puede reasignar pacientes desde la edicion directa.");
               return false;
             }
-            return { tipo: "mover_cama", cama_destino_id: camaDestinoEl.value };
+            var selectReasignar = document.getElementById("modal-mapa-paciente-reasignar");
+            var ingresoIdNuevo = selectReasignar ? (selectReasignar.value || "") : "";
+            if (!ingresoIdNuevo) {
+              Swal.showValidationMessage("Debe seleccionar el nuevo paciente para esta cama.");
+              return false;
+            }
+            var ingresoIdActualReasignar = camaEl.dataset.ingresoId || "";
+            if (ingresoIdActualReasignar && String(ingresoIdActualReasignar) === String(ingresoIdNuevo)) {
+              Swal.showValidationMessage("El paciente seleccionado ya ocupa esta cama.");
+              return false;
+            }
+            return {
+              tipo: "cambiar_estado",
+              estado: "OCUPADA",
+              ingreso_id: ingresoIdNuevo
+            };
           }
+
+          // Rama B: mover el paciente actual a una cama destino.
+          var camaDestinoEl = document.getElementById("modal-cama-destino");
+          if (!camaDestinoEl || !camaDestinoEl.value) {
+            Swal.showValidationMessage("Debe seleccionar la cama destino.");
+            return false;
+          }
+          return { tipo: "mover_cama", cama_destino_id: camaDestinoEl.value };
         } else {
           // Cama VACIA: se permite cambiar estado y opcionalmente asignar paciente.
           // Regla clave: si termina en OCUPADA, paciente es obligatorio.
@@ -1001,24 +1055,73 @@ document.addEventListener("DOMContentLoaded", function () {
           // Alternar bloques segun la accion seleccionada con checks exclusivos.
           // - cambiar_estado => muestra selector de estado
           // - mover_cama => muestra buscador + selector de cama destino
+          // [2026-05-29] - reasignar_paciente => muestra buscador de nuevo paciente
           var bloqueCambiarEstado = document.getElementById("bloque-cambiar-estado");
           var bloqueMoverCama = document.getElementById("bloque-mover-cama");
+          var bloqueReasignarPaciente = document.getElementById("bloque-reasignar-paciente");
           var accionCambiarEstado = document.getElementById("modal-accion-cambiar-estado");
           var accionMoverCama = document.getElementById("modal-accion-mover-cama");
+          var accionReasignarPaciente = document.getElementById("modal-accion-reasignar-paciente");
 
-          function sincronizarAccion(origen) {
-            // Los dos checks se comportan como seleccion exclusiva.
-            if (origen === "cambiar_estado") {
-              accionCambiarEstado.checked = true;
-              accionMoverCama.checked = false;
-              bloqueCambiarEstado.style.display = "";
-              bloqueMoverCama.style.display = "none";
+          // [2026-05-29] Refs y estado del buscador de paciente para reasignacion.
+          var tipoBusquedaPacienteReasignar = document.getElementById("modal-tipo-busqueda-paciente-reasignar");
+          var selectPacienteReasignar = document.getElementById("modal-mapa-paciente-reasignar");
+          var tomPacienteReasignar = null;
+          var pacienteReasignarInicializado = false;
+
+          function inicializarBuscadorReasignar() {
+            // Carga perezosa: solo se construye TomSelect cuando el usuario elige reasignar.
+            if (pacienteReasignarInicializado || !selectPacienteReasignar) {
               return;
             }
-            accionCambiarEstado.checked = false;
-            accionMoverCama.checked = true;
-            bloqueCambiarEstado.style.display = "none";
-            bloqueMoverCama.style.display = "";
+            pacienteReasignarInicializado = true;
+            if (window.TomSelect) {
+              tomPacienteReasignar = new TomSelect(selectPacienteReasignar, {
+                valueField: "id",
+                labelField: "text",
+                searchField: "text",
+                placeholder: "Buscar paciente...",
+                preload: false,
+                load: function (query, callback) {
+                  var tipo = (tipoBusquedaPacienteReasignar && tipoBusquedaPacienteReasignar.value) ? tipoBusquedaPacienteReasignar.value : "dni";
+                  var params = [];
+                  if (query) {
+                    params.push("q=" + encodeURIComponent(query));
+                  }
+                  params.push("tipo=" + encodeURIComponent(tipo));
+                  var queryString = params.length ? ("?" + params.join("&")) : "";
+
+                  fetch(API_URLS.buscarPacientes + queryString)
+                    .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+                    .then(function (data) { callback(mapPacientesTomSelect(data.results || [])); })
+                    .catch(function () { callback([]); });
+                }
+              });
+            }
+            if (tipoBusquedaPacienteReasignar) {
+              tipoBusquedaPacienteReasignar.addEventListener("change", function () {
+                if (tomPacienteReasignar) {
+                  tomPacienteReasignar.clear(true);
+                  tomPacienteReasignar.clearOptions();
+                  tomPacienteReasignar.load("");
+                }
+              });
+            }
+          }
+
+          function sincronizarAccion(origen) {
+            // Tres opciones excluyentes para cama OCUPADA.
+            accionCambiarEstado.checked = origen === "cambiar_estado";
+            accionMoverCama.checked = origen === "mover_cama";
+            accionReasignarPaciente.checked = origen === "reasignar_paciente";
+            bloqueCambiarEstado.style.display = origen === "cambiar_estado" ? "" : "none";
+            bloqueMoverCama.style.display = origen === "mover_cama" ? "" : "none";
+            if (bloqueReasignarPaciente) {
+              bloqueReasignarPaciente.style.display = origen === "reasignar_paciente" ? "" : "none";
+            }
+            if (origen === "reasignar_paciente") {
+              inicializarBuscadorReasignar();
+            }
           }
 
           accionCambiarEstado.addEventListener("change", function () {
@@ -1028,6 +1131,19 @@ document.addEventListener("DOMContentLoaded", function () {
           accionMoverCama.addEventListener("change", function () {
             sincronizarAccion(accionMoverCama.checked ? "mover_cama" : "cambiar_estado");
           });
+
+          if (accionReasignarPaciente) {
+            accionReasignarPaciente.addEventListener("change", function () {
+              sincronizarAccion(accionReasignarPaciente.checked ? "reasignar_paciente" : "cambiar_estado");
+            });
+            // Si el rol no puede reasignar, ocultar la opcion para evitar confusion.
+            if (window.MAPA_ROL_INTENTOS_RESTRINGIDO) {
+              var labelReasignar = document.querySelector('label[for="modal-accion-reasignar-paciente"]');
+              if (labelReasignar) {
+                labelReasignar.style.display = "none";
+              }
+            }
+          }
 
           sincronizarAccion("cambiar_estado");
 
@@ -1412,7 +1528,11 @@ document.addEventListener("DOMContentLoaded", function () {
 
           camaEl.addEventListener("touchstart", function () {
             // [2026-05-08] En modo solo lectura no activar acciones tactiles de edicion
-            if (window.MAPA_SOLO_LECTURA) { return; }
+            // [2026-05-28] Avisar al usuario en lugar de fallar en silencio.
+            if (window.MAPA_SOLO_LECTURA) {
+              if (window.toastr) { toastr.info("Est\u00e1 en modo vista.", "Mapa"); }
+              return;
+            }
             _longTimer = setTimeout(function () {
               _longTimer = null;
               _touchWasLong = true;
@@ -1431,7 +1551,11 @@ document.addEventListener("DOMContentLoaded", function () {
           camaEl.addEventListener("click", function () {
             if (_touchWasLong) { _touchWasLong = false; return; }
             // [2026-05-08] En modo solo lectura no abrir modal de edicion
-            if (window.MAPA_SOLO_LECTURA) { return; }
+            // [2026-05-28] Avisar al usuario en lugar de fallar en silencio.
+            if (window.MAPA_SOLO_LECTURA) {
+              if (window.toastr) { toastr.info("Est\u00e1 en modo vista.", "Mapa"); }
+              return;
+            }
             if (_clickTimer) {
               clearTimeout(_clickTimer);
               _clickTimer = null;

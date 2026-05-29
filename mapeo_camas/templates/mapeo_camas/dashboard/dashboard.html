@@ -1,0 +1,66 @@
+
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}{{ titulo }}{% endblock %}
+
+{% block extra_css %}
+  
+  <link rel="stylesheet" href="{% static 'mapeo_camas/css/dashboard/dashboard.css' %}">
+{% endblock extra_css %}
+
+{% block content %}
+{# [2026-05-28] Se envuelve en `contenedor2` para reutilizar el layout estándar del proyecto. #}
+<div class="contenedor2">
+  <div class="tituloFormulario" style="margin-bottom: 1.5rem;">
+    <div class="tituloFormulario-texto">
+      <i class="bi bi-bar-chart-line"></i>
+      <h2 class="sin-margen">{{ titulo }}</h2>
+    </div>
+    <div class="tituloFormulario-subrallado"></div>
+  </div>
+
+  <div class="dash-wrap" data-component="dashboard-mapeo-camas">
+    <div class="dash-header__meta" style="justify-content: flex-end;">
+      <span class="dash-pill dash-pill--ok">Tiempo real · 30s</span>
+      <span class="dash-muted">{{ subtitulo }}</span>
+      <span id="dash-updated-at" class="dash-muted">—</span>
+      <button id="dash-refresh-btn" type="button" class="dash-refresh-btn" aria-label="Refrescar ahora">
+        Refrescar
+      </button>
+    </div>
+
+    {# [2026-05-28] Cabecera: filtro (izq.) + tarjeta resumen radial (der.) #}
+    <div class="dash-top">
+      {% include 'mapeo_camas/dashboard/_filtros.html' %}
+      {% include 'mapeo_camas/dashboard/_estados_resumen.html' %}
+    </div>
+    {% include 'mapeo_camas/dashboard/_kpi_cards.html' %}
+    {% include 'mapeo_camas/dashboard/_charts.html' %}
+    {% include 'mapeo_camas/dashboard/_tabla_movimientos.html' %}
+  </div>
+</div>
+
+<script>
+  // Configuración inyectada por el template (URL base de la API).
+  window.DASHBOARD_CFG = {
+    apiBase: "{% url 'mapeo_camas_dashboard' %}api"
+  };
+</script>
+{% endblock content %}
+
+{% block extra_js %}
+  {# [2026-05-28] ApexCharts local — única dependencia de terceros del dashboard. #}
+  <script src="{% static 'mapeo_camas/vendor/apexcharts/apexcharts.min.js' %}"></script>
+
+  <script src="{% static 'mapeo_camas/js/dashboard/api.js' %}"></script>
+  <script src="{% static 'mapeo_camas/js/dashboard/filters.js' %}"></script>
+  <script src="{% static 'mapeo_camas/js/dashboard/kpis.js' %}"></script>
+  <script src="{% static 'mapeo_camas/js/dashboard/charts/estados-resumen.js' %}"></script>
+  <script src="{% static 'mapeo_camas/js/dashboard/charts/ocupacion-servicio.js' %}"></script>
+  <script src="{% static 'mapeo_camas/js/dashboard/charts/distribucion-camas.js' %}"></script>
+  <script src="{% static 'mapeo_camas/js/dashboard/charts/ocupacion-hora.js' %}"></script>
+  <script src="{% static 'mapeo_camas/js/dashboard/charts/saturacion-sala.js' %}"></script>
+  <script src="{% static 'mapeo_camas/js/dashboard/tabla-movimientos.js' %}"></script>
+  <script src="{% static 'mapeo_camas/js/dashboard/dashboard.js' %}"></script>
+{% endblock extra_js %}

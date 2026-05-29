@@ -4,6 +4,7 @@ from django.utils.timezone import localtime, now
 
 from ingreso.models import Ingreso
 from mapeo_camas.models import AsignacionCamaPaciente, HistorialEstadoCama, EstadoMapeo, get_observacion_mapeo
+from mapeo_camas.models import MapeoSesionCama, MapeoSesionServicio  # [2026-05-29] Bloqueo de ingreso por sesion de mapeo en curso
 from servicio.models import Cama
 
 
@@ -12,6 +13,79 @@ class MapeoCamasService:
     def get_estado_mapeo(codigo, categoria):
         from mapeo_camas.models import EstadoMapeo
         return EstadoMapeo.objects.get(codigo=codigo, categoria=categoria)
+
+    # [2026-05-29] Helper: ids de servicios cubiertos por alguna sesion de mapeo EN_PROGRESO.
+    # Mientras haya una sesion iniciada sobre esos servicios, los ingresos asociados
+    # no pueden crearse, editarse ni inactivarse para preservar la consistencia del mapeo.
+    @staticmethod
+    def servicios_en_sesion_mapeo_activa():
+        try:
+            estado_en_progreso = EstadoMapeo.objects.get(
+                codigo="EN_PROGRESO",
+                categoria=EstadoMapeo.Categoria.ESTADO_SESION,
+            )
+        except EstadoMapeo.DoesNotExist:
+            return set()
+
+        sesiones_activas_ids = MapeoSesionCama.objects.filter(
+            estado=estado_en_progreso,
+            fecha_fin__isnull=True,
+        ).values_list("id", flat=True)
+
+        if not sesiones_activas_ids:
+            return set()
+
+        return set(
+            MapeoSesionServicio.objects.filter(
+                sesion_mapeo_id__in=sesiones_activas_ids,
+            ).values_list("servicio_id", flat=True)
+        )
+
+    # [2026-05-29] Devuelve mensaje de bloqueo si el ingreso (o el cambio de sala) afecta
+    # un servicio con sesion de mapeo en curso. Retorna None si esta permitido.
+    # El mensaje incluye el nombre del/los servicios con mapeo activo para guiar al usuario.
+    @staticmethod
+    def validar_ingreso_no_bloqueado_por_mapeo(*, ingreso_id=None, sala_id=None):
+        from servicio.models import Sala, Servicio
+
+        servicios_bloqueados = MapeoCamasService.servicios_en_sesion_mapeo_activa()
+        if not servicios_bloqueados:
+            return None
+
+        servicios_afectados = set()
+
+        if ingreso_id:
+            servicio_ingreso = (
+                Ingreso.objects.filter(pk=ingreso_id)
+                .values_list("sala__servicio_id", flat=True)
+                .first()
+            )
+            if servicio_ingreso:
+                servicios_afectados.add(servicio_ingreso)
+
+        if sala_id:
+            servicio_sala = (
+                Sala.objects.filter(pk=sala_id)
+                .values_list("servicio_id", flat=True)
+                .first()
+            )
+            if servicio_sala:
+                servicios_afectados.add(servicio_sala)
+
+        conflicto = servicios_afectados & servicios_bloqueados
+        if not conflicto:
+            return None
+
+        nombres = list(
+            Servicio.objects.filter(id__in=conflicto)
+            .order_by("nombre_servicio")
+            .values_list("nombre_servicio", flat=True)
+        )
+        servicios_txt = ", ".join(nombres) if nombres else "el servicio asociado"
+        return (
+            f"Operacion bloqueada: hay un mapeo de camas en curso sobre {servicios_txt}. "
+            "Espere a que termine la sesion de mapeo antes de modificar este ingreso."
+        )
 
     @staticmethod
     def registrar_historial_estado_cama(

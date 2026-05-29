@@ -32,6 +32,10 @@
       <a href="{% url 'mapeo_camas_historiales' %}" class="dt-button" id="btn-historiales-camas" title="Ver historiales de camas">
         <i class="bi bi-clock-history boton-exportacion"></i>
       </a>
+      {# [2026-05-28] Acceso al dashboard de KPIs de mapeo de camas. #}
+      <a href="{% url 'mapeo_camas_dashboard' %}" class="dt-button" id="btn-dashboard-camas" title="Dashboard de mapeo de camas">
+        <i class="bi bi-bar-chart-line boton-exportacion"></i>
+      </a>
       {% endif %}
       {% if es_superusuario %}
       {# [2026-05-25] Sincronización masiva inicial de ingresos->camas, solo para superusuario. #}

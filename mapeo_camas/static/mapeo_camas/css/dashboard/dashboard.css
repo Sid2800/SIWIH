@@ -1,0 +1,360 @@
+/* =========================================================================
+   Dashboard Mapeo de Camas — estilos
+   Fecha: 2026-05-28
+   - Reutiliza paleta de estados del sistema (mapa-cama--*).
+   - No usa `border` (regla del proyecto): separaciones via box-shadow / gap / outline.
+   - Layout responsive con grid CSS nativo (compatible con Bootstrap 5 si está cargado).
+   ========================================================================= */
+
+.dash-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1rem 1.25rem 2rem;
+}
+
+.dash-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  background: #ffffff;
+  padding: 1rem 1.25rem;
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+
+.dash-header__title { margin: 0; font-size: 1.4rem; font-weight: 600; color: #0f172a; }
+.dash-header__subtitle { margin: 0; color: #475569; font-size: 0.95rem; }
+
+.dash-header__meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+  color: #334155;
+}
+
+.dash-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: #e2e8f0;
+  color: #0f172a;
+  border-radius: 999px;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.dash-pill--ok { background: #dcfce7; color: #166534; }
+.dash-pill--warn { background: #fef9c3; color: #854d0e; }
+.dash-pill--err { background: #fee2e2; color: #991b1b; }
+
+/* ---------------- KPIs ---------------- */
+
+.dash-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 0.9rem;
+}
+
+.dash-kpi {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 0.9rem 1rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-height: 110px;
+  outline: 3px solid transparent;
+  transition: outline-color 120ms ease;
+}
+.dash-kpi:hover { outline-color: rgba(59, 130, 246, 0.35); }
+
+.dash-kpi__label {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.dash-kpi__value {
+  margin: 0;
+  font-size: 1.85rem;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.1;
+}
+.dash-kpi__hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+/* Aplica color del estado al value reutilizando mapa-cama--* */
+.dash-kpi.mapa-cama--ocupada .dash-kpi__value { color: #991b1b; }
+.dash-kpi.mapa-cama--vacia .dash-kpi__value,
+.dash-kpi.mapa-cama--libre .dash-kpi__value { color: #166534; }
+.dash-kpi.mapa-cama--alta .dash-kpi__value { color: #854d0e; }
+.dash-kpi.mapa-cama--fuera-servicio .dash-kpi__value { color: #1e293b; }
+.dash-kpi.mapa-cama--consulta-externa .dash-kpi__value { color: #1d4ed8; }
+
+/* Barra de ocupación */
+.dash-progress {
+  position: relative;
+  height: 6px;
+  width: 100%;
+  background: #e2e8f0;
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 0.35rem;
+}
+.dash-progress__bar {
+  display: block;
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #22c55e 0%, #facc15 70%, #ef4444 100%);
+  transition: width 300ms ease;
+}
+
+/* ---------------- Charts ---------------- */
+
+.dash-charts {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 1rem;
+}
+
+.dash-card {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 1rem 1.1rem 0.6rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+  display: flex;
+  flex-direction: column;
+  min-height: 320px;
+}
+
+.dash-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.dash-card__title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+.dash-card__body {
+  flex: 1;
+  min-height: 240px;
+  position: relative;
+}
+
+/* Estados loading / empty / error compartidos */
+.dash-state {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: #64748b;
+  text-align: center;
+  padding: 0.5rem;
+}
+.dash-state.is-active { display: flex; }
+.dash-state--err { color: #991b1b; }
+.dash-state__spinner {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background:
+    conic-gradient(#3b82f6 0 25%, #e2e8f0 25% 100%);
+  animation: dashSpin 800ms linear infinite;
+  mask: radial-gradient(circle 8px at center, transparent 98%, #000 100%);
+  -webkit-mask: radial-gradient(circle 8px at center, transparent 98%, #000 100%);
+}
+@keyframes dashSpin { to { transform: rotate(360deg); } }
+
+/* Distribución del grid de charts */
+.dash-charts__servicio { grid-column: span 12; }
+.dash-charts__distribucion { grid-column: span 12; }
+.dash-charts__hora { grid-column: span 12; }
+.dash-charts__saturacion { grid-column: span 12; }
+
+@media (min-width: 992px) {
+  .dash-charts__servicio { grid-column: span 8; }
+  .dash-charts__distribucion { grid-column: span 4; }
+  .dash-charts__hora { grid-column: span 7; }
+  .dash-charts__saturacion { grid-column: span 5; }
+}
+
+/* ---------------- Tabla de movimientos ---------------- */
+
+.dash-table-wrap {
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+  padding: 1rem 1.1rem;
+}
+.dash-table-wrap__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.dash-table-scroll {
+  max-height: 360px;
+  overflow: auto;
+}
+.dash-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.dash-table thead th {
+  position: sticky;
+  top: 0;
+  background: #f1f5f9;
+  color: #334155;
+  text-align: left;
+  font-weight: 600;
+  padding: 0.5rem 0.6rem;
+  z-index: 1;
+}
+.dash-table tbody td {
+  padding: 0.45rem 0.6rem;
+  color: #1e293b;
+  background: #ffffff;
+}
+.dash-table tbody tr + tr td {
+  box-shadow: inset 0 1px 0 #e2e8f0;
+}
+.dash-table tbody tr:hover td { background: #f8fafc; }
+
+.dash-tag {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+/* ---------------- Misc ---------------- */
+.dash-muted { color: #64748b; }
+.dash-refresh-btn {
+  appearance: none;
+  background: #0f766e;
+  color: #fff;
+  border-radius: 8px;
+  padding: 0.4rem 0.85rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+}
+.dash-refresh-btn:hover { background: #115e59; }
+.dash-refresh-btn:focus-visible { outline: 3px solid rgba(20, 184, 166, 0.4); }
+.dash-refresh-btn[disabled] { opacity: 0.6; cursor: not-allowed; }
+
+/* ---------------- Filtro temporal (2026-05-28) ---------------- */
+.dash-filtros {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.dash-filtros__presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.dash-chip {
+  appearance: none;
+  background: #f1f5f9;
+  color: #334155;
+  border-radius: 999px;
+  padding: 0.3rem 0.8rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  transition: background 120ms ease, color 120ms ease;
+}
+.dash-chip:hover { background: #e2e8f0; }
+.dash-chip.is-active {
+  background: #0f766e;
+  color: #ffffff;
+}
+.dash-chip:focus-visible {
+  outline: 3px solid rgba(20, 184, 166, 0.4);
+}
+
+.dash-filtros__rango {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.65rem;
+  padding-top: 0.3rem;
+}
+.dash-filtros__rango[hidden] { display: none; }
+.dash-filtros__label {
+  display: inline-flex;
+  flex-direction: column;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  gap: 0.2rem;
+}
+.dash-filtros__input {
+  appearance: none;
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.85rem;
+  color: #0f172a;
+  outline: none;
+  box-shadow: inset 0 0 0 1px #e2e8f0;
+  min-width: 200px;
+}
+.dash-filtros__input:focus {
+  box-shadow: inset 0 0 0 2px #0f766e;
+}
+
+.dash-filtros__resumen {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #475569;
+}
+
+/* ---------------- Cabecera dashboard (filtros + resumen radial) ---------------- */
+.dash-top {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  align-items: stretch;
+}
+@media (min-width: 992px) {
+  .dash-top { grid-template-columns: minmax(0, 1fr) 340px; }
+}
+.dash-top__resumen { min-height: 0; padding-bottom: 0.4rem; }
+.dash-top__resumen .dash-card__body { min-height: 280px; }
+.dash-card__body--centered {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

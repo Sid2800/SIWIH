@@ -1,0 +1,50 @@
+{# Fecha: 2026-05-28 — Parcial de gráficas ApexCharts del dashboard #}
+<section class="dash-charts" aria-label="Gráficas operativas">
+  <article id="card-ocupacion-servicio" class="dash-card dash-charts__servicio">
+    <header class="dash-card__head">
+      <h3 class="dash-card__title">Ocupación por servicio</h3>
+    </header>
+    <div class="dash-card__body">
+      <div id="chart-ocupacion-servicio"></div>
+      <div class="dash-state" data-state="loading"><span class="dash-state__spinner"></span><span>Cargando…</span></div>
+      <div class="dash-state" data-state="empty">Sin datos</div>
+      <div class="dash-state dash-state--err" data-state="err" role="alert">Error</div>
+    </div>
+  </article>
+
+  <article id="card-distribucion-camas" class="dash-card dash-charts__distribucion">
+    <header class="dash-card__head">
+      <h3 class="dash-card__title">Distribución por estado</h3>
+    </header>
+    <div class="dash-card__body">
+      <div id="chart-distribucion-camas"></div>
+      <div class="dash-state" data-state="loading"><span class="dash-state__spinner"></span><span>Cargando…</span></div>
+      <div class="dash-state" data-state="empty">Sin datos</div>
+      <div class="dash-state dash-state--err" data-state="err" role="alert">Error</div>
+    </div>
+  </article>
+
+  <article id="card-ocupacion-hora" class="dash-card dash-charts__hora">
+    <header class="dash-card__head">
+      <h3 class="dash-card__title">Ocupación en el tiempo</h3>
+    </header>
+    <div class="dash-card__body">
+      <div id="chart-ocupacion-hora"></div>
+      <div class="dash-state" data-state="loading"><span class="dash-state__spinner"></span><span>Cargando…</span></div>
+      <div class="dash-state" data-state="empty">Sin datos</div>
+      <div class="dash-state dash-state--err" data-state="err" role="alert">Error</div>
+    </div>
+  </article>
+
+  <article id="card-saturacion-sala" class="dash-card dash-charts__saturacion">
+    <header class="dash-card__head">
+      <h3 class="dash-card__title">Saturación por sala</h3>
+    </header>
+    <div class="dash-card__body">
+      <div id="chart-saturacion-sala"></div>
+      <div class="dash-state" data-state="loading"><span class="dash-state__spinner"></span><span>Cargando…</span></div>
+      <div class="dash-state" data-state="empty">Sin datos</div>
+      <div class="dash-state dash-state--err" data-state="err" role="alert">Error</div>
+    </div>
+  </article>
+</section>

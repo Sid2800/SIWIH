@@ -100,7 +100,7 @@ MAPEO_CAMAS_MAPEAR_ROLES = ["admin","digitador","visitante"]
 MAPEO_CAMAS_MAPEAR_UNIDADES = ["ADMI"]
 
 # [2026-05-18] Acceso para cambios manuales en el mapa (edición directa).
-MAPEO_CAMAS_CAMBIOS_ROLES = ["admin","digitador","visitante"]
+MAPEO_CAMAS_CAMBIOS_ROLES = ["visitante"]
 MAPEO_CAMAS_CAMBIOS_UNIDADES = ["ADMI"]
 
 # [2026-05-18] Usuarios a los que se les aplica el límite de 5 io mas ntentos de cambio por sala. Solo Puede Movimientos. Pre-Altas, Vacia
@@ -109,5 +109,12 @@ MAPEO_CAMAS_INTENTOS_CAMBIO_UNIDADES = ["ADMI"]
 
 # Acceso de auditoría (historiales, detalle de historial)
 # [2026-05-11] Visitante habilitado para visualizar templates de historial.
-MAPEO_CAMAS_HISTORIALES_ROLES = ["admin","digitador"]
+MAPEO_CAMAS_HISTORIALES_ROLES = ["digitador"]
 MAPEO_CAMAS_HISTORIALES_UNIDADES = ["ADMI"]
+
+# [2026-05-28] Acceso al dashboard operativo de KPIs/gráficas en tiempo real.
+# Propósito exclusivo: vista y endpoints JSON del dashboard de mapeo_camas.
+# Hoy coincide en valores con HISTORIALES_*, pero se separa para evitar
+# acoplamiento de permisos (auditoría vs. monitoreo operativo).
+MAPEO_CAMAS_DASHBOARD_ROLES = ["admin","digitador"]
+MAPEO_CAMAS_DASHBOARD_UNIDADES = ["ADMI"]

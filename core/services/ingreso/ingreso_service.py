@@ -453,6 +453,14 @@ class IngresoService:
         ).first()
 
         if ingreso:
+            # [2026-05-29] Defensa en profundidad: si hay una sesion de mapeo de camas
+            # EN_PROGRESO sobre el servicio del ingreso, no se permite inactivar.
+            mensaje_bloqueo = MapeoCamasService.validar_ingreso_no_bloqueado_por_mapeo(
+                ingreso_id=ingreso.id,
+            )
+            if mensaje_bloqueo:
+                return False
+
             with transaction.atomic():  # [2026-05-07] Antes: ingreso.save() simple sin atomic ni liberación de cama
                 # Paso 1: marcar el ingreso como inactivo
                 ingreso.estado = 2

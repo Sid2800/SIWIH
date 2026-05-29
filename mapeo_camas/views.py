@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-import json 
+# 2026-05-29: import json eliminado; parseo delegado a core.utils.utilidades_request
 from functools import lru_cache
 
 from django.contrib.auth.decorators import login_required
@@ -9,6 +9,8 @@ from core.constants.permisos import (
     MAPEO_CAMAS_INTENTOS_CAMBIO_UNIDADES as MAPEO_CAMAS_INTENTO_CAMBIO_UNIDADES,
     MAPEO_CAMAS_CAMBIOS_ROLES,
     MAPEO_CAMAS_CAMBIOS_UNIDADES,
+    MAPEO_CAMAS_DASHBOARD_ROLES,
+    MAPEO_CAMAS_DASHBOARD_UNIDADES,
     MAPEO_CAMAS_HISTORIALES_ROLES,
     MAPEO_CAMAS_HISTORIALES_UNIDADES,
     MAPEO_CAMAS_MAPEAR_ROLES,
@@ -25,6 +27,10 @@ from django.views.decorators.http import require_GET, require_POST
 from django.views.generic import TemplateView
 from ingreso.models import Ingreso
 from core.mixins import UnidadRolRequiredMixin
+# 2026-05-29: reutiliza helpers del core para eliminar duplicación en mapeo_camas/views.py
+from core.services.mapeo_camas_service import MapeoCamasService
+from core.utils.utilidades_textos import formatear_nombre_completo, construir_nombre_dinamico
+from core.utils.utilidades_request import parse_json_request
 from usuario.models import PerfilUnidad, AlcanceUsuario
 
 
@@ -120,15 +126,20 @@ def _servicio_payload(servicio, salas_data, conflicto_mapeo=None):
     }
 
 # Helper global para obtener instancias de EstadoMapeo
+# 2026-05-29: delega en MapeoCamasService.get_estado_mapeo (core) manteniendo el lru_cache
+# local para evitar consultas repetidas en bucles calientes.
 @lru_cache(maxsize=64)
-# [2026-05-07] Helper para obtener instancia de EstadoMapeo por código y categoría
 def get_estado_mapeo(codigo, categoria):
-    return EstadoMapeo.objects.get(codigo=codigo, categoria=categoria)
+    return MapeoCamasService.get_estado_mapeo(codigo, categoria)
 # =============================================================================
 # [2026-05-07] API: Sincronizar camas con ingresos activos
 # [2026-05-25] Restringida nuevamente solo a superusuario.
+# [2026-05-28] MC-PERM-006: se fija el método HTTP con @require_POST; el chequeo
+# is_superuser se mantiene por ser operación de mantenimiento (no es un rol/unidad
+# del modelo de permisos del proyecto).
 # =============================================================================
 @login_required
+@require_POST
 def sincronizar_camas_superadmin(request):
     """
     Sincroniza AsignacionCamaPaciente para todos los ingresos activos con cama asignada.
@@ -137,9 +148,6 @@ def sincronizar_camas_superadmin(request):
     # [2026-05-25] Seguridad: sincronización masiva inicial permitida solo a superusuario.
     if not getattr(request.user, "is_superuser", False):
         return JsonResponse({"ok": False, "error": "Acceso denegado."}, status=403)
-
-    if request.method != "POST":
-        return JsonResponse({"ok": False, "error": "Solo se permite POST."}, status=405)
 
     # Obtener el ÚLTIMO ingreso activo POR CAMA (más reciente para cada cama)
     from django.db.models import Max
@@ -336,12 +344,14 @@ def sincronizar_camas_superadmin(request):
 # [2026-05-07] Vista: Página principal del mapa de camas con sesión de mapeo
 # [2026-05-11] Permisos manejados localmente en mapeo_camas para no afectar mixins globales
 
-# [2026-05-19] El acceso a la vista del mapa es de visualización (HISTORIALES);
-# la edición directa se controla aparte con MAPEO_CAMAS_CAMBIOS_*.
+# [2026-05-28] MC-PERM-001: el acceso al mapa es parte del flujo de mapeo,
+# por lo tanto debe gobernarse con MAPEO_CAMAS_MAPEAR_* (NO con HISTORIALES_*,
+# cuyo propósito exclusivo es auditoría). La edición directa sigue separada con
+# MAPEO_CAMAS_CAMBIOS_* y el acceso a historiales con MAPEO_CAMAS_HISTORIALES_*.
 class MapeoCamasMapaView(UnidadRolRequiredMixin, TemplateView):
     template_name = "mapeo_camas/mapa.html"
-    required_roles = MAPEO_CAMAS_HISTORIALES_ROLES
-    required_unidades = MAPEO_CAMAS_HISTORIALES_UNIDADES
+    required_roles = MAPEO_CAMAS_MAPEAR_ROLES
+    required_unidades = MAPEO_CAMAS_MAPEAR_UNIDADES
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -379,7 +389,9 @@ class MapeoCamasMapaView(UnidadRolRequiredMixin, TemplateView):
         # [2026-05-18] Permiso para flujo de mapeo (iniciar/finalizar/cancelar mapeo).
         context["puede_mapear"] = _puede_gestionar_sesion_mapeo(self.request.user)
         # [2026-05-18] Permiso para cambios manuales directos en el mapa.
-        context["puede_hacer_cambios_mapa"] = _tiene_permiso_cambios_mapa(self.request.user)
+        # [2026-05-28] FIX: incluir tambi\u00e9n a usuarios con MAPEAR_* y sesi\u00f3n activa,
+        # para que el bot\u00f3n de editar card no quede oculto durante el mapeo.
+        context["puede_hacer_cambios_mapa"] = _puede_editar_cama_en_mapa(self.request.user)
         context["puede_ver_historiales"] = _tiene_permiso_historiales(self.request.user)
         # [2026-05-25] Control de UI: acciones de sincronización masiva visibles solo para superusuario.
         context["es_superusuario"] = bool(getattr(self.request.user, "is_superuser", False))
@@ -423,6 +435,10 @@ class MapeoCamasHistorialDetalleView(UnidadRolRequiredMixin, TemplateView):
 @require_GET
 def debug_permisos_mapa(request):
     """Diagnostico en vivo de permisos para la vista principal del mapa."""
+    # [2026-05-28] MC-PERM-008: endpoint diagnóstico no debe ser accesible a cualquier
+    # usuario autenticado; se restringe al permiso de acceso al mapa (MAPEAR_*).
+    if not _tiene_permiso_mapear(request.user):
+        return JsonResponse({"ok": False, "error": "Acceso denegado."}, status=403)
     usuario = request.user
     perfiles = list(
         PerfilUnidad.objects.filter(usuario=usuario)
@@ -487,29 +503,24 @@ def debug_permisos_mapa(request):
 
 # --- Helpers privados --------------------------------------------------------
 
-# [2026-05-07] Helper para obtener nombre completo de paciente
+# 2026-05-29: delega en core.utils.utilidades_textos.formatear_nombre_completo
 def _nombre_paciente(paciente):
-    """Construye el nombre completo del paciente concatenando los cuatro campos.
-    Retorna 'Sin nombre' si todos están vacíos."""
-    partes = [
+    """Nombre completo del paciente; 'Sin nombre' si todos los campos están vacíos."""
+    nombre = formatear_nombre_completo(
         getattr(paciente, "primer_nombre", ""),
         getattr(paciente, "segundo_nombre", ""),
         getattr(paciente, "primer_apellido", ""),
         getattr(paciente, "segundo_apellido", ""),
-    ]
-    nombre = " ".join([p for p in partes if p]).strip()
+    )
     return nombre or "Sin nombre"
 
 
-# [2026-05-07] Helper para obtener nombre completo de usuario
+# 2026-05-29: delega en core.utils.utilidades_textos.construir_nombre_dinamico
 def _nombre_usuario(usuario):
-    """Retorna nombre visible del usuario; usa username como fallback."""
+    """Nombre visible del usuario; usa username como fallback."""
     if not usuario:
         return ""
-    nombre = ""
-    if hasattr(usuario, "get_full_name"):
-        nombre = (usuario.get_full_name() or "").strip()
-    return nombre or getattr(usuario, "username", "") or ""
+    return construir_nombre_dinamico(usuario, ["first_name", "last_name"]) or getattr(usuario, "username", "") or ""
 
 
 # [2026-05-07] Helper para convertir datetime a ISO local
@@ -571,9 +582,10 @@ def _obtener_observacion_desde_request(request):
     if observacion is not None:
         return observacion
 
+    # 2026-05-29: reutiliza core.utils.utilidades_request.parse_json_request
     try:
-        payload = json.loads((request.body or b"").decode("utf-8") or "{}")
-    except (TypeError, ValueError, json.JSONDecodeError):
+        payload = parse_json_request(request)
+    except ValueError:
         payload = {}
     return payload.get("observacion")
 
@@ -610,6 +622,32 @@ def _tiene_permiso_mapear(usuario):
         MAPEO_CAMAS_MAPEAR_ROLES,
         MAPEO_CAMAS_MAPEAR_UNIDADES,
     )
+
+
+# [2026-05-28] MC-PERM-007: helper específico del dashboard, separado de historiales
+# para evitar acoplamiento de permisos entre auditoría y monitoreo operativo.
+def _tiene_permiso_dashboard(usuario):
+    """Permite acceso al dashboard operativo de KPIs/gráficas en tiempo real."""
+    return verificar_permisos_usuario(
+        usuario,
+        MAPEO_CAMAS_DASHBOARD_ROLES,
+        MAPEO_CAMAS_DASHBOARD_UNIDADES,
+    )
+
+
+# [2026-05-28] FIX: los endpoints de edición de cama desde el mapa (actualizar_cama_mapa,
+# mover_paciente_cama) son compartidos por dos flujos:
+#   1) Edición MANUAL fuera de mapeo → requiere MAPEO_CAMAS_CAMBIOS_*.
+#   2) Edición DENTRO de una sesión activa de mapeo → requiere MAPEO_CAMAS_MAPEAR_*
+#      y que el usuario tenga sesión EN_PROGRESO.
+# Este helper unifica ambas vías sin mezclar las constantes (cada una sigue
+# protegiendo su propio caso de uso).
+def _puede_editar_cama_en_mapa(usuario):
+    if _tiene_permiso_cambios_mapa(usuario):
+        return True
+    if _tiene_permiso_mapear(usuario) and _obtener_sesion_mapeo_activa(usuario) is not None:
+        return True
+    return False
 
 
 def _puede_gestionar_sesion_mapeo(usuario):
@@ -794,12 +832,18 @@ def _registrar_historial_mapeo(
     usuario,
     observacion,
     sesion_mapeo=None,
+    forzar_nuevo=False,
 ):
-    """Registra historial de cama; en mapeo activo actualiza el último registro de la sesión."""
+    """Registra historial de cama; en mapeo activo actualiza el último registro de la sesión.
+
+    [2026-05-29] `forzar_nuevo=True` evita la fusion con el ultimo historial de la sesion
+    (necesario para cierres intermedios como el alta historica del paciente saliente en
+    reasignaciones OCUPADA->OCUPADA o PRE_ALTA->OCUPADA con paciente distinto).
+    """
     sesion = sesion_mapeo or _obtener_sesion_mapeo_activa(usuario)
     observacion_catalogada = get_observacion_mapeo(observacion)
 
-    if not sesion:
+    if not sesion or forzar_nuevo:
         return HistorialEstadoCama.objects.create(
             cama=cama,
             estado_anterior=estado_anterior,
@@ -1510,9 +1554,10 @@ def iniciar_mapeo(request):
             }
         )
 
+    # 2026-05-29: reutiliza core.utils.utilidades_request.parse_json_request
     try:
-        payload = json.loads(request.body.decode("utf-8") or "{}")
-    except (TypeError, ValueError, json.JSONDecodeError):
+        payload = parse_json_request(request)
+    except ValueError:
         payload = {}
 
     servicio_ids = payload.get("servicio_ids") or []
@@ -1609,7 +1654,9 @@ def iniciar_mapeo(request):
 @require_GET
 def estado_mapeo(request):
     """Devuelve la sesion de mapeo activa y camas ya procesadas para restaurar UI."""
-    if not _tiene_permiso_historiales(request.user):
+    # [2026-05-28] MC-PERM-005: este endpoint pertenece al flujo de mapeo,
+    # debe validarse con MAPEAR_* (no con HISTORIALES_*).
+    if not _tiene_permiso_mapear(request.user):
         return JsonResponse({"ok": False, "error": "Acceso denegado."}, status=403)
 
     sesion = _obtener_sesion_mapeo_activa(request.user)
@@ -1779,9 +1826,12 @@ def cancelar_mapeo(request):
 # el límite de movimientos en el frontend.
 # =============================================================================
 # [2026-05-07] API: Obtener estructura completa de camas agrupadas por servicio/sala/cub\u00edculo
+# [2026-05-28] MC-PERM-009: se agrega @require_GET para fijar el método HTTP.
+# [2026-05-28] MC-PERM-005: validación con MAPEAR_* (endpoint del flujo de mapeo, no de auditoría).
 @login_required
+@require_GET
 def mapa_camas_data(request):
-    if not _tiene_permiso_historiales(request.user):
+    if not _tiene_permiso_mapear(request.user):
         return JsonResponse({"ok": False, "error": "Acceso denegado."}, status=403)
 
     sesion_activa = _obtener_sesion_mapeo_activa(request.user)
@@ -2018,9 +2068,12 @@ def mapa_camas_data(request):
 # Retorna un máximo de 20 resultados.
 # =============================================================================
 # [2026-05-07] API: Buscar pacientes disponibles para asignar camas
+# [2026-05-28] MC-PERM-003: endpoint del flujo de mapeo expone PII; se exige permiso MAPEAR_*.
 @login_required
 @require_GET
 def buscar_pacientes_mapa(request):
+    if not _tiene_permiso_mapear(request.user):
+        return JsonResponse({"ok": False, "error": "Acceso denegado."}, status=403)
     termino = (request.GET.get("q") or "").strip()
     tipo_busqueda = (request.GET.get("tipo") or "dni").strip().lower()
 
@@ -2081,9 +2134,12 @@ def buscar_pacientes_mapa(request):
 # y no ofrecerla como opción de destino.
 # =============================================================================
 # [2026-05-07] API: Obtener camas disponibles para traslado de pacientes
+# [2026-05-28] MC-PERM-004: endpoint del flujo de mapeo; se exige permiso MAPEAR_*.
 @login_required
 @require_GET
 def camas_disponibles_mapa(request):
+    if not _tiene_permiso_mapear(request.user):
+        return JsonResponse({"ok": False, "error": "Acceso denegado."}, status=403)
     excluir_cama = request.GET.get("excluir") or None
     servicio_restringido_id = None
 
@@ -2146,9 +2202,17 @@ def camas_disponibles_mapa(request):
 # =============================================================================
 # [2026-05-07] API: Realizar traslado de paciente entre camas
 # [2026-05-08] Requiere rol de editor (admin/digitador de ADMI)
+# [2026-05-28] MC-PERM-002: operación mutante; exige permiso CAMBIOS_* explícito.
+# [2026-05-28] FIX: también permitido cuando el usuario tiene MAPEAR_* con sesión
+# de mapeo activa (mismo botón se usa dentro y fuera del flujo de mapeo).
 @login_required
 @require_POST
 def mover_paciente_cama(request):
+    if not _puede_editar_cama_en_mapa(request.user):
+        return JsonResponse(
+            {"ok": False, "error": "Está en modo vista."},
+            status=403,
+        )
     cama_origen_id = request.POST.get("cama_origen_id")
     cama_destino_id = request.POST.get("cama_destino_id")
 
@@ -2347,11 +2411,16 @@ def mover_paciente_cama(request):
 # Registra el cambio en HistorialEstadoCama con observación de cambio manual.
 # ===========================================================================
 # [2026-05-08] Requiere rol de editor (admin/digitador de ADMI)
+# [2026-05-28] FIX: el botón de editar cama se usa tanto en edición manual como
+# dentro del flujo de mapeo; se acepta CAMBIOS_* o MAPEAR_* con sesión activa.
 @login_required
 @require_POST
 def actualizar_cama_mapa(request):
-    if not _tiene_permiso_cambios_mapa(request.user):
-        return JsonResponse({"ok": False, "error": "Acceso denegado."}, status=403)
+    if not _puede_editar_cama_en_mapa(request.user):
+        return JsonResponse(
+            {"ok": False, "error": "Está en modo vista."},
+            status=403,
+        )
 
     cama_id = request.POST.get("cama_id")
     estado_codigo = (request.POST.get("estado") or "").strip()
@@ -2476,6 +2545,18 @@ def actualizar_cama_mapa(request):
         and (not ingreso_nuevo or ingreso_anterior.id != ingreso_nuevo.id)
     )
 
+    # [2026-05-29] Si la cama estaba OCUPADA y se reasigna a OCUPADA con OTRO paciente,
+    # se registra un evento de alta histórica del paciente anterior antes de la nueva
+    # ocupación, para conservar la trazabilidad del ingreso saliente.
+    requiere_cierre_ocupada_a_ocupada = (
+        estado_anterior
+        and estado_anterior.codigo == "OCUPADA"
+        and estado_codigo == "OCUPADA"
+        and ingreso_anterior
+        and ingreso_nuevo
+        and ingreso_anterior.id != ingreso_nuevo.id
+    )
+
     # Si la cama pasa a VACIA desde un estado con paciente, se registra alta.
     requiere_registro_alta_a_vacia = (
         estado_codigo == "VACIA"
@@ -2539,6 +2620,46 @@ def actualizar_cama_mapa(request):
                     usuario=request.user,
                     observacion=get_observacion_mapeo("Alta historica por reasignacion desde PRE_ALTA"),
                     sesion_mapeo=sesion_mapeo_activa,
+                    forzar_nuevo=True,
+                )
+                # [2026-05-29] Segundo paso: liberacion fisica de la cama (ALTA -> VACIA)
+                # antes de aplicar la nueva ocupacion. Mantiene la trazabilidad completa.
+                _registrar_historial_mapeo(
+                    cama=cama,
+                    estado_anterior=estado_alta,
+                    estado_nuevo=estado_vacia,
+                    ingreso=None,
+                    usuario=request.user,
+                    observacion=get_observacion_mapeo("Liberacion de cama tras alta historica"),
+                    sesion_mapeo=sesion_mapeo_activa,
+                    forzar_nuevo=True,
+                )
+                estado_historial_anterior = estado_vacia
+
+            # [2026-05-29] Reasignacion directa OCUPADA -> OCUPADA con paciente distinto:
+            # se conserva el registro historico del ingreso anterior antes de aplicar el nuevo.
+            if requiere_cierre_ocupada_a_ocupada:
+                _registrar_historial_mapeo(
+                    cama=cama,
+                    estado_anterior=estado_anterior,
+                    estado_nuevo=estado_alta,
+                    ingreso=ingreso_anterior,
+                    usuario=request.user,
+                    observacion=get_observacion_mapeo("Alta historica por reasignacion directa de cama"),
+                    sesion_mapeo=sesion_mapeo_activa,
+                    forzar_nuevo=True,
+                )
+                # [2026-05-29] Segundo paso: liberacion fisica de la cama (ALTA -> VACIA)
+                # antes de aplicar la nueva ocupacion. Mantiene la trazabilidad completa.
+                _registrar_historial_mapeo(
+                    cama=cama,
+                    estado_anterior=estado_alta,
+                    estado_nuevo=estado_vacia,
+                    ingreso=None,
+                    usuario=request.user,
+                    observacion=get_observacion_mapeo("Liberacion de cama tras alta historica"),
+                    sesion_mapeo=sesion_mapeo_activa,
+                    forzar_nuevo=True,
                 )
                 estado_historial_anterior = estado_vacia
 
@@ -2643,6 +2764,10 @@ def actualizar_cama_mapa(request):
 
 # [2026-05-07] API: Procesar acción de mapeo en cama (confirmar, alta, traslado, etc.)
 # [2026-05-08] Requiere rol de editor (admin/digitador de ADMI)
+# [2026-05-28] FIX: este endpoint es el ciclo principal DEL flujo de mapeo,
+# por lo tanto se autoriza con MAPEO_CAMAS_MAPEAR_* (no con CAMBIOS_*, que
+# aplica solo a edición manual fuera del mapeo). De lo contrario admin/digitador
+# no pueden procesar camas durante su propia sesión de mapeo.
 @login_required
 @require_POST
 def procesar_cama_mapeo(request):
@@ -2650,7 +2775,7 @@ def procesar_cama_mapeo(request):
     Ciclo principal de mapeo por cama:
     evaluar -> decidir -> ejecutar -> registrar.
     """
-    if not _tiene_permiso_cambios_mapa(request.user):
+    if not _tiene_permiso_mapear(request.user):
         return JsonResponse({"ok": False, "error": "Acceso denegado."}, status=403)
 
     cama_id = request.POST.get("cama_id")
@@ -3032,3 +3157,483 @@ def procesar_cama_mapeo(request):
             return JsonResponse({"ok": True, "mensaje": "Alta forzada aplicada. Cama liberada."})
 
     return JsonResponse({"ok": False, "error": "No se pudo procesar la accion solicitada."}, status=400)
+
+
+# =============================================================================
+# [2026-05-28] Dashboard de KPIs hospitalarios en tiempo real
+# -----------------------------------------------------------------------------
+# Vista principal + endpoints JSON read-only para alimentar gráficas y tabla.
+# Permisos: GET (visualizacion) → UnidadRolRequiredMixin (regla del repo).
+# [2026-05-28] MC-PERM-007: dashboard gobernado por MAPEO_CAMAS_DASHBOARD_*,
+# constantes propias separadas de HISTORIALES_* para evitar acoplamiento.
+# =============================================================================
+from django.db.models import Avg, DurationField, ExpressionWrapper
+from django.views.decorators.cache import cache_page
+
+
+class DashboardMapeoCamasView(UnidadRolRequiredMixin, TemplateView):
+    """[2026-05-28] Dashboard operativo de KPIs y gráficas en tiempo real."""
+    template_name = "mapeo_camas/dashboard/dashboard.html"
+    required_roles = MAPEO_CAMAS_DASHBOARD_ROLES
+    required_unidades = MAPEO_CAMAS_DASHBOARD_UNIDADES
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["titulo"] = "Dashboard · Mapeo de Camas"
+        context["subtitulo"] = "Indicadores operativos y monitoreo continuo"
+        return context
+
+
+def _dashboard_response(data, meta=None):
+    """[2026-05-28] Envoltura estándar de respuesta para endpoints del dashboard."""
+    payload = {
+        "ok": True,
+        "ts": timezone.localtime(timezone.now()).isoformat(),
+        "data": data,
+    }
+    if meta is not None:
+        payload["meta"] = meta
+    return JsonResponse(payload)
+
+
+def _dashboard_error(msg, status=500):
+    """[2026-05-28] Respuesta de error uniforme para el dashboard."""
+    return JsonResponse({"ok": False, "error": str(msg), "ts": timezone.localtime(timezone.now()).isoformat()}, status=status)
+
+
+def _dashboard_inicio_dia():
+    """[2026-05-28] Inicio del día actual en zona horaria local."""
+    ahora = timezone.localtime(timezone.now())
+    inicio = ahora.replace(hour=0, minute=0, second=0, microsecond=0)
+    return inicio
+
+
+# [2026-05-28] Filtro de rango temporal del dashboard ------------------------
+def _dashboard_parse_range(request):
+    """
+    [2026-05-28] Parsea ?desde=ISO&hasta=ISO. Devuelve (desde, hasta) aware.
+    Default: día actual completo (00:00 → ahora).
+    """
+    tz = timezone.get_current_timezone()
+    ahora = timezone.localtime(timezone.now())
+
+    def _parse(s):
+        if not s:
+            return None
+        try:
+            # Soporta 'YYYY-MM-DDTHH:MM', 'YYYY-MM-DD' y con segundos.
+            dt = datetime.fromisoformat(s)
+        except ValueError:
+            return None
+        if timezone.is_naive(dt):
+            dt = timezone.make_aware(dt, tz)
+        return dt
+
+    desde = _parse(request.GET.get("desde"))
+    hasta = _parse(request.GET.get("hasta"))
+
+    if desde is None:
+        desde = ahora.replace(hour=0, minute=0, second=0, microsecond=0)
+    if hasta is None:
+        hasta = ahora
+    if hasta < desde:
+        desde, hasta = hasta, desde
+    return desde, hasta
+
+
+def _dashboard_granularidad(desde, hasta):
+    """[2026-05-28] hora si span ≤ 2 días, día si ≤ 60 días, mes si >."""
+    span = hasta - desde
+    if span.total_seconds() <= 2 * 86400:
+        return "hora"
+    if span.days <= 60:
+        return "dia"
+    return "mes"
+
+
+def _snapshot_estado_camas(hasta):
+    """
+    [2026-05-28] Devuelve dict {codigo_estado: cantidad} de TODAS las camas
+    activas según su estado en el momento `hasta`.
+
+    - Si `hasta` está dentro de los últimos 60 segundos, usa la asignación
+      vigente (AsignacionCamaPaciente) por ser más exacta y barata.
+    - En caso contrario, reconstruye con el último HistorialEstadoCama
+      anterior o igual a `hasta`. Camas sin historial cuentan como VACIA.
+    """
+    ahora = timezone.now()
+    delta = (ahora - hasta).total_seconds() if hasta <= ahora else 0
+    if 0 <= delta <= 60:
+        ultima_asig_id = (
+            AsignacionCamaPaciente.objects
+            .filter(cama_id=OuterRef("cama_id"))
+            .order_by("-fecha_inicio", "-id")
+            .values("id")[:1]
+        )
+        rows = (
+            AsignacionCamaPaciente.objects
+            .filter(id=Subquery(ultima_asig_id))
+            .values("cama_id", "estado__codigo")
+        )
+        estado_por_cama = {r["cama_id"]: r["estado__codigo"] for r in rows}
+    else:
+        ult_hist = (
+            HistorialEstadoCama.objects
+            .filter(cama_id=OuterRef("pk"), fecha_hora__lte=hasta)
+            .order_by("-fecha_hora", "-id")
+            .values("estado_nuevo__codigo")[:1]
+        )
+        rows = (
+            Cama.objects.filter(estado=1)
+            .annotate(_estado_hist=Subquery(ult_hist))
+            .values("numero_cama", "_estado_hist")
+        )
+        estado_por_cama = {r["numero_cama"]: r["_estado_hist"] for r in rows}
+
+    conteo = {}
+    for cama_id in Cama.objects.filter(estado=1).values_list("numero_cama", flat=True):
+        cod = estado_por_cama.get(cama_id) or "VACIA"
+        conteo[cod] = conteo.get(cod, 0) + 1
+    return conteo
+
+
+def _snapshot_estado_por_cama(hasta):
+    """[2026-05-28] {cama_id: codigo_estado} en el momento `hasta`."""
+    ahora = timezone.now()
+    delta = (ahora - hasta).total_seconds() if hasta <= ahora else 0
+    if 0 <= delta <= 60:
+        ultima_asig_id = (
+            AsignacionCamaPaciente.objects
+            .filter(cama_id=OuterRef("cama_id"))
+            .order_by("-fecha_inicio", "-id")
+            .values("id")[:1]
+        )
+        return {
+            r["cama_id"]: r["estado__codigo"]
+            for r in AsignacionCamaPaciente.objects
+            .filter(id=Subquery(ultima_asig_id))
+            .values("cama_id", "estado__codigo")
+        }
+    ult_hist = (
+        HistorialEstadoCama.objects
+        .filter(cama_id=OuterRef("pk"), fecha_hora__lte=hasta)
+        .order_by("-fecha_hora", "-id")
+        .values("estado_nuevo__codigo")[:1]
+    )
+    return {
+        r["numero_cama"]: r["_estado_hist"] or "VACIA"
+        for r in Cama.objects.filter(estado=1)
+        .annotate(_estado_hist=Subquery(ult_hist))
+        .values("numero_cama", "_estado_hist")
+    }
+
+
+def _rango_meta(desde, hasta):
+    """[2026-05-28] Meta serializable del rango aplicado."""
+    return {
+        "desde": timezone.localtime(desde).isoformat(),
+        "hasta": timezone.localtime(hasta).isoformat(),
+        "granularidad": _dashboard_granularidad(desde, hasta),
+    }
+
+
+# [2026-05-28] API: KPIs principales del dashboard.
+@login_required
+@require_GET
+def dashboard_kpis(request):
+    if not _tiene_permiso_dashboard(request.user):
+        return _dashboard_error("Acceso denegado.", status=403)
+    try:
+        desde, hasta = _dashboard_parse_range(request)
+
+        # Snapshot de estado de camas al final del rango.
+        conteo_por_estado = _snapshot_estado_camas(hasta)
+        total_camas = Cama.objects.filter(estado=1).count()
+        ocupadas = conteo_por_estado.get("OCUPADA", 0)
+        disponibles = conteo_por_estado.get("VACIA", 0) + conteo_por_estado.get("LIBRE", 0)
+        fuera_servicio = (
+            conteo_por_estado.get("FUERA_SERVICIO", 0) + conteo_por_estado.get("MANTENIMIENTO", 0)
+        )
+        pct = round((ocupadas / total_camas) * 100, 1) if total_camas else 0
+
+        # Métricas de actividad dentro del rango.
+        altas_rango = Ingreso.objects.filter(
+            fecha_egreso__gte=desde, fecha_egreso__lte=hasta
+        ).count()
+        traslados = MovimientoCama.objects.filter(
+            fecha_hora__gte=desde, fecha_hora__lte=hasta
+        ).count()
+
+        # Sesión de mapeo activa del usuario (siempre la actual; no depende del rango).
+        sesion = _obtener_sesion_mapeo_activa(request.user)
+        cambios_mapeo = 0
+        camas_validadas = 0
+        if sesion:
+            cambios_mapeo = DetalleMapeoCama.objects.filter(
+                sesion_mapeo=sesion, hubo_cambio=True
+            ).count()
+            camas_validadas = (
+                DetalleMapeoCama.objects.filter(sesion_mapeo=sesion, fue_validada=True)
+                .values("cama_id").distinct().count()
+            )
+
+        # Tiempo promedio de ocupación de los egresos en el rango.
+        duracion_expr = ExpressionWrapper(
+            F("fecha_egreso") - F("fecha_ingreso"), output_field=DurationField()
+        )
+        prom = (
+            Ingreso.objects.filter(
+                fecha_egreso__gte=desde,
+                fecha_egreso__lte=hasta,
+                fecha_ingreso__isnull=False,
+            )
+            .annotate(duracion=duracion_expr)
+            .aggregate(prom=Avg("duracion"))
+            .get("prom")
+        )
+        if prom:
+            horas = prom.total_seconds() / 3600.0
+            if horas >= 24:
+                tiempo_prom_str = f"{horas / 24:.1f} d"
+            else:
+                tiempo_prom_str = f"{horas:.1f} h"
+        else:
+            tiempo_prom_str = "—"
+
+        return _dashboard_response({
+            "total_camas": total_camas,
+            "ocupadas": ocupadas,
+            "disponibles": disponibles,
+            "fuera_servicio": fuera_servicio,
+            "porcentaje_ocupacion": pct,
+            "altas_dia": altas_rango,
+            "traslados": traslados,
+            "cambios_mapeo": cambios_mapeo,
+            "camas_validadas": camas_validadas,
+            "tiempo_promedio": tiempo_prom_str,
+        }, meta=_rango_meta(desde, hasta))
+    except Exception as exc:
+        return _dashboard_error(exc)
+
+
+# [2026-05-28] API: ocupación por servicio (barras) — snapshot al final del rango.
+@login_required
+@require_GET
+def dashboard_ocupacion_servicio(request):
+    if not _tiene_permiso_dashboard(request.user):
+        return _dashboard_error("Acceso denegado.", status=403)
+    try:
+        desde, hasta = _dashboard_parse_range(request)
+        estado_por_cama = _snapshot_estado_por_cama(hasta)
+
+        camas = (
+            Cama.objects.filter(estado=1, sala__estado=1, sala__servicio__estado=1)
+            .values("numero_cama", "sala__servicio_id", "sala__servicio__nombre_servicio")
+        )
+        agg = {}
+        for cama in camas:
+            key = (cama["sala__servicio_id"], cama["sala__servicio__nombre_servicio"])
+            bucket = agg.setdefault(key, {"servicio": key[1], "ocupadas": 0, "disponibles": 0, "otros": 0})
+            cod = estado_por_cama.get(cama["numero_cama"]) or "VACIA"
+            if cod == "OCUPADA":
+                bucket["ocupadas"] += 1
+            elif cod in ("VACIA", "LIBRE"):
+                bucket["disponibles"] += 1
+            else:
+                bucket["otros"] += 1
+
+        items = sorted(agg.values(), key=lambda x: x["servicio"])
+        return _dashboard_response({"items": items}, meta=_rango_meta(desde, hasta))
+    except Exception as exc:
+        return _dashboard_error(exc)
+
+
+# [2026-05-28] API: distribución global por estado (donut) — snapshot al final del rango.
+@login_required
+@require_GET
+def dashboard_distribucion_camas(request):
+    if not _tiene_permiso_dashboard(request.user):
+        return _dashboard_error("Acceso denegado.", status=403)
+    try:
+        desde, hasta = _dashboard_parse_range(request)
+        conteo = _snapshot_estado_camas(hasta)
+        items = [
+            {"estado": cod, "cantidad": qty}
+            for cod, qty in sorted(conteo.items(), key=lambda kv: kv[0])
+        ]
+        return _dashboard_response({"items": items}, meta=_rango_meta(desde, hasta))
+    except Exception as exc:
+        return _dashboard_error(exc)
+
+
+# [2026-05-28] API: ocupación por bin (hora/día/mes) según rango.
+@login_required
+@require_GET
+def dashboard_ocupacion_hora(request):
+    if not _tiene_permiso_dashboard(request.user):
+        return _dashboard_error("Acceso denegado.", status=403)
+    try:
+        desde, hasta = _dashboard_parse_range(request)
+        granularidad = _dashboard_granularidad(desde, hasta)
+        total_camas = max(Cama.objects.filter(estado=1).count(), 1)
+
+        # Snapshot al inicio del rango (ocupadas absolutas).
+        conteo_inicio = _snapshot_estado_camas(desde)
+        ocupadas_inicio = conteo_inicio.get("OCUPADA", 0)
+
+        # Eventos dentro del rango: cambios OCUPADA vs liberación.
+        eventos = (
+            HistorialEstadoCama.objects
+            .filter(fecha_hora__gte=desde, fecha_hora__lte=hasta)
+            .values("fecha_hora", "estado_nuevo__codigo")
+        )
+
+        def _bin_key(dt):
+            local = timezone.localtime(dt)
+            if granularidad == "hora":
+                return local.replace(minute=0, second=0, microsecond=0)
+            if granularidad == "dia":
+                return local.replace(hour=0, minute=0, second=0, microsecond=0)
+            # mes
+            return local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+        def _bin_label(dt):
+            if granularidad == "hora":
+                return dt.strftime("%d/%m %H:00")
+            if granularidad == "dia":
+                return dt.strftime("%d/%m")
+            return dt.strftime("%m/%Y")
+
+        def _bin_next(dt):
+            if granularidad == "hora":
+                return dt + timedelta(hours=1)
+            if granularidad == "dia":
+                return dt + timedelta(days=1)
+            # mes: avanzar 1 mes manteniendo día 1
+            year = dt.year + (1 if dt.month == 12 else 0)
+            month = 1 if dt.month == 12 else dt.month + 1
+            return dt.replace(year=year, month=month)
+
+        # Construir bins ordenados desde el inicio del rango hasta `hasta`.
+        bins = []
+        cursor = _bin_key(desde)
+        fin = timezone.localtime(hasta)
+        while cursor <= fin:
+            bins.append(cursor)
+            cursor = _bin_next(cursor)
+
+        ocupa = {b: 0 for b in bins}
+        libera = {b: 0 for b in bins}
+        for ev in eventos:
+            b = _bin_key(ev["fecha_hora"])
+            if b not in ocupa:
+                continue
+            cod = ev["estado_nuevo__codigo"]
+            if cod == "OCUPADA":
+                ocupa[b] += 1
+            elif cod in ("VACIA", "LIBRE", "ALTA"):
+                libera[b] += 1
+
+        items = []
+        ocupadas = ocupadas_inicio
+        for b in bins:
+            ocupadas = max(0, ocupadas + ocupa[b] - libera[b])
+            items.append({
+                "hora": _bin_label(b),
+                "porcentaje": round((ocupadas / total_camas) * 100, 1),
+            })
+        return _dashboard_response(
+            {"items": items, "granularidad": granularidad},
+            meta=_rango_meta(desde, hasta),
+        )
+    except Exception as exc:
+        return _dashboard_error(exc)
+
+
+# [2026-05-28] API: saturación por sala — snapshot al final del rango.
+@login_required
+@require_GET
+def dashboard_saturacion_sala(request):
+    if not _tiene_permiso_dashboard(request.user):
+        return _dashboard_error("Acceso denegado.", status=403)
+    try:
+        desde, hasta = _dashboard_parse_range(request)
+        estado_por_cama = _snapshot_estado_por_cama(hasta)
+        camas = (
+            Cama.objects.filter(estado=1, sala__estado=1, sala__servicio__estado=1)
+            .values(
+                "numero_cama",
+                "sala_id",
+                "sala__nombre_sala",
+                "sala__servicio__nombre_servicio",
+            )
+        )
+        agg = {}
+        for cama in camas:
+            servicio = cama["sala__servicio__nombre_servicio"]
+            sala = cama["sala__nombre_sala"]
+            key = (servicio, sala)
+            bucket = agg.setdefault(key, {"total": 0, "ocupadas": 0})
+            bucket["total"] += 1
+            if estado_por_cama.get(cama["numero_cama"]) == "OCUPADA":
+                bucket["ocupadas"] += 1
+
+        series_map = {}
+        for (servicio, sala), bucket in agg.items():
+            pct = round((bucket["ocupadas"] / bucket["total"]) * 100, 1) if bucket["total"] else 0
+            series_map.setdefault(servicio, []).append({"sala": sala, "porcentaje": pct})
+
+        series = [
+            {"servicio": servicio, "salas": sorted(salas, key=lambda s: s["sala"])}
+            for servicio, salas in sorted(series_map.items())
+        ]
+        return _dashboard_response({"series": series}, meta=_rango_meta(desde, hasta))
+    except Exception as exc:
+        return _dashboard_error(exc)
+
+
+# [2026-05-28] API: movimientos de cama en el rango (tabla).
+@login_required
+@require_GET
+def dashboard_ultimos_movimientos(request):
+    if not _tiene_permiso_dashboard(request.user):
+        return _dashboard_error("Acceso denegado.", status=403)
+    try:
+        desde, hasta = _dashboard_parse_range(request)
+        try:
+            limit = int(request.GET.get("limit") or 30)
+        except (TypeError, ValueError):
+            limit = 30
+        limit = max(1, min(limit, 500))
+
+        movimientos = (
+            MovimientoCama.objects
+            .filter(fecha_hora__gte=desde, fecha_hora__lte=hasta)
+            .select_related(
+                "cama_origen__sala__servicio",
+                "cama_destino__sala__servicio",
+                "ingreso__paciente",
+                "usuario",
+            )
+            .order_by("-fecha_hora")[:limit]
+        )
+        items = []
+        for mov in movimientos:
+            paciente = _paciente_payload(
+                mov.ingreso.paciente if mov.ingreso_id else None,
+                ingreso_id=mov.ingreso_id,
+            )
+            servicio_origen = getattr(getattr(mov.cama_origen, "sala", None), "servicio", None)
+            servicio_nombre = getattr(servicio_origen, "nombre_servicio", "") or ""
+            items.append({
+                "fecha": _hora_local_iso(mov.fecha_hora),
+                "tipo": mov.tipo_movimiento,
+                "cama_origen": _nombre_cama(mov.cama_origen),
+                "cama_destino": _nombre_cama(mov.cama_destino),
+                "paciente": paciente["nombre"] if paciente else "",
+                "servicio": servicio_nombre,
+                "usuario": _nombre_usuario(mov.usuario),
+            })
+        return _dashboard_response({"items": items}, meta=_rango_meta(desde, hasta))
+    except Exception as exc:
+        return _dashboard_error(exc)
