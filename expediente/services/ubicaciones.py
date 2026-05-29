@@ -130,3 +130,42 @@ class CatalogoUbicaciones:
             defaults={'tipo': ExpedienteUbicacion.TIPO_NO_CLINICA},
         )
         return obj
+
+    @staticmethod
+    def ubicacion_del_solicitante(solicitud):
+        """
+        Resuelve la ubicación destino de un préstamo según el SOLICITANTE (Opción A).
+
+        El expediente se mueve a la unidad de servicio del usuario que pidió el
+        préstamo. Esa unidad es NO CLÍNICA (servicio.Unidad), capturada en
+        SolicitudPrestamo.servicio_unidad al crear la solicitud.
+
+        Devuelve la fila ExpedienteUbicacion correspondiente (la crea si falta),
+        o None si la solicitud no tiene servicio_unidad asociada.
+        """
+        unidad = getattr(solicitud, 'servicio_unidad', None)
+        if not unidad:
+            return None
+        return CatalogoUbicaciones.obtener_o_crear_por_unidad_no_clinica(unidad)
+
+    @staticmethod
+    def ubicacion_admision():
+        """
+        Devuelve la ubicación 'ADMISION' (donde regresan los expedientes al
+        devolverse). ADMISION es una Unidad no-clínica en servicio_unidad.
+
+        Si no existe la unidad ADMISION, devuelve None (el llamador decide
+        el fallback). No la inventa para no crear datos basura.
+        """
+        from servicio.models import Unidad
+        unidad = Unidad.objects.filter(
+            nombre_unidad__iexact='ADMISION', estado=1
+        ).first()
+        if not unidad:
+            # intento alterno por si está con tilde u otra grafía
+            unidad = Unidad.objects.filter(
+                nombre_unidad__icontains='ADMIS', estado=1
+            ).first()
+        if not unidad:
+            return None
+        return CatalogoUbicaciones.obtener_o_crear_por_unidad_no_clinica(unidad)

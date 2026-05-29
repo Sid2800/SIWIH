@@ -227,12 +227,15 @@ def _get_servicio_unidad_from_rrhh(user):
 
 def _resolver_ubicacion_expediente(expediente, info_exp=None):
     """
-    Resuelve la ubicación ACTUAL del expediente.
+    Resuelve la ubicación ACTUAL del expediente (texto legible).
 
-    Prioridad:
-    1. expediente.localizacion.descripcion_localizacion  (tabla expediente_localizacion via FK en expediente_expediente)
-    2. info_exp.ubicacion_fisica  (ExpedientePrestamo.ubicacion_fisica si existe)
-    3. "ARCHIVO" como último fallback
+    Prioridad (obtención híbrida durante la transición a expediente_ubicacion):
+    1. NUEVO catálogo: ExpedientePrestamo.ubicacion (FK a ExpedienteUbicacion)
+       → es la fuente más precisa para préstamos del módulo s_exp.
+    2. LEGACY: expediente.localizacion.descripcion_localizacion
+       → lo que usa el módulo expediente (atenciones/ingresos).
+    3. LEGACY: info_exp.ubicacion_fisica (texto libre antiguo).
+    4. "ARCHIVO" como último fallback.
 
     Args:
         expediente: instancia de Expediente
@@ -241,12 +244,23 @@ def _resolver_ubicacion_expediente(expediente, info_exp=None):
     Returns:
         str: descripción de la ubicación actual
     """
+    # 1) Nuevo catálogo (FK relacional) — solo si el expediente está prestado/movido
+    try:
+        if info_exp and getattr(info_exp, 'ubicacion_id', None):
+            desc = info_exp.ubicacion.descripcion
+            if desc:
+                return desc
+    except Exception:
+        pass
+
+    # 2) Legacy: localizacion del expediente (atenciones/ingresos)
     try:
         if expediente.localizacion and expediente.localizacion.descripcion_localizacion:
             return expediente.localizacion.descripcion_localizacion
     except Exception:
         pass
 
+    # 3) Legacy: texto libre antiguo
     if info_exp and getattr(info_exp, 'ubicacion_fisica', None):
         return info_exp.ubicacion_fisica
 
@@ -1135,14 +1149,28 @@ def marcar_entregado_api(request):
         prestamo.solicitud.estado_flujo_id = 'SOL_EN_PRESTAMO'
         prestamo.solicitud.save()
 
+        # Resolver UNA sola vez la ubicación destino del préstamo (Opción A):
+        # el expediente se mueve a la unidad del SOLICITANTE (catálogo nuevo).
+        from expediente.services.ubicaciones import CatalogoUbicaciones
+        ubicacion_destino = None
+        try:
+            ubicacion_destino = CatalogoUbicaciones.ubicacion_del_solicitante(prestamo.solicitud)
+        except Exception as _e:
+            logger.warning(f"No se pudo resolver ubicacion del solicitante: {_e}")
+
         # Solo marcar como prestados los expedientes aprobados
         for d in prestamo.solicitud.detalles.select_related('expediente_prestamo__expediente').filter(aprobado=True):
             estado_anterior = d.expediente_prestamo.estado
             d.expediente_prestamo.estado_id = 'EXP_PRESTADO'
+
+            # NUEVO: registrar la ubicación actual via FK al catálogo unificado.
+            if ubicacion_destino is not None:
+                d.expediente_prestamo.ubicacion = ubicacion_destino
+
             d.expediente_prestamo.save()
 
-            # Actualizar localizacion del expediente a la unidad del solicitante
-            # (cadena RRHH: User -> Empleado -> PersonalNoClinico/PersonalSalud -> servicio_unidad)
+            # LEGACY: mantener sincronizado expediente.localizacion (texto) mientras
+            # dura la transición — atenciones/ingresos aún leen de ahí.
             try:
                 _set_localizacion_por_solicitud(
                     d.expediente_prestamo.expediente,
@@ -1150,7 +1178,7 @@ def marcar_entregado_api(request):
                     request.user,
                 )
             except Exception as _e:
-                logger.warning(f"No se pudo actualizar localizacion al entregar préstamo: {_e}")
+                logger.warning(f"No se pudo actualizar localizacion legacy al entregar: {_e}")
 
             ExpedienteEstadoLog.objects.create(
                 expediente=d.expediente_prestamo.expediente,
@@ -1314,6 +1342,15 @@ def procesar_devolucion_api(request):
         esta_vencido = prestamo.esta_vencido
         unidad_usuario = _get_unidad_usuario(request.user)
 
+        # Resolver UNA sola vez la ubicación ADMISION (catálogo nuevo).
+        # Al devolver, el expediente regresa a ADMISION.
+        from expediente.services.ubicaciones import CatalogoUbicaciones
+        ubicacion_admision = None
+        try:
+            ubicacion_admision = CatalogoUbicaciones.ubicacion_admision()
+        except Exception as _e:
+            logger.warning(f"No se pudo resolver ubicacion ADMISION: {_e}")
+
         for det_id in detalles_recibidos:
             detalle = SolicitudExpedienteDetalle.objects.get(id=det_id, solicitud=solicitud)
             if not detalle.devuelto:
@@ -1322,18 +1359,21 @@ def procesar_devolucion_api(request):
                     detalle.fuera_de_tiempo = True
                 detalle.comentario_devolucion = _comentario(det_id)
                 detalle.save()
-                
+
                 ep = detalle.expediente_prestamo
                 estado_ant = ep.estado
                 ep.estado_id = 'EXP_DISPONIBLE'
                 ep.ubicacion_fisica = unidad_usuario
+                # NUEVO: regresar al catálogo unificado → ADMISION
+                if ubicacion_admision is not None:
+                    ep.ubicacion = ubicacion_admision
                 ep.save()
 
-                # Regresar la localizacion del expediente a ARCHIVO
+                # LEGACY: mantener sincronizado expediente.localizacion (texto)
                 try:
                     _set_localizacion_archivo(ep.expediente, request.user)
                 except Exception as _e:
-                    logger.warning(f"No se pudo regresar a ARCHIVO al devolver: {_e}")
+                    logger.warning(f"No se pudo regresar a ARCHIVO (legacy) al devolver: {_e}")
 
                 ExpedienteEstadoLog.objects.create(
                     expediente=ep.expediente,
@@ -1481,7 +1521,14 @@ def buscar_expedientes_api(request):
 
         def _construir_resultado(exp, paciente):
             """Helper interno: dado un Expediente y un Paciente, arma el dict de respuesta."""
-            info_exp = ExpedientePrestamo.objects.filter(expediente=exp).first()
+            # Precargamos la ubicación (catálogo nuevo) y sus relaciones para
+            # que _resolver_ubicacion_expediente no dispare queries extra.
+            info_exp = ExpedientePrestamo.objects.select_related(
+                'ubicacion__unidad_clinica__area_atencion__servicio',
+                'ubicacion__unidad_clinica__sala',
+                'ubicacion__unidad_clinica__servicio_aux',
+                'ubicacion__unidad_no_clinica',
+            ).filter(expediente=exp).first()
             return {
                 "expediente_id": exp.id,
                 "numero_expediente": exp.numero,

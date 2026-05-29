@@ -99,11 +99,28 @@ class ExpedientePrestamo(models.Model):
         verbose_name='Estado Físico Actual',
         default='EXP_DISPONIBLE'
     )
+
+    # Ubicación física ACTUAL del expediente, referenciada por relación
+    # al catálogo unificado (expediente_ubicacion). Captura solo el ID.
+    #   - Al entregar un préstamo → apunta a la unidad del solicitante.
+    #   - Al devolver            → apunta a ADMISION.
+    # NULL = ubicación no determinada por este módulo (usar fallback legacy).
+    ubicacion = models.ForeignKey(
+        'expediente.ExpedienteUbicacion',
+        on_delete=models.PROTECT,
+        null=True, blank=True,
+        related_name='expedientes_prestamo',
+        verbose_name='Ubicación actual (catálogo)',
+        help_text='FK a expediente_ubicacion. Se actualiza al entregar/devolver.'
+    )
+
+    # ----- DEPRECATED: texto libre, reemplazado por la FK 'ubicacion'.
+    # Se mantiene temporalmente para no romper código legacy durante transición.
     ubicacion_fisica = models.CharField(
         max_length=200,
         blank=True,
         null=True,
-        verbose_name='Ubicación Física'
+        verbose_name='[DEPRECATED] Ubicación Física (texto)'
     )
 
     class Meta:
