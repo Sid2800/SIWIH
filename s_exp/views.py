@@ -235,7 +235,7 @@ def _resolver_ubicacion_expediente(expediente, info_exp=None):
     2. LEGACY: expediente.localizacion.descripcion_localizacion
        → lo que usa el módulo expediente (atenciones/ingresos).
     3. LEGACY: info_exp.ubicacion_fisica (texto libre antiguo).
-    4. "ARCHIVO" como último fallback.
+    4. "ADMISION" como último fallback (ARCHIVO quedó deprecado en s_exp).
 
     Args:
         expediente: instancia de Expediente
@@ -264,7 +264,7 @@ def _resolver_ubicacion_expediente(expediente, info_exp=None):
     if info_exp and getattr(info_exp, 'ubicacion_fisica', None):
         return info_exp.ubicacion_fisica
 
-    return "ARCHIVO"
+    return "ADMISION"
 
 
 def _set_localizacion_por_solicitud(expediente, solicitud, usuario_admin):
@@ -326,35 +326,41 @@ def _set_localizacion_por_solicitud(expediente, solicitud, usuario_admin):
         return nombre_ubicacion
 
 
-def _set_localizacion_archivo(expediente, usuario_admin):
+def _set_localizacion_admision(expediente, usuario_admin):
     """
-    Devuelve expediente.localizacion a 'ARCHIVO' tras una devolución.
+    Devuelve expediente.localizacion (LEGACY) a 'ADMISION' tras una devolución.
+
+    El módulo de Solicitud de Expedientes ya NO usa 'ARCHIVO': cuando un
+    expediente se devuelve, regresa a ADMISION. Esta función mantiene
+    sincronizado el campo legacy expediente.localizacion (texto) mientras dura
+    la transición; la fuente principal es ExpedientePrestamo.ubicacion (FK al
+    catálogo expediente_ubicacion).
 
     Args:
         expediente: instancia de Expediente
         usuario_admin: usuario que recibe la devolución
 
     Returns:
-        str: "ARCHIVO"
+        str: "ADMISION"
     """
     from expediente.models import Localizacion
 
     try:
         loc_obj = Localizacion.objects.filter(
-            descripcion_localizacion__iexact='ARCHIVO'
+            descripcion_localizacion__iexact='ADMISION'
         ).first()
         if not loc_obj:
             loc_obj, _ = Localizacion.objects.get_or_create(
-                descripcion_localizacion='ARCHIVO',
+                descripcion_localizacion='ADMISION',
                 defaults={'estado': True}
             )
         expediente.localizacion = loc_obj
         expediente.modificado_por = usuario_admin
         expediente.save(update_fields=['localizacion', 'modificado_por', 'fecha_modificado'])
     except Exception as e:
-        logger.warning(f"No se pudo regresar a ARCHIVO el expediente #{expediente.numero}: {e}")
+        logger.warning(f"No se pudo regresar a ADMISION el expediente #{expediente.numero}: {e}")
 
-    return 'ARCHIVO'
+    return 'ADMISION'
 
 
 # ============================================
@@ -1369,11 +1375,11 @@ def procesar_devolucion_api(request):
                     ep.ubicacion = ubicacion_admision
                 ep.save()
 
-                # LEGACY: mantener sincronizado expediente.localizacion (texto)
+                # LEGACY: mantener sincronizado expediente.localizacion (texto) → ADMISION
                 try:
-                    _set_localizacion_archivo(ep.expediente, request.user)
+                    _set_localizacion_admision(ep.expediente, request.user)
                 except Exception as _e:
-                    logger.warning(f"No se pudo regresar a ARCHIVO (legacy) al devolver: {_e}")
+                    logger.warning(f"No se pudo regresar a ADMISION (legacy) al devolver: {_e}")
 
                 ExpedienteEstadoLog.objects.create(
                     expediente=ep.expediente,
