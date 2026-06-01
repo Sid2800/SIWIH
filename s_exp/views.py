@@ -2191,8 +2191,13 @@ def reportes_data_api(request):
         ).count()
 
         # --- DEMANDA POR ÁREA ---
+        # La unidad ahora es relacional (servicio_unidad FK). Agrupamos por el
+        # nombre de la unidad consultado en vivo, en lugar del antiguo texto
+        # area_destino (eliminado en el refactor relacional).
         demanda_area = list(
-            qs_solicitudes.values('area_destino').annotate(
+            qs_solicitudes.values(
+                area_destino=F('servicio_unidad__nombre_unidad')
+            ).annotate(
                 total=Count('id')
             ).order_by('-total')
         )
@@ -2625,10 +2630,13 @@ def _obtener_datos_reporte_areas_motivos(fecha_inicio='', fecha_fin=''):
         except (ValueError, TypeError):
             pass
 
-    qs_solicitudes = SolicitudPrestamo.objects.filter(**sol_filtros).select_related('motivo')
+    qs_solicitudes = SolicitudPrestamo.objects.filter(**sol_filtros).select_related(
+        'motivo', 'servicio_unidad'
+    )
 
-    # Obtener todas las áreas únicas (strings directos, no objetos)
-    areas_raw = qs_solicitudes.values_list('area_destino', flat=True).distinct()
+    # Obtener todas las áreas únicas. La unidad ahora es relacional
+    # (servicio_unidad__nombre_unidad), ya no el texto area_destino eliminado.
+    areas_raw = qs_solicitudes.values_list('servicio_unidad__nombre_unidad', flat=True).distinct()
     areas = sorted(set(a or 'Sin Área' for a in areas_raw))
 
     # Obtener todos los motivos únicos
@@ -2640,12 +2648,12 @@ def _obtener_datos_reporte_areas_motivos(fecha_inicio='', fecha_fin=''):
     for area in areas:
         datos[area] = {}
         for motivo in motivos:
-            # Construir filtros de forma segura
+            # Construir filtros de forma segura (vía relación servicio_unidad)
             filtros = {}
             if area == 'Sin Área':
-                filtros['area_destino__in'] = ['', None]
+                filtros['servicio_unidad__isnull'] = True
             else:
-                filtros['area_destino'] = area
+                filtros['servicio_unidad__nombre_unidad'] = area
 
             if motivo == 'Sin Motivo':
                 filtros['motivo__isnull'] = True
