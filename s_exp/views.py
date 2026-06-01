@@ -159,9 +159,30 @@ def _es_exp_solicitante(user):
 
 
 def _get_unidad_usuario(user):
-    """Obtiene el nombre de la unidad del usuario desde PerfilUnidad."""
+    """
+    Obtiene el NOMBRE de la unidad del usuario con cascada de resolución:
+      1. PerfilUnidad (sistema de roles del módulo s_exp)
+      2. Cadena RRHH: Empleado → PersonalNoClinico/PersonalSalud → servicio_unidad
+
+    Esto cubre tanto solicitantes (que suelen tener PerfilUnidad) como
+    admins/digitadores (que suelen estar solo en RRHH). Devuelve '' si no
+    se encuentra en ninguno.
+    """
+    # 1) PerfilUnidad
     perfil = PerfilUnidad.objects.filter(usuario=user).select_related('servicio_unidad').first()
-    return perfil.servicio_unidad.nombre_unidad if perfil and perfil.servicio_unidad else ''
+    if perfil and perfil.servicio_unidad:
+        return perfil.servicio_unidad.nombre_unidad
+
+    # 2) Cadena RRHH (reutilizamos el servicio de datos de solicitud)
+    try:
+        from s_exp.services.datos_solicitud import UbicacionUsuario
+        unidad = UbicacionUsuario.resolver(user)
+        if unidad:
+            return unidad.nombre_unidad
+    except Exception:
+        pass
+
+    return ''
 
 
 def _get_servicio_unidad_from_rrhh(user):
@@ -2817,7 +2838,8 @@ def exportar_reporte_pdf(request):
         # Obtener datos desde la BD
         datos_reporte = _obtener_datos_reporte_areas_motivos(fecha_inicio, fecha_fin)
 
-        # Datos del usuario que genera el reporte
+        # Datos del usuario que genera el reporte.
+        # _get_unidad_usuario ya hace la cascada PerfilUnidad → RRHH.
         user = request.user
         usuario_nombre = (f"{user.first_name} {user.last_name}".strip()) or user.username
         usuario_area = _get_unidad_usuario(user) or '—'
