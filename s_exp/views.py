@@ -49,10 +49,10 @@ logger = logging.getLogger("s_exp")
 # ============================================
 # UTILIDAD: Formateo de fecha/hora en zona local
 # ============================================
-def _fmt_local(dt, formato="%d/%m/%Y %I:%M %p"):
+def _fmt_local(dt, formato="%d/%m/%Y %H:%M"):
     """
     Formatea un datetime CONVIRTIÉNDOLO a la zona horaria local del sistema
-    (TIME_ZONE = America/Tegucigalpa, UTC-6), en formato de 12 horas (AM/PM).
+    (TIME_ZONE = America/Tegucigalpa, UTC-6), en formato de 24 horas.
 
     Compatibilidad:
       - La BD guarda en UTC (USE_TZ=True), igual que TODOS los módulos.
@@ -60,11 +60,11 @@ def _fmt_local(dt, formato="%d/%m/%Y %I:%M %p"):
       - La conversión a hora local se hace SOLO al mostrar, con
         timezone.localtime(), idéntico a core/utils/utilidades_fechas.py.
 
-    Formato 12h: "%I:%M %p" → ej. "09:09 AM" (igual que reporte_paciente).
+    Formato 24h: "%H:%M" → ej. "09:09" / "20:30".
 
     Args:
         dt: datetime aware (o None).
-        formato: patrón strftime (por defecto 12h con AM/PM).
+        formato: patrón strftime (por defecto 24h).
 
     Returns:
         str: fecha/hora local formateada, o '' si dt es None.
@@ -1576,6 +1576,12 @@ def buscar_expedientes_api(request):
         # texto, solo IDs).
         from s_exp.services.datos_solicitud import DatosPaciente
 
+        # Ubicaciones que cuentan como "en el archivo / disponible para prestar".
+        # Regla: un expediente solo puede prestarse si está físicamente en ADMISION.
+        # Durante la transición híbrida también aceptamos ARCHIVO (legacy).
+        # A futuro, dejar únicamente 'ADMISION'.
+        UBICACIONES_DISPONIBLES = {'ADMISION', 'ARCHIVO'}
+
         def _construir_resultado(exp, paciente):
             """Helper interno: dado un Expediente y un Paciente, arma el dict de respuesta."""
             # Precargamos la ubicación (catálogo nuevo) y sus relaciones para
@@ -1586,14 +1592,25 @@ def buscar_expedientes_api(request):
                 'ubicacion__unidad_clinica__servicio_aux',
                 'ubicacion__unidad_no_clinica',
             ).filter(expediente=exp).first()
+
+            ubicacion_texto = _resolver_ubicacion_expediente(exp, info_exp)
+
+            # DISPONIBLE requiere DOS condiciones:
+            #   1. No estar prestado ni en un proceso de solicitud activo.
+            #   2. Estar físicamente en ADMISION (o ARCHIVO durante el híbrido).
+            #      Si está en un área clínica (atención/ingreso), NO se presta.
+            ubic_upper = (ubicacion_texto or '').strip().upper()
+            en_ubicacion_disponible = ubic_upper in UBICACIONES_DISPONIBLES
+            disponible = (exp.id not in expedientes_prestados_ids) and en_ubicacion_disponible
+
             return {
                 "expediente_id": exp.id,
                 "numero_expediente": exp.numero,
                 "paciente_id": paciente.id if paciente else None,
                 "paciente_nombre": DatosPaciente.nombre_completo(paciente),
                 "paciente_dni": DatosPaciente.dni(paciente),
-                "disponible": exp.id not in expedientes_prestados_ids,
-                "ubicacion_fisica": _resolver_ubicacion_expediente(exp, info_exp),
+                "disponible": disponible,
+                "ubicacion_fisica": ubicacion_texto,
             }
 
         resultados = []

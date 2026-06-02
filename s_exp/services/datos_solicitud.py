@@ -34,11 +34,11 @@ from typing import Optional
 from django.utils import timezone
 
 
-def _fmt_local_dt(dt, formato='%d/%m/%Y %I:%M %p'):
+def _fmt_local_dt(dt, formato='%d/%m/%Y %H:%M'):
     """
     Formatea un datetime convirtiéndolo a la zona horaria local (UTC-6) en
-    formato de 12 horas (AM/PM), consistente con los demás módulos.
-    Django guarda en UTC; la conversión a local se hace solo al mostrar.
+    formato de 24 horas. Django guarda en UTC; la conversión a local se hace
+    solo al mostrar.
     """
     if not dt:
         return ''

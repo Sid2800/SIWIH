@@ -123,9 +123,9 @@ def _fmt_fecha(dt, con_hora=True):
     # Convertir a la zona horaria local del sistema antes de formatear
     if timezone.is_aware(dt):
         dt = dt.astimezone(timezone.get_current_timezone())
-    # Formato de 12 horas (AM/PM), consistente con el resto del sistema
+    # Formato de 24 horas
     if con_hora:
-        return dt.strftime('%d/%m/%Y %I:%M %p').strip()
+        return dt.strftime('%d/%m/%Y %H:%M').strip()
     return dt.strftime('%d/%m/%Y')
 
 
