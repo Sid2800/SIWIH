@@ -49,19 +49,22 @@ logger = logging.getLogger("s_exp")
 # ============================================
 # UTILIDAD: Formateo de fecha/hora en zona local
 # ============================================
-def _fmt_local(dt, formato="%d/%m/%Y %H:%M"):
+def _fmt_local(dt, formato="%d/%m/%Y %I:%M %p"):
     """
     Formatea un datetime CONVIRTIÉNDOLO a la zona horaria local del sistema
-    (TIME_ZONE = America/Tegucigalpa, UTC-6).
+    (TIME_ZONE = America/Tegucigalpa, UTC-6), en formato de 12 horas (AM/PM).
 
-    Django guarda los datetime en UTC cuando USE_TZ=True. Si formateamos
-    directo con .strftime() se muestra la hora en UTC (6 horas adelantada).
-    Esta función aplica timezone.localtime() primero para mostrar la hora
-    real local en todas las pestañas (solicitud, devolución, reportes, etc.).
+    Compatibilidad:
+      - La BD guarda en UTC (USE_TZ=True), igual que TODOS los módulos.
+        NO se cambia el almacenamiento para no romper compatibilidad.
+      - La conversión a hora local se hace SOLO al mostrar, con
+        timezone.localtime(), idéntico a core/utils/utilidades_fechas.py.
+
+    Formato 12h: "%I:%M %p" → ej. "09:09 AM" (igual que reporte_paciente).
 
     Args:
         dt: datetime aware (o None).
-        formato: patrón strftime.
+        formato: patrón strftime (por defecto 12h con AM/PM).
 
     Returns:
         str: fecha/hora local formateada, o '' si dt es None.
@@ -71,7 +74,7 @@ def _fmt_local(dt, formato="%d/%m/%Y %H:%M"):
     # Si es aware, convertir a la zona local; si es naive, asumir que ya es local
     if timezone.is_aware(dt):
         dt = timezone.localtime(dt)
-    return dt.strftime(formato)
+    return dt.strftime(formato).strip()
 
 
 # ============================================
@@ -1250,10 +1253,9 @@ def marcar_entregado_api(request):
         )
 
         logger.info(f"Préstamo #{prestamo.id} entregado por {request.user.username}")
-        tz = timezone.get_current_timezone()
         return JsonResponse({
             "success": True,
-            "fecha_entrega": ahora.astimezone(tz).strftime("%d/%m/%Y %H:%M"),
+            "fecha_entrega": _fmt_local(ahora),  # 12h local
             "fecha_limite": prestamo.fecha_limite.isoformat(),
         })
 
@@ -2879,8 +2881,7 @@ def exportar_reporte_pdf(request):
         margen_lat = 1.5 * cm
 
         ahora = timezone.now()
-        tz = timezone.get_current_timezone()
-        fecha_impresion = ahora.astimezone(tz).strftime('%d/%m/%Y %H:%M')
+        fecha_impresion = _fmt_local(ahora)  # 12h local
 
         buf = BytesIO()
 
