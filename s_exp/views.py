@@ -47,6 +47,34 @@ logger = logging.getLogger("s_exp")
 
 
 # ============================================
+# UTILIDAD: Formateo de fecha/hora en zona local
+# ============================================
+def _fmt_local(dt, formato="%d/%m/%Y %H:%M"):
+    """
+    Formatea un datetime CONVIRTIÉNDOLO a la zona horaria local del sistema
+    (TIME_ZONE = America/Tegucigalpa, UTC-6).
+
+    Django guarda los datetime en UTC cuando USE_TZ=True. Si formateamos
+    directo con .strftime() se muestra la hora en UTC (6 horas adelantada).
+    Esta función aplica timezone.localtime() primero para mostrar la hora
+    real local en todas las pestañas (solicitud, devolución, reportes, etc.).
+
+    Args:
+        dt: datetime aware (o None).
+        formato: patrón strftime.
+
+    Returns:
+        str: fecha/hora local formateada, o '' si dt es None.
+    """
+    if not dt:
+        return ''
+    # Si es aware, convertir a la zona local; si es naive, asumir que ya es local
+    if timezone.is_aware(dt):
+        dt = timezone.localtime(dt)
+    return dt.strftime(formato)
+
+
+# ============================================
 # UTILIDAD: Registrar Log en BD
 # ============================================
 def _registrar_log(usuario, accion, descripcion, objeto_tipo=None, objeto_id=None):
@@ -560,7 +588,7 @@ def listar_solicitudes_api(request):
                 "prestamo_id": prestamo_id,
                 "usuario": DatosSolicitud.usuario_username(s),
                 "usuario_nombre": DatosSolicitud.usuario_nombre_completo(s),
-                "fecha_creacion": s.fecha_creacion.strftime("%d/%m/%Y %H:%M"),
+                "fecha_creacion": _fmt_local(s.fecha_creacion),
                 "estado_flujo": DatosSolicitud.estado_codigo(s),
                 "estado_flujo_nombre": DatosSolicitud.estado_nombre(s),
                 "motivo": DatosSolicitud.motivo_nombre(s),
@@ -1113,8 +1141,8 @@ def prestamos_activos_api(request):
                 "unidad_id": DatosSolicitud.unidad_id(p.solicitud),
                 "motivo": DatosSolicitud.motivo_nombre(p.solicitud),
                 "estado": p.estado,
-                "fecha_aprobacion": p.fecha_aprobacion.strftime("%d/%m/%Y %H:%M"),
-                "fecha_entrega": p.fecha_entrega.strftime("%d/%m/%Y %H:%M") if p.fecha_entrega else None,
+                "fecha_aprobacion": _fmt_local(p.fecha_aprobacion),
+                "fecha_entrega": _fmt_local(p.fecha_entrega) or None,
                 "fecha_limite": p.fecha_limite.isoformat() if p.fecha_limite else None,
                 "tiempo_limite_horas": p.tiempo_limite_horas,
                 "tiempo_restante_segundos": p.tiempo_restante_segundos,
@@ -1859,7 +1887,7 @@ def mis_solicitudes_api(request):
                 prestamo_info = {
                     "id": p.id,
                     "estado": p.estado,
-                    "fecha_entrega": p.fecha_entrega.strftime("%d/%m/%Y %H:%M") if p.fecha_entrega else None,
+                    "fecha_entrega": _fmt_local(p.fecha_entrega) or None,
                     "fecha_limite": p.fecha_limite.isoformat() if p.fecha_limite else None,
                     "tiempo_restante_segundos": p.tiempo_restante_segundos,
                     "porcentaje_tiempo_usado": p.porcentaje_tiempo_usado,
@@ -1872,7 +1900,7 @@ def mis_solicitudes_api(request):
 
             data.append({
                 "id": s.id,
-                "fecha_creacion": s.fecha_creacion.strftime("%d/%m/%Y %H:%M"),
+                "fecha_creacion": _fmt_local(s.fecha_creacion),
                 "estado_flujo": DatosSolicitud.estado_codigo(s),
                 "estado_flujo_nombre": DatosSolicitud.estado_nombre(s),
                 "motivo": DatosSolicitud.motivo_nombre(s),
@@ -2267,7 +2295,7 @@ def reportes_data_api(request):
             rechazos.append({
                 "solicitud_id": s.id,
                 "usuario": s.usuario.username,
-                "fecha": s.fecha_creacion.strftime("%d/%m/%Y %H:%M"),
+                "fecha": _fmt_local(s.fecha_creacion),
                 "motivo_rechazo": motivo_r,
             })
 
@@ -2293,7 +2321,7 @@ def reportes_data_api(request):
                 "usuario": DatosSolicitud.usuario_username(p.solicitud),
                 # 'area' viene de la FK unidad (deprecado area_destino texto)
                 "area": DatosSolicitud.unidad_nombre(p.solicitud),
-                "fecha_limite": p.fecha_limite.strftime("%d/%m/%Y %H:%M") if p.fecha_limite else "",
+                "fecha_limite": _fmt_local(p.fecha_limite),
                 "dias_vencido": (ahora - p.fecha_limite).days if p.fecha_limite else 0,
             })
 
@@ -2416,7 +2444,7 @@ def historial_prestamos_paciente_api(request, paciente_id):
 
             data.append({
                 "numero_expediente": DatosDetalleSolicitud.numero_expediente(d),
-                "fecha_solicitud": s.fecha_creacion.strftime("%d/%m/%Y %H:%M"),
+                "fecha_solicitud": _fmt_local(s.fecha_creacion),
                 "motivo": DatosSolicitud.motivo_nombre(s),
                 "solicitante": DatosSolicitud.usuario_nombre_completo(s),
                 "estado": DatosSolicitud.estado_nombre(s),
@@ -2461,7 +2489,7 @@ def historial_prestamos_expediente_api(request, expediente_id):
 
             data.append({
                 "numero_expediente": DatosDetalleSolicitud.numero_expediente(d),
-                "fecha_solicitud": s.fecha_creacion.strftime("%d/%m/%Y %H:%M"),
+                "fecha_solicitud": _fmt_local(s.fecha_creacion),
                 "motivo": DatosSolicitud.motivo_nombre(s),
                 "solicitante": DatosSolicitud.usuario_nombre_completo(s),
                 "estado": DatosSolicitud.estado_nombre(s),
@@ -2538,7 +2566,7 @@ def historial_solicitudes_api(request):
                 "id": s.id,
                 "usuario": DatosSolicitud.usuario_username(s),
                 "usuario_nombre": DatosSolicitud.usuario_nombre_completo(s),
-                "fecha_creacion": s.fecha_creacion.strftime("%d/%m/%Y %H:%M"),
+                "fecha_creacion": _fmt_local(s.fecha_creacion),
                 "estado_flujo": DatosSolicitud.estado_codigo(s),
                 "estado_flujo_nombre": DatosSolicitud.estado_nombre(s),
                 "motivo": DatosSolicitud.motivo_nombre(s),
@@ -2590,7 +2618,7 @@ def historial_solicitud_detalle_api(request, solicitud_id):
         ).select_related('usuario', 'estado_anterior', 'estado_nuevo').order_by('fecha')
 
         logs_data = [{
-            "fecha": l.fecha.strftime("%d/%m/%Y %H:%M"),
+            "fecha": _fmt_local(l.fecha),
             "accion": f"Exp #{l.expediente_id}: {l.estado_anterior.nombre if l.estado_anterior else '—'} → {l.estado_nuevo.nombre}",
             "usuario": l.usuario.username,
             "observacion": l.observacion or "",
@@ -2601,7 +2629,7 @@ def historial_solicitud_detalle_api(request, solicitud_id):
             "id": s.id,
             "usuario": DatosSolicitud.usuario_username(s),
             "usuario_nombre": DatosSolicitud.usuario_nombre_completo(s),
-            "fecha_creacion": s.fecha_creacion.strftime("%d/%m/%Y %H:%M"),
+            "fecha_creacion": _fmt_local(s.fecha_creacion),
             "estado_flujo": DatosSolicitud.estado_codigo(s),
             "estado_flujo_nombre": DatosSolicitud.estado_nombre(s),
             "motivo": DatosSolicitud.motivo_nombre(s),

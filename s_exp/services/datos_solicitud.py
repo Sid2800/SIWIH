@@ -31,6 +31,19 @@ Convenciones:
 """
 
 from typing import Optional
+from django.utils import timezone
+
+
+def _fmt_local_dt(dt, formato='%d/%m/%Y %H:%M'):
+    """
+    Formatea un datetime convirtiéndolo a la zona horaria local (UTC-6).
+    Django guarda en UTC; sin esta conversión la hora saldría adelantada.
+    """
+    if not dt:
+        return ''
+    if timezone.is_aware(dt):
+        dt = timezone.localtime(dt)
+    return dt.strftime(formato)
 
 
 # =============================================================================
@@ -231,7 +244,8 @@ class DatosSolicitud:
             'id': solicitud.id,
             'usuario': DatosSolicitud.usuario_username(solicitud),
             'usuario_nombre': DatosSolicitud.usuario_nombre_completo(solicitud),
-            'fecha_creacion': solicitud.fecha_creacion.strftime('%d/%m/%Y %H:%M'),
+            # Convertir a hora local (UTC-6) antes de formatear
+            'fecha_creacion': _fmt_local_dt(solicitud.fecha_creacion),
             'estado_flujo': DatosSolicitud.estado_codigo(solicitud),
             'estado_flujo_nombre': DatosSolicitud.estado_nombre(solicitud),
             'motivo': DatosSolicitud.motivo_nombre(solicitud),
