@@ -1,8 +1,28 @@
 from django.contrib import admin
 from .models import (
     MotivoSolicitud, EstadoSolicitud, EstadoExpedienteFisico,
-    ExpedientePrestamo, SolicitudPrestamo, ExpedienteEstadoLog
+    ExpedientePrestamo, SolicitudPrestamo, ExpedienteEstadoLog,
+    EstadoPrestamo, EstadoDevolucion, TipoAccionLog,
 )
+
+
+# ----- Catálogos relacionales nuevos (estados como FK) -----
+@admin.register(EstadoPrestamo)
+class EstadoPrestamoAdmin(admin.ModelAdmin):
+    list_display = ('codigo', 'nombre')
+    search_fields = ('codigo', 'nombre')
+
+
+@admin.register(EstadoDevolucion)
+class EstadoDevolucionAdmin(admin.ModelAdmin):
+    list_display = ('codigo', 'nombre')
+    search_fields = ('codigo', 'nombre')
+
+
+@admin.register(TipoAccionLog)
+class TipoAccionLogAdmin(admin.ModelAdmin):
+    list_display = ('codigo', 'nombre')
+    search_fields = ('codigo', 'nombre')
 
 
 @admin.register(MotivoSolicitud)

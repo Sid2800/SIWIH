@@ -83,6 +83,123 @@ class EstadoExpedienteFisico(models.Model):
 
 
 # ============================================
+# CATÁLOGO: ESTADOS DEL PRÉSTAMO
+# ============================================
+class EstadoPrestamo(models.Model):
+    """
+    Catálogo de estados del ciclo de vida de un préstamo.
+
+    Reemplaza el antiguo CharField con choices en Prestamo.estado.
+    El 'codigo' es la clave primaria (string) — mismo patrón que
+    EstadoSolicitud y EstadoExpedienteFisico — para que las consultas
+    existentes (filter(estado='Entregado')) sigan funcionando: Django las
+    interpreta como filter(estado_id='Entregado').
+
+    Estados:
+      Activo            → préstamo aprobado, aún no entregado
+      Entregado         → entregado al solicitante, cronómetro corriendo
+      Vencido           → superó la fecha límite sin devolverse
+      DevolucionParcial → devolución incompleta (faltan expedientes)
+      Cerrado           → devolución completa, préstamo finalizado
+      DevueltoVencido   → devuelto pero fuera de tiempo
+    """
+    codigo = models.CharField(
+        max_length=30,
+        primary_key=True,
+        verbose_name='Código (Ejem: Entregado)'
+    )
+    nombre = models.CharField(
+        max_length=60,
+        verbose_name='Nombre legible del Estado'
+    )
+
+    class Meta:
+        db_table = 's_exp_estadoprestamo'
+        verbose_name = 'Estado de Préstamo'
+        verbose_name_plural = 'Estados de Préstamo'
+
+    def __str__(self):
+        return self.nombre
+
+
+# ============================================
+# CATÁLOGO: ESTADOS DE LA DEVOLUCIÓN
+# ============================================
+class EstadoDevolucion(models.Model):
+    """
+    Catálogo de estados de una devolución (auditoría).
+
+    Reemplaza el CharField con choices en Devolucion.estado.
+    'codigo' como PK (string) por consistencia con los demás catálogos.
+
+    Estados:
+      Completa   → se recibieron todos los expedientes esperados
+      Incompleta → faltaron expedientes por recibir
+      Parcial    → devolución parcial registrada
+    """
+    codigo = models.CharField(
+        max_length=20,
+        primary_key=True,
+        verbose_name='Código (Ejem: Completa)'
+    )
+    nombre = models.CharField(
+        max_length=40,
+        verbose_name='Nombre legible del Estado'
+    )
+
+    class Meta:
+        db_table = 's_exp_estadodevolucion'
+        verbose_name = 'Estado de Devolución'
+        verbose_name_plural = 'Estados de Devolución'
+
+    def __str__(self):
+        return self.nombre
+
+
+# ============================================
+# CATÁLOGO: TIPOS DE ACCIÓN DEL LOG
+# ============================================
+class TipoAccionLog(models.Model):
+    """
+    Catálogo de tipos de acción registrados en la bitácora (LogHistorico).
+
+    Reemplaza el CharField libre en LogHistorico.accion. Tener un catálogo
+    relacional evita typos, permite traducir/describir cada acción en un
+    solo lugar y facilita reportes/filtros por tipo.
+
+    'codigo' como PK (string) para que _registrar_log siga recibiendo el
+    código tal cual ('SOLICITUD_CREADA') y se asigne como accion_id.
+
+    Tipos:
+      SOLICITUD_CREADA              → usuario crea una solicitud
+      SOLICITUD_APROBADA            → admin aprueba
+      SOLICITUD_RECHAZADA           → admin rechaza
+      SOLICITUD_LISTA               → admin marca lista para recoger
+      SOLICITUD_DEVOLUCION_INICIADA → usuario pide devolver
+      PRESTAMO_ENTREGADO            → admin entrega el préstamo
+      REVISION_ENTREGA              → admin revisa entrega
+      DEVOLUCION_PROCESADA          → admin audita la devolución
+    """
+    codigo = models.CharField(
+        max_length=50,
+        primary_key=True,
+        verbose_name='Código (Ejem: SOLICITUD_CREADA)'
+    )
+    nombre = models.CharField(
+        max_length=100,
+        verbose_name='Nombre legible de la Acción'
+    )
+
+    class Meta:
+        db_table = 's_exp_tipoaccionlog'
+        verbose_name = 'Tipo de Acción (Log)'
+        verbose_name_plural = 'Tipos de Acción (Log)'
+
+    def __str__(self):
+        return self.nombre
+
+
+# ============================================
 # EXPEDIENTE PARA PRÉSTAMO (Estado Actual)
 # ============================================
 class ExpedientePrestamo(models.Model):
@@ -324,14 +441,6 @@ class SolicitudExpedienteDetalle(models.Model):
 # PRÉSTAMO
 # ============================================
 class Prestamo(models.Model):
-    ESTADO_CHOICES = [
-        ('Activo', 'Activo'),
-        ('Entregado', 'Entregado'),
-        ('Vencido', 'Vencido'),
-        ('DevolucionParcial', 'Devolución Parcial'),
-        ('Cerrado', 'Cerrado'),
-    ]
-
     solicitud = models.OneToOneField(
         SolicitudPrestamo,
         on_delete=models.PROTECT,
@@ -378,9 +487,15 @@ class Prestamo(models.Model):
         blank=True,
         verbose_name='Última alerta de vencimiento aceptada'
     )
-    estado = models.CharField(
-        max_length=30,
-        choices=ESTADO_CHOICES,
+    # Estado del préstamo ahora es RELACIONAL (FK al catálogo EstadoPrestamo).
+    # El PK del catálogo es el código string ('Entregado', 'Activo'...), por lo
+    # que las consultas filter(estado='Entregado') siguen funcionando (Django
+    # las mapea a estado_id='Entregado'). Las ASIGNACIONES deben usar estado_id:
+    #   prestamo.estado_id = 'Entregado'   (no prestamo.estado = 'Entregado')
+    estado = models.ForeignKey(
+        EstadoPrestamo,
+        on_delete=models.PROTECT,
+        related_name='prestamos',
         default='Activo',
         verbose_name='Estado del Préstamo'
     )
@@ -407,14 +522,14 @@ class Prestamo(models.Model):
     @property
     def esta_vencido(self):
         from django.utils import timezone
-        if self.fecha_limite and self.estado == 'Entregado':
+        if self.fecha_limite and self.estado_id == 'Entregado':
             return timezone.now() > self.fecha_limite
         return False
 
     @property
     def tiempo_restante_segundos(self):
         from django.utils import timezone
-        if self.fecha_limite and self.estado == 'Entregado':
+        if self.fecha_limite and self.estado_id == 'Entregado':
             delta = self.fecha_limite - timezone.now()
             return max(0, int(delta.total_seconds()))
         return None
@@ -422,7 +537,7 @@ class Prestamo(models.Model):
     @property
     def porcentaje_tiempo_usado(self):
         from django.utils import timezone
-        if self.fecha_entrega and self.fecha_limite and self.estado == 'Entregado':
+        if self.fecha_entrega and self.fecha_limite and self.estado_id == 'Entregado':
             total = (self.fecha_limite - self.fecha_entrega).total_seconds()
             usado = (timezone.now() - self.fecha_entrega).total_seconds()
             if total > 0:
@@ -434,12 +549,6 @@ class Prestamo(models.Model):
 # DEVOLUCIÓN
 # ============================================
 class Devolucion(models.Model):
-    ESTADO_CHOICES = [
-        ('Completa', 'Completa'),
-        ('Incompleta', 'Incompleta'),
-        ('Parcial', 'Parcial'),
-    ]
-
     prestamo = models.ForeignKey(
         Prestamo,
         on_delete=models.PROTECT,
@@ -456,9 +565,13 @@ class Devolucion(models.Model):
     cantidad_recibida = models.PositiveIntegerField(
         verbose_name='Cantidad Recibida'
     )
-    estado = models.CharField(
-        max_length=20,
-        choices=ESTADO_CHOICES,
+    # Estado de la devolución ahora es RELACIONAL (FK al catálogo
+    # EstadoDevolucion). PK = código string ('Completa', 'Incompleta',
+    # 'Parcial'). Asignar con estado_id; las queries por string siguen igual.
+    estado = models.ForeignKey(
+        EstadoDevolucion,
+        on_delete=models.PROTECT,
+        related_name='devoluciones',
         default='Completa',
         verbose_name='Estado de Devolución'
     )
@@ -482,8 +595,14 @@ class Devolucion(models.Model):
 # LOG HISTÓRICO GENERAL
 # ============================================
 class LogHistorico(models.Model):
-    accion = models.CharField(
-        max_length=100,
+    # Acción ahora es RELACIONAL (FK al catálogo TipoAccionLog).
+    # PK = código string ('SOLICITUD_CREADA'...). _registrar_log sigue
+    # recibiendo el código y lo asigna como accion_id. Las queries
+    # filter(accion__in=[...]) siguen funcionando (mapean a accion_id__in).
+    accion = models.ForeignKey(
+        TipoAccionLog,
+        on_delete=models.PROTECT,
+        related_name='logs',
         verbose_name='Acción'
     )
     timestamp = models.DateTimeField(

@@ -362,3 +362,45 @@ class DatosPaciente:
             paciente.primer_apellido, paciente.segundo_apellido,
         ]
         return ' '.join([t for t in partes if t]).strip()
+
+
+# =============================================================================
+# DatosPrestamo
+# =============================================================================
+class DatosPrestamo:
+    """
+    Acceso unificado al estado de un Préstamo y de una Devolución.
+
+    Ahora que Prestamo.estado y Devolucion.estado son FK a catálogos
+    (EstadoPrestamo / EstadoDevolucion) con PK = código string:
+      - .estado_id  → el código ('Entregado', 'Activo'...) para lógica/JSON.
+      - .estado.nombre → el nombre legible para mostrar al usuario.
+
+    Estos helpers centralizan el acceso para que las APIs no toquen la FK
+    directamente y siempre devuelvan el dato correcto.
+    """
+
+    @staticmethod
+    def estado_codigo(prestamo) -> str:
+        """Código del estado del préstamo (ej. 'Entregado'). Sirve para
+        comparaciones/lógica y se envía al frontend igual que antes."""
+        return prestamo.estado_id if prestamo and prestamo.estado_id else ''
+
+    @staticmethod
+    def estado_nombre(prestamo) -> str:
+        """Nombre legible del estado del préstamo (catálogo EstadoPrestamo)."""
+        if prestamo and prestamo.estado_id and prestamo.estado:
+            return prestamo.estado.nombre
+        return ''
+
+    @staticmethod
+    def devolucion_estado_codigo(devolucion) -> str:
+        """Código del estado de la devolución (ej. 'Completa')."""
+        return devolucion.estado_id if devolucion and devolucion.estado_id else ''
+
+    @staticmethod
+    def devolucion_estado_nombre(devolucion) -> str:
+        """Nombre legible del estado de la devolución (catálogo EstadoDevolucion)."""
+        if devolucion and devolucion.estado_id and devolucion.estado:
+            return devolucion.estado.nombre
+        return ''

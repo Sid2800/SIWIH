@@ -82,17 +82,26 @@ def _fmt_local(dt, formato="%d/%m/%Y %H:%M"):
 # ============================================
 def _registrar_log(usuario, accion, descripcion, objeto_tipo=None, objeto_id=None):
     """
-    Registra un evento en la bitácora de auditoría del sistema (ExpedienteLog).
-    
+    Registra un evento en la bitácora de auditoría del sistema (LogHistorico).
+
     Args:
         usuario: Instancia de User que realiza la acción.
-        accion: Código de la acción (ej. 'SOLICITUD_CREADA').
+        accion: CÓDIGO de la acción (ej. 'SOLICITUD_CREADA'). Es el PK del
+                catálogo TipoAccionLog; se asigna como accion_id.
         descripcion: Texto explicativo del evento.
         objeto_tipo: Nombre del modelo afectado (opcional).
         objeto_id: ID del registro afectado (opcional).
+
+    Nota: si el código de acción no existe en el catálogo TipoAccionLog,
+    se crea al vuelo (get_or_create) para que el log nunca falle por un
+    código nuevo no registrado previamente.
     """
+    from .models import TipoAccionLog
+    # Asegurar que el tipo de acción exista en el catálogo (evita FK error)
+    TipoAccionLog.objects.get_or_create(codigo=accion, defaults={'nombre': accion})
+
     LogHistorico.objects.create(
-        accion=accion,
+        accion_id=accion,   # FK al catálogo TipoAccionLog (PK = código string)
         usuario=usuario,
         detalle=descripcion,
         objeto_tipo=objeto_tipo,
@@ -957,7 +966,7 @@ def revisar_entrega_api(request):
             solicitud.save()
             try:
                 p = solicitud.prestamo
-                p.estado = 'Cerrado'
+                p.estado_id = 'Cerrado'
                 p.save()
             except Exception:
                 pass
@@ -1143,7 +1152,7 @@ def prestamos_activos_api(request):
                 "unidad": DatosSolicitud.unidad_nombre(p.solicitud),
                 "unidad_id": DatosSolicitud.unidad_id(p.solicitud),
                 "motivo": DatosSolicitud.motivo_nombre(p.solicitud),
-                "estado": p.estado,
+                "estado": p.estado_id,
                 "fecha_aprobacion": _fmt_local(p.fecha_aprobacion),
                 "fecha_entrega": _fmt_local(p.fecha_entrega) or None,
                 "fecha_limite": p.fecha_limite.isoformat() if p.fecha_limite else None,
@@ -1201,7 +1210,7 @@ def marcar_entregado_api(request):
             # Configuración estándar en horas
             prestamo.fecha_limite = ahora + timedelta(hours=prestamo.tiempo_limite_horas)
 
-        prestamo.estado = 'Entregado'
+        prestamo.estado_id = 'Entregado'
         prestamo.save()
 
         prestamo.solicitud.estado_flujo_id = 'SOL_EN_PRESTAMO'
@@ -1321,7 +1330,7 @@ def prestamos_para_devolucion_api(request):
                 "usuario": DatosSolicitud.usuario_username(p.solicitud),
                 "usuario_nombre": DatosSolicitud.usuario_nombre_completo(p.solicitud),
                 "unidad": DatosSolicitud.unidad_nombre(p.solicitud),
-                "estado": p.estado,
+                "estado": p.estado_id,
                 "detalles_expedientes": detalles,
                 "cant_expedientes": p.solicitud.detalles.filter(aprobado=True).count(),
                 "cant_devueltos": p.solicitud.detalles.filter(aprobado=True, devuelto=True).count(),
@@ -1485,15 +1494,15 @@ def procesar_devolucion_api(request):
             # Todo procesado: ver si fue vencido
             if prestamo.esta_vencido:
                 solicitud.estado_flujo_id = 'SOL_FINALIZADA'
-                prestamo.estado = 'DevueltoVencido'
+                prestamo.estado_id = 'DevueltoVencido'
             else:
                 solicitud.estado_flujo_id = 'SOL_FINALIZADA'
-                prestamo.estado = 'Cerrado'
+                prestamo.estado_id = 'Cerrado'
             prestamo.fecha_devolucion_real = timezone.now()
         else:
             # Faltan expedientes (no_recibidos pendientes)
             solicitud.estado_flujo_id = 'SOL_INCOMPLETA'
-            prestamo.estado = 'DevolucionParcial'
+            prestamo.estado_id = 'DevolucionParcial'
             
         solicitud.save()
         prestamo.save()
@@ -1503,7 +1512,8 @@ def procesar_devolucion_api(request):
             prestamo=prestamo,
             cantidad_esperada=total_exp,
             cantidad_recibida=devueltos_ahora,
-            estado='Completa' if devueltos_ahora >= total_exp and not hay_no_recibidos else 'Incompleta',
+            # estado_id (FK al catálogo EstadoDevolucion). El código string es el PK.
+            estado_id='Completa' if devueltos_ahora >= total_exp and not hay_no_recibidos else 'Incompleta',
             notas_admin=notas
         )
 
@@ -1905,7 +1915,7 @@ def mis_solicitudes_api(request):
                 p = s.prestamo
                 prestamo_info = {
                     "id": p.id,
-                    "estado": p.estado,
+                    "estado": p.estado_id,
                     "fecha_entrega": _fmt_local(p.fecha_entrega) or None,
                     "fecha_limite": p.fecha_limite.isoformat() if p.fecha_limite else None,
                     "tiempo_restante_segundos": p.tiempo_restante_segundos,
@@ -2575,7 +2585,7 @@ def historial_solicitudes_api(request):
             if s.estado_flujo_id == 'SOL_INCOMPLETA':
                 faltantes = s.detalles.filter(devuelto=False).count()
                 evento = f"⚠️ Incompleta: {faltantes} expediente(s) sin devolver"
-            elif prestamo and prestamo.estado == 'DevueltoVencido':
+            elif prestamo and prestamo.estado_id == 'DevueltoVencido':
                 evento = "🕒 Devuelto fuera del tiempo acordado"
             elif s.estado_flujo_id == 'SOL_FINALIZADA':
                 evento = "✅ Finalizada correctamente"
@@ -2655,7 +2665,7 @@ def historial_solicitud_detalle_api(request, solicitud_id):
             "area_destino": DatosSolicitud.unidad_nombre(s),
             "expedientes": expedientes_data,
             "logs": logs_data,
-            "prestamo": {"id": prestamo.id, "estado": prestamo.estado} if prestamo else None,
+            "prestamo": {"id": prestamo.id, "estado": prestamo.estado_id} if prestamo else None,
         }})
     except SolicitudPrestamo.DoesNotExist:
         return JsonResponse({"error": "Solicitud no encontrada"}, status=404)
