@@ -134,7 +134,7 @@ def marcar_entregado_api(request):
     prestamo_id = body.get('prestamo_id')
 
     try:
-        prestamo = Prestamo.objects.get(id=prestamo_id, estado='Activo')
+        prestamo = Prestamo.objects.get(id=prestamo_id, estado__codigo='Activo')
         if prestamo.solicitud.estado_flujo_id != EstadoSolicitud.id_de('SOL_LISTO_RECOGER'):
              return JsonResponse({"error": "La solicitud debe estar marcada como 'Listo para recoger' antes de entregar."}, status=400)
     except Prestamo.DoesNotExist:

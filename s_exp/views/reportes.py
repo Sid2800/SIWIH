@@ -181,7 +181,7 @@ def reportes_data_api(request):
 
         # --- INCONSISTENCIAS (devoluciones parciales) ---
         parciales = Prestamo.objects.filter(
-            estado='DevolucionParcial',
+            estado__codigo='DevolucionParcial',
             **filtros_prestamo
         ).select_related('solicitud__usuario')
 
