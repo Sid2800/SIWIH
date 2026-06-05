@@ -34,6 +34,23 @@ class Expediente(models.Model):
         on_delete=models.PROTECT,
         default=1
     )
+    # NUEVO (transición híbrida hacia el catálogo unificado):
+    # Ubicación física ACTUAL del expediente referenciada por id a
+    # expediente_ubicacion (no texto). Convive con 'localizacion' (legacy)
+    # mientras los demás módulos migran; a futuro será la única fuente y
+    # 'localizacion' se eliminará.
+    #   - Por defecto: ADMISION.
+    #   - En préstamos (s_exp): al ENTREGAR cambia a la unidad del solicitante;
+    #     al DEVOLVER regresa a ADMISION.
+    #   - A futuro, casos clínicos usarán Unidad_clinica vía el mismo catálogo.
+    ubicacion = models.ForeignKey(
+        'expediente.ExpedienteUbicacion',
+        on_delete=models.PROTECT,
+        null=True, blank=True,
+        related_name='expedientes_ubicados',
+        verbose_name='Ubicación actual (catálogo unificado)',
+        help_text='FK a expediente_ubicacion. Se actualiza con préstamos/devoluciones.'
+    )
     estado = models.IntegerField(
         verbose_name="Estado",
         choices=[(1, "Asignado"), (2, "Libre")],

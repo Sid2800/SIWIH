@@ -23,16 +23,23 @@ def registrar_log(usuario, accion, descripcion, objeto_tipo=None, objeto_id=None
         objeto_tipo: nombre del modelo afectado (opcional).
         objeto_id: ID del registro afectado (opcional).
     """
-    from s_exp.models import LogHistorico, TipoAccionLog
+    from s_exp.models import LogHistorico, TipoAccionLog, TipoObjetoLog
 
     # Garantizar que el tipo de acción exista en el catálogo (evita FK error).
     # La PK del catálogo es un id ENTERO, así que usamos la instancia obtenida.
     tipo, _ = TipoAccionLog.objects.get_or_create(codigo=accion, defaults={'nombre': accion})
 
+    # objeto_tipo ahora es relacional: recibimos el código (nombre del modelo)
+    # y lo resolvemos a su instancia en el catálogo TipoObjetoLog.
+    obj_tipo = None
+    if objeto_tipo:
+        obj_tipo, _ = TipoObjetoLog.objects.get_or_create(
+            codigo=objeto_tipo, defaults={'nombre': objeto_tipo})
+
     LogHistorico.objects.create(
-        accion=tipo,        # FK al catálogo TipoAccionLog (PK = id entero)
+        accion=tipo,            # FK a TipoAccionLog (PK = id entero)
         usuario=usuario,
         detalle=descripcion,
-        objeto_tipo=objeto_tipo,
+        objeto_tipo=obj_tipo,   # FK a TipoObjetoLog (PK = id entero) o None
         objeto_id=objeto_id,
     )

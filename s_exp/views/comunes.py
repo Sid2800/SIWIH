@@ -69,16 +69,23 @@ def _registrar_log(usuario, accion, descripcion, objeto_tipo=None, objeto_id=Non
     se crea al vuelo (get_or_create) para que el log nunca falle por un
     código nuevo no registrado previamente.
     """
-    from s_exp.models import TipoAccionLog
+    from s_exp.models import TipoAccionLog, TipoObjetoLog
     # Asegurar que el tipo de acción exista en el catálogo (evita FK error).
     # La PK es un id ENTERO; usamos la instancia obtenida para la FK.
     tipo, _ = TipoAccionLog.objects.get_or_create(codigo=accion, defaults={'nombre': accion})
 
+    # objeto_tipo ahora es relacional (FK a TipoObjetoLog): recibimos el código
+    # (nombre del modelo) y lo resolvemos a su instancia.
+    obj_tipo = None
+    if objeto_tipo:
+        obj_tipo, _ = TipoObjetoLog.objects.get_or_create(
+            codigo=objeto_tipo, defaults={'nombre': objeto_tipo})
+
     LogHistorico.objects.create(
-        accion=tipo,        # FK al catálogo TipoAccionLog (PK = id entero)
+        accion=tipo,            # FK a TipoAccionLog (PK = id entero)
         usuario=usuario,
         detalle=descripcion,
-        objeto_tipo=objeto_tipo,
+        objeto_tipo=obj_tipo,   # FK a TipoObjetoLog (PK = id entero) o None
         objeto_id=objeto_id,
     )
 
@@ -265,11 +272,11 @@ def _resolver_ubicacion_expediente(expediente, info_exp=None):
     Resuelve la ubicación ACTUAL del expediente (texto legible).
 
     Prioridad (obtención híbrida durante la transición a expediente_ubicacion):
-    1. NUEVO catálogo: ExpedientePrestamo.ubicacion (FK a ExpedienteUbicacion)
-       → es la fuente más precisa para préstamos del módulo s_exp.
-    2. LEGACY: expediente.localizacion.descripcion_localizacion
+    1. NUEVO: expediente.ubicacion (FK a ExpedienteUbicacion en la tabla
+       principal Expediente) → fuente canónica del catálogo unificado.
+    2. NUEVO: ExpedientePrestamo.ubicacion (FK) → específico del préstamo s_exp.
+    3. LEGACY: expediente.localizacion.descripcion_localizacion
        → lo que usa el módulo expediente (atenciones/ingresos).
-    3. LEGACY: info_exp.ubicacion_fisica (texto libre antiguo).
     4. "ADMISION" como último fallback (ARCHIVO quedó deprecado en s_exp).
 
     Args:
@@ -279,7 +286,16 @@ def _resolver_ubicacion_expediente(expediente, info_exp=None):
     Returns:
         str: descripción de la ubicación actual
     """
-    # 1) Nuevo catálogo (FK relacional) — solo si el expediente está prestado/movido
+    # 1) Nuevo catálogo en la tabla principal Expediente (FK relacional)
+    try:
+        if getattr(expediente, 'ubicacion_id', None):
+            desc = expediente.ubicacion.descripcion
+            if desc:
+                return desc
+    except Exception:
+        pass
+
+    # 2) Nuevo catálogo en ExpedientePrestamo (préstamo s_exp)
     try:
         if info_exp and getattr(info_exp, 'ubicacion_id', None):
             desc = info_exp.ubicacion.descripcion
@@ -288,32 +304,32 @@ def _resolver_ubicacion_expediente(expediente, info_exp=None):
     except Exception:
         pass
 
-    # 2) Legacy: localizacion del expediente (atenciones/ingresos)
+    # 3) Legacy: localizacion del expediente (atenciones/ingresos)
     try:
         if expediente.localizacion and expediente.localizacion.descripcion_localizacion:
             return expediente.localizacion.descripcion_localizacion
     except Exception:
         pass
 
-    # 3) Legacy: texto libre antiguo
-    if info_exp and getattr(info_exp, 'ubicacion_fisica', None):
-        return info_exp.ubicacion_fisica
-
     return "ADMISION"
 
 
-def _set_localizacion_por_solicitud(expediente, solicitud, usuario_admin):
+def _set_localizacion_por_solicitud(expediente, solicitud, usuario_admin, ubicacion_obj=None):
     """
-    Actualiza expediente.localizacion al entregar un préstamo.
+    Actualiza la ubicación del expediente al ENTREGAR un préstamo.
 
-    La nueva ubicación es la unidad del SOLICITANTE, obtenida desde:
-    SolicitudPrestamo.servicio_unidad (capturada via RRHH al crear la solicitud)
-    o, si no existe, se intenta resolver desde la cadena RRHH del usuario.
+    NUEVO (catálogo unificado): si se pasa ubicacion_obj (ExpedienteUbicacion),
+    se guarda en expediente.ubicacion (FK por id) — esta es la fuente futura.
+
+    LEGACY: además sincroniza expediente.localizacion (texto) mientras dura la
+    transición, con la unidad del SOLICITANTE obtenida desde
+    SolicitudPrestamo.servicio_unidad o, si no existe, vía la cadena RRHH.
 
     Args:
         expediente: instancia de Expediente
         solicitud: instancia de SolicitudPrestamo
         usuario_admin: usuario que aprueba/entrega el préstamo
+        ubicacion_obj: instancia de ExpedienteUbicacion (catálogo unificado) o None
 
     Returns:
         str: descripción de la nueva ubicación asignada
@@ -354,26 +370,32 @@ def _set_localizacion_por_solicitud(expediente, solicitud, usuario_admin):
         )
         expediente.localizacion = loc_obj
         expediente.modificado_por = usuario_admin
-        expediente.save(update_fields=['localizacion', 'modificado_por', 'fecha_modificado'])
+        campos = ['localizacion', 'modificado_por', 'fecha_modificado']
+        # NUEVO: persistir también la FK al catálogo unificado en la tabla principal.
+        if ubicacion_obj is not None:
+            expediente.ubicacion = ubicacion_obj
+            campos.append('ubicacion')
+        expediente.save(update_fields=campos)
         return nombre_ubicacion
     except Exception as e:
         logger.warning(f"No se pudo actualizar localizacion del expediente #{expediente.numero}: {e}")
         return nombre_ubicacion
 
 
-def _set_localizacion_admision(expediente, usuario_admin):
+def _set_localizacion_admision(expediente, usuario_admin, ubicacion_obj=None):
     """
-    Devuelve expediente.localizacion (LEGACY) a 'ADMISION' tras una devolución.
+    Devuelve la ubicación del expediente a 'ADMISION' tras una DEVOLUCIÓN.
 
-    El módulo de Solicitud de Expedientes ya NO usa 'ARCHIVO': cuando un
-    expediente se devuelve, regresa a ADMISION. Esta función mantiene
-    sincronizado el campo legacy expediente.localizacion (texto) mientras dura
-    la transición; la fuente principal es ExpedientePrestamo.ubicacion (FK al
-    catálogo expediente_ubicacion).
+    NUEVO (catálogo unificado): si se pasa ubicacion_obj (la fila ADMISION de
+    ExpedienteUbicacion), se guarda en expediente.ubicacion (FK por id).
+
+    LEGACY: además sincroniza expediente.localizacion (texto) a 'ADMISION'
+    mientras dura la transición. El módulo s_exp ya NO usa 'ARCHIVO'.
 
     Args:
         expediente: instancia de Expediente
         usuario_admin: usuario que recibe la devolución
+        ubicacion_obj: fila ADMISION de ExpedienteUbicacion o None
 
     Returns:
         str: "ADMISION"
@@ -391,7 +413,12 @@ def _set_localizacion_admision(expediente, usuario_admin):
             )
         expediente.localizacion = loc_obj
         expediente.modificado_por = usuario_admin
-        expediente.save(update_fields=['localizacion', 'modificado_por', 'fecha_modificado'])
+        campos = ['localizacion', 'modificado_por', 'fecha_modificado']
+        # NUEVO: persistir también la FK al catálogo unificado en la tabla principal.
+        if ubicacion_obj is not None:
+            expediente.ubicacion = ubicacion_obj
+            campos.append('ubicacion')
+        expediente.save(update_fields=campos)
     except Exception as e:
         logger.warning(f"No se pudo regresar a ADMISION el expediente #{expediente.numero}: {e}")
 

@@ -19,7 +19,6 @@ from s_exp.models import SolicitudPrestamo, SolicitudExpedienteDetalle, Prestamo
 
 from .comunes import (
     _es_exp_admin,
-    _get_unidad_usuario,
     _registrar_log,
     _set_localizacion_admision,
 )
@@ -164,7 +163,6 @@ def procesar_devolucion_api(request):
 
         # 1. Procesar los que llegaron (Disponibles)
         esta_vencido = prestamo.esta_vencido
-        unidad_usuario = _get_unidad_usuario(request.user)
 
         # Resolver UNA sola vez la ubicación ADMISION (catálogo nuevo).
         # Al devolver, el expediente regresa a ADMISION.
@@ -187,17 +185,19 @@ def procesar_devolucion_api(request):
                 ep = detalle.expediente_prestamo
                 estado_ant = ep.estado
                 ep.estado_id = EstadoExpedienteFisico.id_de('EXP_DISPONIBLE')
-                ep.ubicacion_fisica = unidad_usuario
-                # NUEVO: regresar al catálogo unificado → ADMISION
+                # NUEVO: regresar al catálogo unificado → ADMISION (FK por id)
                 if ubicacion_admision is not None:
                     ep.ubicacion = ubicacion_admision
                 ep.save()
 
-                # LEGACY: mantener sincronizado expediente.localizacion (texto) → ADMISION
+                # Actualizar la ubicación del expediente a ADMISION:
+                #  - NUEVO: expediente.ubicacion (FK catálogo) = ADMISION
+                #  - LEGACY: expediente.localizacion (texto) sincronizado
                 try:
-                    _set_localizacion_admision(ep.expediente, request.user)
+                    _set_localizacion_admision(ep.expediente, request.user,
+                                               ubicacion_obj=ubicacion_admision)
                 except Exception as _e:
-                    logger.warning(f"No se pudo regresar a ADMISION (legacy) al devolver: {_e}")
+                    logger.warning(f"No se pudo regresar a ADMISION al devolver: {_e}")
 
                 ExpedienteEstadoLog.objects.create(
                     expediente=ep.expediente,

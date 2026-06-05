@@ -287,15 +287,6 @@ class ExpedientePrestamo(models.Model):
         help_text='FK a expediente_ubicacion. Se actualiza al entregar/devolver.'
     )
 
-    # ----- DEPRECATED: texto libre, reemplazado por la FK 'ubicacion'.
-    # Se mantiene temporalmente para no romper código legacy durante transición.
-    ubicacion_fisica = models.CharField(
-        max_length=200,
-        blank=True,
-        null=True,
-        verbose_name='[DEPRECATED] Ubicación Física (texto)'
-    )
-
     class Meta:
         db_table = 's_exp_expedienteprestamo'
         verbose_name = 'Expediente Préstamo'
@@ -649,6 +640,36 @@ class Devolucion(models.Model):
 
 
 # ============================================
+# CATÁLOGO: TIPOS DE OBJETO DEL LOG
+# ============================================
+class TipoObjetoLog(CatalogoCodigoMixin):
+    """
+    Catálogo del 'tipo de objeto' al que apunta una entrada de LogHistorico
+    (junto con objeto_id forman una referencia genérica).
+
+    Antes objeto_tipo era texto libre ('SolicitudPrestamo', 'Prestamo'...).
+    Ahora es relacional: la FK guarda el id entero y aquí vive el código/nombre.
+    'codigo' y la PK entera 'id' vienen de CatalogoCodigoMixin.
+
+    Códigos esperados (nombre del modelo referenciado):
+      SolicitudPrestamo, Prestamo, Devolucion, ...
+    Se crean al vuelo (get_or_create) si aparece un código nuevo.
+    """
+    nombre = models.CharField(
+        max_length=100,
+        verbose_name='Nombre legible del Tipo de Objeto'
+    )
+
+    class Meta:
+        db_table = 's_exp_tipoobjetolog'
+        verbose_name = 'Tipo de Objeto (Log)'
+        verbose_name_plural = 'Tipos de Objeto (Log)'
+
+    def __str__(self):
+        return self.nombre
+
+
+# ============================================
 # LOG HISTÓRICO GENERAL
 # ============================================
 class LogHistorico(models.Model):
@@ -677,10 +698,15 @@ class LogHistorico(models.Model):
         null=True,
         verbose_name='Detalle'
     )
-    objeto_tipo = models.CharField(
-        max_length=100,
-        blank=True,
+    # Tipo de objeto ahora es RELACIONAL (FK al catálogo TipoObjetoLog).
+    # La FK guarda el id entero; registrar_log sigue recibiendo el código
+    # ('SolicitudPrestamo'...) y lo resuelve a la instancia.
+    objeto_tipo = models.ForeignKey(
+        TipoObjetoLog,
+        on_delete=models.PROTECT,
+        related_name='logs',
         null=True,
+        blank=True,
         verbose_name='Tipo de Objeto'
     )
     objeto_id = models.BigIntegerField(

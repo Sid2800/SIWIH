@@ -178,16 +178,18 @@ def marcar_entregado_api(request):
 
             d.expediente_prestamo.save()
 
-            # LEGACY: mantener sincronizado expediente.localizacion (texto) mientras
-            # dura la transición — atenciones/ingresos aún leen de ahí.
+            # Actualizar la ubicación del expediente:
+            #  - NUEVO: expediente.ubicacion (FK catálogo unificado) = ubicacion_destino
+            #  - LEGACY: expediente.localizacion (texto) sincronizado en la transición
             try:
                 _set_localizacion_por_solicitud(
                     d.expediente_prestamo.expediente,
                     prestamo.solicitud,
                     request.user,
+                    ubicacion_obj=ubicacion_destino,
                 )
             except Exception as _e:
-                logger.warning(f"No se pudo actualizar localizacion legacy al entregar: {_e}")
+                logger.warning(f"No se pudo actualizar ubicacion/localizacion al entregar: {_e}")
 
             ExpedienteEstadoLog.objects.create(
                 expediente=d.expediente_prestamo.expediente,
