@@ -59,8 +59,8 @@ def _registrar_log(usuario, accion, descripcion, objeto_tipo=None, objeto_id=Non
 
     Args:
         usuario: Instancia de User que realiza la acción.
-        accion: CÓDIGO de la acción (ej. 'SOLICITUD_CREADA'). Es el PK del
-                catálogo TipoAccionLog; se asigna como accion_id.
+        accion: CÓDIGO de la acción (ej. 'SOLICITUD_CREADA'). Es el 'codigo'
+                (texto único) del catálogo TipoAccionLog; la FK guarda su id.
         descripcion: Texto explicativo del evento.
         objeto_tipo: Nombre del modelo afectado (opcional).
         objeto_id: ID del registro afectado (opcional).
@@ -70,11 +70,12 @@ def _registrar_log(usuario, accion, descripcion, objeto_tipo=None, objeto_id=Non
     código nuevo no registrado previamente.
     """
     from s_exp.models import TipoAccionLog
-    # Asegurar que el tipo de acción exista en el catálogo (evita FK error)
-    TipoAccionLog.objects.get_or_create(codigo=accion, defaults={'nombre': accion})
+    # Asegurar que el tipo de acción exista en el catálogo (evita FK error).
+    # La PK es un id ENTERO; usamos la instancia obtenida para la FK.
+    tipo, _ = TipoAccionLog.objects.get_or_create(codigo=accion, defaults={'nombre': accion})
 
     LogHistorico.objects.create(
-        accion_id=accion,   # FK al catálogo TipoAccionLog (PK = código string)
+        accion=tipo,        # FK al catálogo TipoAccionLog (PK = id entero)
         usuario=usuario,
         detalle=descripcion,
         objeto_tipo=objeto_tipo,

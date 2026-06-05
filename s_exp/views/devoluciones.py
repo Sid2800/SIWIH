@@ -25,6 +25,9 @@ from .comunes import (
 )
 
 
+from s_exp.models import EstadoSolicitud, EstadoExpedienteFisico, EstadoPrestamo, EstadoDevolucion
+
+
 logger = logging.getLogger("s_exp")
 
 
@@ -41,8 +44,8 @@ def prestamos_para_devolucion_api(request):
     try:
         # Mostrar solicitudes marcadas para devolución O con devoluciones incompletas pendientes
         qs = Prestamo.objects.select_related('solicitud__usuario').filter(
-            solicitud__estado_flujo_id='SOL_EN_DEVOLUCION',
-            estado__in=['Entregado', 'Vencido', 'DevolucionParcial']
+            solicitud__estado_flujo__codigo='SOL_EN_DEVOLUCION',
+            estado__codigo__in=['Entregado', 'Vencido', 'DevolucionParcial']
         ).order_by('fecha_limite')
 
         # Importamos los servicios — acceso unificado a datos del detalle
@@ -55,7 +58,7 @@ def prestamos_para_devolucion_api(request):
             for d in p.solicitud.detalles.select_related(
                 'expediente_prestamo__expediente', 'expediente_prestamo__estado', 'paciente'
             ).filter(aprobado=True):
-                estado_fisico_id = d.expediente_prestamo.estado_id or ''
+                estado_fisico_id = EstadoExpedienteFisico.codigo_de(d.expediente_prestamo.estado_id)
                 # Estado de devolución para el front:
                 #   - 'pendiente'  : aún no devuelto
                 #   - 'devuelto'   : devuelto correctamente (EXP_DISPONIBLE)
@@ -85,7 +88,7 @@ def prestamos_para_devolucion_api(request):
                 "usuario": DatosSolicitud.usuario_username(p.solicitud),
                 "usuario_nombre": DatosSolicitud.usuario_nombre_completo(p.solicitud),
                 "unidad": DatosSolicitud.unidad_nombre(p.solicitud),
-                "estado": p.estado_id,
+                "estado": EstadoPrestamo.codigo_de(p.estado_id),
                 "detalles_expedientes": detalles,
                 "cant_expedientes": p.solicitud.detalles.filter(aprobado=True).count(),
                 "cant_devueltos": p.solicitud.detalles.filter(aprobado=True, devuelto=True).count(),
@@ -115,10 +118,10 @@ def solicitar_devolucion_api(request):
         solicitud = SolicitudPrestamo.objects.get(
             id=solicitud_id, 
             usuario=request.user, 
-            estado_flujo_id__in=['SOL_EN_PRESTAMO', 'SOL_INCOMPLETA']
+            estado_flujo__codigo__in=['SOL_EN_PRESTAMO', 'SOL_INCOMPLETA']
         )
         
-        solicitud.estado_flujo_id = 'SOL_EN_DEVOLUCION'
+        solicitud.estado_flujo_id = EstadoSolicitud.id_de('SOL_EN_DEVOLUCION')
         solicitud.save()
 
         _registrar_log(
@@ -183,7 +186,7 @@ def procesar_devolucion_api(request):
 
                 ep = detalle.expediente_prestamo
                 estado_ant = ep.estado
-                ep.estado_id = 'EXP_DISPONIBLE'
+                ep.estado_id = EstadoExpedienteFisico.id_de('EXP_DISPONIBLE')
                 ep.ubicacion_fisica = unidad_usuario
                 # NUEVO: regresar al catálogo unificado → ADMISION
                 if ubicacion_admision is not None:
@@ -199,7 +202,7 @@ def procesar_devolucion_api(request):
                 ExpedienteEstadoLog.objects.create(
                     expediente=ep.expediente,
                     estado_anterior=estado_ant,
-                    estado_nuevo_id='EXP_DISPONIBLE',
+                    estado_nuevo_id=EstadoExpedienteFisico.id_de('EXP_DISPONIBLE'),
                     usuario=request.user,
                     solicitud=solicitud,
                     observacion="Devuelto correctamente" + (" (Fuera de tiempo)" if esta_vencido else "")
@@ -215,13 +218,13 @@ def procesar_devolucion_api(request):
                 
                 ep = detalle.expediente_prestamo
                 estado_ant = ep.estado
-                ep.estado_id = 'EXP_PERDIDO'
+                ep.estado_id = EstadoExpedienteFisico.id_de('EXP_PERDIDO')
                 ep.save()
                 
                 ExpedienteEstadoLog.objects.create(
                     expediente=ep.expediente,
                     estado_anterior=estado_ant,
-                    estado_nuevo_id='EXP_PERDIDO',
+                    estado_nuevo_id=EstadoExpedienteFisico.id_de('EXP_PERDIDO'),
                     usuario=request.user,
                     solicitud=solicitud,
                     observacion="Marcado como perdido durante auditoría"
@@ -234,7 +237,7 @@ def procesar_devolucion_api(request):
             ExpedienteEstadoLog.objects.create(
                 expediente=ep.expediente,
                 estado_anterior=ep.estado,
-                estado_nuevo_id='EXP_PRESTADO',
+                estado_nuevo_id=EstadoExpedienteFisico.id_de('EXP_PRESTADO'),
                 usuario=request.user,
                 solicitud=solicitud,
                 observacion="Auditado como NO RECIBIDO (Sigue en préstamo)"
@@ -248,16 +251,16 @@ def procesar_devolucion_api(request):
         if devueltos_ahora >= total_exp and not hay_no_recibidos:
             # Todo procesado: ver si fue vencido
             if prestamo.esta_vencido:
-                solicitud.estado_flujo_id = 'SOL_FINALIZADA'
-                prestamo.estado_id = 'DevueltoVencido'
+                solicitud.estado_flujo_id = EstadoSolicitud.id_de('SOL_FINALIZADA')
+                prestamo.estado_id = EstadoPrestamo.id_de('DevueltoVencido')
             else:
-                solicitud.estado_flujo_id = 'SOL_FINALIZADA'
-                prestamo.estado_id = 'Cerrado'
+                solicitud.estado_flujo_id = EstadoSolicitud.id_de('SOL_FINALIZADA')
+                prestamo.estado_id = EstadoPrestamo.id_de('Cerrado')
             prestamo.fecha_devolucion_real = timezone.now()
         else:
             # Faltan expedientes (no_recibidos pendientes)
-            solicitud.estado_flujo_id = 'SOL_INCOMPLETA'
-            prestamo.estado_id = 'DevolucionParcial'
+            solicitud.estado_flujo_id = EstadoSolicitud.id_de('SOL_INCOMPLETA')
+            prestamo.estado_id = EstadoPrestamo.id_de('DevolucionParcial')
             
         solicitud.save()
         prestamo.save()
@@ -268,7 +271,7 @@ def procesar_devolucion_api(request):
             cantidad_esperada=total_exp,
             cantidad_recibida=devueltos_ahora,
             # estado_id (FK al catálogo EstadoDevolucion). El código string es el PK.
-            estado_id='Completa' if devueltos_ahora >= total_exp and not hay_no_recibidos else 'Incompleta',
+            estado_id=EstadoDevolucion.id_de('Completa') if devueltos_ahora >= total_exp and not hay_no_recibidos else EstadoDevolucion.id_de('Incompleta'),
             notas_admin=notas
         )
 
@@ -278,7 +281,7 @@ def procesar_devolucion_api(request):
         descripcion_log = (
             f"Auditoría de devolución del préstamo #{prestamo.id}: "
             f"{devueltos_ahora}/{total_exp} expedientes devueltos. "
-            f"Estado solicitud: {solicitud.estado_flujo_id}."
+            f"Estado solicitud: {EstadoSolicitud.codigo_de(solicitud.estado_flujo_id)}."
         )
         _registrar_log(
             request.user,
@@ -287,7 +290,7 @@ def procesar_devolucion_api(request):
             'Prestamo', prestamo.id
         )
 
-        return JsonResponse({"success": True, "estado": solicitud.estado_flujo_id})
+        return JsonResponse({"success": True, "estado": EstadoSolicitud.codigo_de(solicitud.estado_flujo_id)})
 
     except Exception as e:
         logger.error(f"Error en procesar_devolucion_api: {e}", exc_info=True)

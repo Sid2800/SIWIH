@@ -82,15 +82,15 @@ def reportes_data_api(request):
             solicitud__in=qs_solicitudes
         ).count()
         total_aprobadas = qs_solicitudes.filter(
-            estado_flujo_id__in=['SOL_APROBADA_ORGANIZANDO', 'SOL_LISTO_RECOGER',
-                                 'SOL_EN_PRESTAMO', 'SOL_EN_DEVOLUCION',
-                                 'SOL_FINALIZADA', 'SOL_INCOMPLETA']
+            estado_flujo__codigo__in=['SOL_APROBADA_ORGANIZANDO', 'SOL_LISTO_RECOGER',
+                                      'SOL_EN_PRESTAMO', 'SOL_EN_DEVOLUCION',
+                                      'SOL_FINALIZADA', 'SOL_INCOMPLETA']
         ).count()
         total_rechazadas = qs_solicitudes.filter(
-            estado_flujo_id='SOL_RECHAZADA'
+            estado_flujo__codigo='SOL_RECHAZADA'
         ).count()
         total_pendientes = qs_solicitudes.filter(
-            estado_flujo_id='SOL_PENDIENTE'
+            estado_flujo__codigo='SOL_PENDIENTE'
         ).count()
 
         # --- DEMANDA POR ÁREA ---
@@ -138,7 +138,7 @@ def reportes_data_api(request):
 
         # --- RECHAZOS CON DETALLE ---
         rechazos_qs = qs_solicitudes.filter(
-            estado_flujo_id='SOL_RECHAZADA'
+            estado_flujo__codigo='SOL_RECHAZADA'
         ).select_related('usuario')
         rechazos = []
         for s in rechazos_qs:
@@ -162,7 +162,7 @@ def reportes_data_api(request):
             filtros_prestamo['fecha_aprobacion__lte'] = dt_fin
 
         morosos = Prestamo.objects.filter(
-            estado__in=['Entregado', 'Vencido'],
+            estado__codigo__in=['Entregado', 'Vencido'],
             fecha_limite__lt=ahora,
             **filtros_prestamo
         ).select_related('solicitud__usuario', 'solicitud__servicio_unidad')

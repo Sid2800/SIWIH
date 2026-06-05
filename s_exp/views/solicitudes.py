@@ -29,6 +29,9 @@ from .comunes import (
 )
 
 
+from s_exp.models import EstadoSolicitud, EstadoExpedienteFisico, EstadoPrestamo, EstadoDevolucion
+
+
 logger = logging.getLogger("s_exp")
 
 
@@ -60,7 +63,7 @@ def listar_solicitudes_api(request):
         ).annotate(cant_expedientes=Count('detalles'))
 
         if estado_filtro:
-            qs = qs.filter(estado_flujo_id=estado_filtro)
+            qs = qs.filter(estado_flujo__codigo=estado_filtro)
 
         if search_value:
             qs = qs.filter(
@@ -169,7 +172,7 @@ def aprobar_solicitud_api(request):
         }
 
     try:
-        solicitud = SolicitudPrestamo.objects.get(id=solicitud_id, estado_flujo_id='SOL_PENDIENTE')
+        solicitud = SolicitudPrestamo.objects.get(id=solicitud_id, estado_flujo__codigo='SOL_PENDIENTE')
     except SolicitudPrestamo.DoesNotExist:
         return JsonResponse({"error": "Solicitud no encontrada o ya procesada"}, status=404)
 
@@ -179,7 +182,7 @@ def aprobar_solicitud_api(request):
         # Verificar que los expedientes aprobados estén disponibles
         for d in detalles:
             info = mapa_decisiones.get(d.id, {'aprobado': True, 'observaciones': ''})
-            if info['aprobado'] and d.expediente_prestamo.estado_id == 'EXP_PRESTADO':
+            if info['aprobado'] and d.expediente_prestamo.estado_id == EstadoExpedienteFisico.id_de('EXP_PRESTADO'):
                 return JsonResponse({
                     "error": f"El expediente #{d.expediente_prestamo.expediente.numero} ya no está disponible"
                 }, status=400)
@@ -208,18 +211,18 @@ def aprobar_solicitud_api(request):
 
         if todos_rechazados:
             # Rechazar toda la solicitud
-            solicitud.estado_flujo_id = 'SOL_RECHAZADA'
+            solicitud.estado_flujo_id = EstadoSolicitud.id_de('SOL_RECHAZADA')
             solicitud.save()
 
             for d in rechazados:
                 ep = d.expediente_prestamo
                 estado_ant = ep.estado
-                ep.estado_id = 'EXP_DISPONIBLE'
+                ep.estado_id = EstadoExpedienteFisico.id_de('EXP_DISPONIBLE')
                 ep.save()
                 ExpedienteEstadoLog.objects.create(
                     expediente=ep.expediente,
                     estado_anterior=estado_ant,
-                    estado_nuevo_id='EXP_DISPONIBLE',
+                    estado_nuevo_id=EstadoExpedienteFisico.id_de('EXP_DISPONIBLE'),
                     usuario=request.user,
                     solicitud=solicitud,
                     observacion=f"Liberado: todos los expedientes rechazados. Motivo: {motivo_rechazo_general}"
@@ -229,7 +232,7 @@ def aprobar_solicitud_api(request):
                 solicitud=solicitud,
                 admin_aprobador=request.user,
                 motivo_rechazo=motivo_rechazo_general,
-                estado='Cerrado'
+                estado_id=EstadoPrestamo.id_de('Cerrado')
             )
 
             _registrar_log(
@@ -240,19 +243,19 @@ def aprobar_solicitud_api(request):
             return JsonResponse({"success": True, "todos_rechazados": True})
 
         # Al menos un expediente aprobado: continuar con la solicitud
-        solicitud.estado_flujo_id = 'SOL_APROBADA_ORGANIZANDO'
+        solicitud.estado_flujo_id = EstadoSolicitud.id_de('SOL_APROBADA_ORGANIZANDO')
         solicitud.save()
 
         # Aprobados → EXP_APARTADO
         for d in aprobados:
-            if d.expediente_prestamo.estado_id != 'EXP_APARTADO':
+            if d.expediente_prestamo.estado_id != EstadoExpedienteFisico.id_de('EXP_APARTADO'):
                 estado_ant = d.expediente_prestamo.estado
-                d.expediente_prestamo.estado_id = 'EXP_APARTADO'
+                d.expediente_prestamo.estado_id = EstadoExpedienteFisico.id_de('EXP_APARTADO')
                 d.expediente_prestamo.save()
                 ExpedienteEstadoLog.objects.create(
                     expediente=d.expediente_prestamo.expediente,
                     estado_anterior=estado_ant,
-                    estado_nuevo_id='EXP_APARTADO',
+                    estado_nuevo_id=EstadoExpedienteFisico.id_de('EXP_APARTADO'),
                     usuario=request.user,
                     solicitud=solicitud,
                     observacion="Apartado al aprobar solicitud"
@@ -262,12 +265,12 @@ def aprobar_solicitud_api(request):
         for d in rechazados:
             ep = d.expediente_prestamo
             estado_ant = ep.estado
-            ep.estado_id = 'EXP_DISPONIBLE'
+            ep.estado_id = EstadoExpedienteFisico.id_de('EXP_DISPONIBLE')
             ep.save()
             ExpedienteEstadoLog.objects.create(
                 expediente=ep.expediente,
                 estado_anterior=estado_ant,
-                estado_nuevo_id='EXP_DISPONIBLE',
+                estado_nuevo_id=EstadoExpedienteFisico.id_de('EXP_DISPONIBLE'),
                 usuario=request.user,
                 solicitud=solicitud,
                 observacion=f"No se prestará en esta solicitud. Motivo: {motivo_rechazo_general}"
@@ -278,7 +281,7 @@ def aprobar_solicitud_api(request):
             admin_aprobador=request.user,
             tiempo_limite_horas=int(tiempo_limite),
             es_minutos=es_minutos,
-            estado='Activo'
+            estado_id=EstadoPrestamo.id_de('Activo')
         )
 
         detalle_rechazo = f" ({len(rechazados)} expediente(s) rechazado(s))" if rechazados else ""
@@ -304,7 +307,7 @@ def expedientes_revision_api(request, solicitud_id):
 
     try:
         solicitud = SolicitudPrestamo.objects.get(
-            id=solicitud_id, estado_flujo_id='SOL_APROBADA_ORGANIZANDO'
+            id=solicitud_id, estado_flujo__codigo='SOL_APROBADA_ORGANIZANDO'
         )
     except SolicitudPrestamo.DoesNotExist:
         return JsonResponse({"error": "Solicitud no encontrada o no está en revisión"}, status=404)
@@ -332,7 +335,7 @@ def expedientes_solicitud_api(request, solicitud_id):
         return JsonResponse({"error": "Sin permisos"}, status=403)
 
     try:
-        solicitud = SolicitudPrestamo.objects.get(id=solicitud_id, estado_flujo_id='SOL_PENDIENTE')
+        solicitud = SolicitudPrestamo.objects.get(id=solicitud_id, estado_flujo__codigo='SOL_PENDIENTE')
     except SolicitudPrestamo.DoesNotExist:
         return JsonResponse({"error": "Solicitud no encontrada o ya procesada"}, status=404)
 
@@ -350,7 +353,7 @@ def expedientes_solicitud_api(request, solicitud_id):
                 "paciente_id": DatosDetalleSolicitud.paciente_id(d),
                 "paciente_nombre": DatosDetalleSolicitud.paciente_nombre_completo(d),
                 "paciente_identidad": DatosDetalleSolicitud.paciente_dni(d),
-                "estado_fisico": d.expediente_prestamo.estado_id,
+                "estado_fisico": EstadoExpedienteFisico.codigo_de(d.expediente_prestamo.estado_id),
             })
         return JsonResponse({
             "expedientes": expedientes,
@@ -380,7 +383,7 @@ def imprimir_solicitud_pdf(request, solicitud_id):
     except SolicitudPrestamo.DoesNotExist:
         return JsonResponse({"error": "Solicitud no encontrada"}, status=404)
 
-    if solicitud.estado_flujo_id not in estados_permitidos:
+    if EstadoSolicitud.codigo_de(solicitud.estado_flujo_id) not in estados_permitidos:
         return JsonResponse({"error": "La solicitud no está en un estado imprimible"}, status=400)
 
     try:
@@ -422,7 +425,7 @@ def revisar_entrega_api(request):
 
     try:
         solicitud = SolicitudPrestamo.objects.get(
-            id=solicitud_id, estado_flujo_id='SOL_APROBADA_ORGANIZANDO'
+            id=solicitud_id, estado_flujo__codigo='SOL_APROBADA_ORGANIZANDO'
         )
     except SolicitudPrestamo.DoesNotExist:
         return JsonResponse({"error": "Solicitud no encontrada o no está en revisión"}, status=404)
@@ -445,12 +448,12 @@ def revisar_entrega_api(request):
 
                 ep = d.expediente_prestamo
                 estado_ant = ep.estado
-                ep.estado_id = 'EXP_DISPONIBLE'
+                ep.estado_id = EstadoExpedienteFisico.id_de('EXP_DISPONIBLE')
                 ep.save()
                 ExpedienteEstadoLog.objects.create(
                     expediente=ep.expediente,
                     estado_anterior=estado_ant,
-                    estado_nuevo_id='EXP_DISPONIBLE',
+                    estado_nuevo_id=EstadoExpedienteFisico.id_de('EXP_DISPONIBLE'),
                     usuario=request.user,
                     solicitud=solicitud,
                     observacion=f"Revisión de entrega: {d.motivo_rechazo_individual}"
@@ -465,11 +468,11 @@ def revisar_entrega_api(request):
         # Si todos los expedientes quedaron rechazados, cerrar la solicitud
         aprobados_restantes = solicitud.detalles.filter(aprobado=True).count()
         if aprobados_restantes == 0:
-            solicitud.estado_flujo_id = 'SOL_RECHAZADA'
+            solicitud.estado_flujo_id = EstadoSolicitud.id_de('SOL_RECHAZADA')
             solicitud.save()
             try:
                 p = solicitud.prestamo
-                p.estado_id = 'Cerrado'
+                p.estado_id = EstadoPrestamo.id_de('Cerrado')
                 p.save()
             except Exception:
                 pass
@@ -500,11 +503,11 @@ def marcar_listo_recojer_api(request):
         body = json.loads(request.body)
         solicitud_id = body.get('solicitud_id')
 
-        solicitud = SolicitudPrestamo.objects.get(id=solicitud_id, estado_flujo_id='SOL_APROBADA_ORGANIZANDO')
+        solicitud = SolicitudPrestamo.objects.get(id=solicitud_id, estado_flujo__codigo='SOL_APROBADA_ORGANIZANDO')
         # Validar que al menos un expediente siga aprobado
         if solicitud.detalles.filter(aprobado=True).count() == 0:
             return JsonResponse({"error": "No hay expedientes aprobados para entregar"}, status=400)
-        solicitud.estado_flujo_id = 'SOL_LISTO_RECOGER'
+        solicitud.estado_flujo_id = EstadoSolicitud.id_de('SOL_LISTO_RECOGER')
         solicitud.notificado_listo = False  # Reset para que el sistema dispare la alerta al usuario
         solicitud.save()
 
@@ -549,25 +552,25 @@ def rechazar_solicitud_api(request):
         return JsonResponse({"error": "El motivo de rechazo es obligatorio"}, status=400)
 
     try:
-        solicitud = SolicitudPrestamo.objects.get(id=solicitud_id, estado_flujo_id='SOL_PENDIENTE')
+        solicitud = SolicitudPrestamo.objects.get(id=solicitud_id, estado_flujo__codigo='SOL_PENDIENTE')
     except SolicitudPrestamo.DoesNotExist:
         return JsonResponse({"error": "Solicitud no encontrada o ya procesada"}, status=404)
 
     try:
-        solicitud.estado_flujo_id = 'SOL_RECHAZADA'
+        solicitud.estado_flujo_id = EstadoSolicitud.id_de('SOL_RECHAZADA')
         solicitud.save()
 
         # Liberar expedientes: volver a ponerlos disponibles
         for detalle in solicitud.detalles.select_related('expediente_prestamo'):
             ep = detalle.expediente_prestamo
             estado_anterior = ep.estado
-            ep.estado_id = 'EXP_DISPONIBLE'
+            ep.estado_id = EstadoExpedienteFisico.id_de('EXP_DISPONIBLE')
             ep.save()
 
             ExpedienteEstadoLog.objects.create(
                 expediente=ep.expediente,
                 estado_anterior=estado_anterior,
-                estado_nuevo_id='EXP_DISPONIBLE',
+                estado_nuevo_id=EstadoExpedienteFisico.id_de('EXP_DISPONIBLE'),
                 usuario=request.user,
                 solicitud=solicitud,
                 observacion=f"Expediente liberado por rechazo de solicitud. Motivo: {motivo_rechazo}"
@@ -577,7 +580,7 @@ def rechazar_solicitud_api(request):
             solicitud=solicitud,
             admin_aprobador=request.user,
             motivo_rechazo=motivo_rechazo,
-            estado='Cerrado'
+            estado_id=EstadoPrestamo.id_de('Cerrado')
         )
 
         _registrar_log(
@@ -652,12 +655,12 @@ def crear_solicitud_api(request):
 
         # Verificar que existan y no estén prestados o en proceso
         prestados = set(
-            ExpedientePrestamo.objects.filter(estado_id='EXP_PRESTADO')
+            ExpedientePrestamo.objects.filter(estado__codigo='EXP_PRESTADO')
             .values_list('expediente_id', flat=True)
         )
         en_proceso = set(
             SolicitudExpedienteDetalle.objects.filter(
-                solicitud__estado_flujo_id__in=['SOL_PENDIENTE', 'SOL_APROBADA_ORGANIZANDO'],
+                solicitud__estado_flujo__codigo__in=['SOL_PENDIENTE', 'SOL_APROBADA_ORGANIZANDO'],
                 aprobado=True,
             ).values_list('expediente_prestamo__expediente_id', flat=True)
         )
@@ -677,6 +680,7 @@ def crear_solicitud_api(request):
         solicitud = SolicitudPrestamo.objects.create(
             usuario=request.user,
             motivo=motivo,
+            estado_flujo_id=EstadoSolicitud.id_de('SOL_PENDIENTE'),
             observaciones=observaciones or None,
             servicio_unidad=servicio_unidad,  # ubicación del solicitante (FK a servicio.Unidad)
             tiempo_sugerido_horas=tiempo_sugerido_horas,
@@ -689,16 +693,16 @@ def crear_solicitud_api(request):
             # Obtener o crear ExpedientePrestamo (estado físico actual)
             ep, created_ep = ExpedientePrestamo.objects.get_or_create(
                 expediente=exp,
-                defaults={'estado_id': 'EXP_APARTADO'}
+                defaults={'estado_id': EstadoExpedienteFisico.id_de('EXP_APARTADO')}
             )
             if not created_ep:
                 estado_anterior = ep.estado
-                ep.estado_id = 'EXP_APARTADO'
+                ep.estado_id = EstadoExpedienteFisico.id_de('EXP_APARTADO')
                 ep.save()
                 ExpedienteEstadoLog.objects.create(
                     expediente=exp,
                     estado_anterior=estado_anterior,
-                    estado_nuevo_id='EXP_APARTADO',
+                    estado_nuevo_id=EstadoExpedienteFisico.id_de('EXP_APARTADO'),
                     usuario=request.user,
                     solicitud=solicitud,
                     observacion="Expediente apartado por solicitud"
@@ -707,7 +711,7 @@ def crear_solicitud_api(request):
                 ExpedienteEstadoLog.objects.create(
                     expediente=exp,
                     estado_anterior=None,
-                    estado_nuevo_id='EXP_APARTADO',
+                    estado_nuevo_id=EstadoExpedienteFisico.id_de('EXP_APARTADO'),
                     usuario=request.user,
                     solicitud=solicitud
                 )
@@ -817,7 +821,7 @@ def mis_solicitudes_api(request):
                 p = s.prestamo
                 prestamo_info = {
                     "id": p.id,
-                    "estado": p.estado_id,
+                    "estado": EstadoPrestamo.codigo_de(p.estado_id),
                     "fecha_entrega": _fmt_local(p.fecha_entrega) or None,
                     "fecha_limite": p.fecha_limite.isoformat() if p.fecha_limite else None,
                     "tiempo_restante_segundos": p.tiempo_restante_segundos,

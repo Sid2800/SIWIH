@@ -55,14 +55,14 @@ def buscar_expedientes_api(request):
 
         # IDs de expedientes no disponibles (Cualquier estado que no sea disponible)
         expedientes_no_disponibles = set(
-            ExpedientePrestamo.objects.exclude(estado_id='EXP_DISPONIBLE')
+            ExpedientePrestamo.objects.exclude(estado__codigo='EXP_DISPONIBLE')
             .values_list('expediente_id', flat=True)
         )
         # También las solicitudes activas que podrían no haber actualizado el estado físico aún.
         # IMPORTANTE: solo cuentan los detalles APROBADOS — los rechazados ya no apartan al expediente.
         en_proceso = set(
             SolicitudExpedienteDetalle.objects.filter(
-                solicitud__estado_flujo_id__in=['SOL_PENDIENTE', 'SOL_APROBADA_ORGANIZANDO', 'SOL_LISTO_RECOGER', 'SOL_EN_PRESTAMO', 'SOL_EN_DEVOLUCION', 'SOL_INCOMPLETA'],
+                solicitud__estado_flujo__codigo__in=['SOL_PENDIENTE', 'SOL_APROBADA_ORGANIZANDO', 'SOL_LISTO_RECOGER', 'SOL_EN_PRESTAMO', 'SOL_EN_DEVOLUCION', 'SOL_INCOMPLETA'],
                 devuelto=False,
                 aprobado=True,
             ).values_list('expediente_prestamo__expediente_id', flat=True)
@@ -221,7 +221,7 @@ def historial_prestamos_paciente_api(request, paciente_id):
 
         for d in detalles:
             s = d.solicitud
-            estado = s.estado_flujo_id
+            estado = DatosSolicitud.estado_codigo(s)  # id -> código de texto
             if estado in ('SOL_EN_PRESTAMO', 'SOL_APROBADA_ORGANIZANDO') and not d.devuelto:
                 en_prestamo_actual = True
 
@@ -266,7 +266,7 @@ def historial_prestamos_expediente_api(request, expediente_id):
 
         for d in detalles:
             s = d.solicitud
-            estado = s.estado_flujo_id
+            estado = DatosSolicitud.estado_codigo(s)  # id -> código de texto
             if estado in ('SOL_EN_PRESTAMO', 'SOL_APROBADA_ORGANIZANDO') and not d.devuelto:
                 en_prestamo_actual = True
 

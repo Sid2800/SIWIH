@@ -52,7 +52,8 @@ def historial_solicitudes_api(request):
         ).annotate(cant_exp=Count('detalles'))
 
         if estado_filtro:
-            qs = qs.filter(estado_flujo_id=estado_filtro)
+            # estado_filtro es el CÓDIGO de texto que envía el frontend.
+            qs = qs.filter(estado_flujo__codigo=estado_filtro)
 
         if search_value:
             qs = qs.filter(
@@ -72,15 +73,18 @@ def historial_solicitudes_api(request):
             numeros = list(
                 s.detalles.values_list('expediente_prestamo__expediente__numero', flat=True)
             )
-            # Eventos resumen (incompleta, devuelto fuera de tiempo)
+            # Eventos resumen (incompleta, devuelto fuera de tiempo).
+            # Comparamos por id usando id_de() (cacheado, sin query extra), ya
+            # que estado_flujo_id/estado_id son enteros (PK de los catálogos).
+            from s_exp.models import EstadoSolicitud, EstadoPrestamo
             evento = None
             prestamo = s.prestamos.first()
-            if s.estado_flujo_id == 'SOL_INCOMPLETA':
+            if s.estado_flujo_id == EstadoSolicitud.id_de('SOL_INCOMPLETA'):
                 faltantes = s.detalles.filter(devuelto=False).count()
                 evento = f"⚠️ Incompleta: {faltantes} expediente(s) sin devolver"
-            elif prestamo and prestamo.estado_id == 'DevueltoVencido':
+            elif prestamo and prestamo.estado_id == EstadoPrestamo.id_de('DevueltoVencido'):
                 evento = "🕒 Devuelto fuera del tiempo acordado"
-            elif s.estado_flujo_id == 'SOL_FINALIZADA':
+            elif s.estado_flujo_id == EstadoSolicitud.id_de('SOL_FINALIZADA'):
                 evento = "✅ Finalizada correctamente"
 
             from s_exp.services.datos_solicitud import DatosSolicitud
@@ -147,6 +151,8 @@ def historial_solicitud_detalle_api(request, solicitud_id):
         } for l in logs]
 
         prestamo = s.prestamos.first()
+        # estado del prestamo: traducir id->codigo para el frontend.
+        from s_exp.models import EstadoPrestamo
         return JsonResponse({"data": {
             "id": s.id,
             "usuario": DatosSolicitud.usuario_username(s),
@@ -158,7 +164,7 @@ def historial_solicitud_detalle_api(request, solicitud_id):
             "area_destino": DatosSolicitud.unidad_nombre(s),
             "expedientes": expedientes_data,
             "logs": logs_data,
-            "prestamo": {"id": prestamo.id, "estado": prestamo.estado_id} if prestamo else None,
+            "prestamo": {"id": prestamo.id, "estado": EstadoPrestamo.codigo_de(prestamo.estado_id)} if prestamo else None,
         }})
     except SolicitudPrestamo.DoesNotExist:
         return JsonResponse({"error": "Solicitud no encontrada"}, status=404)

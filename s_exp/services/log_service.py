@@ -25,11 +25,12 @@ def registrar_log(usuario, accion, descripcion, objeto_tipo=None, objeto_id=None
     """
     from s_exp.models import LogHistorico, TipoAccionLog
 
-    # Garantizar que el tipo de acción exista en el catálogo (evita FK error)
-    TipoAccionLog.objects.get_or_create(codigo=accion, defaults={'nombre': accion})
+    # Garantizar que el tipo de acción exista en el catálogo (evita FK error).
+    # La PK del catálogo es un id ENTERO, así que usamos la instancia obtenida.
+    tipo, _ = TipoAccionLog.objects.get_or_create(codigo=accion, defaults={'nombre': accion})
 
     LogHistorico.objects.create(
-        accion_id=accion,   # FK al catálogo TipoAccionLog (PK = código string)
+        accion=tipo,        # FK al catálogo TipoAccionLog (PK = id entero)
         usuario=usuario,
         detalle=descripcion,
         objeto_tipo=objeto_tipo,

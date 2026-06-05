@@ -69,8 +69,11 @@ def changes_check_api(request):
     ]
 
     def _max_log(acciones, excluir_self=True):
-        """MAX(timestamp) de logs filtrados por tipo. Opcional: excluir al user actual."""
-        qs = LogHistorico.objects.filter(accion__in=acciones)
+        """MAX(timestamp) de logs filtrados por tipo. Opcional: excluir al user actual.
+
+        'acciones' son CÓDIGOS de texto; la FK accion guarda un id entero, por
+        eso filtramos por accion__codigo__in (no accion__in)."""
+        qs = LogHistorico.objects.filter(accion__codigo__in=acciones)
         if excluir_self:
             qs = qs.exclude(usuario=user)
         return qs.aggregate(ts=Max('timestamp'))['ts']
@@ -117,7 +120,7 @@ def alertas_usuario_api(request):
         # Alertas para solicitantes: préstamos a punto de vencer
         prestamos_usuario = Prestamo.objects.filter(
             solicitud__usuario=request.user,
-            estado='Entregado'
+            estado__codigo='Entregado'
         )
 
         for p in prestamos_usuario:
@@ -161,7 +164,7 @@ def alertas_usuario_api(request):
         # Alertas de Vencimiento Recurrentes (Sticky cada 5 min)
         prestamos_vencidos = Prestamo.objects.filter(
             solicitud__usuario=request.user,
-            estado='Vencido'
+            estado__codigo='Vencido'
         )
         ahora = timezone.now()
         for p in prestamos_vencidos:
@@ -186,7 +189,7 @@ def alertas_usuario_api(request):
         # Solicitudes aprobadas listas para retirar (Persistentes hasta que el usuario las acepte)
         solicitudes_aprobadas = SolicitudPrestamo.objects.filter(
             usuario=request.user,
-            estado_flujo_id='SOL_LISTO_RECOGER',
+            estado_flujo__codigo='SOL_LISTO_RECOGER',
             notificado_listo=False
         )
         for s in solicitudes_aprobadas:
@@ -200,9 +203,8 @@ def alertas_usuario_api(request):
 
         # Solicitudes rechazadas recientes
         solicitudes_rechazadas = SolicitudPrestamo.objects.filter(
-
             usuario=request.user,
-            estado_flujo_id='SOL_RECHAZADA'
+            estado_flujo__codigo='SOL_RECHAZADA'
         ).order_by('-fecha_creacion')[:5]
         for s in solicitudes_rechazadas:
             try:

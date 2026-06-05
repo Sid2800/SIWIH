@@ -4,6 +4,77 @@ from expediente.models import Expediente
 
 
 # ============================================
+# MIXIN: CATÁLOGO CON CÓDIGO SEMÁNTICO
+# ============================================
+class CatalogoCodigoMixin(models.Model):
+    """
+    Base para los catálogos de estados/acciones del módulo.
+
+    DISEÑO RELACIONAL:
+      - La LLAVE PRIMARIA es un 'id' entero autoincremental (lo agrega Django
+        automáticamente). Las FK de las tablas transaccionales guardan ese id
+        (entero pequeño), NO el texto — esto reduce el tamaño de la BD y es la
+        forma correcta de normalizar (igual que s_exp_motivosolicitud).
+      - 'codigo' es un texto ESTABLE y ÚNICO ('Entregado', 'SOL_PENDIENTE'...).
+        Sirve para que la LÓGICA del código siga siendo legible y para mostrar
+        en el frontend. NO es la PK: es solo una columna indexada única.
+
+    ACCESO DESDE EL CÓDIGO:
+      - Para FILTRAR por código:   Modelo.objects.filter(campo__codigo='X')
+      - Para ASIGNAR/COMPARAR id:  Modelo.id_de('X')   → devuelve el id entero
+      - Para LEER el código de un id (sin query): Modelo.codigo_de(id)
+      - Para obtener la instancia: Modelo.obtener('X')
+
+    RENDIMIENTO:
+      id_de()/codigo_de()/obtener() cachean el mapeo a nivel de clase. Los
+      catálogos son pequeños y casi inmutables, así que tras la primera
+      consulta se sirven de memoria (0 queries). codigo_de() evita el N+1 al
+      serializar muchas filas (no toca la relación). Si se repuebla el
+      catálogo, reinicie el proceso (o llame a limpiar_cache()).
+    """
+    codigo = models.CharField(max_length=50, unique=True)
+
+    class Meta:
+        abstract = True
+
+    # Cachés por clase. Cada subclase obtiene los suyos al asignarse por primera
+    # vez (cls.<attr> = ...), sin compartir con las demás subclases.
+    _cache_id = None        # { codigo: id }
+    _cache_codigo = None    # { id: codigo }
+
+    @classmethod
+    def id_de(cls, codigo):
+        """Devuelve el id ENTERO correspondiente a un código (cacheado)."""
+        if cls._cache_id is None:
+            cls._cache_id = {}
+        if codigo not in cls._cache_id:
+            cls._cache_id[codigo] = cls.objects.get(codigo=codigo).pk
+        return cls._cache_id[codigo]
+
+    @classmethod
+    def codigo_de(cls, id_):
+        """Devuelve el CÓDIGO (texto) a partir de un id, sin query (cacheado)."""
+        if not id_:
+            return ''
+        if cls._cache_codigo is None:
+            cls._cache_codigo = {
+                row['id']: row['codigo'] for row in cls.objects.values('id', 'codigo')
+            }
+        return cls._cache_codigo.get(id_, '')
+
+    @classmethod
+    def obtener(cls, codigo):
+        """Devuelve la INSTANCIA correspondiente a un código."""
+        return cls.objects.get(codigo=codigo)
+
+    @classmethod
+    def limpiar_cache(cls):
+        """Invalida las cachés (usar tras repoblar el catálogo)."""
+        cls._cache_id = None
+        cls._cache_codigo = None
+
+
+# ============================================
 # CATÁLOGO: MOTIVOS DE SOLICITUD
 # ============================================
 class MotivoSolicitud(models.Model):
@@ -30,12 +101,8 @@ class MotivoSolicitud(models.Model):
 # ============================================
 # CATÁLOGO: ESTADOS DE SOLICITUD
 # ============================================
-class EstadoSolicitud(models.Model):
-    codigo = models.CharField(
-        max_length=50,
-        primary_key=True,
-        verbose_name='Código (Ejem: SOL_PENDIENTE)'
-    )
+class EstadoSolicitud(CatalogoCodigoMixin):
+    # 'codigo' (texto único) y la PK entera 'id' vienen de CatalogoCodigoMixin.
     nombre = models.CharField(
         max_length=100,
         verbose_name='Nombre del Estado'
@@ -58,16 +125,12 @@ class EstadoSolicitud(models.Model):
 # ============================================
 # CATÁLOGO: ESTADOS DEL EXPEDIENTE FISICO
 # ============================================
-class EstadoExpedienteFisico(models.Model):
+class EstadoExpedienteFisico(CatalogoCodigoMixin):
     """
     Define el estado físico actual de un expediente en el archivo
     (ej. Disponible, Prestado, En Proceso de Ubicación).
+    'codigo' (texto único) y la PK entera 'id' vienen de CatalogoCodigoMixin.
     """
-    codigo = models.CharField(
-        max_length=50,
-        primary_key=True,
-        verbose_name='Código (Ejem: EXP_DISPONIBLE)'
-    )
     nombre = models.CharField(
         max_length=100,
         verbose_name='Nombre del Estado'
@@ -85,7 +148,7 @@ class EstadoExpedienteFisico(models.Model):
 # ============================================
 # CATÁLOGO: ESTADOS DEL PRÉSTAMO
 # ============================================
-class EstadoPrestamo(models.Model):
+class EstadoPrestamo(CatalogoCodigoMixin):
     """
     Catálogo de estados del ciclo de vida de un préstamo.
 
@@ -102,12 +165,9 @@ class EstadoPrestamo(models.Model):
       DevolucionParcial → devolución incompleta (faltan expedientes)
       Cerrado           → devolución completa, préstamo finalizado
       DevueltoVencido   → devuelto pero fuera de tiempo
+
+    'codigo' (texto único) y la PK entera 'id' vienen de CatalogoCodigoMixin.
     """
-    codigo = models.CharField(
-        max_length=30,
-        primary_key=True,
-        verbose_name='Código (Ejem: Entregado)'
-    )
     nombre = models.CharField(
         max_length=60,
         verbose_name='Nombre legible del Estado'
@@ -125,7 +185,7 @@ class EstadoPrestamo(models.Model):
 # ============================================
 # CATÁLOGO: ESTADOS DE LA DEVOLUCIÓN
 # ============================================
-class EstadoDevolucion(models.Model):
+class EstadoDevolucion(CatalogoCodigoMixin):
     """
     Catálogo de estados de una devolución (auditoría).
 
@@ -136,12 +196,9 @@ class EstadoDevolucion(models.Model):
       Completa   → se recibieron todos los expedientes esperados
       Incompleta → faltaron expedientes por recibir
       Parcial    → devolución parcial registrada
+
+    'codigo' (texto único) y la PK entera 'id' vienen de CatalogoCodigoMixin.
     """
-    codigo = models.CharField(
-        max_length=20,
-        primary_key=True,
-        verbose_name='Código (Ejem: Completa)'
-    )
     nombre = models.CharField(
         max_length=40,
         verbose_name='Nombre legible del Estado'
@@ -159,7 +216,7 @@ class EstadoDevolucion(models.Model):
 # ============================================
 # CATÁLOGO: TIPOS DE ACCIÓN DEL LOG
 # ============================================
-class TipoAccionLog(models.Model):
+class TipoAccionLog(CatalogoCodigoMixin):
     """
     Catálogo de tipos de acción registrados en la bitácora (LogHistorico).
 
@@ -179,12 +236,9 @@ class TipoAccionLog(models.Model):
       PRESTAMO_ENTREGADO            → admin entrega el préstamo
       REVISION_ENTREGA              → admin revisa entrega
       DEVOLUCION_PROCESADA          → admin audita la devolución
+
+    'codigo' (texto único) y la PK entera 'id' vienen de CatalogoCodigoMixin.
     """
-    codigo = models.CharField(
-        max_length=50,
-        primary_key=True,
-        verbose_name='Código (Ejem: SOLICITUD_CREADA)'
-    )
     nombre = models.CharField(
         max_length=100,
         verbose_name='Nombre legible de la Acción'
@@ -209,12 +263,14 @@ class ExpedientePrestamo(models.Model):
         related_name='prestamo_info',
         verbose_name='Expediente'
     )
+    # FK al catálogo (guarda el id entero). El estado inicial 'EXP_DISPONIBLE'
+    # se asigna explícitamente en el código (get_or_create) vía
+    # EstadoExpedienteFisico.id_de('EXP_DISPONIBLE').
     estado = models.ForeignKey(
         EstadoExpedienteFisico,
         on_delete=models.PROTECT,
         related_name='expedientes',
-        verbose_name='Estado Físico Actual',
-        default='EXP_DISPONIBLE'
+        verbose_name='Estado Físico Actual'
     )
 
     # Ubicación física ACTUAL del expediente, referenciada por relación
@@ -264,12 +320,14 @@ class SolicitudPrestamo(models.Model):
         auto_now_add=True,
         verbose_name='Fecha de Creación'
     )
+    # FK al catálogo (guarda el id entero). El estado inicial 'SOL_PENDIENTE'
+    # se asigna explícitamente al crear la solicitud vía
+    # EstadoSolicitud.id_de('SOL_PENDIENTE').
     estado_flujo = models.ForeignKey(
         EstadoSolicitud,
         on_delete=models.PROTECT,
         related_name='solicitudes',
-        verbose_name='Estado de la Solicitud',
-        default='SOL_PENDIENTE'
+        verbose_name='Estado de la Solicitud'
     )
     motivo = models.ForeignKey(
         MotivoSolicitud,
@@ -487,16 +545,16 @@ class Prestamo(models.Model):
         blank=True,
         verbose_name='Última alerta de vencimiento aceptada'
     )
-    # Estado del préstamo ahora es RELACIONAL (FK al catálogo EstadoPrestamo).
-    # El PK del catálogo es el código string ('Entregado', 'Activo'...), por lo
-    # que las consultas filter(estado='Entregado') siguen funcionando (Django
-    # las mapea a estado_id='Entregado'). Las ASIGNACIONES deben usar estado_id:
-    #   prestamo.estado_id = 'Entregado'   (no prestamo.estado = 'Entregado')
+    # Estado del préstamo: FK RELACIONAL al catálogo EstadoPrestamo, cuya PK
+    # es un id ENTERO (no el texto). Para trabajar con el código:
+    #   - Asignar:  prestamo.estado_id = EstadoPrestamo.id_de('Entregado')
+    #   - Filtrar:  Prestamo.objects.filter(estado__codigo='Entregado')
+    #   - Comparar: prestamo.estado_id == EstadoPrestamo.id_de('Entregado')
+    #   - Leer cód: prestamo.estado.codigo  (o vía DatosPrestamo en servicios)
     estado = models.ForeignKey(
         EstadoPrestamo,
         on_delete=models.PROTECT,
         related_name='prestamos',
-        default='Activo',
         verbose_name='Estado del Préstamo'
     )
     tiempo_limite_horas = models.PositiveIntegerField(
@@ -522,14 +580,14 @@ class Prestamo(models.Model):
     @property
     def esta_vencido(self):
         from django.utils import timezone
-        if self.fecha_limite and self.estado_id == 'Entregado':
+        if self.fecha_limite and self.estado_id == EstadoPrestamo.id_de('Entregado'):
             return timezone.now() > self.fecha_limite
         return False
 
     @property
     def tiempo_restante_segundos(self):
         from django.utils import timezone
-        if self.fecha_limite and self.estado_id == 'Entregado':
+        if self.fecha_limite and self.estado_id == EstadoPrestamo.id_de('Entregado'):
             delta = self.fecha_limite - timezone.now()
             return max(0, int(delta.total_seconds()))
         return None
@@ -537,7 +595,7 @@ class Prestamo(models.Model):
     @property
     def porcentaje_tiempo_usado(self):
         from django.utils import timezone
-        if self.fecha_entrega and self.fecha_limite and self.estado_id == 'Entregado':
+        if self.fecha_entrega and self.fecha_limite and self.estado_id == EstadoPrestamo.id_de('Entregado'):
             total = (self.fecha_limite - self.fecha_entrega).total_seconds()
             usado = (timezone.now() - self.fecha_entrega).total_seconds()
             if total > 0:
@@ -572,7 +630,6 @@ class Devolucion(models.Model):
         EstadoDevolucion,
         on_delete=models.PROTECT,
         related_name='devoluciones',
-        default='Completa',
         verbose_name='Estado de Devolución'
     )
     notas_admin = models.TextField(

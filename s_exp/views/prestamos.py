@@ -27,6 +27,9 @@ from .comunes import (
 )
 
 
+from s_exp.models import EstadoSolicitud, EstadoExpedienteFisico, EstadoPrestamo, EstadoDevolucion
+
+
 logger = logging.getLogger("s_exp")
 
 
@@ -50,7 +53,7 @@ def prestamos_activos_api(request):
         qs = Prestamo.objects.select_related(
             'solicitud__usuario', 'solicitud__motivo', 'solicitud__servicio_unidad'
         ).filter(
-            estado__in=['Activo', 'Entregado', 'Vencido', 'DevolucionParcial', 'DevueltoVencido']
+            estado__codigo__in=['Activo', 'Entregado', 'Vencido', 'DevolucionParcial', 'DevueltoVencido']
         )
 
         if estado_filtro:
@@ -65,7 +68,7 @@ def prestamos_activos_api(request):
             )
 
         total_records = Prestamo.objects.filter(
-            estado__in=['Activo', 'Entregado', 'Vencido', 'DevolucionParcial', 'DevueltoVencido']
+            estado__codigo__in=['Activo', 'Entregado', 'Vencido', 'DevolucionParcial', 'DevueltoVencido']
         ).count()
         filtered_records = qs.count()
 
@@ -91,7 +94,7 @@ def prestamos_activos_api(request):
                 "unidad": DatosSolicitud.unidad_nombre(p.solicitud),
                 "unidad_id": DatosSolicitud.unidad_id(p.solicitud),
                 "motivo": DatosSolicitud.motivo_nombre(p.solicitud),
-                "estado": p.estado_id,
+                "estado": EstadoPrestamo.codigo_de(p.estado_id),
                 "fecha_aprobacion": _fmt_local(p.fecha_aprobacion),
                 "fecha_entrega": _fmt_local(p.fecha_entrega) or None,
                 "fecha_limite": p.fecha_limite.isoformat() if p.fecha_limite else None,
@@ -101,7 +104,7 @@ def prestamos_activos_api(request):
                 "esta_vencido": p.esta_vencido,
                 "expedientes": numeros,
                 "cant_expedientes": len(numeros),
-                "solicitud_estado_flujo": p.solicitud.estado_flujo_id,
+                "solicitud_estado_flujo": EstadoSolicitud.codigo_de(p.solicitud.estado_flujo_id),
             })
 
         return JsonResponse({
@@ -132,7 +135,7 @@ def marcar_entregado_api(request):
 
     try:
         prestamo = Prestamo.objects.get(id=prestamo_id, estado='Activo')
-        if prestamo.solicitud.estado_flujo_id != 'SOL_LISTO_RECOGER':
+        if prestamo.solicitud.estado_flujo_id != EstadoSolicitud.id_de('SOL_LISTO_RECOGER'):
              return JsonResponse({"error": "La solicitud debe estar marcada como 'Listo para recoger' antes de entregar."}, status=400)
     except Prestamo.DoesNotExist:
         return JsonResponse({"error": "Préstamo no encontrado o no está en estado Activo"}, status=404)
@@ -149,10 +152,10 @@ def marcar_entregado_api(request):
             # Configuración estándar en horas
             prestamo.fecha_limite = ahora + timedelta(hours=prestamo.tiempo_limite_horas)
 
-        prestamo.estado_id = 'Entregado'
+        prestamo.estado_id = EstadoPrestamo.id_de('Entregado')
         prestamo.save()
 
-        prestamo.solicitud.estado_flujo_id = 'SOL_EN_PRESTAMO'
+        prestamo.solicitud.estado_flujo_id = EstadoSolicitud.id_de('SOL_EN_PRESTAMO')
         prestamo.solicitud.save()
 
         # Resolver UNA sola vez la ubicación destino del préstamo (Opción A):
@@ -167,7 +170,7 @@ def marcar_entregado_api(request):
         # Solo marcar como prestados los expedientes aprobados
         for d in prestamo.solicitud.detalles.select_related('expediente_prestamo__expediente').filter(aprobado=True):
             estado_anterior = d.expediente_prestamo.estado
-            d.expediente_prestamo.estado_id = 'EXP_PRESTADO'
+            d.expediente_prestamo.estado_id = EstadoExpedienteFisico.id_de('EXP_PRESTADO')
 
             # NUEVO: registrar la ubicación actual via FK al catálogo unificado.
             if ubicacion_destino is not None:
@@ -189,7 +192,7 @@ def marcar_entregado_api(request):
             ExpedienteEstadoLog.objects.create(
                 expediente=d.expediente_prestamo.expediente,
                 estado_anterior=estado_anterior,
-                estado_nuevo_id='EXP_PRESTADO',
+                estado_nuevo_id=EstadoExpedienteFisico.id_de('EXP_PRESTADO'),
                 usuario=request.user,
                 solicitud=prestamo.solicitud
             )

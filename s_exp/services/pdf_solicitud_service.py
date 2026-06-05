@@ -363,7 +363,9 @@ def generar_pdf_solicitud(solicitud, admin_actual=None):
 
     # Estado del flujo: si la solicitud está finalizada/incompleta/etc., los comentarios
     # de devolución y rechazo individual ya tienen sentido y deben imprimirse.
-    estado_flujo = (solicitud.estado_flujo_id or '').upper() if hasattr(solicitud, 'estado_flujo_id') else ''
+    # estado_flujo_id ahora es un id entero; traducimos a su código de texto.
+    from s_exp.models import EstadoSolicitud
+    estado_flujo = (EstadoSolicitud.codigo_de(solicitud.estado_flujo_id) or '').upper()
     estados_con_revision = {'SOL_LISTO_RECOGER', 'SOL_EN_PRESTAMO', 'SOL_EN_DEVOLUCION',
                              'SOL_INCOMPLETA', 'SOL_FINALIZADA', 'SOL_RECHAZADA'}
     mostrar_comentarios = estado_flujo in estados_con_revision

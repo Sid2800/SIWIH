@@ -224,8 +224,13 @@ class DatosSolicitud:
 
     @staticmethod
     def estado_codigo(solicitud) -> str:
-        """Código del estado de la solicitud (ej: SOL_PENDIENTE)."""
-        return solicitud.estado_flujo_id or ''
+        """Código del estado de la solicitud (ej: SOL_PENDIENTE).
+
+        estado_flujo_id ahora es un ENTERO (PK del catálogo). Traducimos el id
+        a su código de texto vía la caché de EstadoSolicitud (sin query extra).
+        """
+        from s_exp.models import EstadoSolicitud
+        return EstadoSolicitud.codigo_de(solicitud.estado_flujo_id)
 
     @staticmethod
     def estado_nombre(solicitud) -> str:
@@ -372,19 +377,21 @@ class DatosPrestamo:
     Acceso unificado al estado de un Préstamo y de una Devolución.
 
     Ahora que Prestamo.estado y Devolucion.estado son FK a catálogos
-    (EstadoPrestamo / EstadoDevolucion) con PK = código string:
-      - .estado_id  → el código ('Entregado', 'Activo'...) para lógica/JSON.
+    (EstadoPrestamo / EstadoDevolucion) cuya PK es un id ENTERO:
+      - .estado_id  → el id entero. Lo traducimos a su código de texto
+        ('Entregado', 'Activo'...) con codigo_de() para lógica/JSON/frontend.
       - .estado.nombre → el nombre legible para mostrar al usuario.
 
     Estos helpers centralizan el acceso para que las APIs no toquen la FK
-    directamente y siempre devuelvan el dato correcto.
+    directamente y el frontend siga recibiendo el código string como siempre.
     """
 
     @staticmethod
     def estado_codigo(prestamo) -> str:
         """Código del estado del préstamo (ej. 'Entregado'). Sirve para
         comparaciones/lógica y se envía al frontend igual que antes."""
-        return prestamo.estado_id if prestamo and prestamo.estado_id else ''
+        from s_exp.models import EstadoPrestamo
+        return EstadoPrestamo.codigo_de(prestamo.estado_id) if prestamo else ''
 
     @staticmethod
     def estado_nombre(prestamo) -> str:
@@ -396,7 +403,8 @@ class DatosPrestamo:
     @staticmethod
     def devolucion_estado_codigo(devolucion) -> str:
         """Código del estado de la devolución (ej. 'Completa')."""
-        return devolucion.estado_id if devolucion and devolucion.estado_id else ''
+        from s_exp.models import EstadoDevolucion
+        return EstadoDevolucion.codigo_de(devolucion.estado_id) if devolucion else ''
 
     @staticmethod
     def devolucion_estado_nombre(devolucion) -> str:
