@@ -52,13 +52,32 @@
 $(document).ready(function() {
     cargarDevoluciones(false);
 
-    // ===== Auto-refresh AUTOMÁTICO (sin banner) =====
-    // Para Control de Devoluciones, conviene auto-reload porque el admin
-    // necesita ver las nuevas devoluciones inmediatamente y procesarlas.
+    // ===== Auto-refresh inteligente con BANNER (botón "Actualizar") =====
+    //
+    // ORIGEN DEL FLUJO:
+    //   Cuando un usuario marca una solicitud para devolver, el backend
+    //   (solicitar_devolucion_api) registra el log 'SOLICITUD_DEVOLUCION_INICIADA'.
+    //   El endpoint ligero changes_check_api expone MAX(timestamp) de ese log
+    //   bajo la sección 'devoluciones'.
+    //
+    // QUÉ HACE:
+    //   registrarConTrigger consulta changes_check_api cada 5s (polling con
+    //   header X-Polling-Request, por lo que NO renueva la sesión de 30 min).
+    //   Si el timestamp de 'devoluciones' cambió respecto al último visto,
+    //   acumula las novedades en un BANNER flotante con un botón "Actualizar",
+    //   en lugar de recargar solo. Así el admin no pierde el contexto si está
+    //   auditando una devolución en curso, y ve un contador cuando llegan
+    //   varias devoluciones seguidas (2, 3, ...). Mismo comportamiento que
+    //   Gestión de Solicitudes (consistencia de UX).
+    //
+    // IMPACTO EN RENDIMIENTO:
+    //   El polling solo pega a un endpoint que hace agregaciones MAX(timestamp)
+    //   (muy barato). La recarga real (cargarDevoluciones) solo se ejecuta
+    //   cuando el admin pulsa "Actualizar", no en cada tick.
     if (window.RealtimeSExp) {
-        RealtimeSExp.registrarConAutoReload('control-devoluciones', 'devoluciones', function () {
+        RealtimeSExp.registrarConTrigger('control-devoluciones', 'devoluciones', function () {
             cargarDevoluciones(true);
-        }, 5);
+        }, 5, { etiqueta: 'devoluciones' });
     }
 });
 

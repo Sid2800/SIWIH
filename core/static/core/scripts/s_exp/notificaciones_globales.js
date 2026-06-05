@@ -56,17 +56,45 @@ function verificarAlertasGlobales() {
         // Header para que este polling NO renueve la sesión del usuario
         headers: { 'X-Polling-Request': 'true' },
         success: function (resp) {
-            if (resp.alertas && resp.alertas.length > 0) {
-                resp.alertas.forEach(function (alerta) {
-                    // Solo procesar alertas persistentes (sticky)
-                    if (alerta.sticky) {
-                        if (alerta.tipo_alerta === 'vencimiento' && alerta.prestamo_id) {
-                            mostrarModalAlertaVencimiento(alerta);
-                        } else if (alerta.solicitud_id) {
-                            mostrarModalAlertaSticky(alerta);
-                        }
-                    }
-                });
+            // ===== Cola SECUENCIAL: un modal global a la vez =====
+            //
+            // ORIGEN DEL FLUJO:
+            //   /api/alertas/ devuelve SOLO las alertas del usuario actual
+            //   (sus solicitudes "listas para recoger" o sus préstamos vencidos).
+            //   Por eso, si el admin notifica a varias personas distintas, cada
+            //   quien ve únicamente las suyas: NO se acumulan entre usuarios.
+            //
+            // QUÉ HACE (evita el parpadeo de modales):
+            //   SweetAlert2 solo puede mostrar un modal a la vez. Antes el
+            //   forEach disparaba un Swal.fire por cada alerta y cada uno
+            //   reemplazaba al anterior (solo se veía el último). Ahora:
+            //     1. Si YA hay un modal activo → no abrir otro (se respeta el
+            //        que el usuario está leyendo).
+            //     2. Si no hay ninguno → se muestra SOLO la primera alerta
+            //        pendiente. Las demás NO se marcan como leídas, así que
+            //        reaparecen en el siguiente ciclo (5s) en cuanto el usuario
+            //        pulsa "Entendido". Resultado: se atienden una por una.
+            //
+            // IMPACTO EN RENDIMIENTO:
+            //   Igual de ligero que antes (un solo request a /alertas/), pero
+            //   sin crear/destruir modales innecesarios en el mismo ciclo.
+            if (!resp.alertas || !resp.alertas.length) return;
+
+            // Si ya hay un modal sticky abierto, esperar a que se acepte.
+            if (window.__sexp_modales_activos && window.__sexp_modales_activos.size > 0) return;
+
+            // Tomar la PRIMERA alerta sticky válida y mostrar solo esa.
+            const pendiente = resp.alertas.find(function (a) {
+                return a.sticky && (
+                    (a.tipo_alerta === 'vencimiento' && a.prestamo_id) || a.solicitud_id
+                );
+            });
+            if (!pendiente) return;
+
+            if (pendiente.tipo_alerta === 'vencimiento' && pendiente.prestamo_id) {
+                mostrarModalAlertaVencimiento(pendiente);
+            } else if (pendiente.solicitud_id) {
+                mostrarModalAlertaSticky(pendiente);
             }
         },
         error: function (xhr) {
