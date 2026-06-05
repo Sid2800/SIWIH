@@ -214,10 +214,16 @@ def _header_footer_factory(solicitud, fecha_impresion, con_hora_footer):
     return dibujar_header, dibujar_footer
 
 
-def generar_pdf_solicitud(solicitud):
+def generar_pdf_solicitud(solicitud, admin_actual=None):
     """
     Genera el PDF de la solicitud y retorna bytes.
-    solicitud: instancia de SolicitudPrestamo
+
+    Args:
+        solicitud: instancia de SolicitudPrestamo.
+        admin_actual: usuario admin que genera/imprime el PDF. Se usa como
+            RESPALDO para la firma de entrega cuando la solicitud aún no tiene
+            un Prestamo con admin_aprobador (p. ej. recién aprobada/organizando,
+            o solicitudes creadas por flujos antiguos sin préstamo asociado).
     """
     tz = timezone.get_current_timezone()
     ahora = timezone.now().astimezone(tz)
@@ -459,6 +465,7 @@ def generar_pdf_solicitud(solicitud):
     # =========================================================
     admin_nombre = ''
     admin_area = ''
+    # 1) Preferimos el admin que aprobó el préstamo (firmante real de la entrega).
     try:
         p = solicitud.prestamo
         a = p.admin_aprobador
@@ -466,6 +473,15 @@ def generar_pdf_solicitud(solicitud):
         admin_area = _unidad_usuario(a) if a else ''
     except Exception:
         pass
+
+    # 2) Respaldo: si aún no hay admin_aprobador (solicitud en organización o sin
+    #    préstamo asociado), usamos el admin que está generando el PDF.
+    if not admin_nombre and admin_actual is not None:
+        admin_nombre = (
+            f"{admin_actual.first_name} {admin_actual.last_name}".strip()
+            or admin_actual.username
+        )
+        admin_area = _unidad_usuario(admin_actual)
 
     solicitante_nombre = responsable
     solicitante_area = unidad

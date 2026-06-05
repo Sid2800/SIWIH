@@ -385,7 +385,9 @@ def imprimir_solicitud_pdf(request, solicitud_id):
 
     try:
         from s_exp.services.pdf_solicitud_service import generar_pdf_solicitud
-        pdf_bytes = generar_pdf_solicitud(solicitud)
+        # Pasamos el admin actual como respaldo de la firma de entrega cuando
+        # la solicitud aún no tiene admin_aprobador (organizando/sin préstamo).
+        pdf_bytes = generar_pdf_solicitud(solicitud, admin_actual=request.user)
     except Exception as e:
         logger.error(f"Error generando PDF solicitud {solicitud_id}: {e}", exc_info=True)
         return JsonResponse({"error": "Error al generar el PDF"}, status=500)
