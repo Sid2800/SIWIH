@@ -6,6 +6,12 @@ from django.utils.timezone import localtime, now
 from core.constants.domain_constants import LogApp
 from core.utils.utilidades_logging import log_error, log_warning
 from ingreso.models import Ingreso
+from mapeo_camas.constants.view_constants import (
+    OBS_AJUSTE_MAPEO_SIN_ALTA,
+    ESTADOS_OCUPADA_PREALTA,
+    OBS_REASIGNACION_SIN_ORIGEN_DETALLE,
+    OBS_REASIGNACION_SIN_ORIGEN_HISTORIAL,
+)
 from mapeo_camas.models import AsignacionCamaPaciente, HistorialEstadoCama, EstadoMapeo, get_observacion_mapeo
 from mapeo_camas.models import MapeoSesionCama, MapeoSesionServicio  # [2026-05-29] Bloqueo de ingreso por sesion de mapeo en curso
 from paciente.models import Paciente
@@ -128,6 +134,105 @@ class MapeoCamasService:
                     }
                 )
         return resultados
+
+    @staticmethod
+    def obtener_ultimas_asignaciones_por_cama(cama_ids=None):
+        """[2026-06-09 REFACTOR] Retorna dict {cama_id: AsignacionCamaPaciente} con asignación más reciente."""
+        try:
+            ultima_asignacion_id = (
+                AsignacionCamaPaciente.objects
+                .filter(cama_id=OuterRef("cama_id"))
+                .order_by("-fecha_inicio", "-id")
+                .values("id")[:1]
+            )
+            qs = (
+                AsignacionCamaPaciente.objects
+                .select_related("ingreso", "estado")
+                .filter(id=Subquery(ultima_asignacion_id))
+            )
+            if cama_ids:
+                qs = qs.filter(cama_id__in=cama_ids)
+            return {asig.cama_id: asig for asig in qs}
+        except Exception as exc:
+            log_error(
+                "Error al obtener ultimas asignaciones por cama",
+                app=LogApp.INGRESOS,
+                camas_filtradas=len(cama_ids) if cama_ids else 0,
+                error=str(exc),
+            )
+            raise
+
+    @staticmethod
+    def obtener_ultimos_historiales_por_cama(cama_ids=None):
+        """[2026-06-09 REFACTOR] Retorna dict {cama_id: HistorialEstadoCama} con historial más reciente."""
+        try:
+            ultima_historial_id = (
+                HistorialEstadoCama.objects
+                .filter(cama_id=OuterRef("cama_id"))
+                .order_by("-fecha_hora", "-id")
+                .values("id")[:1]
+            )
+            qs = (
+                HistorialEstadoCama.objects
+                .select_related("usuario")
+                .filter(id=Subquery(ultima_historial_id))
+            )
+            if cama_ids:
+                qs = qs.filter(cama_id__in=cama_ids)
+            return {historial.cama_id: historial for historial in qs}
+        except Exception as exc:
+            log_error(
+                "Error al obtener ultimos historiales por cama",
+                app=LogApp.INGRESOS,
+                camas_filtradas=len(cama_ids) if cama_ids else 0,
+                error=str(exc),
+            )
+            raise
+
+    @staticmethod
+    def liberar_cama_reasignacion_sin_origen(*, usuario, cama, asignacion, estado_anterior, sesion_mapeo):
+        """[2026-06-09 FEATURE] Libera cama ocupada cuando la reasignacion no encuentra paciente en otra cama."""
+        from mapeo_camas._sesion import _registrar_detalle_mapeo, _registrar_historial_mapeo
+
+        estado_vacia = MapeoCamasService.get_estado_mapeo("VACIA", "ESTADO_CAMA")
+
+        with transaction.atomic():
+            asignacion.estado = estado_vacia
+            asignacion.ingreso = None
+            asignacion.usuario_asignacion = usuario
+            asignacion.save(update_fields=["estado", "ingreso", "usuario_asignacion"])
+
+            historial = _registrar_historial_mapeo(
+                cama=cama,
+                estado_anterior=estado_anterior,
+                estado_nuevo=estado_vacia,
+                ingreso=None,
+                usuario=usuario,
+                observacion=get_observacion_mapeo(OBS_REASIGNACION_SIN_ORIGEN_HISTORIAL),
+                sesion_mapeo=sesion_mapeo,
+            )
+
+            from mapeo_camas.models import DetalleMapeoCama
+
+            _registrar_detalle_mapeo(
+                usuario=usuario,
+                cama=cama,
+                asignacion=asignacion,
+                tipo_accion=DetalleMapeoCama.TipoAccion.CORRECCION,
+                hubo_cambio=True,
+                observacion=get_observacion_mapeo(OBS_REASIGNACION_SIN_ORIGEN_DETALLE),
+                sesion_mapeo=sesion_mapeo,
+            )
+
+        log_warning(
+            "Cama liberada por reasignacion sin origen",
+            app=LogApp.INGRESOS,
+            cama_id=getattr(cama, "pk", None),
+            usuario_id=getattr(usuario, "id", None),
+            sesion_mapeo_id=getattr(sesion_mapeo, "id", None),
+        )
+
+        return {"asignacion": asignacion, "historial": historial, "estado_vacia": estado_vacia}
 
     @staticmethod
     def obtener_historiales_data(tipo, cama_id="", fecha_inicio=None, fecha_fin=None):
@@ -1221,6 +1326,23 @@ class MapeoOperacionesMapaService:
         with transaction.atomic():
             estado_historial_anterior = estado_anterior
 
+            # [2026-06-09 FIX] Si el ingreso saliente ya tiene cama activa en otro lugar,
+            # no corresponde registrar ALTA: corresponde salida por traslado del origen.
+            asig_ingreso_anterior_en_otra_cama = None
+            if requiere_cierre_ocupada_a_ocupada and ingreso_anterior:
+                asig_ingreso_anterior_en_otra_cama = (
+                    AsignacionCamaPaciente.objects
+                    .select_related("cama", "estado")
+                    .filter(
+                        ingreso_id=ingreso_anterior.id,
+                        estado__codigo__in=ESTADOS_OCUPADA_PREALTA,
+                        estado__categoria="ESTADO_CAMA",
+                    )
+                    .exclude(cama_id=cama.pk)
+                    .order_by("-fecha_inicio", "-id")
+                    .first()
+                )
+
             if requiere_cierre_prealta:
                 registrar_historial(
                     cama=cama, estado_anterior=estado_anterior, estado_nuevo=estado_alta,
@@ -1237,18 +1359,26 @@ class MapeoOperacionesMapaService:
                 estado_historial_anterior = estado_vacia
 
             if requiere_cierre_ocupada_a_ocupada:
-                registrar_historial(
-                    cama=cama, estado_anterior=estado_anterior, estado_nuevo=estado_alta,
-                    ingreso=ingreso_anterior, usuario=usuario,
-                    observacion=get_observacion_mapeo("Alta historica por reasignacion directa de cama"),
-                    sesion_mapeo=sesion_mapeo, forzar_nuevo=True,
-                )
-                registrar_historial(
-                    cama=cama, estado_anterior=estado_alta, estado_nuevo=estado_vacia,
-                    ingreso=None, usuario=usuario,
-                    observacion=get_observacion_mapeo("Liberacion de cama tras alta historica"),
-                    sesion_mapeo=sesion_mapeo, forzar_nuevo=True,
-                )
+                if asig_ingreso_anterior_en_otra_cama:
+                    registrar_historial(
+                        cama=cama, estado_anterior=estado_anterior, estado_nuevo=estado_vacia,
+                        ingreso=None, usuario=usuario,
+                        observacion=get_observacion_mapeo(OBS_AJUSTE_MAPEO_SIN_ALTA),
+                        sesion_mapeo=sesion_mapeo, forzar_nuevo=True,
+                    )
+                else:
+                    registrar_historial(
+                        cama=cama, estado_anterior=estado_anterior, estado_nuevo=estado_alta,
+                        ingreso=ingreso_anterior, usuario=usuario,
+                        observacion=get_observacion_mapeo("Alta historica por reasignacion directa de cama"),
+                        sesion_mapeo=sesion_mapeo, forzar_nuevo=True,
+                    )
+                    registrar_historial(
+                        cama=cama, estado_anterior=estado_alta, estado_nuevo=estado_vacia,
+                        ingreso=None, usuario=usuario,
+                        observacion=get_observacion_mapeo("Liberacion de cama tras alta historica"),
+                        sesion_mapeo=sesion_mapeo, forzar_nuevo=True,
+                    )
                 estado_historial_anterior = estado_vacia
 
             if requiere_registro_alta_a_vacia:

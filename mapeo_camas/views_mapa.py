@@ -74,7 +74,6 @@ from ._sesion import (
     _registrar_historial_mapeo,
     _sincronizar_cama_en_ingreso_activo,
 )
-from .services import MapeoCamasQueryService
 from .validators import (
     validar_cama_id,
     validar_ids_movimiento,
@@ -233,8 +232,8 @@ def mapa_camas_data(request):
         }
 
     # 2026-06-09: ORM pesado extraído a service reutilizable para adelgazar la vista.
-    asignacion_por_cama = MapeoCamasQueryService.obtener_ultimas_asignaciones_por_cama()
-    historial_por_cama = MapeoCamasQueryService.obtener_ultimos_historiales_por_cama()
+    asignacion_por_cama = MapeoCamasService.obtener_ultimas_asignaciones_por_cama()
+    historial_por_cama = MapeoCamasService.obtener_ultimos_historiales_por_cama()
 
     cambios_por_sala = {
         item["sala_real_id"]: item["total"]

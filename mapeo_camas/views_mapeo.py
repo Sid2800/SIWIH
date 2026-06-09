@@ -11,6 +11,7 @@ from django.views.decorators.http import require_GET, require_POST
 
 from core.utils.utilidades_fechas import hora_local_iso
 from core.utils.utilidades_request import parse_json_request
+from core.services.mapeo_camas_service import MapeoCamasService
 from servicio.models import Cama, Servicio
 
 from mapeo_camas.models import (
@@ -437,6 +438,49 @@ def procesar_cama_mapeo(request):
                     {"ok": False, "error": "Este rol solo puede realizar cambios de cama dentro del mismo servicio."},
                     status=403,
                 )
+
+    # [2026-06-09 FEATURE] Si la cama figura ocupada y el paciente observado no está en otra cama,
+    # corregir a VACIA con observacion para alinear estado fisico vs sistema.
+    if accion == "CAMBIO_TRASLADO" and ingreso_observado:
+        asig_actual = (
+            AsignacionCamaPaciente.objects
+            .select_related("estado", "ingreso")
+            .filter(cama_id=cama.pk)
+            .order_by("-fecha_inicio", "-id")
+            .first()
+        )
+        asig_ingreso_en_otra_cama = (
+            AsignacionCamaPaciente.objects
+            .select_related("estado")
+            .filter(
+                ingreso_id=ingreso_observado.id,
+                estado__codigo__in=ESTADOS_OCUPADA_PREALTA,
+                estado__categoria="ESTADO_CAMA",
+            )
+            .exclude(cama_id=cama.pk)
+            .order_by("-fecha_inicio", "-id")
+            .first()
+        )
+        if (
+            asig_actual
+            and asig_actual.estado
+            and asig_actual.estado.codigo in ESTADOS_OCUPADA_PREALTA
+            and asig_ingreso_en_otra_cama is None
+        ):
+            resultado_liberacion = MapeoCamasService.liberar_cama_reasignacion_sin_origen(
+                usuario=request.user,
+                cama=cama,
+                asignacion=asig_actual,
+                estado_anterior=asig_actual.estado,
+                sesion_mapeo=sesion,
+            )
+            return JsonResponse(
+                {
+                    "ok": True,
+                    "mensaje": "No se encontro al paciente en otra cama. La cama se actualizo a VACIA con observacion.",
+                    "estado_sistema": resultado_liberacion["estado_vacia"].codigo,
+                }
+            )
 
     if accion == "CAMBIO_TRASLADO":
         limite_error = _validar_limite_intentos_salas(request.user, [sala_real.id])
