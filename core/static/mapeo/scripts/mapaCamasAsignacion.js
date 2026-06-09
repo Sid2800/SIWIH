@@ -922,15 +922,8 @@ document.addEventListener("DOMContentLoaded", function () {
       "</fieldset>" +
       '<fieldset id="bloque-mover-cama" class="modalAtencionCampos" style="display:none">' +
       "  <legend>Seleccionar cama destino disponible</legend>" +
-      '  <div class="formularioCampoModal">' +
-      '    <label for="modal-tipo-busqueda-cama">Buscar por</label>' +
-      '    <select id="modal-tipo-busqueda-cama" class="formularioCampo-select">' +
-      '      <option value="numero" selected>Numero de cama</option>' +
-      '      <option value="sala">Sala</option>' +
-      '      <option value="servicio">Servicio</option>' +
-      '      <option value="cubiculo">Cubiculo</option>' +
-      "    </select>" +
-      "  </div>" +
+      // 2026-05-29: se removio el filtro 'Buscar por' (numero/sala/servicio/cubiculo);
+      // el TomSelect busca directamente por todos esos campos a la vez.
       '  <div class="formularioCampoModal">' +
       '    <label for="modal-cama-destino">Cama disponible</label>' +
       '    <select id="modal-cama-destino" class="formularioCampo-select">' +
@@ -1149,27 +1142,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
           // Cargar camas disponibles; excluir la cama actual del listado
           var selectCamaDestino = document.getElementById("modal-cama-destino");
-          var tipoBusquedaCama = document.getElementById("modal-tipo-busqueda-cama");
+          // 2026-05-29: TomSelect busca directo por numero/sala/servicio/cubiculo/text;
+          // ya no hay selector 'Buscar por' separado.
           var todasCamasDisponibles = [];
           var tomCamaDestino = null;
-
-          function obtenerCampoBusquedaCama() {
-            // Cambia el campo de busqueda del TomSelect sin tocar las opciones cargadas.
-            var tipo = tipoBusquedaCama ? tipoBusquedaCama.value : "numero";
-            if (tipo === "numero") {
-              return ["numero", "text"];
-            }
-            if (tipo === "sala") {
-              return ["sala", "text"];
-            }
-            if (tipo === "servicio") {
-              return ["servicio", "text"];
-            }
-            if (tipo === "cubiculo") {
-              return ["cubiculo", "text"];
-            }
-            return ["text"];
-          }
 
           fetch(API_URLS.camasDisponibles + "?excluir=" + encodeURIComponent(numeroCama))
             .then(function (r) { return r.ok ? r.json() : Promise.reject("Error al cargar camas."); })
@@ -1177,11 +1153,10 @@ document.addEventListener("DOMContentLoaded", function () {
               // Cache local para filtrar en memoria sin pegar al backend por tecla.
               todasCamasDisponibles = data.results || [];
               if (selectCamaDestino && window.TomSelect) {
-                // Select con busqueda integrada para mantener 2 controles visibles.
                 tomCamaDestino = new TomSelect(selectCamaDestino, {
                   valueField: "id",
                   labelField: "text",
-                  searchField: obtenerCampoBusquedaCama(),
+                  searchField: ["numero", "sala", "servicio", "cubiculo", "text"],
                   placeholder: "Buscar cama disponible...",
                   options: mapCamasTomSelect(todasCamasDisponibles)
                 });
@@ -1192,18 +1167,6 @@ document.addEventListener("DOMContentLoaded", function () {
             .catch(function () {
               selectCamaDestino.innerHTML = '<option value="">Error al cargar camas disponibles</option>';
             });
-
-          if (tipoBusquedaCama) {
-            tipoBusquedaCama.addEventListener("change", function () {
-              if (tomCamaDestino) {
-                // Reinicia input interno y reevalua con nuevo criterio de busqueda.
-                tomCamaDestino.settings.searchField = obtenerCampoBusquedaCama();
-                tomCamaDestino.clear(true);
-                tomCamaDestino.clearTextbox();
-                tomCamaDestino.refreshOptions(false);
-              }
-            });
-          }
 
         } else {
           // Cama VACIA (u otro estado sin paciente): mostrar/ocultar busqueda de paciente

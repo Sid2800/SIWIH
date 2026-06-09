@@ -376,3 +376,445 @@ class MapeoCamasService:
     # Alias explicito para mantener el nombre funcional solicitado.
     SINCRONIZAR_CAMA_CON_INGRESO = sincronizar_cama_con_ingreso
     SINCRONIZAR_CAMBIO_CAMA_EN_INGRESO = sincronizar_cambio_cama_en_ingreso
+
+
+# =============================================================================
+# 2026-05-29: Refactor B - operaciones pesadas del mapa de camas migradas
+# desde mapeo_camas/views.py al servicio. Las vistas pasan a ser wrappers
+# de parsing + permisos + armado de respuesta.
+# Imports diferidos para evitar ciclos con mapeo_camas._sesion/_helpers.
+# =============================================================================
+
+
+def _mc_constants():
+    from mapeo_camas._constants import (
+        OBSERVACION_CAMBIO_MANUAL_MAPA,
+        OBSERVACION_CAMBIO_TRASLADO_MAPEO,
+        OBSERVACION_MOVIMIENTO_PACIENTE_MAPA,
+        OBSERVACION_MOVIMIENTO_PACIENTE_MAPA_DETALLE,
+        OBSERVACION_MOVIMIENTO_PACIENTE_MAPA_SUPERADMIN,
+    )
+    return {
+        "CAMBIO_MANUAL": OBSERVACION_CAMBIO_MANUAL_MAPA,
+        "CAMBIO_TRASLADO": OBSERVACION_CAMBIO_TRASLADO_MAPEO,
+        "MOV_PAC": OBSERVACION_MOVIMIENTO_PACIENTE_MAPA,
+        "MOV_PAC_DETALLE": OBSERVACION_MOVIMIENTO_PACIENTE_MAPA_DETALLE,
+        "MOV_PAC_SUPERADMIN": OBSERVACION_MOVIMIENTO_PACIENTE_MAPA_SUPERADMIN,
+    }
+
+
+def _mc_sesion_helpers():
+    from mapeo_camas._sesion import (
+        _registrar_detalle_mapeo,
+        _registrar_historial_mapeo,
+        _sincronizar_cama_en_ingreso_activo,
+    )
+    return _registrar_historial_mapeo, _registrar_detalle_mapeo, _sincronizar_cama_en_ingreso_activo
+
+
+def _sala_real_id(cama):
+    sala = getattr(cama, "sala", None)
+    return getattr(sala, "id", None) or getattr(sala, "pk", None)
+
+
+class MapeoOperacionesMapaService:
+    """[2026-05-29] Operaciones transaccionales del mapa de camas (refactor B)."""
+
+    # -------------------------------------------------------------------------
+    # mover_paciente_entre_camas
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def mover_paciente_entre_camas(*, usuario, cama_origen, cama_destino, sesion_mapeo, es_superadmin):
+        registrar_historial, registrar_detalle, sincronizar_cama = _mc_sesion_helpers()
+        OBS = _mc_constants()
+
+        asig_origen = (
+            AsignacionCamaPaciente.objects
+            .filter(cama_id=cama_origen.pk)
+            .order_by("-fecha_inicio", "-id")
+            .first()
+        )
+        asig_destino = (
+            AsignacionCamaPaciente.objects
+            .filter(cama_id=cama_destino.pk)
+            .order_by("-fecha_inicio", "-id")
+            .first()
+        )
+
+        estado_ocupada = MapeoCamasService.get_estado_mapeo("OCUPADA", "ESTADO_CAMA")
+        estado_vacia = MapeoCamasService.get_estado_mapeo("VACIA", "ESTADO_CAMA")
+
+        if not asig_origen or asig_origen.estado is None or asig_origen.estado.codigo not in {"OCUPADA", "PRE_ALTA"}:
+            raise ValidationError("La cama origen no tiene paciente asignado (debe estar OCUPADA o PRE_ALTA).")
+
+        ingreso_operativo = asig_origen.ingreso
+        if not ingreso_operativo:
+            raise ValidationError("La cama origen no tiene un ingreso activo valido. Datos incompletos.")
+
+        if asig_destino and (asig_destino.estado is not None and asig_destino.estado.codigo != "VACIA"):
+            raise ValidationError("La cama destino no esta disponible (no esta vacia).")
+
+        sala_origen_id = _sala_real_id(cama_origen)
+        sala_destino_id = _sala_real_id(cama_destino)
+
+        estado_anterior_origen = asig_origen.estado
+        estado_anterior_destino = asig_destino.estado if asig_destino else estado_vacia
+
+        obs_origen = (
+            get_observacion_mapeo(OBS["MOV_PAC_SUPERADMIN"])
+            if es_superadmin
+            else get_observacion_mapeo(OBS["MOV_PAC"])
+        )
+        obs_destino = (
+            get_observacion_mapeo(OBS["MOV_PAC_SUPERADMIN"])
+            if es_superadmin
+            else (
+                get_observacion_mapeo(OBS["MOV_PAC"])
+                if sala_destino_id != sala_origen_id
+                else get_observacion_mapeo(OBS["MOV_PAC_DETALLE"])
+            )
+        )
+
+        from mapeo_camas.models import DetalleMapeoCama, MovimientoCama
+
+        with transaction.atomic():
+            asig_origen.estado = estado_vacia
+            asig_origen.save()
+
+            if not asig_destino:
+                asig_destino = AsignacionCamaPaciente(
+                    cama=cama_destino,
+                    estado=estado_ocupada,
+                    ingreso=ingreso_operativo,
+                    usuario_asignacion=usuario,
+                )
+            else:
+                asig_destino.estado = estado_ocupada
+                asig_destino.ingreso = ingreso_operativo
+                asig_destino.usuario_asignacion = usuario
+            asig_destino.save()
+
+            sincronizar_cama(ingreso_id=ingreso_operativo.id, cama_id=cama_destino.pk)
+
+            historial_origen = registrar_historial(
+                cama=cama_origen, estado_anterior=estado_anterior_origen, estado_nuevo=estado_vacia,
+                ingreso=None, usuario=usuario, observacion=obs_origen, sesion_mapeo=sesion_mapeo,
+            )
+            historial_destino = registrar_historial(
+                cama=cama_destino, estado_anterior=estado_anterior_destino, estado_nuevo=estado_ocupada,
+                ingreso=ingreso_operativo, usuario=usuario, observacion=obs_destino, sesion_mapeo=sesion_mapeo,
+            )
+
+            MovimientoCama.objects.create(
+                tipo_movimiento="TRASLADO",
+                cama_origen_id=cama_origen.pk,
+                cama_destino_id=cama_destino.pk,
+                ingreso=ingreso_operativo,
+                usuario=usuario,
+                observacion=get_observacion_mapeo("Movimiento desde mapa de camas"),
+            )
+
+            registrar_detalle(
+                usuario=usuario, cama=cama_origen, asignacion=asig_origen,
+                tipo_accion=DetalleMapeoCama.TipoAccion.TRASLADO, hubo_cambio=True,
+                observacion=get_observacion_mapeo("Traslado de paciente desde mapa (cama origen)."),
+            )
+            registrar_detalle(
+                usuario=usuario, cama=cama_destino, asignacion=asig_destino,
+                tipo_accion=DetalleMapeoCama.TipoAccion.TRASLADO, hubo_cambio=True,
+                observacion=get_observacion_mapeo("Traslado de paciente desde mapa (cama destino)."),
+            )
+
+        return {
+            "asig_origen": asig_origen,
+            "asig_destino": asig_destino,
+            "historial_origen": historial_origen,
+            "historial_destino": historial_destino,
+            "ingreso_operativo": ingreso_operativo,
+            "estado_ocupada": estado_ocupada,
+            "estado_vacia": estado_vacia,
+            "sala_origen_id": sala_origen_id,
+            "sala_destino_id": sala_destino_id,
+        }
+
+
+    # -------------------------------------------------------------------------
+    # aplicar_actualizacion_manual_cama (refactor B - actualizar_cama_mapa)
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def aplicar_actualizacion_manual_cama(
+        *,
+        usuario,
+        cama,
+        estado_codigo,
+        estado_nuevo_obj,
+        ingreso_nuevo,
+        sesion_mapeo,
+        asig_previa_paciente,
+        asignacion,
+        estado_anterior,
+        ingreso_anterior,
+        requiere_cierre_prealta,
+        requiere_cierre_ocupada_a_ocupada,
+        requiere_registro_alta_a_vacia,
+    ):
+        registrar_historial, _registrar_detalle, sincronizar_cama = _mc_sesion_helpers()
+        OBS = _mc_constants()
+        from mapeo_camas.models import DetalleMapeoCama, MovimientoCama
+
+        estado_vacia = MapeoCamasService.get_estado_mapeo("VACIA", "ESTADO_CAMA")
+        estado_alta = MapeoCamasService.get_estado_mapeo("ALTA", "ESTADO_CAMA")
+
+        with transaction.atomic():
+            estado_historial_anterior = estado_anterior
+
+            if requiere_cierre_prealta:
+                registrar_historial(
+                    cama=cama, estado_anterior=estado_anterior, estado_nuevo=estado_alta,
+                    ingreso=ingreso_anterior, usuario=usuario,
+                    observacion=get_observacion_mapeo("Alta historica por reasignacion desde PRE_ALTA"),
+                    sesion_mapeo=sesion_mapeo, forzar_nuevo=True,
+                )
+                registrar_historial(
+                    cama=cama, estado_anterior=estado_alta, estado_nuevo=estado_vacia,
+                    ingreso=None, usuario=usuario,
+                    observacion=get_observacion_mapeo("Liberacion de cama tras alta historica"),
+                    sesion_mapeo=sesion_mapeo, forzar_nuevo=True,
+                )
+                estado_historial_anterior = estado_vacia
+
+            if requiere_cierre_ocupada_a_ocupada:
+                registrar_historial(
+                    cama=cama, estado_anterior=estado_anterior, estado_nuevo=estado_alta,
+                    ingreso=ingreso_anterior, usuario=usuario,
+                    observacion=get_observacion_mapeo("Alta historica por reasignacion directa de cama"),
+                    sesion_mapeo=sesion_mapeo, forzar_nuevo=True,
+                )
+                registrar_historial(
+                    cama=cama, estado_anterior=estado_alta, estado_nuevo=estado_vacia,
+                    ingreso=None, usuario=usuario,
+                    observacion=get_observacion_mapeo("Liberacion de cama tras alta historica"),
+                    sesion_mapeo=sesion_mapeo, forzar_nuevo=True,
+                )
+                estado_historial_anterior = estado_vacia
+
+            if requiere_registro_alta_a_vacia:
+                registrar_historial(
+                    cama=cama, estado_anterior=estado_anterior, estado_nuevo=estado_alta,
+                    ingreso=ingreso_anterior, usuario=usuario,
+                    observacion=get_observacion_mapeo("Alta historica por cambio manual a VACIA"),
+                    sesion_mapeo=sesion_mapeo,
+                )
+                estado_historial_anterior = estado_alta
+
+            if asig_previa_paciente:
+                estado_anterior_previa = asig_previa_paciente.estado
+                asig_previa_paciente.estado = estado_vacia
+                asig_previa_paciente.save()
+                registrar_historial(
+                    cama=asig_previa_paciente.cama, estado_anterior=estado_anterior_previa,
+                    estado_nuevo=estado_vacia, ingreso=None, usuario=usuario,
+                    observacion=get_observacion_mapeo("Cambio de cama: paciente trasladado a otra cama"),
+                    sesion_mapeo=sesion_mapeo,
+                )
+                MovimientoCama.objects.create(
+                    tipo_movimiento="TRASLADO",
+                    cama_origen=asig_previa_paciente.cama, cama_destino=cama,
+                    ingreso=ingreso_nuevo, usuario=usuario,
+                    observacion=get_observacion_mapeo("Cambio de cama desde mapa"),
+                )
+
+            asignacion.estado = estado_nuevo_obj
+            asignacion.ingreso = ingreso_nuevo
+            asignacion.usuario_asignacion = usuario
+            asignacion.save()
+
+            if ingreso_nuevo:
+                sincronizar_cama(ingreso_id=ingreso_nuevo.id, cama_id=cama.pk)
+
+            historial = registrar_historial(
+                cama=cama, estado_anterior=estado_historial_anterior,
+                estado_nuevo=estado_nuevo_obj, ingreso=asignacion.ingreso,
+                usuario=usuario,
+                observacion=get_observacion_mapeo(OBS["CAMBIO_MANUAL"]),
+                sesion_mapeo=sesion_mapeo,
+            )
+
+        return {"asignacion": asignacion, "historial": historial}
+
+
+    # -------------------------------------------------------------------------
+    # procesar_accion_mapeo (refactor B - procesar_cama_mapeo)
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def procesar_accion_mapeo(*, usuario, cama, accion, observacion, ingreso_observado, sesion):
+        registrar_historial, registrar_detalle, sincronizar_cama = _mc_sesion_helpers()
+        OBS = _mc_constants()
+        from mapeo_camas.models import DetalleMapeoCama
+
+        estado_vacia = MapeoCamasService.get_estado_mapeo("VACIA", "ESTADO_CAMA")
+        estado_ocupada = MapeoCamasService.get_estado_mapeo("OCUPADA", "ESTADO_CAMA")
+
+        asig_actual = (
+            AsignacionCamaPaciente.objects.select_related("ingreso")
+            .filter(cama_id=cama.pk)
+            .order_by("-fecha_inicio", "-id")
+            .first()
+        )
+        estado_sistema = asig_actual.estado if asig_actual else estado_vacia
+
+        with transaction.atomic():
+            if accion == "CONFIRMAR":
+                registrar_historial(
+                    cama=cama, estado_anterior=estado_sistema, estado_nuevo=estado_sistema,
+                    ingreso=asig_actual.ingreso if asig_actual else None,
+                    usuario=usuario,
+                    observacion=get_observacion_mapeo("Confirmacion de mapeo sin cambios"),
+                    sesion_mapeo=sesion,
+                )
+                registrar_detalle(
+                    usuario=usuario, cama=cama, asignacion=asig_actual,
+                    tipo_accion=DetalleMapeoCama.TipoAccion.CONFIRMACION, hubo_cambio=False,
+                    observacion=get_observacion_mapeo(observacion or "Confirmacion de estado sin cambios."),
+                    sesion_mapeo=sesion,
+                )
+                return {"mensaje": "Cama confirmada sin cambios.", "estado_sistema": estado_sistema.codigo}
+
+            if accion == "CONFIRMAR_ALTA":
+                if not asig_actual:
+                    raise ValidationError("No hay asignacion activa para confirmar alta.")
+                estado_anterior = asig_actual.estado
+                asig_actual.estado = estado_vacia
+                asig_actual.ingreso = None
+                asig_actual.save()
+                registrar_historial(
+                    cama=cama, estado_anterior=estado_anterior, estado_nuevo=estado_vacia,
+                    ingreso=None, usuario=usuario,
+                    observacion=get_observacion_mapeo("Confirmacion de alta desde mapeo"),
+                    sesion_mapeo=sesion,
+                )
+                registrar_detalle(
+                    usuario=usuario, cama=cama, asignacion=asig_actual,
+                    tipo_accion=DetalleMapeoCama.TipoAccion.ALTA, hubo_cambio=True,
+                    observacion=get_observacion_mapeo(observacion or "Confirmar alta (egreso)."),
+                    sesion_mapeo=sesion,
+                )
+                return {"mensaje": "Alta confirmada. Cama liberada."}
+
+            if accion == "CANCELAR_PREALTA":
+                if not asig_actual or not asig_actual.ingreso_id:
+                    raise ValidationError("No existe ingreso actual para cancelar prealta.")
+                estado_anterior = asig_actual.estado
+                asig_actual.estado = estado_ocupada
+                asig_actual.save()
+                sincronizar_cama(ingreso_id=asig_actual.ingreso_id, cama_id=cama.pk)
+                registrar_historial(
+                    cama=cama, estado_anterior=estado_anterior, estado_nuevo=estado_ocupada,
+                    ingreso=asig_actual.ingreso, usuario=usuario,
+                    observacion=get_observacion_mapeo("Cancelar prealta desde mapeo"),
+                    sesion_mapeo=sesion,
+                )
+                registrar_detalle(
+                    usuario=usuario, cama=cama, asignacion=asig_actual,
+                    tipo_accion=DetalleMapeoCama.TipoAccion.CORRECCION, hubo_cambio=True,
+                    observacion=get_observacion_mapeo(observacion or "Cancelar prealta, paciente permanece."),
+                    sesion_mapeo=sesion,
+                )
+                return {"mensaje": "Prealta cancelada. Cama en OCUPADA."}
+
+            if accion == "CAMBIO_TRASLADO":
+                if not ingreso_observado:
+                    raise ValidationError("Debe indicar ingreso_observado_id para cambio/traslado.")
+
+                if asig_actual and asig_actual.ingreso_id == ingreso_observado.id:
+                    registrar_historial(
+                        cama=cama, estado_anterior=estado_sistema, estado_nuevo=estado_sistema,
+                        ingreso=asig_actual.ingreso, usuario=usuario,
+                        observacion=get_observacion_mapeo("Confirmacion de mapeo sin cambios (paciente coincide)"),
+                        sesion_mapeo=sesion,
+                    )
+                    registrar_detalle(
+                        usuario=usuario, cama=cama, asignacion=asig_actual,
+                        tipo_accion=DetalleMapeoCama.TipoAccion.CONFIRMACION, hubo_cambio=False,
+                        observacion=get_observacion_mapeo(observacion or "Paciente coincide con sistema."),
+                        sesion_mapeo=sesion,
+                    )
+                    return {"mensaje": "Sin cambios: paciente ya coincide con sistema."}
+
+                estado_anterior = asig_actual.estado if asig_actual else estado_vacia
+                if asig_actual and asig_actual.ingreso_id:
+                    asig_actual.estado = estado_vacia
+                    asig_actual.ingreso = None
+                    asig_actual.save()
+
+                nueva_asig = AsignacionCamaPaciente.objects.create(
+                    cama=cama, ingreso=ingreso_observado, estado=estado_ocupada,
+                    usuario_asignacion=usuario,
+                )
+                sincronizar_cama(ingreso_id=ingreso_observado.id, cama_id=cama.pk)
+                registrar_historial(
+                    cama=cama, estado_anterior=estado_anterior, estado_nuevo=estado_ocupada,
+                    ingreso=ingreso_observado, usuario=usuario,
+                    observacion=get_observacion_mapeo(OBS["CAMBIO_TRASLADO"]),
+                    sesion_mapeo=sesion,
+                )
+                registrar_detalle(
+                    usuario=usuario, cama=cama, asignacion=nueva_asig,
+                    tipo_accion=DetalleMapeoCama.TipoAccion.CAMBIO, hubo_cambio=True,
+                    observacion=get_observacion_mapeo(observacion or "Cambio/traslado de paciente."),
+                    sesion_mapeo=sesion,
+                )
+                return {"mensaje": "Cambio/traslado aplicado correctamente."}
+
+            if accion == "ASIGNACION":
+                if not ingreso_observado:
+                    raise ValidationError("Debe indicar ingreso_observado_id para asignacion.")
+                if asig_actual and asig_actual.estado == estado_ocupada:
+                    raise ValidationError("La cama ya figura ocupada en sistema. Use CAMBIO_TRASLADO.")
+                if asig_actual:
+                    asig_actual.estado = estado_ocupada
+                    asig_actual.ingreso = ingreso_observado
+                    asig_actual.usuario_asignacion = usuario
+                    asig_actual.save()
+                    asignacion_obj = asig_actual
+                else:
+                    asignacion_obj = AsignacionCamaPaciente.objects.create(
+                        cama=cama, ingreso=ingreso_observado, estado=estado_ocupada,
+                        usuario_asignacion=usuario,
+                    )
+                sincronizar_cama(ingreso_id=ingreso_observado.id, cama_id=cama.pk)
+                registrar_historial(
+                    cama=cama, estado_anterior=estado_vacia, estado_nuevo=estado_ocupada,
+                    ingreso=ingreso_observado, usuario=usuario,
+                    observacion=get_observacion_mapeo("Asignacion detectada durante mapeo"),
+                    sesion_mapeo=sesion,
+                )
+                registrar_detalle(
+                    usuario=usuario, cama=cama, asignacion=asignacion_obj,
+                    tipo_accion=DetalleMapeoCama.TipoAccion.CAMBIO, hubo_cambio=True,
+                    observacion=get_observacion_mapeo(observacion or "Sistema libre, paciente presente (asignacion)."),
+                    sesion_mapeo=sesion,
+                )
+                return {"mensaje": "Asignacion aplicada correctamente."}
+
+            if accion == "ALTA_FORZADA":
+                if not asig_actual or asig_actual.estado != estado_ocupada:
+                    raise ValidationError("No existe ocupacion activa para forzar alta.")
+                asig_actual.estado = estado_vacia
+                asig_actual.ingreso = None
+                asig_actual.save()
+                registrar_historial(
+                    cama=cama, estado_anterior=estado_ocupada, estado_nuevo=estado_vacia,
+                    ingreso=None, usuario=usuario,
+                    observacion=get_observacion_mapeo("Alta forzada desde mapeo"),
+                    sesion_mapeo=sesion,
+                )
+                registrar_detalle(
+                    usuario=usuario, cama=cama, asignacion=asig_actual,
+                    tipo_accion=DetalleMapeoCama.TipoAccion.ALTA, hubo_cambio=True,
+                    observacion=get_observacion_mapeo(observacion or "Sistema ocupado, cama vacia (alta forzada)."),
+                    sesion_mapeo=sesion,
+                )
+                return {"mensaje": "Alta forzada aplicada. Cama liberada."}
+
+        raise ValidationError("No se pudo procesar la accion solicitada.")

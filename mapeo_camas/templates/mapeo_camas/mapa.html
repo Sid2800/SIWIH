@@ -137,7 +137,7 @@
 {% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'mapeo_camas/styles/mapaCamas.css' %}?v=20260526c">
+<link rel="stylesheet" href="{% static 'mapeo/styles/mapaCamas.css' %}?v=20260526c">
 {% endblock %}
 
 {% block extra_js %}
@@ -146,5 +146,5 @@
   window.MAPA_SOLO_LECTURA = {% if es_editor %}false{% else %}true{% endif %};
   window.MAPA_ROL_INTENTOS_RESTRINGIDO = {% if es_rol_intentos_restringido %}true{% else %}false{% endif %};
 </script>
-<script src="{% static 'mapeo_camas/scripts/mapaCamasAsignacion.js' %}?v=20260525b"></script>
+<script src="{% static 'mapeo/scripts/mapaCamasAsignacion.js' %}?v=20260525b"></script>
 {% endblock %}
