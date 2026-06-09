@@ -1,10 +1,14 @@
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
+from django.db.models import Count, Exists, OuterRef, Prefetch, Q, Subquery
 from django.utils.timezone import localtime, now
 
+from core.constants.domain_constants import LogApp
+from core.utils.utilidades_logging import log_error, log_warning
 from ingreso.models import Ingreso
 from mapeo_camas.models import AsignacionCamaPaciente, HistorialEstadoCama, EstadoMapeo, get_observacion_mapeo
 from mapeo_camas.models import MapeoSesionCama, MapeoSesionServicio  # [2026-05-29] Bloqueo de ingreso por sesion de mapeo en curso
+from paciente.models import Paciente
 from servicio.models import Cama
 
 
@@ -13,6 +17,600 @@ class MapeoCamasService:
     def get_estado_mapeo(codigo, categoria):
         from mapeo_camas.models import EstadoMapeo
         return EstadoMapeo.objects.get(codigo=codigo, categoria=categoria)
+
+    @staticmethod
+    def obtener_camas_historial_filtro():
+        from mapeo_camas._helpers import _ubicacion_desde_cama
+
+        camas = (
+            Cama.objects.filter(estado=1)
+            .select_related("sala__servicio", "cubiculo")
+            .order_by("numero_cama")
+        )
+        return [
+            {
+                "id": str(cama.numero_cama),
+                "numero_cama": str(cama.numero_cama),
+                "ubicacion": _ubicacion_desde_cama(cama),
+            }
+            for cama in camas
+        ]
+
+    @staticmethod
+    def buscar_pacientes_para_mapa(termino="", tipo_busqueda="dni"):
+        # [2026-06-01] ORM centralizado del buscador de pacientes para mapa.
+        from mapeo_camas._helpers import _paciente_payload
+
+        ingreso_activo = Exists(
+            Ingreso.objects.filter(
+                paciente_id=OuterRef("pk"),
+                estado=1,
+                fecha_egreso__isnull=True,
+            )
+        )
+        ingreso_activo_id = Subquery(
+            Ingreso.objects.filter(
+                paciente_id=OuterRef("pk"),
+                estado=1,
+                fecha_egreso__isnull=True,
+            )
+            .order_by("-fecha_ingreso", "-id")
+            .values("id")[:1]
+        )
+        pacientes_qs = (
+            Paciente.objects.filter(estado__in=["A", "P"])
+            .annotate(ingreso_activo_id=ingreso_activo_id)
+            .filter(ingreso_activo)
+        )
+
+        if termino:
+            if tipo_busqueda == "dni":
+                pacientes_qs = pacientes_qs.filter(dni__icontains=termino)
+            elif tipo_busqueda == "nombre":
+                pacientes_qs = pacientes_qs.filter(
+                    Q(primer_nombre__icontains=termino)
+                    | Q(segundo_nombre__icontains=termino)
+                    | Q(primer_apellido__icontains=termino)
+                    | Q(segundo_apellido__icontains=termino)
+                )
+            else:
+                pacientes_qs = pacientes_qs.filter(
+                    Q(dni__icontains=termino)
+                    | Q(primer_nombre__icontains=termino)
+                    | Q(segundo_nombre__icontains=termino)
+                    | Q(primer_apellido__icontains=termino)
+                    | Q(segundo_apellido__icontains=termino)
+                )
+
+        pacientes = pacientes_qs.order_by("primer_nombre", "primer_apellido")[:20]
+        return [_paciente_payload(p, ingreso_id=getattr(p, "ingreso_activo_id", None)) for p in pacientes]
+
+    @staticmethod
+    def obtener_camas_disponibles_para_mapa(*, excluir_cama=None, servicio_restringido_id=None):
+        # [2026-06-01] ORM centralizado de camas disponibles para reasignación en mapa.
+        ultima_asignacion_id = (
+            AsignacionCamaPaciente.objects
+            .filter(cama_id=OuterRef("pk"))
+            .order_by("-fecha_inicio", "-id")
+            .values("id")[:1]
+        )
+
+        todas_camas = (
+            Cama.objects.filter(estado=1)
+            .select_related("sala__servicio", "cubiculo")
+            .annotate(ultima_asignacion_id=Subquery(ultima_asignacion_id))
+            .order_by("sala__servicio__nombre_servicio", "sala__nombre_sala", "numero_cama")
+        )
+
+        if excluir_cama:
+            todas_camas = todas_camas.exclude(numero_cama=excluir_cama)
+
+        asig_ids = [c.ultima_asignacion_id for c in todas_camas if c.ultima_asignacion_id]
+        asig_por_id = {
+            a.id: a
+            for a in AsignacionCamaPaciente.objects.select_related("estado").filter(id__in=asig_ids)
+        }
+
+        estado_vacia = MapeoCamasService.get_estado_mapeo("VACIA", "ESTADO_CAMA")
+        resultados = []
+        for cama in todas_camas:
+            asig = asig_por_id.get(cama.ultima_asignacion_id)
+            estado = asig.estado if asig else estado_vacia
+            if getattr(estado, "codigo", estado) == "VACIA":
+                if servicio_restringido_id and getattr(cama.sala, "servicio_id", None) != servicio_restringido_id:
+                    continue
+                resultados.append(
+                    {
+                        "numero_cama": cama.numero_cama,
+                        "sala": cama.sala.nombre_sala,
+                        "servicio": cama.sala.servicio.nombre_servicio,
+                        "cubiculo": cama.cubiculo.nombre_cubiculo if cama.cubiculo else None,
+                    }
+                )
+        return resultados
+
+    @staticmethod
+    def obtener_historiales_data(tipo, cama_id="", fecha_inicio=None, fecha_fin=None):
+        from mapeo_camas._helpers import (
+            _hora_local_iso,
+            _nombre_cama,
+            _nombre_usuario,
+            _observacion_codigo,
+            _paciente_payload,
+            _ubicacion_desde_cama,
+        )
+        from mapeo_camas.models import DetalleMapeoCama, HistorialEstadoCama, MapeoSesionCama, MapeoSesionServicio, MovimientoCama
+
+        def _estructura_desde_servicios(servicios_map):
+            estructura = []
+            for servicio_data in servicios_map.values():
+                salas_data = []
+                for sala_data in servicio_data["salas"].values():
+                    salas_data.append(
+                        {
+                            "nombre": sala_data["nombre"],
+                            "cubiculos": list(sala_data["cubiculos"].values()),
+                            "camas_directas": sala_data["camas_directas"],
+                        }
+                    )
+                estructura.append({"nombre": servicio_data["nombre"], "salas": salas_data})
+            return estructura
+
+        if tipo == "mapeo":
+            sesiones = MapeoSesionCama.objects.select_related("usuario").prefetch_related(
+                Prefetch(
+                    "servicios_incluidos",
+                    queryset=MapeoSesionServicio.objects.select_related("servicio").order_by("servicio__nombre_servicio"),
+                    to_attr="servicios_prefetch",
+                )
+            ).order_by("-fecha_inicio")
+            if fecha_inicio:
+                sesiones = sesiones.filter(fecha_inicio__gte=fecha_inicio)
+            if fecha_fin:
+                sesiones = sesiones.filter(fecha_inicio__lte=fecha_fin)
+
+            sesiones = sesiones.annotate(
+                total_detalles=Count("detalles", distinct=True),
+                total_camas=Count("detalles__cama", distinct=True),
+                total_cambios=Count("detalles", filter=Q(detalles__hubo_cambio=True), distinct=True),
+            )[:200]
+
+            results = []
+            for sesion in sesiones:
+                nombres_servicios = [
+                    ss.servicio.nombre_servicio
+                    for ss in getattr(sesion, "servicios_prefetch", [])
+                    if ss.servicio_id
+                ]
+                results.append(
+                    {
+                        "id": sesion.id,
+                        "referencia": f"Sesion {sesion.id}",
+                        "tipo": "MAPEO",
+                        "estado": sesion.estado.codigo if hasattr(sesion.estado, "codigo") else str(sesion.estado),
+                        "fecha_principal": _hora_local_iso(sesion.fecha_inicio),
+                        "fecha_inicio": _hora_local_iso(sesion.fecha_inicio),
+                        "fecha_fin": _hora_local_iso(sesion.fecha_fin),
+                        "usuario": _nombre_usuario(sesion.usuario),
+                        "detalle_1": f"Camas procesadas: {sesion.total_camas}",
+                        "detalle_2": f"Cambios detectados: {sesion.total_cambios}",
+                        "detalle_3": f"Registros detalle: {sesion.total_detalles}",
+                        "servicios": nombres_servicios,
+                    }
+                )
+            return {"ok": True, "results": results}, 200
+
+        if tipo == "historial":
+            historial_qs = HistorialEstadoCama.objects.select_related(
+                "cama__sala__servicio", "cama__cubiculo", "ingreso__paciente", "usuario"
+            )
+            if fecha_inicio:
+                historial_qs = historial_qs.filter(fecha_hora__gte=fecha_inicio)
+            if fecha_fin:
+                historial_qs = historial_qs.filter(fecha_hora__lte=fecha_fin)
+            if cama_id:
+                historial_qs = historial_qs.filter(cama_id=cama_id)
+
+            latest_id_por_cama = (
+                historial_qs.filter(cama_id=OuterRef("cama_id"))
+                .order_by("-fecha_hora", "-id")
+                .values("id")[:1]
+            )
+
+            eventos_por_cama = {
+                str(item["cama_id"]): item["total"]
+                for item in historial_qs.values("cama_id").annotate(total=Count("id"))
+            }
+
+            ultimos_eventos = (
+                historial_qs.filter(id=Subquery(latest_id_por_cama))
+                .order_by("-fecha_hora", "-id")[:300]
+            )
+
+            results = []
+            for item in ultimos_eventos:
+                total_eventos = eventos_por_cama.get(str(item.cama_id), 0)
+                paciente = _paciente_payload(item.ingreso.paciente if item.ingreso_id else None, ingreso_id=item.ingreso_id)
+                results.append(
+                    {
+                        "id": item.cama_id,
+                        "referencia": f"Cama {_nombre_cama(item.cama)}",
+                        "tipo": "HISTORIAL",
+                        "estado": item.estado_nuevo.codigo if hasattr(item.estado_nuevo, "codigo") else str(item.estado_nuevo),
+                        "fecha_principal": _hora_local_iso(item.fecha_hora),
+                        "fecha_inicio": _hora_local_iso(item.fecha_hora),
+                        "fecha_fin": "",
+                        "usuario": _nombre_usuario(item.usuario),
+                        "detalle_1": f"Cama: {_nombre_cama(item.cama)}",
+                        "detalle_2": f"Ultimo cambio: {(getattr(item.estado_anterior, 'codigo', item.estado_anterior) or 'SIN_ESTADO')} -> {getattr(item.estado_nuevo, 'codigo', item.estado_nuevo)}",
+                        "detalle_3": f"Eventos: {total_eventos} | " + (
+                            f"Paciente: {paciente['nombre']}" if paciente else "Paciente: Sin paciente"
+                        ),
+                    }
+                )
+            return {"ok": True, "results": results}, 200
+
+        if tipo == "movimiento":
+            movimientos = (
+                MovimientoCama.objects.select_related(
+                    "cama_origen__sala__servicio",
+                    "cama_origen__cubiculo",
+                    "cama_destino__sala__servicio",
+                    "cama_destino__cubiculo",
+                    "ingreso__paciente",
+                    "usuario",
+                )
+                .order_by("-fecha_hora")
+            )
+            if fecha_inicio:
+                movimientos = movimientos.filter(fecha_hora__gte=fecha_inicio)
+            if fecha_fin:
+                movimientos = movimientos.filter(fecha_hora__lte=fecha_fin)
+            if cama_id:
+                movimientos = movimientos.filter(Q(cama_origen_id=cama_id) | Q(cama_destino_id=cama_id))
+
+            camas_map = {}
+            for mov in movimientos[:500]:
+                for cama in [mov.cama_origen, mov.cama_destino]:
+                    key = str(cama.pk)
+                    if key not in camas_map:
+                        camas_map[key] = {"cama": cama, "ultimo": mov, "total": 0}
+                    camas_map[key]["total"] += 1
+
+            camas_ordenadas = sorted(
+                camas_map.values(),
+                key=lambda x: x["ultimo"].fecha_hora,
+                reverse=True,
+            )[:300]
+
+            results = []
+            for registro in camas_ordenadas:
+                cama = registro["cama"]
+                ultimo = registro["ultimo"]
+                total = registro["total"]
+                paciente = _paciente_payload(ultimo.ingreso.paciente if ultimo.ingreso_id else None, ingreso_id=ultimo.ingreso_id)
+                results.append(
+                    {
+                        "id": cama.pk,
+                        "referencia": f"Cama {_nombre_cama(cama)}",
+                        "tipo": "MOVIMIENTO",
+                        "estado": f"{total} movimiento(s)",
+                        "fecha_principal": _hora_local_iso(ultimo.fecha_hora),
+                        "fecha_inicio": _hora_local_iso(ultimo.fecha_hora),
+                        "fecha_fin": "",
+                        "usuario": _nombre_usuario(ultimo.usuario),
+                        "detalle_1": f"Cama: {_nombre_cama(cama)}",
+                        "detalle_2": f"Total movimientos: {total}",
+                        "detalle_3": f"Ultimo paciente: {paciente['nombre']}" if paciente else "Sin paciente",
+                    }
+                )
+            return {"ok": True, "results": results}, 200
+
+        return {"ok": False, "error": "Tipo no soportado."}, 400
+
+    @staticmethod
+    def obtener_historiales_cards_data(tipo, registro_id, page=1, page_size=50):
+        from mapeo_camas._helpers import (
+            _hora_local_iso,
+            _nombre_cama,
+            _nombre_usuario,
+            _observacion_codigo,
+            _paciente_payload,
+            _ubicacion_desde_cama,
+        )
+        from mapeo_camas.models import DetalleMapeoCama, HistorialEstadoCama, MapeoSesionCama, MapeoSesionServicio, MovimientoCama
+
+        def _estructura_desde_servicios(servicios_map):
+            estructura = []
+            for servicio_data in servicios_map.values():
+                salas_data = []
+                for sala_data in servicio_data["salas"].values():
+                    salas_data.append(
+                        {
+                            "nombre": sala_data["nombre"],
+                            "cubiculos": list(sala_data["cubiculos"].values()),
+                            "camas_directas": sala_data["camas_directas"],
+                        }
+                    )
+                estructura.append({"nombre": servicio_data["nombre"], "salas": salas_data})
+            return estructura
+
+        if not registro_id:
+            return {"ok": False, "error": "Debe indicar id."}, 400
+
+        if tipo == "mapeo":
+            sesion = MapeoSesionCama.objects.filter(pk=registro_id).first()
+            if not sesion:
+                return {"ok": False, "error": "Sesion no encontrada."}, 404
+
+            detalles = (
+                DetalleMapeoCama.objects.filter(sesion_mapeo=sesion)
+                .select_related("cama__sala__servicio", "cama__cubiculo__sala__servicio", "ingreso_actual__paciente", "usuario", "estado_actual", "tipo_accion")
+                .order_by("cama__sala__nombre_sala", "cama__cubiculo__numero", "cama__numero_cama", "fecha_hora")
+            )
+
+            detalles_list = list(detalles)
+            ultimo_estado_por_cama = {}
+            tipo_accion_display_map = {}
+
+            for item in detalles_list:
+                estado_actual_codigo = item.estado_actual.codigo if item.estado_actual else ""
+                estado_anterior_codigo = ultimo_estado_por_cama.get(item.cama_id, None)
+
+                if estado_anterior_codigo is None:
+                    tipo_accion_display = "Confirmación"
+                else:
+                    tipo_accion_display = f"{estado_anterior_codigo} \u2192 {estado_actual_codigo}"
+
+                tipo_accion_display_map[(item.cama_id, item.fecha_hora.isoformat())] = tipo_accion_display
+                ultimo_estado_por_cama[item.cama_id] = estado_actual_codigo
+
+            detalles_list_ordenados = sorted(detalles_list, key=lambda x: x.fecha_hora, reverse=True)
+
+            cards = []
+            servicios_map = {}
+            camas_vistas_estructura = set()
+
+            for item in detalles_list_ordenados:
+                paciente = _paciente_payload(item.ingreso_actual.paciente if item.ingreso_actual_id else None, ingreso_id=item.ingreso_actual_id)
+                cama_numero = _nombre_cama(item.cama)
+                cubiculo_obj = getattr(item.cama, "cubiculo", None)
+                sala_real = (cubiculo_obj.sala if cubiculo_obj else None) or getattr(item.cama, "sala", None)
+                servicio_nombre = getattr(getattr(sala_real, "servicio", None), "nombre_servicio", "") or "SIN_SERVICIO"
+                sala_nombre = getattr(sala_real, "nombre_sala", "") or "SIN_SALA"
+                cubiculo_nombre = (f"#{cubiculo_obj.numero} {cubiculo_obj.nombre_cubiculo}") if cubiculo_obj else "SIN_CUBICULO"
+
+                if servicio_nombre not in servicios_map:
+                    servicios_map[servicio_nombre] = {"nombre": servicio_nombre, "salas": {}}
+                if sala_nombre not in servicios_map[servicio_nombre]["salas"]:
+                    servicios_map[servicio_nombre]["salas"][sala_nombre] = {
+                        "nombre": sala_nombre,
+                        "cubiculos": {},
+                        "camas_directas": [],
+                    }
+
+                tipo_accion_display = tipo_accion_display_map.get((item.cama_id, item.fecha_hora.isoformat()), "Confirmación")
+
+                cama_item = {
+                    "numero_cama": cama_numero,
+                    "estado": item.estado_actual.codigo if item.estado_actual else "",
+                    "paciente": paciente["nombre"] if paciente else "Sin paciente",
+                    "dni": paciente["dni"] if paciente else "",
+                    "usuario": _nombre_usuario(item.usuario),
+                    "fecha": _hora_local_iso(item.fecha_hora),
+                    "tipo_accion": tipo_accion_display,
+                    "hubo_cambio": bool(item.hubo_cambio),
+                    "fue_validada": bool(item.fue_validada),
+                    "observacion": _observacion_codigo(item.observacion),
+                }
+
+                clave_cama = (servicio_nombre, sala_nombre, cubiculo_nombre, cama_numero)
+                if clave_cama not in camas_vistas_estructura:
+                    camas_vistas_estructura.add(clave_cama)
+                    if cubiculo_nombre == "SIN_CUBICULO":
+                        servicios_map[servicio_nombre]["salas"][sala_nombre]["camas_directas"].append(cama_item)
+                    else:
+                        cubiculos_map = servicios_map[servicio_nombre]["salas"][sala_nombre]["cubiculos"]
+                        if cubiculo_nombre not in cubiculos_map:
+                            cubiculos_map[cubiculo_nombre] = {
+                                "nombre": cubiculo_nombre,
+                                "camas": [],
+                            }
+                        cubiculos_map[cubiculo_nombre]["camas"].append(cama_item)
+
+                cards.append(
+                    {
+                        "titulo": f"Cama {item.cama_id}",
+                        "subtitulo": tipo_accion_display,
+                        "estado": item.estado_actual.codigo if item.estado_actual else "",
+                        "paciente": paciente["nombre"] if paciente else "Sin paciente",
+                        "usuario": _nombre_usuario(item.usuario),
+                        "fecha": _hora_local_iso(item.fecha_hora),
+                        "detalle_1": f"Ubicacion: {_ubicacion_desde_cama(item.cama)}",
+                        "detalle_2": f"Validada: {'SI' if item.fue_validada else 'NO'}",
+                        "detalle_3": f"Hubo cambio: {'SI' if item.hubo_cambio else 'NO'}",
+                        "observacion": _observacion_codigo(item.observacion),
+                    }
+                )
+
+            estructura = _estructura_desde_servicios(servicios_map)
+            servicios_sesion = [
+                ss.servicio.nombre_servicio
+                for ss in MapeoSesionServicio.objects.select_related("servicio")
+                .filter(sesion_mapeo=sesion)
+                .order_by("servicio__nombre_servicio")
+            ]
+
+            return {
+                "ok": True,
+                "cards": cards,
+                "estructura": estructura,
+                "servicios_sesion": servicios_sesion,
+                "sesion_observacion": sesion.observacion_texto if sesion.observacion_texto else None,
+                "paginacion": {
+                    "page": 1,
+                    "page_size": page_size,
+                    "total_items": len(cards),
+                    "total_pages": 1,
+                },
+            }, 200
+
+        if tipo == "historial":
+            timeline_qs = (
+                HistorialEstadoCama.objects.select_related(
+                    "cama__sala__servicio", "cama__cubiculo__sala__servicio",
+                    "estado_anterior", "estado_nuevo", "ingreso__paciente", "usuario",
+                )
+                .filter(cama_id=registro_id)
+                .order_by("cama__sala__nombre_sala", "cama__cubiculo__numero", "cama__numero_cama", "-fecha_hora")
+            )
+            total_items = timeline_qs.count()
+            if total_items == 0:
+                return {"ok": False, "error": "Historial no encontrado para esta cama."}, 404
+
+            total_pages = max(1, (total_items + page_size - 1) // page_size)
+            if page > total_pages:
+                page = total_pages
+            inicio = (page - 1) * page_size
+            timeline_page = timeline_qs[inicio:inicio + page_size]
+
+            servicios_map = {}
+            for item in timeline_page:
+                paciente = _paciente_payload(item.ingreso.paciente if item.ingreso_id else None, ingreso_id=item.ingreso_id)
+                estado_nuevo_codigo = item.estado_nuevo.codigo if hasattr(item.estado_nuevo, "codigo") else str(item.estado_nuevo)
+                estado_anterior_codigo = (
+                    item.estado_anterior.codigo if hasattr(item.estado_anterior, "codigo") else str(item.estado_anterior)
+                ) if item.estado_anterior else "SIN_ESTADO"
+
+                cubiculo_obj = getattr(item.cama, "cubiculo", None)
+                sala_real = (cubiculo_obj.sala if cubiculo_obj else None) or getattr(item.cama, "sala", None)
+                servicio_nombre = getattr(getattr(sala_real, "servicio", None), "nombre_servicio", "") or "SIN_SERVICIO"
+                sala_nombre = getattr(sala_real, "nombre_sala", "") or "SIN_SALA"
+                cubiculo_nombre = (f"#{cubiculo_obj.numero} {cubiculo_obj.nombre_cubiculo}") if cubiculo_obj else "SIN_CUBICULO"
+
+                if servicio_nombre not in servicios_map:
+                    servicios_map[servicio_nombre] = {"nombre": servicio_nombre, "salas": {}}
+                if sala_nombre not in servicios_map[servicio_nombre]["salas"]:
+                    servicios_map[servicio_nombre]["salas"][sala_nombre] = {
+                        "nombre": sala_nombre, "cubiculos": {}, "camas_directas": [],
+                    }
+
+                cama_item = {
+                    "numero_cama": _nombre_cama(item.cama),
+                    "estado": estado_nuevo_codigo,
+                    "paciente": paciente["nombre"] if paciente else "Sin paciente",
+                    "dni": paciente["dni"] if paciente else "",
+                    "usuario": _nombre_usuario(item.usuario),
+                    "fecha": _hora_local_iso(item.fecha_hora),
+                    "tipo_accion": f"{estado_anterior_codigo} \u2192 {estado_nuevo_codigo}",
+                    "observacion": _observacion_codigo(item.observacion),
+                }
+
+                if cubiculo_nombre == "SIN_CUBICULO":
+                    servicios_map[servicio_nombre]["salas"][sala_nombre]["camas_directas"].append(cama_item)
+                else:
+                    cubiculos_map = servicios_map[servicio_nombre]["salas"][sala_nombre]["cubiculos"]
+                    if cubiculo_nombre not in cubiculos_map:
+                        cubiculos_map[cubiculo_nombre] = {"nombre": cubiculo_nombre, "camas": []}
+                    cubiculos_map[cubiculo_nombre]["camas"].append(cama_item)
+
+            estructura = _estructura_desde_servicios(servicios_map)
+            return {
+                "ok": True,
+                "cards": [],
+                "estructura": estructura,
+                "paginacion": {
+                    "page": page,
+                    "page_size": page_size,
+                    "total_items": total_items,
+                    "total_pages": total_pages,
+                },
+            }, 200
+
+        if tipo == "movimiento":
+            movimientos_qs = (
+                MovimientoCama.objects.select_related(
+                    "cama_origen__sala__servicio", "cama_origen__cubiculo__sala__servicio",
+                    "cama_destino__sala__servicio", "cama_destino__cubiculo__sala__servicio",
+                    "ingreso__paciente", "usuario",
+                )
+                .filter(Q(cama_origen_id=registro_id) | Q(cama_destino_id=registro_id))
+                .order_by("-fecha_hora")
+            )
+            total_items = movimientos_qs.count()
+            if total_items == 0:
+                return {"ok": False, "error": "No se encontraron movimientos para esta cama."}, 404
+
+            total_pages = max(1, (total_items + page_size - 1) // page_size)
+            if page > total_pages:
+                page = total_pages
+            inicio = (page - 1) * page_size
+            movimientos_page = movimientos_qs[inicio:inicio + page_size]
+
+            primer_mov = movimientos_qs.first()
+            cama_ref = (
+                primer_mov.cama_origen
+                if str(primer_mov.cama_origen_id) == str(registro_id)
+                else primer_mov.cama_destino
+            )
+
+            cubiculo_obj_ref = getattr(cama_ref, "cubiculo", None)
+            sala_real_ref = (cubiculo_obj_ref.sala if cubiculo_obj_ref else None) or getattr(cama_ref, "sala", None)
+            servicio_nombre = getattr(getattr(sala_real_ref, "servicio", None), "nombre_servicio", "") or "SIN_SERVICIO"
+            sala_nombre = getattr(sala_real_ref, "nombre_sala", "") or "SIN_SALA"
+            cubiculo_nombre = (f"#{cubiculo_obj_ref.numero} {cubiculo_obj_ref.nombre_cubiculo}") if cubiculo_obj_ref else "SIN_CUBICULO"
+
+            servicios_map = {
+                servicio_nombre: {
+                    "nombre": servicio_nombre,
+                    "salas": {
+                        sala_nombre: {
+                            "nombre": sala_nombre, "cubiculos": {}, "camas_directas": [],
+                        }
+                    },
+                }
+            }
+
+            for mov in movimientos_page:
+                paciente = _paciente_payload(mov.ingreso.paciente if mov.ingreso_id else None, ingreso_id=mov.ingreso_id)
+                tipo_mov = mov.tipo_movimiento.codigo if hasattr(mov.tipo_movimiento, "codigo") else str(mov.tipo_movimiento)
+                es_origen = str(mov.cama_origen_id) == str(registro_id)
+                otra_cama = mov.cama_destino if es_origen else mov.cama_origen
+                rol = f"SALIDA \u2192 Cama {_nombre_cama(otra_cama)}" if es_origen else f"ENTRADA \u2190 Cama {_nombre_cama(otra_cama)}"
+
+                cama_item = {
+                    "numero_cama": _nombre_cama(cama_ref),
+                    "estado": tipo_mov,
+                    "paciente": paciente["nombre"] if paciente else "Sin paciente",
+                    "dni": paciente["dni"] if paciente else "",
+                    "usuario": _nombre_usuario(mov.usuario),
+                    "fecha": _hora_local_iso(mov.fecha_hora),
+                    "tipo_accion": rol,
+                    "observacion": _observacion_codigo(mov.observacion),
+                }
+
+                if cubiculo_nombre == "SIN_CUBICULO":
+                    servicios_map[servicio_nombre]["salas"][sala_nombre]["camas_directas"].append(cama_item)
+                else:
+                    cubiculos_map = servicios_map[servicio_nombre]["salas"][sala_nombre]["cubiculos"]
+                    if cubiculo_nombre not in cubiculos_map:
+                        cubiculos_map[cubiculo_nombre] = {"nombre": cubiculo_nombre, "camas": []}
+                    cubiculos_map[cubiculo_nombre]["camas"].append(cama_item)
+
+            estructura = _estructura_desde_servicios(servicios_map)
+            return {
+                "ok": True,
+                "cards": [],
+                "estructura": estructura,
+                "paginacion": {
+                    "page": page,
+                    "page_size": page_size,
+                    "total_items": total_items,
+                    "total_pages": total_pages,
+                },
+            }, 200
+
+        return {"ok": False, "error": "Tipo no soportado."}, 400
 
     # [2026-05-29] Helper: ids de servicios cubiertos por alguna sesion de mapeo EN_PROGRESO.
     # Mientras haya una sesion iniciada sobre esos servicios, los ingresos asociados
@@ -142,6 +740,14 @@ class MapeoCamasService:
                 )
 
         if errores:
+            # [2026-06-01] Logging funcional para auditoría de validaciones de negocio.
+            log_warning(
+                "Validacion de consistencia fallida en mapeo de camas",
+                app=LogApp.INGRESOS,
+                cama_id=cama_id,
+                ingreso_id=ingreso_id,
+                errores=errores,
+            )
             raise ValidationError(errores)
 
     @staticmethod
@@ -153,6 +759,13 @@ class MapeoCamasService:
         - Si no existe, se crea uno nuevo.
         """
         if not cama_id or not ingreso_id or not usuario:
+            log_warning(
+                "Sincronizacion cama-ingreso omitida por parametros incompletos",
+                app=LogApp.INGRESOS,
+                cama_id=cama_id,
+                ingreso_id=ingreso_id,
+                usuario_id=getattr(usuario, "id", None),
+            )
             return None
 
         try:
@@ -209,6 +822,13 @@ class MapeoCamasService:
 
                 return asignacion
         except IntegrityError as exc:
+            log_error(
+                "Conflicto de concurrencia al sincronizar cama con ingreso",
+                app=LogApp.INGRESOS,
+                cama_id=cama_id,
+                ingreso_id=ingreso_id,
+                usuario_id=getattr(usuario, "id", None),
+            )
             raise ValidationError(
                 "Conflicto de concurrencia: la cama o el ingreso ya tienen asignacion activa."
             ) from exc
@@ -264,6 +884,14 @@ class MapeoCamasService:
         - Si queda sin cama, solo cierra la asignacion activa.
         """
         if not ingreso_id or not usuario:
+            log_warning(
+                "Cambio de cama omitido por parametros incompletos",
+                app=LogApp.INGRESOS,
+                cama_anterior_id=cama_anterior_id,
+                cama_nueva_id=cama_nueva_id,
+                ingreso_id=ingreso_id,
+                usuario_id=getattr(usuario, "id", None),
+            )
             return None
 
         if cama_anterior_id == cama_nueva_id:
@@ -312,6 +940,13 @@ class MapeoCamasService:
                 estado=estado_ocupada,
             ).exclude(pk=asignacion_activa.pk).first()
             if cama_ocupada:
+                log_warning(
+                    "Cambio de cama bloqueado: cama destino ocupada",
+                    app=LogApp.INGRESOS,
+                    cama_nueva_id=cama_nueva_id,
+                    ingreso_id=ingreso_id,
+                    asignacion_ocupada_id=cama_ocupada.id,
+                )
                 raise ValidationError(
                     {"cama_id": f"La cama #{cama_nueva_id} ya tiene una asignacion activa."}
                 )
@@ -387,7 +1022,8 @@ class MapeoCamasService:
 
 
 def _mc_constants():
-    from mapeo_camas._constants import (
+    # [2026-06-01] Constantes del flujo de mapeo centralizadas en core.
+    from core.constants.mapeo_camas_constants import (
         OBSERVACION_CAMBIO_MANUAL_MAPA,
         OBSERVACION_CAMBIO_TRASLADO_MAPEO,
         OBSERVACION_MOVIMIENTO_PACIENTE_MAPA,
@@ -445,13 +1081,30 @@ class MapeoOperacionesMapaService:
         estado_vacia = MapeoCamasService.get_estado_mapeo("VACIA", "ESTADO_CAMA")
 
         if not asig_origen or asig_origen.estado is None or asig_origen.estado.codigo not in {"OCUPADA", "PRE_ALTA"}:
+            log_warning(
+                "Movimiento bloqueado: cama origen sin paciente operativo",
+                app=LogApp.INGRESOS,
+                cama_origen_id=getattr(cama_origen, "pk", None),
+                cama_destino_id=getattr(cama_destino, "pk", None),
+            )
             raise ValidationError("La cama origen no tiene paciente asignado (debe estar OCUPADA o PRE_ALTA).")
 
         ingreso_operativo = asig_origen.ingreso
         if not ingreso_operativo:
+            log_warning(
+                "Movimiento bloqueado: cama origen sin ingreso operativo",
+                app=LogApp.INGRESOS,
+                cama_origen_id=getattr(cama_origen, "pk", None),
+            )
             raise ValidationError("La cama origen no tiene un ingreso activo valido. Datos incompletos.")
 
         if asig_destino and (asig_destino.estado is not None and asig_destino.estado.codigo != "VACIA"):
+            log_warning(
+                "Movimiento bloqueado: cama destino no disponible",
+                app=LogApp.INGRESOS,
+                cama_destino_id=getattr(cama_destino, "pk", None),
+                estado_destino=getattr(getattr(asig_destino, "estado", None), "codigo", None),
+            )
             raise ValidationError("La cama destino no esta disponible (no esta vacia).")
 
         sala_origen_id = _sala_real_id(cama_origen)
@@ -682,6 +1335,12 @@ class MapeoOperacionesMapaService:
 
             if accion == "CONFIRMAR_ALTA":
                 if not asig_actual:
+                    log_warning(
+                        "Confirmar alta bloqueado: no hay asignacion activa",
+                        app=LogApp.INGRESOS,
+                        cama_id=getattr(cama, "pk", None),
+                        accion=accion,
+                    )
                     raise ValidationError("No hay asignacion activa para confirmar alta.")
                 estado_anterior = asig_actual.estado
                 asig_actual.estado = estado_vacia
@@ -703,6 +1362,12 @@ class MapeoOperacionesMapaService:
 
             if accion == "CANCELAR_PREALTA":
                 if not asig_actual or not asig_actual.ingreso_id:
+                    log_warning(
+                        "Cancelar prealta bloqueado: ingreso actual no disponible",
+                        app=LogApp.INGRESOS,
+                        cama_id=getattr(cama, "pk", None),
+                        accion=accion,
+                    )
                     raise ValidationError("No existe ingreso actual para cancelar prealta.")
                 estado_anterior = asig_actual.estado
                 asig_actual.estado = estado_ocupada
@@ -724,6 +1389,12 @@ class MapeoOperacionesMapaService:
 
             if accion == "CAMBIO_TRASLADO":
                 if not ingreso_observado:
+                    log_warning(
+                        "Cambio/traslado bloqueado: ingreso observado faltante",
+                        app=LogApp.INGRESOS,
+                        cama_id=getattr(cama, "pk", None),
+                        accion=accion,
+                    )
                     raise ValidationError("Debe indicar ingreso_observado_id para cambio/traslado.")
 
                 if asig_actual and asig_actual.ingreso_id == ingreso_observado.id:
@@ -768,8 +1439,20 @@ class MapeoOperacionesMapaService:
 
             if accion == "ASIGNACION":
                 if not ingreso_observado:
+                    log_warning(
+                        "Asignacion bloqueada: ingreso observado faltante",
+                        app=LogApp.INGRESOS,
+                        cama_id=getattr(cama, "pk", None),
+                        accion=accion,
+                    )
                     raise ValidationError("Debe indicar ingreso_observado_id para asignacion.")
                 if asig_actual and asig_actual.estado == estado_ocupada:
+                    log_warning(
+                        "Asignacion bloqueada: cama ya ocupada",
+                        app=LogApp.INGRESOS,
+                        cama_id=getattr(cama, "pk", None),
+                        accion=accion,
+                    )
                     raise ValidationError("La cama ya figura ocupada en sistema. Use CAMBIO_TRASLADO.")
                 if asig_actual:
                     asig_actual.estado = estado_ocupada
@@ -799,6 +1482,12 @@ class MapeoOperacionesMapaService:
 
             if accion == "ALTA_FORZADA":
                 if not asig_actual or asig_actual.estado != estado_ocupada:
+                    log_warning(
+                        "Alta forzada bloqueada: no existe ocupacion activa",
+                        app=LogApp.INGRESOS,
+                        cama_id=getattr(cama, "pk", None),
+                        accion=accion,
+                    )
                     raise ValidationError("No existe ocupacion activa para forzar alta.")
                 asig_actual.estado = estado_vacia
                 asig_actual.ingreso = None
@@ -817,4 +1506,10 @@ class MapeoOperacionesMapaService:
                 )
                 return {"mensaje": "Alta forzada aplicada. Cama liberada."}
 
+        log_warning(
+            "Accion de mapeo no procesada",
+            app=LogApp.INGRESOS,
+            cama_id=getattr(cama, "pk", None),
+            accion=accion,
+        )
         raise ValidationError("No se pudo procesar la accion solicitada.")

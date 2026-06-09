@@ -22,12 +22,6 @@
         <i class="bi bi-play-circle boton-exportacion"></i>
       </button>
       {% endif %}
-      <button type="button" class="dt-button" id="btn-copiar-camas" title="Copiar resumen visible">
-        <i class="bi bi-clipboard boton-exportacion"></i>
-      </button>
-      <button type="button" class="dt-button" id="btn-imprimir-camas" title="Imprimir mapa">
-        <i class="bi bi-printer boton-exportacion"></i>
-      </button>
       {% if puede_ver_historiales %}
       <a href="{% url 'mapeo_camas_historiales' %}" class="dt-button" id="btn-historiales-camas" title="Ver historiales de camas">
         <i class="bi bi-clock-history boton-exportacion"></i>
@@ -137,14 +131,31 @@
 {% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'mapeo/styles/mapaCamas.css' %}?v=20260526c">
+<!-- 2026-06-09: estáticos de mapeo centralizados en core/static/core/css -->
+<link rel="stylesheet" href="{% static 'core/css/mapeo/mapaCamas.css' %}?v=20260526c">
 {% endblock %}
 
 {% block extra_js %}
 {# [2026-05-08] Indica al JS si el usuario puede editar el mapa o es solo lectura #}
+{# [2026-06-01] URLs de la API inyectadas desde el template para evitar hardcodeo en JS. #}
 <script>
   window.MAPA_SOLO_LECTURA = {% if es_editor %}false{% else %}true{% endif %};
   window.MAPA_ROL_INTENTOS_RESTRINGIDO = {% if es_rol_intentos_restringido %}true{% else %}false{% endif %};
+  window.MAPA_CFG = {
+    urls: {
+      estadoMapeo:      "{% url 'mapeo_camas_estado_mapeo' %}",
+      iniciarMapeo:     "{% url 'mapeo_camas_iniciar_mapeo' %}",
+      terminarMapeo:    "{% url 'mapeo_camas_terminar_mapeo' %}",
+      cancelarMapeo:    "{% url 'mapeo_camas_cancelar_mapeo' %}",
+      sincronizarCamas: "{% url 'sincronizar-camas-superadmin' %}",
+      mapa:             "{% url 'mapeo_camas_data' %}",
+      buscarPacientes:  "{% url 'mapeo_camas_buscar_pacientes' %}",
+      actualizarCama:   "{% url 'mapeo_camas_actualizar_cama' %}",
+      camasDisponibles: "{% url 'mapeo_camas_camas_disponibles' %}",
+      moverPaciente:    "{% url 'mapeo_camas_mover_paciente' %}",
+      procesarCamaMapeo:"{% url 'mapeo_camas_procesar_cama_mapeo' %}"
+    }
+  };
 </script>
-<script src="{% static 'mapeo/scripts/mapaCamasAsignacion.js' %}?v=20260525b"></script>
+<script src="{% static 'core/scripts/mapeo/mapaCamasAsignacion.js' %}?v=20260601a"></script>
 {% endblock %}

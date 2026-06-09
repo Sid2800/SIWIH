@@ -1,10 +1,6 @@
 document.addEventListener("DOMContentLoaded", function () {
-  var API_URLS = {
-    camas: "/mapeo-camas/api/historiales/camas/",
-    data: "/mapeo-camas/api/historiales/data/",
-    detalle: "/mapeo-camas/historiales/detalle/",
-    mapa: "/mapeo-camas/"
-  };
+  // [2026-06-01] Endpoints inyectados por el template via window.MAPA_CFG — no hardcodear URLs aquí.
+  var API_URLS = (window.MAPA_CFG && window.MAPA_CFG.urls) || {};
 
   var filtroTipo = null;
   var filtroCama = null;

@@ -6,6 +6,9 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
 
+from core.constants.choices_constants import EstadoMapeoCategoria
+from mapeo_camas.constants.choices_constants import DetalleMapeoTipoAccion
+
 
 # =============================================================================
 # EstadoMapeo
@@ -13,17 +16,12 @@ from django.utils import timezone
 # Catálogo centralizado de estados para camas, sesiones, etc.
 # =============================================================================
 class EstadoMapeo(models.Model):
-
-    class Categoria(models.TextChoices):
-        ESTADO_CAMA = "ESTADO_CAMA", "Estado de cama"
-        ESTADO_SESION = "ESTADO_SESION", "Estado de sesion"
-        TIPO_ACCION = "TIPO_ACCION", "Tipo de accion"
-        OBSERVACION = "OBSERVACION", "Observacion"
+    Categoria = EstadoMapeoCategoria
 
     codigo = models.CharField(max_length=255, unique=True, db_index=True, verbose_name="Código")
     categoria = models.CharField(
         max_length=20,
-        choices=Categoria.choices,
+        choices=EstadoMapeoCategoria.choices,
         verbose_name="Categoría",
     )
     activo = models.BooleanField(default=True, verbose_name="Activo")
@@ -45,7 +43,7 @@ def get_observacion_mapeo(codigo):
     codigo_normalizado = (codigo or "").strip() or "Sin observaciones"
     observacion, _ = EstadoMapeo.objects.get_or_create(
         codigo=codigo_normalizado,
-        categoria=EstadoMapeo.Categoria.OBSERVACION,
+        categoria=EstadoMapeoCategoria.OBSERVACION,
         defaults={"activo": True},
     )
     return observacion
@@ -443,13 +441,8 @@ class MapeoSesionServicio(models.Model):
 # =============================================================================
 class DetalleMapeoCama(models.Model):
 
-    # Constantes de codigo para los tipos de accion (categoria TIPO_ACCION en EstadoMapeo)
-    class TipoAccion:
-        CONFIRMACION = "CONFIRMACION"
-        ALTA = "ALTA"
-        CAMBIO = "CAMBIO"
-        TRASLADO = "TRASLADO"
-        CORRECCION = "CORRECCION"
+    # 2026-06-09: alias de compatibilidad; origen central en mapeo_camas/constants/choices_constants.py.
+    TipoAccion = DetalleMapeoTipoAccion
 
     sesion_mapeo = models.ForeignKey(
         MapeoSesionCama,

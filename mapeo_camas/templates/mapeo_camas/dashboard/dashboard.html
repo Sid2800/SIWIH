@@ -5,8 +5,8 @@
 {% block title %}{{ titulo }}{% endblock %}
 
 {% block extra_css %}
-  
-  <link rel="stylesheet" href="{% static 'mapeo/css/dashboard/dashboard.css' %}">
+  <!-- 2026-06-09: estáticos de mapeo centralizados en core/static/core/css -->
+  <link rel="stylesheet" href="{% static 'core/css/mapeo/dashboard/dashboard.css' %}">
 {% endblock extra_css %}
 
 {% block content %}
@@ -48,26 +48,33 @@
 </div>
 
 <script>
-  // Configuración inyectada por el template (URL base de la API).
+  {# [2026-06-01] URLs de la API inyectadas desde el template — no hardcodear en JS. #}
   window.DASHBOARD_CFG = {
-    apiBase: "{% url 'mapeo_camas_dashboard' %}api"
+    urls: {
+      kpis:               "{% url 'mapeo_camas_dashboard_kpis' %}",
+      ocupacionServicio:  "{% url 'mapeo_camas_dashboard_ocupacion_servicio' %}",
+      distribucionCamas:  "{% url 'mapeo_camas_dashboard_distribucion_camas' %}",
+      ocupacionHora:      "{% url 'mapeo_camas_dashboard_ocupacion_hora' %}",
+      saturacionSala:     "{% url 'mapeo_camas_dashboard_saturacion_sala' %}",
+      ultimosMovimientos: "{% url 'mapeo_camas_dashboard_ultimos_movimientos' %}"
+    }
   };
 </script>
 {% endblock content %}
 
 {% block extra_js %}
   {# [2026-05-28] ApexCharts local — única dependencia de terceros del dashboard. #}
-  <script src="{% static 'mapeo/vendor/apexcharts/apexcharts.min.js' %}"></script>
+  <script src="{% static 'core/vendor/apexcharts/apexcharts.min.js' %}"></script>
 
-  <script src="{% static 'mapeo/js/dashboard/api.js' %}"></script>
-  <script src="{% static 'mapeo/js/dashboard/filters.js' %}"></script>
-  <script src="{% static 'mapeo/js/dashboard/kpis.js' %}"></script>
-  <script src="{% static 'mapeo/js/dashboard/charts/estados-resumen.js' %}"></script>
-  <script src="{% static 'mapeo/js/dashboard/charts/ocupacion-servicio.js' %}"></script>
-  <script src="{% static 'mapeo/js/dashboard/charts/distribucion-camas.js' %}"></script>
-  <script src="{% static 'mapeo/js/dashboard/charts/ocupacion-hora.js' %}"></script>
-  <script src="{% static 'mapeo/js/dashboard/charts/saturacion-sala.js' %}"></script>
-  <script src="{% static 'mapeo/js/dashboard/tabla-movimientos.js' %}"></script>
-  <script src="{% static 'mapeo/js/dashboard/info-modal.js' %}"></script>
-  <script src="{% static 'mapeo/js/dashboard/dashboard.js' %}"></script>
+  <script src="{% static 'core/scripts/mapeo/dashboard/api.js' %}"></script>
+  <script src="{% static 'core/scripts/mapeo/dashboard/filters.js' %}"></script>
+  <script src="{% static 'core/scripts/mapeo/dashboard/kpis.js' %}"></script>
+  <script src="{% static 'core/scripts/mapeo/dashboard/charts/estados-resumen.js' %}"></script>
+  <script src="{% static 'core/scripts/mapeo/dashboard/charts/ocupacion-servicio.js' %}"></script>
+  <script src="{% static 'core/scripts/mapeo/dashboard/charts/distribucion-camas.js' %}"></script>
+  <script src="{% static 'core/scripts/mapeo/dashboard/charts/ocupacion-hora.js' %}"></script>
+  <script src="{% static 'core/scripts/mapeo/dashboard/charts/saturacion-sala.js' %}"></script>
+  <script src="{% static 'core/scripts/mapeo/dashboard/tabla-movimientos.js' %}"></script>
+  <script src="{% static 'core/scripts/mapeo/dashboard/info-modal.js' %}"></script>
+  <script src="{% static 'core/scripts/mapeo/dashboard/dashboard.js' %}"></script>
 {% endblock extra_js %}

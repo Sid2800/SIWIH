@@ -80,17 +80,16 @@
     return url + (url.indexOf("?") >= 0 ? "&" : "?") + qs;
   }
 
-  // Endpoints centralizados del dashboard.
-  // Cualquier cambio de ruta se hace acá. Inyectados al window por dashboard.js.
-  function makeEndpoints(baseUrl) {
-    const u = (path) => baseUrl.replace(/\/$/, "") + path;
+  // [2026-06-01] Endpoints inyectados por el template via window.DASHBOARD_CFG.urls.
+  // Recibe el objeto urls directamente; no construye rutas por concatenación.
+  function makeEndpoints(urls) {
     return {
-      kpis: () => u("/kpis/"),
-      ocupacionServicio: () => u("/ocupacion-servicio/"),
-      distribucionCamas: () => u("/distribucion-camas/"),
-      ocupacionHora: () => u("/ocupacion-hora/"),
-      saturacionSala: () => u("/saturacion-sala/"),
-      ultimosMovimientos: (limit = 30) => u("/ultimos-movimientos/?limit=" + encodeURIComponent(limit)),
+      kpis: () => urls.kpis || "",
+      ocupacionServicio: () => urls.ocupacionServicio || "",
+      distribucionCamas: () => urls.distribucionCamas || "",
+      ocupacionHora: () => urls.ocupacionHora || "",
+      saturacionSala: () => urls.saturacionSala || "",
+      ultimosMovimientos: (limit = 30) => (urls.ultimosMovimientos || "") + "?limit=" + encodeURIComponent(limit),
     };
   }
 

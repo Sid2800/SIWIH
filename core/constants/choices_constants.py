@@ -71,3 +71,10 @@ class FuenteSeguimiento(models.IntegerChoices):
 class TipoDefuncion(models.IntegerChoices):
     INTRAHOSPITALARIA = 1, "Intrahospitalaria"
     EXTRAHOSPITALARIA = 2, "Extrahospitalaria"
+
+
+class EstadoMapeoCategoria(models.TextChoices):
+    ESTADO_CAMA = "ESTADO_CAMA", "Estado de cama"
+    ESTADO_SESION = "ESTADO_SESION", "Estado de sesion"
+    TIPO_ACCION = "TIPO_ACCION", "Tipo de accion"
+    OBSERVACION = "OBSERVACION", "Observacion"

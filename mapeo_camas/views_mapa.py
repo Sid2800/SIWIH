@@ -4,12 +4,13 @@ buscadores y operaciones de edición (mover paciente, actualizar cama)."""
 
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
-from django.db.models import Count, Exists, F, OuterRef, Prefetch, Q, Subquery
+from django.db.models import Count, F, Prefetch, Q
 from django.http import JsonResponse
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 from django.views.generic import TemplateView
 
+from core.utils.utilidades_fechas import hora_local_iso
 from core.constants.permisos import (
     MAPEO_CAMAS_HISTORIALES_ROLES,
     MAPEO_CAMAS_HISTORIALES_UNIDADES,
@@ -17,8 +18,8 @@ from core.constants.permisos import (
     MAPEO_CAMAS_MAPEAR_UNIDADES,
 )
 from core.mixins import UnidadRolRequiredMixin
+from core.services.mapeo_camas_service import MapeoCamasService
 from ingreso.models import Ingreso
-from paciente.models import Paciente
 from servicio.models import Cama, Cubiculo, Sala, Servicio
 
 from mapeo_camas.models import (
@@ -32,15 +33,20 @@ from mapeo_camas.models import (
     get_observacion_mapeo,
 )
 
-from ._constants import (
+from core.constants.mapeo_camas_constants import (
     OBSERVACION_CAMBIO_MANUAL_MAPA,
     OBSERVACION_MOVIMIENTO_PACIENTE_MAPA,
     OBSERVACION_MOVIMIENTO_PACIENTE_MAPA_DETALLE,
     OBSERVACION_MOVIMIENTO_PACIENTE_MAPA_SUPERADMIN,
 )
+from .constants.view_constants import (
+    ESTADOS_CON_HISTORIAL_ALTA_VACIA,
+    ESTADOS_EDICION_DIRECTA_ROL_RESTRINGIDO,
+    ESTADOS_MANTIENEN_INGRESO_SIN_NUEVO,
+    ESTADOS_OCUPADA_PREALTA,
+)
 from ._helpers import (
     _es_superadmin,
-    _hora_local_iso,
     _meta_ultima_actualizacion,
     _nombre_usuario,
     _paciente_payload,
@@ -67,6 +73,13 @@ from ._sesion import (
     _registrar_detalle_mapeo,
     _registrar_historial_mapeo,
     _sincronizar_cama_en_ingreso_activo,
+)
+from .services import MapeoCamasQueryService
+from .validators import (
+    validar_cama_id,
+    validar_ids_movimiento,
+    validar_ingreso_requerido_para_ocupada,
+    validar_transicion_vacia_a_prealta,
 )
 
 
@@ -219,35 +232,9 @@ def mapa_camas_data(request):
             "sesion_id": sesion_servicio.sesion_mapeo_id,
         }
 
-    ultima_asignacion_id = (
-        AsignacionCamaPaciente.objects
-        .filter(cama_id=OuterRef("cama_id"))
-        .order_by("-fecha_inicio", "-id")
-        .values("id")[:1]
-    )
-    asignacion_por_cama = {
-        asig.cama_id: asig
-        for asig in (
-            AsignacionCamaPaciente.objects
-            .select_related("ingreso", "estado")
-            .filter(id=Subquery(ultima_asignacion_id))
-        )
-    }
-
-    ultima_historial_id = (
-        HistorialEstadoCama.objects
-        .filter(cama_id=OuterRef("cama_id"))
-        .order_by("-fecha_hora", "-id")
-        .values("id")[:1]
-    )
-    historial_por_cama = {
-        historial.cama_id: historial
-        for historial in (
-            HistorialEstadoCama.objects
-            .select_related("usuario")
-            .filter(id=Subquery(ultima_historial_id))
-        )
-    }
+    # 2026-06-09: ORM pesado extraído a service reutilizable para adelgazar la vista.
+    asignacion_por_cama = MapeoCamasQueryService.obtener_ultimas_asignaciones_por_cama()
+    historial_por_cama = MapeoCamasQueryService.obtener_ultimos_historiales_por_cama()
 
     cambios_por_sala = {
         item["sala_real_id"]: item["total"]
@@ -368,50 +355,7 @@ def buscar_pacientes_mapa(request):
         return JsonResponse({"ok": False, "error": "Acceso denegado."}, status=403)
     termino = (request.GET.get("q") or "").strip()
     tipo_busqueda = (request.GET.get("tipo") or "dni").strip().lower()
-
-    ingreso_activo = Exists(
-        Ingreso.objects.filter(
-            paciente_id=OuterRef("pk"),
-            estado=1,
-            fecha_egreso__isnull=True,
-        )
-    )
-    ingreso_activo_id = Subquery(
-        Ingreso.objects.filter(
-            paciente_id=OuterRef("pk"),
-            estado=1,
-            fecha_egreso__isnull=True,
-        )
-        .order_by("-fecha_ingreso", "-id")
-        .values("id")[:1]
-    )
-    pacientes_qs = (
-        Paciente.objects.filter(estado__in=["A", "P"])
-        .annotate(ingreso_activo_id=ingreso_activo_id)
-        .filter(ingreso_activo)
-    )
-
-    if termino:
-        if tipo_busqueda == "dni":
-            pacientes_qs = pacientes_qs.filter(dni__icontains=termino)
-        elif tipo_busqueda == "nombre":
-            pacientes_qs = pacientes_qs.filter(
-                Q(primer_nombre__icontains=termino)
-                | Q(segundo_nombre__icontains=termino)
-                | Q(primer_apellido__icontains=termino)
-                | Q(segundo_apellido__icontains=termino)
-            )
-        else:
-            pacientes_qs = pacientes_qs.filter(
-                Q(dni__icontains=termino)
-                | Q(primer_nombre__icontains=termino)
-                | Q(segundo_nombre__icontains=termino)
-                | Q(primer_apellido__icontains=termino)
-                | Q(segundo_apellido__icontains=termino)
-            )
-
-    pacientes = pacientes_qs.order_by("primer_nombre", "primer_apellido")[:20]
-    resultados = [_paciente_payload(p, ingreso_id=getattr(p, "ingreso_activo_id", None)) for p in pacientes]
+    resultados = MapeoCamasService.buscar_pacientes_para_mapa(termino=termino, tipo_busqueda=tipo_busqueda)
     return JsonResponse({"results": resultados})
 
 
@@ -432,37 +376,10 @@ def camas_disponibles_mapa(request):
             servicio_restringido_id = getattr(cama_origen.sala, "servicio_id", None)
         except Cama.DoesNotExist:
             servicio_restringido_id = None
-
-    asignaciones = AsignacionCamaPaciente.objects.order_by("cama_id", "-fecha_inicio", "-id")
-    asignacion_por_cama = {}
-    for asig in asignaciones:
-        if asig.cama_id not in asignacion_por_cama:
-            asignacion_por_cama[asig.cama_id] = asig
-
-    todas_camas = (
-        Cama.objects.filter(estado=1)
-        .select_related("sala__servicio", "cubiculo")
-        .order_by("sala__servicio__nombre_servicio", "sala__nombre_sala", "numero_cama")
+    resultados = MapeoCamasService.obtener_camas_disponibles_para_mapa(
+        excluir_cama=excluir_cama,
+        servicio_restringido_id=servicio_restringido_id,
     )
-
-    resultados = []
-    estado_vacia = get_estado_mapeo("VACIA", "ESTADO_CAMA")
-    for cama in todas_camas:
-        if excluir_cama and str(cama.numero_cama) == str(excluir_cama):
-            continue
-        # [2026-05-04 AUDIT] Usar cama.pk (PK real) como clave.
-        asig = asignacion_por_cama.get(cama.pk)
-        estado = asig.estado if asig else estado_vacia
-        if getattr(estado, "codigo", estado) == "VACIA":
-            if servicio_restringido_id and getattr(cama.sala, "servicio_id", None) != servicio_restringido_id:
-                continue
-            resultados.append({
-                "numero_cama": cama.numero_cama,
-                "sala": cama.sala.nombre_sala,
-                "servicio": cama.sala.servicio.nombre_servicio,
-                "cubiculo": cama.cubiculo.nombre_cubiculo if cama.cubiculo else None,
-            })
-
     return JsonResponse({"results": resultados})
 
 
@@ -482,11 +399,12 @@ def mover_paciente_cama(request):
 
     cama_origen_id = request.POST.get("cama_origen_id")
     cama_destino_id = request.POST.get("cama_destino_id")
-
-    if not cama_origen_id or not cama_destino_id:
-        return JsonResponse({"ok": False, "error": "Debe indicar la cama origen y la cama destino."}, status=400)
-    if str(cama_origen_id) == str(cama_destino_id):
-        return JsonResponse({"ok": False, "error": "La cama destino debe ser diferente a la cama origen."}, status=400)
+    # 2026-06-04: valida IDs de request con core.validators antes del flujo ORM/modelo.
+    try:
+        cama_origen_id, cama_destino_id = validar_ids_movimiento(cama_origen_id, cama_destino_id)
+    except DjangoValidationError as exc:
+        msg = exc.message if hasattr(exc, "message") else "; ".join(exc.messages)
+        return JsonResponse({"ok": False, "error": msg}, status=400)
 
     try:
         cama_origen = Cama.objects.select_related("sala__servicio", "cubiculo").get(pk=cama_origen_id)
@@ -510,13 +428,15 @@ def mover_paciente_cama(request):
         return limite_error
 
     try:
-        resultado = MapeoOperacionesMapaService.mover_paciente_entre_camas(
-            usuario=request.user,
-            cama_origen=cama_origen,
-            cama_destino=cama_destino,
-            sesion_mapeo=_obtener_sesion_mapeo_activa(request.user),
-            es_superadmin=_es_superadmin(request.user),
-        )
+        # 2026-06-09: atomic defensivo en endpoint para asegurar escritura transaccional.
+        with transaction.atomic():
+            resultado = MapeoOperacionesMapaService.mover_paciente_entre_camas(
+                usuario=request.user,
+                cama_origen=cama_origen,
+                cama_destino=cama_destino,
+                sesion_mapeo=_obtener_sesion_mapeo_activa(request.user),
+                es_superadmin=_es_superadmin(request.user),
+            )
     except DjangoValidationError as exc:
         msg = exc.message if hasattr(exc, "message") else "; ".join(exc.messages)
         return JsonResponse({"ok": False, "error": msg}, status=400)
@@ -532,7 +452,7 @@ def mover_paciente_cama(request):
             "paciente": None,
             "cambios_realizados": _contar_cambios_manual_por_sala(resultado["sala_origen_id"]),
             "max_cambios": max_cambios_usuario,
-            "ultima_actualizacion": _hora_local_iso(resultado["historial_origen"].fecha_hora),
+            "ultima_actualizacion": hora_local_iso(resultado["historial_origen"].fecha_hora),
             "usuario_ultima_actualizacion": _nombre_usuario(resultado["historial_origen"].usuario),
         },
         "cama_destino": {
@@ -541,7 +461,7 @@ def mover_paciente_cama(request):
             "paciente": _paciente_payload(ingreso_operativo.paciente, ingreso_id=ingreso_operativo.id),
             "cambios_realizados": _contar_cambios_manual_por_sala(resultado["sala_destino_id"]),
             "max_cambios": max_cambios_usuario,
-            "ultima_actualizacion": _hora_local_iso(resultado["historial_destino"].fecha_hora),
+            "ultima_actualizacion": hora_local_iso(resultado["historial_destino"].fecha_hora),
             "usuario_ultima_actualizacion": _nombre_usuario(resultado["historial_destino"].usuario),
         },
     })
@@ -564,8 +484,15 @@ def actualizar_cama_mapa(request):
     estado_codigo = (request.POST.get("estado") or "").strip()
     ingreso_id = request.POST.get("ingreso_id") or None
 
-    if not cama_id:
-        return JsonResponse({"ok": False, "error": "Debe indicar la cama."}, status=400)
+    # 2026-06-04: valida entrada de request con core.validators antes de validaciones de modelo.
+    try:
+        cama_id = validar_cama_id(cama_id)
+        validar_ingreso_requerido_para_ocupada(estado_codigo, ingreso_id)
+    except DjangoValidationError as exc:
+        msg = exc.message if hasattr(exc, "message") else "; ".join(exc.messages)
+        if "cama_id" in msg:
+            return JsonResponse({"ok": False, "error": "Debe indicar la cama."}, status=400)
+        return JsonResponse({"ok": False, "error": msg}, status=400)
 
     try:
         estado_nuevo_obj = EstadoMapeo.objects.get(codigo=estado_codigo, categoria="ESTADO_CAMA")
@@ -585,22 +512,20 @@ def actualizar_cama_mapa(request):
     )
     if not asignacion:
         estado_vacia_obj = EstadoMapeo.objects.get(codigo="VACIA", categoria="ESTADO_CAMA")
-        asignacion = AsignacionCamaPaciente.objects.create(
-            cama=cama, usuario_asignacion=request.user, estado=estado_vacia_obj, ingreso=None,
-        )
+        # 2026-06-01: asegura atomic en creación inicial de asignación operativa.
+        with transaction.atomic():
+            asignacion = AsignacionCamaPaciente.objects.create(
+                cama=cama, usuario_asignacion=request.user, estado=estado_vacia_obj, ingreso=None,
+            )
 
     ingreso_nuevo = None
     if estado_codigo == "OCUPADA":
-        if not ingreso_id:
-            return JsonResponse(
-                {"ok": False, "error": "Para asignar una cama OCUPADA debe indicar el ingreso."}, status=400,
-            )
         ingreso_nuevo = _resolver_ingreso_operativo(ingreso_id=ingreso_id)
         if not ingreso_nuevo:
             return JsonResponse({"ok": False, "error": "El ingreso seleccionado no existe."}, status=404)
 
     if _es_rol_intentos_restringido(request.user):
-        if estado_codigo not in {"PRE_ALTA", "VACIA"}:
+        if estado_codigo not in ESTADOS_EDICION_DIRECTA_ROL_RESTRINGIDO:
             return JsonResponse(
                 {"ok": False, "error": "Este rol solo puede hacer pre-altas o pasar la cama a vacia desde edicion directa."},
                 status=403,
@@ -613,7 +538,7 @@ def actualizar_cama_mapa(request):
             .select_related("estado", "cama")
             .filter(
                 ingreso=ingreso_nuevo,
-                estado__codigo__in=["OCUPADA", "PRE_ALTA"],
+                estado__codigo__in=ESTADOS_OCUPADA_PREALTA,
                 estado__categoria="ESTADO_CAMA",
             )
             .exclude(cama_id=cama_id)
@@ -635,12 +560,15 @@ def actualizar_cama_mapa(request):
     estado_anterior = asignacion.estado
     ingreso_anterior = asignacion.ingreso
 
-    # [2026-05-27 AUDIT] VACIA no puede convertirse en PRE_ALTA.
-    if estado_anterior and estado_anterior.codigo == "VACIA" and estado_codigo == "PRE_ALTA":
-        return JsonResponse(
-            {"ok": False, "error": "Una cama vacia no puede pasar a pre-alta. Debe iniciarse como ocupada o permanecer vacia."},
-            status=400,
+    # 2026-06-04: valida transición de estado antes del flujo de persistencia.
+    try:
+        validar_transicion_vacia_a_prealta(
+            estado_anterior.codigo if estado_anterior else None,
+            estado_codigo,
         )
+    except DjangoValidationError as exc:
+        msg = exc.message if hasattr(exc, "message") else "; ".join(exc.messages)
+        return JsonResponse({"ok": False, "error": msg}, status=400)
 
     requiere_cierre_prealta = (
         estado_anterior and estado_anterior.codigo == "PRE_ALTA"
@@ -658,12 +586,12 @@ def actualizar_cama_mapa(request):
         estado_codigo == "VACIA"
         and ingreso_anterior is not None
         and estado_anterior is not None
-        and estado_anterior.codigo in {"OCUPADA", "PRE_ALTA", "ALTA"}
+        and estado_anterior.codigo in ESTADOS_CON_HISTORIAL_ALTA_VACIA
     )
 
     if estado_codigo == "VACIA":
         ingreso_nuevo = None
-    elif estado_codigo in {"PRE_ALTA", "ALTA"} and ingreso_nuevo is None:
+    elif estado_codigo in ESTADOS_MANTIENEN_INGRESO_SIN_NUEVO and ingreso_nuevo is None:
         ingreso_nuevo = ingreso_anterior
 
     hubo_cambio = (
@@ -695,21 +623,23 @@ def actualizar_cama_mapa(request):
         })
 
     try:
-        resultado = MapeoOperacionesMapaService.aplicar_actualizacion_manual_cama(
-            usuario=request.user,
-            cama=cama,
-            estado_codigo=estado_codigo,
-            estado_nuevo_obj=estado_nuevo_obj,
-            ingreso_nuevo=ingreso_nuevo,
-            sesion_mapeo=_obtener_sesion_mapeo_activa(request.user),
-            asig_previa_paciente=asig_previa_paciente,
-            asignacion=asignacion,
-            estado_anterior=estado_anterior,
-            ingreso_anterior=ingreso_anterior,
-            requiere_cierre_prealta=bool(requiere_cierre_prealta),
-            requiere_cierre_ocupada_a_ocupada=bool(requiere_cierre_ocupada_a_ocupada),
-            requiere_registro_alta_a_vacia=bool(requiere_registro_alta_a_vacia),
-        )
+        # 2026-06-09: atomic defensivo en endpoint para asegurar escritura transaccional.
+        with transaction.atomic():
+            resultado = MapeoOperacionesMapaService.aplicar_actualizacion_manual_cama(
+                usuario=request.user,
+                cama=cama,
+                estado_codigo=estado_codigo,
+                estado_nuevo_obj=estado_nuevo_obj,
+                ingreso_nuevo=ingreso_nuevo,
+                sesion_mapeo=_obtener_sesion_mapeo_activa(request.user),
+                asig_previa_paciente=asig_previa_paciente,
+                asignacion=asignacion,
+                estado_anterior=estado_anterior,
+                ingreso_anterior=ingreso_anterior,
+                requiere_cierre_prealta=bool(requiere_cierre_prealta),
+                requiere_cierre_ocupada_a_ocupada=bool(requiere_cierre_ocupada_a_ocupada),
+                requiere_registro_alta_a_vacia=bool(requiere_registro_alta_a_vacia),
+            )
     except DjangoValidationError as exc:
         msg = exc.message if hasattr(exc, "message") else "; ".join(exc.messages)
         return JsonResponse({"ok": False, "error": msg}, status=400)
@@ -743,7 +673,7 @@ def actualizar_cama_mapa(request):
             ),
             "cambios_realizados": cambios_realizados,
             "max_cambios": max_cambios_usuario,
-            "ultima_actualizacion": _hora_local_iso(historial.fecha_hora),
+            "ultima_actualizacion": hora_local_iso(historial.fecha_hora),
             "usuario_ultima_actualizacion": _nombre_usuario(historial.usuario),
         },
     })

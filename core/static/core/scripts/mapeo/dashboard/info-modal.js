@@ -7,6 +7,19 @@
 (function (global) {
   "use strict";
 
+  // 2026-06-09: endpoints de guía derivados de configuración inyectada por template.
+  const DASH_URLS = (global.DASHBOARD_CFG && global.DASHBOARD_CFG.urls) || {};
+  const ENDPOINTS = {
+    KPIS: "GET " + (DASH_URLS.kpis || "[url_kpis_no_configurada]"),
+    OCUPACION_SERVICIO: "GET " + (DASH_URLS.ocupacionServicio || "[url_ocupacion_servicio_no_configurada]"),
+    DISTRIBUCION_CAMAS: "GET " + (DASH_URLS.distribucionCamas || "[url_distribucion_camas_no_configurada]"),
+    OCUPACION_HORA: "GET " + (DASH_URLS.ocupacionHora || "[url_ocupacion_hora_no_configurada]"),
+    SATURACION_SALA: "GET " + (DASH_URLS.saturacionSala || "[url_saturacion_sala_no_configurada]"),
+    ULTIMOS_MOVIMIENTOS: "GET " + (DASH_URLS.ultimosMovimientos || "[url_ultimos_movimientos_no_configurada]"),
+    TODOS: "Aplicado a TODOS los endpoints del dashboard",
+    HELPER: "Helper interno",
+  };
+
   // [2026-06-01] Mantener en sincronía con mapeo_camas/views_dashboard.py.
   // La UI muestra primero una guía de negocio y deja lo técnico como apoyo opcional.
   const SECCIONES = [
@@ -15,7 +28,7 @@
       items: [
         {
           nombre: "Total camas",
-          endpoint: "GET /mapeo-camas/dashboard/api/kpis/",
+          endpoint: ENDPOINTS.KPIS,
           metodo: "dashboard_kpis() — views.py",
           origen: ["Tabla base: Cama", "Filtro estructural: estado=1"],
           campos: ["Cama.id", "Cama.estado"],
@@ -28,7 +41,7 @@
         },
         {
           nombre: "Ocupadas / Disponibles / Fuera servicio",
-          endpoint: "GET /mapeo-camas/dashboard/api/kpis/",
+          endpoint: ENDPOINTS.KPIS,
           metodo: "dashboard_kpis() → _snapshot_estado_camas(hasta)",
           origen: [
             "Fuente actual: AsignacionCamaPaciente vigente cuando hasta esta a 60 s o menos del ahora.",
@@ -50,7 +63,7 @@
         },
         {
           nombre: "% Ocupación",
-          endpoint: "GET /mapeo-camas/dashboard/api/kpis/",
+          endpoint: ENDPOINTS.KPIS,
           metodo: "dashboard_kpis()",
           origen: ["Resultado derivado de Total camas y Ocupadas del mismo endpoint."],
           campos: ["ocupadas", "total_camas"],
@@ -64,7 +77,7 @@
         },
         {
           nombre: "Altas del rango",
-          endpoint: "GET /mapeo-camas/dashboard/api/kpis/",
+          endpoint: ENDPOINTS.KPIS,
           metodo: "dashboard_kpis()",
           origen: ["Tabla clinica: Ingreso"],
           campos: ["Ingreso.fecha_egreso"],
@@ -77,7 +90,7 @@
         },
         {
           nombre: "Traslados",
-          endpoint: "GET /mapeo-camas/dashboard/api/kpis/",
+          endpoint: ENDPOINTS.KPIS,
           metodo: "dashboard_kpis()",
           origen: ["Tabla operativa: MovimientoCama"],
           campos: ["MovimientoCama.fecha_hora"],
@@ -90,7 +103,7 @@
         },
         {
           nombre: "Cambios detectados / Camas validadas",
-          endpoint: "GET /mapeo-camas/dashboard/api/kpis/",
+          endpoint: ENDPOINTS.KPIS,
           metodo: "dashboard_kpis() → _obtener_sesion_mapeo_activa(user)",
           origen: ["Tabla operativa: DetalleMapeoCama de la sesion activa del usuario."],
           campos: ["DetalleMapeoCama.hubo_cambio", "DetalleMapeoCama.fue_validada", "DetalleMapeoCama.cama_id"],
@@ -105,7 +118,7 @@
         },
         {
           nombre: "Tiempo promedio ocupación",
-          endpoint: "GET /mapeo-camas/dashboard/api/kpis/",
+          endpoint: ENDPOINTS.KPIS,
           metodo: "dashboard_kpis()  +  Avg(ExpressionWrapper(F('fecha_egreso')-F('fecha_ingreso')))",
           origen: ["Tabla clinica: Ingreso con fecha_ingreso y fecha_egreso."],
           campos: ["Ingreso.fecha_ingreso", "Ingreso.fecha_egreso"],
@@ -125,7 +138,7 @@
       items: [
         {
           nombre: "RadialBar Ocupadas / Disponibles / Fuera servicio",
-          endpoint: "GET /mapeo-camas/dashboard/api/kpis/  (sin request extra)",
+          endpoint: ENDPOINTS.KPIS + " (sin request extra)",
           metodo: "DashboardChartEstadosResumen.update(data_kpis)",
           origen: ["Reutiliza el JSON de dashboard_kpis(); no hace una consulta adicional."],
           campos: ["ocupadas", "disponibles", "fuera_servicio", "total_camas"],
@@ -144,7 +157,7 @@
       items: [
         {
           nombre: "Ocupadas vs Disponibles por servicio",
-          endpoint: "GET /mapeo-camas/dashboard/api/ocupacion-servicio/",
+          endpoint: ENDPOINTS.OCUPACION_SERVICIO,
           metodo: "dashboard_ocupacion_servicio() → _snapshot_estado_por_cama(hasta)",
           origen: ["Cama + relacion Sala -> Servicio + snapshot por cama al cierre del rango."],
           campos: ["Cama.estado", "Sala.estado", "Servicio.estado", "cama.sala.servicio", "estado_snapshot"],
@@ -163,7 +176,7 @@
       items: [
         {
           nombre: "Conteo global por código de estado",
-          endpoint: "GET /mapeo-camas/dashboard/api/distribucion-camas/",
+          endpoint: ENDPOINTS.DISTRIBUCION_CAMAS,
           metodo: "dashboard_distribucion_camas() → _snapshot_estado_camas(hasta)",
           origen: ["Snapshot consolidado de estado por cama al cierre del rango."],
           campos: ["codigo_estado", "cantidad"],
@@ -182,7 +195,7 @@
       items: [
         {
           nombre: "Serie temporal de % ocupación",
-          endpoint: "GET /mapeo-camas/dashboard/api/ocupacion-hora/",
+          endpoint: ENDPOINTS.OCUPACION_HORA,
           metodo: "dashboard_ocupacion_hora() → _dashboard_granularidad(desde, hasta)",
           origen: ["HistorialEstadoCama dentro del rango + snapshot inicial en desde."],
           campos: ["HistorialEstadoCama.fecha_hora", "HistorialEstadoCama.estado_nuevo", "snapshot_inicial['OCUPADA']", "total_camas"],
@@ -203,7 +216,7 @@
       items: [
         {
           nombre: "% Ocupación por sala dentro de cada servicio",
-          endpoint: "GET /mapeo-camas/dashboard/api/saturacion-sala/",
+          endpoint: ENDPOINTS.SATURACION_SALA,
           metodo: "dashboard_saturacion_sala() → _snapshot_estado_por_cama(hasta)",
           origen: ["Cama activa agrupada por Sala y Servicio + snapshot de estado por cama."],
           campos: ["Sala.nombre", "Servicio.nombre", "estado_snapshot", "cama_id"],
@@ -223,7 +236,7 @@
       items: [
         {
           nombre: "Movimientos de cama en el rango",
-          endpoint: "GET /mapeo-camas/dashboard/api/ultimos-movimientos/?limit=N",
+          endpoint: ENDPOINTS.ULTIMOS_MOVIMIENTOS + "?limit=N",
           metodo: "dashboard_ultimos_movimientos()",
           origen: ["Tabla MovimientoCama con relaciones precargadas."],
           campos: ["fecha_hora", "cama_origen", "cama_destino", "ingreso.paciente", "usuario"],
@@ -243,7 +256,7 @@
       items: [
         {
           nombre: "Parser de rango (?desde, ?hasta)",
-          endpoint: "Aplicado a TODOS los endpoints anteriores",
+          endpoint: ENDPOINTS.TODOS,
           metodo: "_dashboard_parse_range(request)",
           origen: ["Parametros de query string recibidos por request.GET."],
           campos: ["desde", "hasta"],
@@ -257,7 +270,7 @@
         },
         {
           nombre: "Snapshot histórico de camas",
-          endpoint: "Helper interno",
+          endpoint: ENDPOINTS.HELPER,
           metodo: "_snapshot_estado_camas(hasta) / _snapshot_estado_por_cama(hasta)",
           origen: ["AsignacionCamaPaciente vigente o HistorialEstadoCama por cama segun cercania temporal."],
           campos: ["cama_id", "estado_nuevo", "fecha_hora"],

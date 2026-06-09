@@ -1,15 +1,15 @@
 # 2026-05-29: extraído de mapeo_camas/views.py en refactor E (split)
 """Dashboard operativo de KPIs y monitoreo en tiempo real."""
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from django.contrib.auth.decorators import login_required
-from django.db.models import Avg, DurationField, ExpressionWrapper, F, OuterRef, Subquery
-from django.http import JsonResponse
+from django.db.models import Avg, DurationField, ExpressionWrapper, F
 from django.utils import timezone
 from django.views.decorators.http import require_GET
 from django.views.generic import TemplateView
 
+from core.utils.utilidades_fechas import hora_local_iso
 from core.constants.permisos import (
     MAPEO_CAMAS_DASHBOARD_ROLES,
     MAPEO_CAMAS_DASHBOARD_UNIDADES,
@@ -26,10 +26,16 @@ from mapeo_camas.models import (
 )
 
 from ._helpers import (
-    _hora_local_iso,
+    _dashboard_error,
+    _dashboard_granularidad,
+    _dashboard_parse_range,
+    _dashboard_response,
     _nombre_cama,
     _nombre_usuario,
     _paciente_payload,
+    _rango_meta,
+    _snapshot_estado_camas,
+    _snapshot_estado_por_cama,
 )
 from ._permisos import _tiene_permiso_dashboard
 from ._sesion import _obtener_sesion_mapeo_activa
@@ -60,154 +66,6 @@ class DashboardMapeoCamasView(UnidadRolRequiredMixin, TemplateView):
         context["titulo"] = "Dashboard · Mapeo de Camas"
         context["subtitulo"] = "Indicadores operativos y monitoreo continuo"
         return context
-
-
-def _dashboard_response(data, meta=None):
-    """[2026-05-28] Envoltura estándar de respuesta para endpoints del dashboard."""
-    payload = {
-        "ok": True,
-        "ts": timezone.localtime(timezone.now()).isoformat(),
-        "data": data,
-    }
-    if meta is not None:
-        payload["meta"] = meta
-    return JsonResponse(payload)
-
-
-def _dashboard_error(msg, status=500):
-    """[2026-05-28] Respuesta de error uniforme para el dashboard."""
-    return JsonResponse(
-        {"ok": False, "error": str(msg), "ts": timezone.localtime(timezone.now()).isoformat()},
-        status=status,
-    )
-
-
-def _dashboard_inicio_dia():
-    """[2026-05-28] Inicio del día actual en zona horaria local."""
-    ahora = timezone.localtime(timezone.now())
-    return ahora.replace(hour=0, minute=0, second=0, microsecond=0)
-
-
-def _dashboard_parse_range(request):
-    """
-    [2026-05-28] Parsea ?desde=ISO&hasta=ISO. Devuelve (desde, hasta) aware.
-    Default: día actual completo (00:00 → ahora).
-    """
-    tz = timezone.get_current_timezone()
-    ahora = timezone.localtime(timezone.now())
-
-    def _parse(s):
-        if not s:
-            return None
-        try:
-            dt = datetime.fromisoformat(s)
-        except ValueError:
-            return None
-        if timezone.is_naive(dt):
-            dt = timezone.make_aware(dt, tz)
-        return dt
-
-    desde = _parse(request.GET.get("desde"))
-    hasta = _parse(request.GET.get("hasta"))
-
-    if desde is None:
-        desde = ahora.replace(hour=0, minute=0, second=0, microsecond=0)
-    if hasta is None:
-        hasta = ahora
-    if hasta < desde:
-        desde, hasta = hasta, desde
-    return desde, hasta
-
-
-def _dashboard_granularidad(desde, hasta):
-    """[2026-05-28] hora si span ≤ 2 días, día si ≤ 60 días, mes si >."""
-    span = hasta - desde
-    if span.total_seconds() <= 2 * 86400:
-        return "hora"
-    if span.days <= 60:
-        return "dia"
-    return "mes"
-
-
-def _snapshot_estado_camas(hasta):
-    """
-    [2026-05-28] {codigo_estado: cantidad} de TODAS las camas activas
-    según su estado en el momento `hasta`.
-    """
-    ahora = timezone.now()
-    delta = (ahora - hasta).total_seconds() if hasta <= ahora else 0
-    if 0 <= delta <= 60:
-        ultima_asig_id = (
-            AsignacionCamaPaciente.objects
-            .filter(cama_id=OuterRef("cama_id"))
-            .order_by("-fecha_inicio", "-id")
-            .values("id")[:1]
-        )
-        rows = (
-            AsignacionCamaPaciente.objects
-            .filter(id=Subquery(ultima_asig_id))
-            .values("cama_id", "estado__codigo")
-        )
-        estado_por_cama = {r["cama_id"]: r["estado__codigo"] for r in rows}
-    else:
-        ult_hist = (
-            HistorialEstadoCama.objects
-            .filter(cama_id=OuterRef("pk"), fecha_hora__lte=hasta)
-            .order_by("-fecha_hora", "-id")
-            .values("estado_nuevo__codigo")[:1]
-        )
-        rows = (
-            Cama.objects.filter(estado=1)
-            .annotate(_estado_hist=Subquery(ult_hist))
-            .values("numero_cama", "_estado_hist")
-        )
-        estado_por_cama = {r["numero_cama"]: r["_estado_hist"] for r in rows}
-
-    conteo = {}
-    for cama_id in Cama.objects.filter(estado=1).values_list("numero_cama", flat=True):
-        cod = estado_por_cama.get(cama_id) or "VACIA"
-        conteo[cod] = conteo.get(cod, 0) + 1
-    return conteo
-
-
-def _snapshot_estado_por_cama(hasta):
-    """[2026-05-28] {cama_id: codigo_estado} en el momento `hasta`."""
-    ahora = timezone.now()
-    delta = (ahora - hasta).total_seconds() if hasta <= ahora else 0
-    if 0 <= delta <= 60:
-        ultima_asig_id = (
-            AsignacionCamaPaciente.objects
-            .filter(cama_id=OuterRef("cama_id"))
-            .order_by("-fecha_inicio", "-id")
-            .values("id")[:1]
-        )
-        return {
-            r["cama_id"]: r["estado__codigo"]
-            for r in AsignacionCamaPaciente.objects
-            .filter(id=Subquery(ultima_asig_id))
-            .values("cama_id", "estado__codigo")
-        }
-    ult_hist = (
-        HistorialEstadoCama.objects
-        .filter(cama_id=OuterRef("pk"), fecha_hora__lte=hasta)
-        .order_by("-fecha_hora", "-id")
-        .values("estado_nuevo__codigo")[:1]
-    )
-    return {
-        r["numero_cama"]: r["_estado_hist"] or "VACIA"
-        for r in Cama.objects.filter(estado=1)
-        .annotate(_estado_hist=Subquery(ult_hist))
-        .values("numero_cama", "_estado_hist")
-    }
-
-
-def _rango_meta(desde, hasta):
-    """[2026-05-28] Meta serializable del rango aplicado."""
-    return {
-        "desde": timezone.localtime(desde).isoformat(),
-        "hasta": timezone.localtime(hasta).isoformat(),
-        "granularidad": _dashboard_granularidad(desde, hasta),
-    }
 
 
 @login_required
@@ -484,7 +342,8 @@ def dashboard_ultimos_movimientos(request):
             servicio_origen = getattr(getattr(mov.cama_origen, "sala", None), "servicio", None)
             servicio_nombre = getattr(servicio_origen, "nombre_servicio", "") or ""
             items.append({
-                "fecha": _hora_local_iso(mov.fecha_hora),
+                # 2026-06-09: usa helper general de core para fechas serializadas.
+                "fecha": hora_local_iso(mov.fecha_hora),
                 "tipo": mov.tipo_movimiento,
                 "cama_origen": _nombre_cama(mov.cama_origen),
                 "cama_destino": _nombre_cama(mov.cama_destino),

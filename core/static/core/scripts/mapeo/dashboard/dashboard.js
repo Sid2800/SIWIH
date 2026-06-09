@@ -15,14 +15,14 @@
 
   const REFRESH_MS = 30000;
 
-  // El template inyecta window.DASHBOARD_CFG con la URL base de la API.
+  // [2026-06-01] El template inyecta window.DASHBOARD_CFG.urls con cada URL nombrada.
   const cfg = window.DASHBOARD_CFG || {};
   const api = window.DashboardAPI;
   if (!api) {
     console.error("[dashboard] DashboardAPI no disponible");
     return;
   }
-  const endpoints = api.makeEndpoints(cfg.apiBase || "");
+  const endpoints = api.makeEndpoints(cfg.urls || {});
 
   let timer = null;
   let inflight = null;

@@ -19,6 +19,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.db.models import Exists, Max, OuterRef, Q
 
+from core.services.mapeo_camas_service import MapeoCamasService
 from ingreso.models import Ingreso
 from mapeo_camas.models import AsignacionCamaPaciente, EstadoMapeo, HistorialEstadoCama, get_observacion_mapeo
 from servicio.models import Cama
@@ -26,7 +27,8 @@ from servicio.models import Cama
 User = get_user_model()
 
 def get_estado_mapeo(codigo, categoria="ESTADO_CAMA"):
-    return EstadoMapeo.objects.get(codigo=codigo, categoria=categoria)
+    # 2026-06-01: reutiliza helper central de core/services/mapeo_camas_service.py.
+    return MapeoCamasService.get_estado_mapeo(codigo, categoria)
 
 class Command(BaseCommand):
     help = "Sincroniza AsignacionCamaPaciente para todos los ingresos activos con cama asignada."
@@ -92,10 +94,12 @@ class Command(BaseCommand):
                 )
             )
         elif asignaciones_candidatas_reparacion:
-            asignaciones_reparadas = asignaciones_invalidas_qs.update(
-                estado_id=estado_vacia.pk,
-                ingreso_id=None,
-            )
+            # 2026-06-01: asegura atomic en saneamiento masivo de asignaciones inválidas.
+            with transaction.atomic():
+                asignaciones_reparadas = asignaciones_invalidas_qs.update(
+                    estado_id=estado_vacia.pk,
+                    ingreso_id=None,
+                )
             self.stdout.write(
                 self.style.SUCCESS(
                     "[OK] Asignaciones reparadas a VACIA: "
@@ -124,15 +128,16 @@ class Command(BaseCommand):
         camas_con_ingreso_activo = set(ingresos.values_list("cama_id", flat=True))
 
         estado_ocupada = get_estado_mapeo("OCUPADA")
+        # 2026-06-04: optimiza lectura masiva con values() para evitar instanciar modelos completos.
         asignaciones_actuales_qs = (
             AsignacionCamaPaciente.objects
-            .select_related("estado")
             .order_by("cama_id", "-fecha_inicio", "-id")
+            .values("cama_id", "estado__codigo", "ingreso_id")
         )
         ultima_asignacion_por_cama = {}
         for asig in asignaciones_actuales_qs:
-            if asig.cama_id not in ultima_asignacion_por_cama:
-                ultima_asignacion_por_cama[asig.cama_id] = asig
+            if asig["cama_id"] not in ultima_asignacion_por_cama:
+                ultima_asignacion_por_cama[asig["cama_id"]] = asig
 
         sincronizados = 0
         omitidos = 0
@@ -146,9 +151,8 @@ class Command(BaseCommand):
             # Si la última asignación ya está OCUPADA para el mismo ingreso, no hacer nada.
             if (
                 asig_actual
-                and asig_actual.estado
-                and asig_actual.estado.codigo == "OCUPADA"
-                and asig_actual.ingreso_id == ingreso_id
+                and asig_actual.get("estado__codigo") == "OCUPADA"
+                and asig_actual.get("ingreso_id") == ingreso_id
             ):
                 omitidos += 1
                 self.stdout.write(
@@ -186,7 +190,11 @@ class Command(BaseCommand):
                         self.stdout.write(
                             f"  [OMITIDO] Ingreso #{ingreso_id} — cama #{cama_id} ya quedó sincronizada."
                         )
-                        ultima_asignacion_por_cama[cama_id] = asig_bloqueada
+                        ultima_asignacion_por_cama[cama_id] = {
+                            "cama_id": cama_id,
+                            "estado__codigo": asig_bloqueada.estado.codigo,
+                            "ingreso_id": asig_bloqueada.ingreso_id,
+                        }
                         continue
 
                     estado_anterior = asig_bloqueada.estado if asig_bloqueada else estado_vacia
@@ -214,7 +222,11 @@ class Command(BaseCommand):
                         observacion=get_observacion_mapeo("Ingreso (sync masivo)"),
                     )
 
-                    ultima_asignacion_por_cama[cama_id] = asig_sync
+                    ultima_asignacion_por_cama[cama_id] = {
+                        "cama_id": cama_id,
+                        "estado__codigo": "OCUPADA",
+                        "ingreso_id": ingreso_id,
+                    }
 
                 sincronizados += 1
                 self.stdout.write(
@@ -272,24 +284,26 @@ class Command(BaseCommand):
                     )
                 )
             else:
-                if camas_para_crear:
-                    AsignacionCamaPaciente.objects.bulk_create([
-                        AsignacionCamaPaciente(
-                            cama_id=cama_id,
-                            estado=estado_vacia,
-                            ingreso=None,
-                            usuario_asignacion=usuario,
-                        )
-                        for cama_id in camas_para_crear
-                    ])
-                    vacias_creadas = len(camas_para_crear)
+                # 2026-06-01: asegura atomic en creación/actualización de camas VACIA.
+                with transaction.atomic():
+                    if camas_para_crear:
+                        AsignacionCamaPaciente.objects.bulk_create([
+                            AsignacionCamaPaciente(
+                                cama_id=cama_id,
+                                estado=estado_vacia,
+                                ingreso=None,
+                                usuario_asignacion=usuario,
+                            )
+                            for cama_id in camas_para_crear
+                        ])
+                        vacias_creadas = len(camas_para_crear)
 
-                for asig in asignaciones_para_actualizar:
-                    asig.estado = estado_vacia
-                    asig.ingreso = None
-                    asig.usuario_asignacion = usuario
-                    asig.save(update_fields=["estado", "ingreso", "usuario_asignacion"])
-                vacias_actualizadas = len(asignaciones_para_actualizar)
+                    for asig in asignaciones_para_actualizar:
+                        asig.estado = estado_vacia
+                        asig.ingreso = None
+                        asig.usuario_asignacion = usuario
+                        asig.save(update_fields=["estado", "ingreso", "usuario_asignacion"])
+                    vacias_actualizadas = len(asignaciones_para_actualizar)
 
                 if vacias_creadas or vacias_actualizadas:
                     self.stdout.write(

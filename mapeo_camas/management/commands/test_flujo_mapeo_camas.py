@@ -7,6 +7,7 @@ Management command para probar el flujo completo de mapeo de camas:
 
 from django.core.management.base import BaseCommand
 from django.db import transaction
+from core.services.mapeo_camas_service import MapeoCamasService
 from ingreso.models import Ingreso
 from mapeo_camas.models import AsignacionCamaPaciente, HistorialEstadoCama, EstadoMapeo
 from paciente.models import Paciente
@@ -23,7 +24,8 @@ except ImportError:
 
 
 def get_estado_mapeo(codigo, categoria="ESTADO_CAMA"):
-    return EstadoMapeo.objects.get(codigo=codigo, categoria=categoria)
+    # 2026-06-01: reutiliza helper central de core/services/mapeo_camas_service.py.
+    return MapeoCamasService.get_estado_mapeo(codigo, categoria)
 
 
 class Command(BaseCommand):

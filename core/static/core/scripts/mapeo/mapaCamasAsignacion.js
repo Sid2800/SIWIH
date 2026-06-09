@@ -3,20 +3,8 @@ document.addEventListener("DOMContentLoaded", function () {
   // Configuracion general y referencias DOM
   // ========================================================================
 
-  // Endpoints usados por el mapa para cargar datos, buscar y guardar cambios.
-  var API_URLS = {
-    estadoMapeo: "/mapeo-camas/api/estado-mapeo/",
-    iniciarMapeo: "/mapeo-camas/api/iniciar-mapeo/",
-    terminarMapeo: "/mapeo-camas/api/terminar-mapeo/",
-    cancelarMapeo: "/mapeo-camas/api/cancelar-mapeo/",
-    sincronizarCamas: "/mapeo-camas/api/sincronizar-camas/",
-    mapa: "/mapeo-camas/api/mapa-camas/",
-    buscarPacientes: "/mapeo-camas/api/buscar-pacientes/",
-    actualizarCama: "/mapeo-camas/api/actualizar-cama/",
-    camasDisponibles: "/mapeo-camas/api/camas-disponibles/",
-    moverPaciente: "/mapeo-camas/api/mover-paciente/",
-    procesarCamaMapeo: "/mapeo-camas/api/procesar-cama-mapeo/"
-  };
+  // [2026-06-01] Endpoints inyectados por el template via window.MAPA_CFG — no hardcodear URLs aquí.
+  var API_URLS = (window.MAPA_CFG && window.MAPA_CFG.urls) || {};
 
   var ESTADOS_CAMA = [
     "VACIA",
@@ -34,8 +22,6 @@ document.addEventListener("DOMContentLoaded", function () {
   var inputBusqueda = document.getElementById("mapa-busqueda");
   var tipoBusqueda = document.getElementById("mapa-tipo-busqueda");
   var btnLimpiar = document.getElementById("btn-limpiar-busqueda");
-  var btnCopiar = document.getElementById("btn-copiar-camas");
-  var btnImprimir = document.getElementById("btn-imprimir-camas");
   var btnHistoriales = document.getElementById("btn-historiales-camas");
   var btnSincronizarCamas = document.getElementById("btn-sincronizar-camas");
   var btnIniciarMapeo = document.getElementById("btn-iniciar-mapeo");
@@ -83,8 +69,6 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     ocultar(btnIniciarMapeo, activo);
-    ocultar(btnCopiar, activo);
-    ocultar(btnImprimir, activo);
     ocultar(btnHistoriales, activo);
     
     // [2026-05-20 OPT] Consolida btnTerminarMapeo y btnTerminarMapeoPie en selector unificado
@@ -1678,33 +1662,6 @@ document.addEventListener("DOMContentLoaded", function () {
     sincronizarFiltrosMoviles();
     aplicarFiltro();
     inputBusqueda.focus();
-  });
-
-  btnCopiar.addEventListener("click", function () {
-    // Copia solo las camas actualmente visibles (respeta filtros activos).
-    var filas = [];
-    camasRenderizadas.forEach(function (item) {
-      if (item.style.display === "none") {
-        return;
-      }
-      filas.push(
-        "Cama " + (item.dataset.numeroCama || "") +
-        " | Estado: " + (item.dataset.estado || "") +
-        " | Paciente: " + (item.dataset.paciente || "Sin paciente") +
-        " | Sala: " + (item.dataset.sala || "") +
-        " | Servicio: " + (item.dataset.servicio || "")
-      );
-    });
-
-    var contenido = filas.join("\n") || "Sin resultados visibles.";
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(contenido);
-    }
-  });
-
-  btnImprimir.addEventListener("click", function () {
-    // La vista ya define estilos @media print para exportar el estado visual actual.
-    window.print();
   });
 
   if (btnSincronizarCamas) {

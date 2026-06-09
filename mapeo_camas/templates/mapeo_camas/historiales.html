@@ -70,5 +70,17 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'mapeo/scripts/historialesCamas.js' %}?v=20260508b"></script>
+{# [2026-06-01] URLs de la API inyectadas desde el template para evitar hardcodeo en JS. #}
+<script>
+  window.MAPA_CFG = {
+    urls: {
+      camas:  "{% url 'mapeo_camas_historiales_camas' %}",
+      data:   "{% url 'mapeo_camas_historiales_data' %}",
+      detalle:"{% url 'mapeo_camas_historiales_detalle' %}",
+      mapa:   "{% url 'mapeo_camas_mapa' %}"
+    }
+  };
+</script>
+<!-- 2026-06-09: estáticos de mapeo centralizados en core/static/core/scripts -->
+<script src="{% static 'core/scripts/mapeo/historialesCamas.js' %}?v=20260601a"></script>
 {% endblock %}

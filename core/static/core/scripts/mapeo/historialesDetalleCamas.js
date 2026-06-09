@@ -1,7 +1,6 @@
 document.addEventListener("DOMContentLoaded", function () {
-  var API_URLS = {
-    cards: "/mapeo-camas/api/historiales/cards/"
-  };
+  // [2026-06-01] Endpoints inyectados por el template via window.MAPA_CFG — no hardcodear URLs aquí.
+  var API_URLS = (window.MAPA_CFG && window.MAPA_CFG.urls) || {};
 
   var contenedor = document.getElementById("detalle-cards-contenedor");
   var estructuraContenedor = document.getElementById("detalle-estructura-contenedor");
@@ -9,8 +8,6 @@ document.addEventListener("DOMContentLoaded", function () {
   var tablaBody = document.getElementById("tabla-detalle-camas-body");
   var metaEl = document.getElementById("detalle-meta");
   var resumenComunEl = document.getElementById("detalle-resumen-comun");
-  var btnCopiar = document.getElementById("btn-copiar-detalle");
-  var btnImprimir = document.getElementById("btn-imprimir-detalle");
   var btnVistaEstructura = document.getElementById("btn-vista-estructura");
   var btnVistaTabla = document.getElementById("btn-vista-tabla");
   var paginacionWrap = document.getElementById("detalle-paginacion");
@@ -696,48 +693,6 @@ document.addEventListener("DOMContentLoaded", function () {
       if (dtfFechaFin) dtfFechaFin.value = "";
       aplicarFiltrosCompartidos();
     });
-  }
-
-  function copiarResumenVisible() {
-    var texto = (document.getElementById("detalle-meta")?.innerText || "") + "\n\n" +
-      (document.getElementById("detalle-estructura-contenedor")?.innerText || "") + "\n\n" +
-      (document.getElementById("detalle-cards-contenedor")?.innerText || "") + "\n\n" +
-      (document.getElementById("detalle-tabla-contenedor")?.innerText || "");
-
-    if (!texto.trim()) {
-      toastr.warning("No hay contenido visible para copiar.", "Copiar");
-      return;
-    }
-
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(texto)
-        .then(function () {
-          toastr.success("Resumen copiado al portapapeles.", "Copiar");
-        })
-        .catch(function () {
-          toastr.error("No se pudo copiar el resumen.", "Copiar");
-        });
-      return;
-    }
-
-    var tmp = document.createElement("textarea");
-    tmp.value = texto;
-    document.body.appendChild(tmp);
-    tmp.select();
-    document.execCommand("copy");
-    document.body.removeChild(tmp);
-    toastr.success("Resumen copiado al portapapeles.", "Copiar");
-  }
-
-  function imprimirDetalle() {
-    window.print();
-  }
-
-  if (btnCopiar) {
-    btnCopiar.addEventListener("click", copiarResumenVisible);
-  }
-  if (btnImprimir) {
-    btnImprimir.addEventListener("click", imprimirDetalle);
   }
 
   if (btnPagePrev) {

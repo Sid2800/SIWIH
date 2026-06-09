@@ -1,35 +1,28 @@
 # 2026-05-29: extraído de mapeo_camas/views.py en refactor E (split)
-"""Helpers de formateo, parseo y resolución compartidos por las vistas de mapeo_camas."""
+"""Helpers compartidos por las vistas de mapeo_camas."""
 
+from datetime import datetime
 from functools import lru_cache
+
+from django.db.models import OuterRef, Subquery
+from django.http import JsonResponse
+from django.utils import timezone
 
 from core.services.mapeo_camas_service import MapeoCamasService
 from core.services.usuario_service import UsuarioService
-from core.utils.utilidades_fechas import hora_local_iso, parse_fecha_filtro_dia
+from core.utils.utilidades_fechas import hora_local_iso
 from core.utils.utilidades_request import parse_json_request
 from core.utils.utilidades_textos import (
     construir_nombre_dinamico,
     formatear_nombre_completo,
 )
 from ingreso.models import Ingreso
+from mapeo_camas.models import AsignacionCamaPaciente, HistorialEstadoCama
+from servicio.models import Cama
 
-
-__all__ = [
-    "get_estado_mapeo",
-    "_nombre_paciente",
-    "_nombre_usuario",
-    "_hora_local_iso",
-    "_paciente_payload",
-    "_resolver_ingreso_operativo",
-    "_observacion_codigo",
-    "_normalizar_observacion_sesion",
-    "_obtener_observacion_desde_request",
-    "_es_superadmin",
-    "_meta_ultima_actualizacion",
-    "_parse_fecha_filtro",
-    "_nombre_cama",
-    "_ubicacion_desde_cama",
-]
+# 2026-06-09: compatibilidad temporal con imports existentes en core/services.
+# Mantiene alineación porque delega al helper general de core.utils.utilidades_fechas.
+_hora_local_iso = hora_local_iso
 
 
 # Helper global para obtener instancias de EstadoMapeo
@@ -58,10 +51,6 @@ def _nombre_usuario(usuario):
     if not usuario:
         return ""
     return construir_nombre_dinamico(usuario, ["first_name", "last_name"]) or getattr(usuario, "username", "") or ""
-
-
-# 2026-05-29: alias local del helper global core.utils.utilidades_fechas.hora_local_iso
-_hora_local_iso = hora_local_iso
 
 
 # [2026-05-07] Helper para serializar datos de paciente en historiales
@@ -135,14 +124,11 @@ def _meta_ultima_actualizacion(historial):
             "ultima_actualizacion": "",
             "usuario_ultima_actualizacion": "",
         }
+    # 2026-06-09: usa helper general de core para formato de fecha local.
     return {
-        "ultima_actualizacion": _hora_local_iso(historial.fecha_hora),
+        "ultima_actualizacion": hora_local_iso(historial.fecha_hora),
         "usuario_ultima_actualizacion": _nombre_usuario(historial.usuario),
     }
-
-
-# 2026-05-29: alias local del helper global core.utils.utilidades_fechas.parse_fecha_filtro_dia
-_parse_fecha_filtro = parse_fecha_filtro_dia
 
 
 def _nombre_cama(cama):
@@ -161,3 +147,140 @@ def _ubicacion_desde_cama(cama):
     sala_nombre = getattr(sala, "nombre_sala", "") or ""
     cubiculo_nombre = getattr(cubiculo, "nombre_cubiculo", "") or "SIN_CUBICULO"
     return f"{servicio_nombre} / {sala_nombre} / {cubiculo_nombre}"
+
+
+def _dashboard_response(data, meta=None):
+    """Envoltura estándar de respuesta para endpoints del dashboard."""
+    # 2026-06-09: unificado en _helpers.py para mantener un único módulo de helpers.
+    payload = {
+        "ok": True,
+        "ts": hora_local_iso(timezone.now()),
+        "data": data,
+    }
+    if meta is not None:
+        payload["meta"] = meta
+    return JsonResponse(payload)
+
+
+def _dashboard_error(msg, status=500):
+    """Respuesta de error uniforme para el dashboard."""
+    return JsonResponse(
+        {"ok": False, "error": str(msg), "ts": hora_local_iso(timezone.now())},
+        status=status,
+    )
+
+
+def _dashboard_parse_range(request):
+    """Parsea ?desde=ISO&hasta=ISO y devuelve (desde, hasta) aware."""
+    tz = timezone.get_current_timezone()
+    ahora = timezone.localtime(timezone.now())
+
+    def _parse(s):
+        if not s:
+            return None
+        try:
+            dt = datetime.fromisoformat(s)
+        except ValueError:
+            return None
+        if timezone.is_naive(dt):
+            dt = timezone.make_aware(dt, tz)
+        return dt
+
+    desde = _parse(request.GET.get("desde"))
+    hasta = _parse(request.GET.get("hasta"))
+
+    if desde is None:
+        desde = ahora.replace(hour=0, minute=0, second=0, microsecond=0)
+    if hasta is None:
+        hasta = ahora
+    if hasta < desde:
+        desde, hasta = hasta, desde
+    return desde, hasta
+
+
+def _dashboard_granularidad(desde, hasta):
+    """hora si span <= 2 días, día si <= 60 días, mes si >."""
+    span = hasta - desde
+    if span.total_seconds() <= 2 * 86400:
+        return "hora"
+    if span.days <= 60:
+        return "dia"
+    return "mes"
+
+
+def _snapshot_estado_camas(hasta):
+    """{codigo_estado: cantidad} de camas activas al momento hasta."""
+    ahora = timezone.now()
+    delta = (ahora - hasta).total_seconds() if hasta <= ahora else 0
+    if 0 <= delta <= 60:
+        ultima_asig_id = (
+            AsignacionCamaPaciente.objects
+            .filter(cama_id=OuterRef("cama_id"))
+            .order_by("-fecha_inicio", "-id")
+            .values("id")[:1]
+        )
+        rows = (
+            AsignacionCamaPaciente.objects
+            .filter(id=Subquery(ultima_asig_id))
+            .values("cama_id", "estado__codigo")
+        )
+        estado_por_cama = {r["cama_id"]: r["estado__codigo"] for r in rows}
+    else:
+        ult_hist = (
+            HistorialEstadoCama.objects
+            .filter(cama_id=OuterRef("pk"), fecha_hora__lte=hasta)
+            .order_by("-fecha_hora", "-id")
+            .values("estado_nuevo__codigo")[:1]
+        )
+        rows = (
+            Cama.objects.filter(estado=1)
+            .annotate(_estado_hist=Subquery(ult_hist))
+            .values("numero_cama", "_estado_hist")
+        )
+        estado_por_cama = {r["numero_cama"]: r["_estado_hist"] for r in rows}
+
+    conteo = {}
+    for cama_id in Cama.objects.filter(estado=1).values_list("numero_cama", flat=True):
+        cod = estado_por_cama.get(cama_id) or "VACIA"
+        conteo[cod] = conteo.get(cod, 0) + 1
+    return conteo
+
+
+def _snapshot_estado_por_cama(hasta):
+    """{cama_id: codigo_estado} en el momento hasta."""
+    ahora = timezone.now()
+    delta = (ahora - hasta).total_seconds() if hasta <= ahora else 0
+    if 0 <= delta <= 60:
+        ultima_asig_id = (
+            AsignacionCamaPaciente.objects
+            .filter(cama_id=OuterRef("cama_id"))
+            .order_by("-fecha_inicio", "-id")
+            .values("id")[:1]
+        )
+        return {
+            r["cama_id"]: r["estado__codigo"]
+            for r in AsignacionCamaPaciente.objects
+            .filter(id=Subquery(ultima_asig_id))
+            .values("cama_id", "estado__codigo")
+        }
+    ult_hist = (
+        HistorialEstadoCama.objects
+        .filter(cama_id=OuterRef("pk"), fecha_hora__lte=hasta)
+        .order_by("-fecha_hora", "-id")
+        .values("estado_nuevo__codigo")[:1]
+    )
+    return {
+        r["numero_cama"]: r["_estado_hist"] or "VACIA"
+        for r in Cama.objects.filter(estado=1)
+        .annotate(_estado_hist=Subquery(ult_hist))
+        .values("numero_cama", "_estado_hist")
+    }
+
+
+def _rango_meta(desde, hasta):
+    """Meta serializable del rango aplicado."""
+    return {
+        "desde": hora_local_iso(desde),
+        "hasta": hora_local_iso(hasta),
+        "granularidad": _dashboard_granularidad(desde, hasta),
+    }

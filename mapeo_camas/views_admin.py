@@ -78,23 +78,26 @@ def sincronizar_camas_superadmin(request):
         pk=OuterRef("estado_id"),
         categoria="ESTADO_CAMA",
     )
-    asignaciones_reparadas = (
-        AsignacionCamaPaciente.objects
-        .annotate(estado_valido=Exists(estado_valido_subquery))
-        .filter(Q(estado_id__isnull=True) | Q(estado_valido=False))
-        .update(estado_id=estado_vacia.pk, ingreso_id=None)
-    )
+    # 2026-06-01: asegura atomic en saneamiento masivo de asignaciones inválidas.
+    with transaction.atomic():
+        asignaciones_reparadas = (
+            AsignacionCamaPaciente.objects
+            .annotate(estado_valido=Exists(estado_valido_subquery))
+            .filter(Q(estado_id__isnull=True) | Q(estado_valido=False))
+            .update(estado_id=estado_vacia.pk, ingreso_id=None)
+        )
 
     estado_ocupada = get_estado_mapeo("OCUPADA", "ESTADO_CAMA")
+    # 2026-06-04: optimiza lectura masiva con values() para evitar instanciar modelos completos.
     asignaciones_actuales_qs = (
         AsignacionCamaPaciente.objects
-        .select_related("estado")
         .order_by("cama_id", "-fecha_inicio", "-id")
+        .values("cama_id", "estado__codigo", "ingreso_id")
     )
     ultima_asignacion_por_cama = {}
     for asig in asignaciones_actuales_qs:
-        if asig.cama_id not in ultima_asignacion_por_cama:
-            ultima_asignacion_por_cama[asig.cama_id] = asig
+        if asig["cama_id"] not in ultima_asignacion_por_cama:
+            ultima_asignacion_por_cama[asig["cama_id"]] = asig
 
     sincronizados = 0
     omitidos = 0
@@ -108,9 +111,8 @@ def sincronizar_camas_superadmin(request):
 
         if (
             asig_actual
-            and asig_actual.estado
-            and asig_actual.estado.codigo == "OCUPADA"
-            and asig_actual.ingreso_id == ingreso_id
+            and asig_actual.get("estado__codigo") == "OCUPADA"
+            and asig_actual.get("ingreso_id") == ingreso_id
         ):
             omitidos += 1
             continue
@@ -131,7 +133,11 @@ def sincronizar_camas_superadmin(request):
                     and asig_bloqueada.ingreso_id == ingreso_id
                 ):
                     omitidos += 1
-                    ultima_asignacion_por_cama[cama_id] = asig_bloqueada
+                    ultima_asignacion_por_cama[cama_id] = {
+                        "cama_id": cama_id,
+                        "estado__codigo": asig_bloqueada.estado.codigo,
+                        "ingreso_id": asig_bloqueada.ingreso_id,
+                    }
                     continue
 
                 estado_anterior = asig_bloqueada.estado if asig_bloqueada else estado_vacia
@@ -159,7 +165,11 @@ def sincronizar_camas_superadmin(request):
                     observacion=get_observacion_mapeo("Ingreso (sync masivo)"),
                 )
 
-                ultima_asignacion_por_cama[cama_id] = asig_sync
+                ultima_asignacion_por_cama[cama_id] = {
+                    "cama_id": cama_id,
+                    "estado__codigo": "OCUPADA",
+                    "ingreso_id": ingreso_id,
+                }
 
             sincronizados += 1
         except Exception as exc:
@@ -172,48 +182,52 @@ def sincronizar_camas_superadmin(request):
     vacias_creadas = 0
     vacias_actualizadas = 0
     if camas_desocupadas_ids:
+        # 2026-06-09: optimiza preclasificación con values() y evita instanciar todas las asignaciones.
         asignaciones_desocupadas = (
             AsignacionCamaPaciente.objects
-            .select_related("estado")
             .filter(cama_id__in=camas_desocupadas_ids)
+            .values("id", "cama_id", "estado__codigo", "ingreso_id")
             .order_by("cama_id", "-fecha_inicio", "-id")
         )
         ultima_asignacion_por_cama = {}
         for asig in asignaciones_desocupadas:
-            if asig.cama_id not in ultima_asignacion_por_cama:
-                ultima_asignacion_por_cama[asig.cama_id] = asig
+            if asig["cama_id"] not in ultima_asignacion_por_cama:
+                ultima_asignacion_por_cama[asig["cama_id"]] = asig
 
         camas_para_crear = []
-        asignaciones_para_actualizar = []
+        asignaciones_para_actualizar_ids = []
         for cama_id in camas_desocupadas_ids:
             asig = ultima_asignacion_por_cama.get(cama_id)
             if not asig:
                 camas_para_crear.append(cama_id)
                 continue
-            estado_codigo = getattr(asig.estado, "codigo", None)
-            if estado_codigo == "VACIA" and asig.ingreso_id is None:
+            estado_codigo = asig.get("estado__codigo")
+            ingreso_id = asig.get("ingreso_id")
+            if estado_codigo == "VACIA" and ingreso_id is None:
                 continue
-            if estado_codigo == "OCUPADA" or asig.ingreso_id is not None or estado_codigo is None:
+            if estado_codigo == "OCUPADA" or ingreso_id is not None or estado_codigo is None:
+                asignaciones_para_actualizar_ids.append(asig["id"])
+
+        # 2026-06-01: asegura atomic en creación/actualización masiva de camas VACIA.
+        with transaction.atomic():
+            if camas_para_crear:
+                AsignacionCamaPaciente.objects.bulk_create([
+                    AsignacionCamaPaciente(
+                        cama_id=cama_id,
+                        estado=estado_vacia,
+                        ingreso=None,
+                        usuario_asignacion=request.user,
+                    )
+                    for cama_id in camas_para_crear
+                ])
+                vacias_creadas = len(camas_para_crear)
+
+            for asig in AsignacionCamaPaciente.objects.filter(id__in=asignaciones_para_actualizar_ids):
                 asig.estado = estado_vacia
                 asig.ingreso = None
                 asig.usuario_asignacion = request.user
-                asignaciones_para_actualizar.append(asig)
-
-        if camas_para_crear:
-            AsignacionCamaPaciente.objects.bulk_create([
-                AsignacionCamaPaciente(
-                    cama_id=cama_id,
-                    estado=estado_vacia,
-                    ingreso=None,
-                    usuario_asignacion=request.user,
-                )
-                for cama_id in camas_para_crear
-            ])
-            vacias_creadas = len(camas_para_crear)
-
-        for asig in asignaciones_para_actualizar:
-            asig.save(update_fields=["estado", "ingreso", "usuario_asignacion"])
-        vacias_actualizadas = len(asignaciones_para_actualizar)
+                asig.save(update_fields=["estado", "ingreso", "usuario_asignacion"])
+            vacias_actualizadas = len(asignaciones_para_actualizar_ids)
 
     return JsonResponse({
         "ok": True,

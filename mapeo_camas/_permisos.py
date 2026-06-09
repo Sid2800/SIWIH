@@ -27,7 +27,7 @@ from usuario.permisos import verificar_permisos_usuario
 
 from mapeo_camas.models import HistorialEstadoCama
 
-from ._constants import (
+from core.constants.mapeo_camas_constants import (
     MAX_CAMBIOS_CAMA,
     OBSERVACION_CAMBIO_TRASLADO_MAPEO,
     OBSERVACION_MOVIMIENTO_PACIENTE_MAPA,
@@ -35,25 +35,6 @@ from ._constants import (
     VENTANA_LIMITE_CAMBIOS_SALA_HORAS,
 )
 from ._sesion import _obtener_sesion_mapeo_activa
-
-
-__all__ = [
-    "_tiene_permiso_historiales",
-    "_tiene_permiso_cambios_mapa",
-    "_tiene_permiso_mapear",
-    "_tiene_permiso_dashboard",
-    "_puede_editar_cama_en_mapa",
-    "_puede_gestionar_sesion_mapeo",
-    "_inicio_ventana_limite_sala",
-    "_filtro_observaciones_movimiento_limite",
-    "_contar_cambios_manual_por_sala",
-    "_sala_real_id_desde_cama",
-    "_aplica_limite_intentos",
-    "_max_cambios_para_usuario",
-    "_es_rol_intentos_restringido",
-    "_validar_limite_intentos_salas",
-]
-
 
 # [2026-05-19] Helpers de permisos para mantener una sola fuente de verdad.
 def _tiene_permiso_historiales(usuario):

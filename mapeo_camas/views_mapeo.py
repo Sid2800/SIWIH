@@ -3,11 +3,13 @@
 y procesamiento por cama (procesar_cama_mapeo)."""
 
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.http import JsonResponse
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
+from core.utils.utilidades_fechas import hora_local_iso
 from core.utils.utilidades_request import parse_json_request
 from servicio.models import Cama, Servicio
 
@@ -20,9 +22,14 @@ from mapeo_camas.models import (
     get_observacion_mapeo,
 )
 
-from ._constants import (
+from core.constants.mapeo_camas_constants import (
     OBSERVACION_CAMBIO_TRASLADO_MAPEO,
     OBSERVACION_SESION_SIN_OBSERVACIONES,
+)
+from .constants.view_constants import (
+    ACCIONES_MAPEO_PERMITIDAS_ROL_RESTRINGIDO,
+    ACCIONES_MAPEO_VALIDAS,
+    ESTADOS_OCUPADA_PREALTA,
 )
 from ._helpers import (
     _nombre_usuario,
@@ -45,6 +52,8 @@ from ._sesion import (
     _registrar_historial_mapeo,
     _sincronizar_cama_en_ingreso_activo,
 )
+from .validators import validar_accion_mapeo, validar_cama_id
+from .validators import validar_id_opcional, validar_servicios_ids_mapeo
 
 
 __all__ = [
@@ -72,12 +81,13 @@ def iniciar_mapeo(request):
     sesion_activa = _obtener_sesion_mapeo_activa(request.user)
     if sesion_activa:
         servicios_ids = _obtener_servicios_ids_sesion(sesion_activa)
+        # 2026-06-04: reutiliza helper general de fechas (core.utils.utilidades_fechas.hora_local_iso).
         return JsonResponse(
             {
                 "ok": True,
                 "sesion_id": sesion_activa.id,
                 "estado": sesion_activa.estado.codigo if sesion_activa.estado else None,
-                "hora_inicio": timezone.localtime(sesion_activa.fecha_inicio).isoformat(),
+                "hora_inicio": hora_local_iso(sesion_activa.fecha_inicio),
                 "camas_mapeadas": _camas_mapeadas_sesion(sesion_activa),
                 "servicio_ids": servicios_ids,
                 "mensaje": "Ya existe una sesion de mapeo en progreso.",
@@ -90,19 +100,16 @@ def iniciar_mapeo(request):
         payload = {}
 
     servicio_ids = payload.get("servicio_ids") or []
-    if not isinstance(servicio_ids, list):
-        return JsonResponse({"ok": False, "error": "Debe indicar una lista valida de servicios."}, status=400)
-
-    servicios_ids_normalizados = []
-    for servicio_id in servicio_ids:
-        try:
-            servicios_ids_normalizados.append(int(servicio_id))
-        except (TypeError, ValueError):
-            return JsonResponse({"ok": False, "error": "La lista de servicios contiene valores invalidos."}, status=400)
-
-    servicios_ids_normalizados = sorted(set(servicios_ids_normalizados))
-    if not servicios_ids_normalizados:
-        return JsonResponse({"ok": False, "error": "Debe seleccionar al menos un servicio para iniciar el mapeo."}, status=400)
+    # 2026-06-09: valida servicio_ids desde validators antes de consultar modelos.
+    try:
+        servicios_ids_normalizados = validar_servicios_ids_mapeo(servicio_ids)
+    except ValidationError as exc:
+        msg = exc.message if hasattr(exc, "message") else "; ".join(exc.messages)
+        if "lista valida de servicios" in msg:
+            return JsonResponse({"ok": False, "error": "Debe indicar una lista valida de servicios."}, status=400)
+        if "al menos un servicio" in msg:
+            return JsonResponse({"ok": False, "error": "Debe seleccionar al menos un servicio para iniciar el mapeo."}, status=400)
+        return JsonResponse({"ok": False, "error": "La lista de servicios contiene valores invalidos."}, status=400)
 
     servicios_validos_ids = list(
         Servicio.objects.filter(estado=1, id__in=servicios_ids_normalizados)
@@ -166,7 +173,7 @@ def iniciar_mapeo(request):
             "ok": True,
             "sesion_id": sesion.id,
             "estado": sesion.estado.codigo if sesion.estado else None,
-            "hora_inicio": timezone.localtime(sesion.fecha_inicio).isoformat(),
+            "hora_inicio": hora_local_iso(sesion.fecha_inicio),
             "camas_mapeadas": [],
             "servicio_ids": servicios_validos_ids,
             "mensaje": "Mapeo iniciado correctamente.",
@@ -192,7 +199,7 @@ def estado_mapeo(request):
             "sesion_activa": {
                 "id": sesion.id,
                 "estado": sesion.estado.codigo if sesion.estado else None,
-                "hora_inicio": timezone.localtime(sesion.fecha_inicio).isoformat(),
+                "hora_inicio": hora_local_iso(sesion.fecha_inicio),
             },
             "camas_mapeadas": _camas_mapeadas_sesion(sesion),
             "servicio_ids": _obtener_servicios_ids_sesion(sesion),
@@ -231,26 +238,30 @@ def terminar_mapeo(request):
     if total_camas_mapeadas < total_camas_objetivo:
         faltantes = total_camas_objetivo - total_camas_mapeadas
         camas_faltantes = []
+        # 2026-06-09: optimiza serialización de faltantes con values().
         faltantes_qs = (
             total_camas_qs.exclude(pk__in=camas_mapeadas_ids)
-            .select_related("sala__servicio", "cubiculo__sala__servicio")
+            .values(
+                "pk",
+                "numero_cama",
+                "sala__nombre_sala",
+                "sala__servicio__nombre_servicio",
+                "cubiculo__numero",
+                "cubiculo__nombre_cubiculo",
+            )
             .order_by("numero_cama")
         )
         for cama in faltantes_qs:
-            cubiculo_obj = getattr(cama, "cubiculo", None)
-            sala_real = getattr(cama, "sala", None)
-            servicio_real = getattr(sala_real, "servicio", None) if sala_real else None
+            cubiculo = "SIN_CUBICULO"
+            if cama.get("cubiculo__numero") is not None and cama.get("cubiculo__nombre_cubiculo"):
+                cubiculo = f"{cama['cubiculo__numero']} - {cama['cubiculo__nombre_cubiculo']}"
             camas_faltantes.append(
                 {
-                    "cama_id": cama.pk,
-                    "numero_cama": str(cama.numero_cama),
-                    "servicio": getattr(servicio_real, "nombre_servicio", "") or "SIN_SERVICIO",
-                    "sala": getattr(sala_real, "nombre_sala", "") or "SIN_SALA",
-                    "cubiculo": (
-                        f"{cubiculo_obj.numero} - {cubiculo_obj.nombre_cubiculo}"
-                        if cubiculo_obj
-                        else "SIN_CUBICULO"
-                    ),
+                    "cama_id": cama["pk"],
+                    "numero_cama": str(cama["numero_cama"]),
+                    "servicio": cama.get("sala__servicio__nombre_servicio") or "SIN_SERVICIO",
+                    "sala": cama.get("sala__nombre_sala") or "SIN_SALA",
+                    "cubiculo": cubiculo,
                 }
             )
 
@@ -268,11 +279,13 @@ def terminar_mapeo(request):
             status=400,
         )
 
-    sesion.estado = get_estado_mapeo("FINALIZADO", "ESTADO_SESION")
-    sesion.fecha_fin = timezone.now()
-    sesion.observacion = get_observacion_mapeo(OBSERVACION_SESION_SIN_OBSERVACIONES)
-    sesion.observacion_texto = observacion_sesion
-    sesion.save(update_fields=["estado", "fecha_fin", "observacion", "observacion_texto"])
+    # 2026-06-01: asegura atomic en actualización de cierre de sesión de mapeo.
+    with transaction.atomic():
+        sesion.estado = get_estado_mapeo("FINALIZADO", "ESTADO_SESION")
+        sesion.fecha_fin = timezone.now()
+        sesion.observacion = get_observacion_mapeo(OBSERVACION_SESION_SIN_OBSERVACIONES)
+        sesion.observacion_texto = observacion_sesion
+        sesion.save(update_fields=["estado", "fecha_fin", "observacion", "observacion_texto"])
 
     total_detalles = DetalleMapeoCama.objects.filter(sesion_mapeo=sesion).count()
     return JsonResponse(
@@ -280,7 +293,7 @@ def terminar_mapeo(request):
             "ok": True,
             "sesion_id": sesion.id,
             "estado": sesion.estado.codigo if hasattr(sesion.estado, "codigo") else str(sesion.estado),
-            "hora_fin": timezone.localtime(sesion.fecha_fin).isoformat(),
+            "hora_fin": hora_local_iso(sesion.fecha_fin),
             "total_detalles": total_detalles,
             "mensaje": "Mapeo finalizado correctamente.",
         }
@@ -300,11 +313,13 @@ def cancelar_mapeo(request):
 
     observacion_sesion = _normalizar_observacion_sesion(_obtener_observacion_desde_request(request))
 
-    sesion.estado = get_estado_mapeo("CANCELADO", "ESTADO_SESION")
-    sesion.fecha_fin = timezone.now()
-    sesion.observacion = get_observacion_mapeo(OBSERVACION_SESION_SIN_OBSERVACIONES)
-    sesion.observacion_texto = observacion_sesion
-    sesion.save(update_fields=["estado", "fecha_fin", "observacion", "observacion_texto"])
+    # 2026-06-01: asegura atomic en actualización de cancelación de sesión de mapeo.
+    with transaction.atomic():
+        sesion.estado = get_estado_mapeo("CANCELADO", "ESTADO_SESION")
+        sesion.fecha_fin = timezone.now()
+        sesion.observacion = get_observacion_mapeo(OBSERVACION_SESION_SIN_OBSERVACIONES)
+        sesion.observacion_texto = observacion_sesion
+        sesion.save(update_fields=["estado", "fecha_fin", "observacion", "observacion_texto"])
 
     total_detalles = DetalleMapeoCama.objects.filter(sesion_mapeo=sesion).count()
     return JsonResponse(
@@ -312,7 +327,7 @@ def cancelar_mapeo(request):
             "ok": True,
             "sesion_id": sesion.id,
             "estado": sesion.estado.codigo if hasattr(sesion.estado, "codigo") else str(sesion.estado),
-            "hora_fin": timezone.localtime(sesion.fecha_fin).isoformat(),
+            "hora_fin": hora_local_iso(sesion.fecha_fin),
             "total_detalles": total_detalles,
             "mensaje": "Mapeo cancelado correctamente.",
         }
@@ -328,7 +343,6 @@ def procesar_cama_mapeo(request):
     """
     Ciclo principal de mapeo por cama: evaluar -> decidir -> ejecutar -> registrar.
     """
-    from django.core.exceptions import ValidationError as DjangoValidationError
     from core.services.mapeo_camas_service import MapeoOperacionesMapaService
 
     if not _tiene_permiso_mapear(request.user):
@@ -340,18 +354,26 @@ def procesar_cama_mapeo(request):
     ingreso_observado_id = request.POST.get("ingreso_observado_id") or None
     sesion_mapeo_id = request.POST.get("sesion_mapeo_id") or None
 
-    if not cama_id:
-        return JsonResponse({"ok": False, "error": "Debe indicar cama_id."}, status=400)
-
-    acciones_validas = {
-        "CONFIRMAR", "CONFIRMAR_ALTA", "CANCELAR_PREALTA",
-        "CAMBIO_TRASLADO", "ASIGNACION", "ALTA_FORZADA",
-    }
-    if accion not in acciones_validas:
-        return JsonResponse({"ok": False, "error": "Accion de mapeo no valida."}, status=400)
+    acciones_validas = ACCIONES_MAPEO_VALIDAS
+    # 2026-06-04: valida request con validators de app antes de ORM/modelo.
+    try:
+        cama_id = validar_cama_id(cama_id)
+        validar_accion_mapeo(accion, acciones_validas)
+        # 2026-06-09: valida IDs opcionales de request antes de filtros ORM.
+        ingreso_observado_id = validar_id_opcional(ingreso_observado_id, "ingreso_observado_id")
+        sesion_mapeo_id = validar_id_opcional(sesion_mapeo_id, "sesion_mapeo_id")
+    except ValidationError as exc:
+        msg = exc.message if hasattr(exc, "message") else "; ".join(exc.messages)
+        if "cama_id" in msg:
+            return JsonResponse({"ok": False, "error": "Debe indicar cama_id."}, status=400)
+        if "ingreso_observado_id" in msg:
+            return JsonResponse({"ok": False, "error": "ingreso_observado_id debe ser un entero válido."}, status=400)
+        if "sesion_mapeo_id" in msg:
+            return JsonResponse({"ok": False, "error": "sesion_mapeo_id debe ser un entero válido."}, status=400)
+        return JsonResponse({"ok": False, "error": msg}, status=400)
 
     if _es_rol_intentos_restringido(request.user):
-        acciones_permitidas_rol = {"CONFIRMAR", "CAMBIO_TRASLADO", "CONFIRMAR_ALTA", "ALTA_FORZADA"}
+        acciones_permitidas_rol = ACCIONES_MAPEO_PERMITIDAS_ROL_RESTRINGIDO
         if accion not in acciones_permitidas_rol:
             return JsonResponse(
                 {"ok": False, "error": "Este rol solo puede confirmar, mover pacientes o liberar camas en el flujo de mapeo."},
@@ -401,7 +423,7 @@ def procesar_cama_mapeo(request):
             .select_related("cama__sala__servicio", "estado")
             .filter(
                 ingreso_id=ingreso_observado.id,
-                estado__codigo__in=["OCUPADA", "PRE_ALTA"],
+                estado__codigo__in=ESTADOS_OCUPADA_PREALTA,
                 estado__categoria="ESTADO_CAMA",
             )
             .order_by("-fecha_inicio", "-id")
@@ -422,15 +444,17 @@ def procesar_cama_mapeo(request):
             return limite_error
 
     try:
-        resultado = MapeoOperacionesMapaService.procesar_accion_mapeo(
-            usuario=request.user,
-            cama=cama,
-            accion=accion,
-            observacion=observacion,
-            ingreso_observado=ingreso_observado,
-            sesion=sesion,
-        )
-    except DjangoValidationError as exc:
+        # 2026-06-09: atomic defensivo en endpoint para asegurar escritura transaccional.
+        with transaction.atomic():
+            resultado = MapeoOperacionesMapaService.procesar_accion_mapeo(
+                usuario=request.user,
+                cama=cama,
+                accion=accion,
+                observacion=observacion,
+                ingreso_observado=ingreso_observado,
+                sesion=sesion,
+            )
+    except ValidationError as exc:
         msg = exc.message if hasattr(exc, "message") else "; ".join(exc.messages)
         return JsonResponse({"ok": False, "error": msg}, status=400)
 
