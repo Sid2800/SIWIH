@@ -1,6 +1,12 @@
-# Comparación: `feature/prestamos-expediente` vs `origin/main`
+# Informe del módulo `s_exp` (Préstamo de Expedientes) — rama `expedientesV2` vs `main`
 
-## 📊 Resumen Numérico
+> Este documento tiene dos partes:
+> 1. La **comparación inicial** del módulo (creación, dada de alta en el sistema).
+> 2. Una **ACTUALIZACIÓN** al final con el refactor relacional, correcciones y la
+>    **guía de instalación en equipo nuevo**. Para lo más reciente, ir a la
+>    sección "🔄 ACTUALIZACIÓN" más abajo.
+
+## 📊 Resumen Numérico (comparación inicial)
 
 | Concepto | Valor |
 |----------|-------|
@@ -127,22 +133,35 @@ Estos archivos solo **agregan** cosas, no modifican código existente:
 
 ## 🆕 ¿Hay tablas nuevas en BD?
 
-Sí — **10 tablas nuevas** del módulo `s_exp` (todas en uso):
+**Catálogos** (poblados automáticamente por migraciones / comandos):
 
-| Tabla | Filas esperadas | Uso |
-|-------|----------------|-----|
-| `s_exp_motivosolicitud` | ~15 | Catálogo de motivos |
-| `s_exp_estadosolicitud` | ~9 | Catálogo de estados solicitud |
-| `s_exp_estadoexpedientefisico` | ~5 | Catálogo de estados físicos |
-| `s_exp_expedienteprestamo` | grow | Estado físico actual del expediente |
-| `s_exp_solicitudprestamo` | grow | Solicitudes de préstamo |
-| `s_exp_solicituddetalle` | grow | Detalles (M2M intermedio) |
-| `s_exp_prestamo` | grow | Préstamos aprobados |
-| `s_exp_devolucion` | grow | Devoluciones |
-| `s_exp_loghistorico` | grow | Auditoría completa |
-| `s_exp_expedienteestadolog` | grow | Histórico de estados físicos |
+| Tabla | Filas | PK | Poblado por |
+|-------|------|----|-------------|
+| `s_exp_motivosolicitud` | 16 | id | **manual** (`s_exp_datos_v2.sql`) |
+| `s_exp_estadosolicitud` | 8 | id | migración 0020 |
+| `s_exp_estadoexpedientefisico` | 5 | id | migración 0020 |
+| `s_exp_estadoprestamo` | 6 | id | migración 0020 |
+| `s_exp_estadodevolucion` | 3 | id | migración 0020 |
+| `s_exp_tipoaccionlog` | 8 | id | migración 0020 |
+| `s_exp_tipoobjetolog` | 3 | id | migración 0021 |
+| `expediente_ubicacion` | ~35 | id | `poblar_ubicaciones` + signals |
 
-**❌ No hay tablas para eliminar.** Todas referenciadas con 5-130 usos cada una.
+**Transaccionales** (crecen con el uso):
+
+| Tabla | Uso |
+|-------|-----|
+| `s_exp_expedienteprestamo` | Estado físico + ubicación (FK) actual del expediente |
+| `s_exp_solicitudprestamo` | Solicitudes de préstamo |
+| `s_exp_solicituddetalle` | Detalles (M2M intermedio) |
+| `s_exp_prestamo` | Préstamos aprobados |
+| `s_exp_devolucion` | Devoluciones |
+| `s_exp_loghistorico` | Auditoría completa |
+| `s_exp_expedienteestadolog` | Histórico de estados físicos |
+
+**Columna nueva en tabla existente:** `expediente_expediente.ubicacion_id`
+(FK a `expediente_ubicacion`, transición híbrida; convive con `localizacion_id`).
+
+**❌ No hay tablas para eliminar.**
 
 ---
 
@@ -159,25 +178,149 @@ from s_exp import views, urls, models, admin; print('OK')"
 
 ---
 
-## 📋 Recomendaciones para Merge
+---
 
-1. **Antes del merge**, hacer rebase contra main para detectar conflictos:
-   ```bash
-   git rebase origin/main
-   ```
+# 🔄 ACTUALIZACIÓN — Refactor relacional y correcciones (rama `expedientesV2`)
 
-2. **Conflicto esperado en `base.html`** → revisar a mano (245 líneas afectadas)
+> Estado de fusión con `main`: **`main` es ancestro directo** de `expedientesV2`
+> (135 commits adelante, **0 divergentes**). El merge es **fast-forward → SIN
+> conflictos**. Verificado: en `base.html` **se conservan las 82 URLs de main**
+> y se agregan 31 de s_exp (no se perdió ni reordenó nada de otros módulos).
 
-3. **Migraciones**: aplicar en orden las de `s_exp/0001-0012` y las de `usuario/0003-0009`
+## 1) Arquitectura: `views.py` → paquete `s_exp/views/`
+El antiguo `views.py` (~3100 líneas) se dividió por dominio. `__init__.py`
+re-exporta todo, así `urls.py` no cambia:
+`comunes, dashboard, solicitudes, prestamos, devoluciones, buscador, alertas,
+reportes, historial`.
 
-4. **Verificar después del merge**:
-   - `python manage.py check`
-   - `python manage.py migrate`
-   - Login + acceso al menú "Préstamos Exp."
-   - Crear solicitud + aprobar + entregar + devolver (flujo completo)
+## 2) Capa de servicios `s_exp/services/`
+`datos_solicitud, permisos, formato, log_service, reporte_export_service,
+pdf_solicitud_service`. Las vistas quedan delgadas; el acceso a datos y la
+generación de PDF/Excel vive aquí.
+
+## 3) Más relacional (menos texto, más IDs)
+- Snapshots de texto → **FK**: `SolicitudExpedienteDetalle.paciente`,
+  `SolicitudPrestamo.servicio_unidad` (se eliminaron columnas de texto duplicado).
+- **Catálogos de estados/acciones con PK ENTERA `id`** (antes el `codigo` texto
+  era la PK). `codigo` queda como columna única. Aplica a: `EstadoSolicitud`,
+  `EstadoExpedienteFisico`, `EstadoPrestamo`, `EstadoDevolucion`, `TipoAccionLog`.
+  Las FK ahora guardan un entero pequeño, no texto repetido.
+  - Helpers cacheados en el modelo: `Modelo.id_de('CODIGO')`,
+    `Modelo.codigo_de(id)`, `Modelo.obtener('CODIGO')` (0 queries tras la 1ª).
+  - En consultas: `filter(estado__codigo='Entregado')`.
+- `LogHistorico.objeto_tipo`: texto → **FK** al catálogo nuevo `TipoObjetoLog`.
+- `ExpedientePrestamo.ubicacion_fisica` (texto) **eliminado**; la ubicación es
+  100% relacional vía FK `ubicacion` a `expediente_ubicacion`.
+
+## 4) Ubicaciones unificadas (`expediente_ubicacion`)
+- Catálogo único de ubicaciones clínicas (tipo=1) y no clínicas (tipo=2).
+- **Nueva columna `expediente_expediente.ubicacion`** (FK por id). Transición
+  híbrida: convive con `localizacion_id` (legacy) y a futuro lo reemplaza.
+- Flujo de préstamo: al **entregar** → ubicación = unidad del solicitante;
+  al **devolver** → ADMISION. Se actualiza tanto en `ExpedientePrestamo` como
+  en `Expediente`.
+
+## 5) UX / correcciones
+- Menú "Préstamos Exp." gateado por el filtro `es_no_clinico` (derivado de RRHH
+  `rrhh_personalnoclinico`), no por nombres escritos a mano.
+- Devoluciones (admin): banner "Actualizar" igual que Gestión de Solicitudes.
+- Notificaciones globales: cola secuencial (un modal sticky a la vez).
+- Horas en formato 24h, consistente con el resto del sistema (BD en UTC).
+- PDF de solicitud: cuadro de firma más alto para nombres de unidad largos.
+
+## 6) Comandos de management (reutilizables, idempotentes)
+- `python manage.py poblar_catalogos` — estados/acciones de s_exp.
+- `python manage.py poblar_ubicaciones` — pobla `expediente_ubicacion` desde
+  las unidades de `servicio`.
+- `python manage.py limpiar_transaccional [--dry-run] [--noinput]` — borra datos
+  transaccionales de prueba conservando catálogos.
+
+## 7) Migraciones
+- `s_exp/0001` … **`0021_tipoobjetolog_and_more`** (21 migraciones).
+- `expediente/` … **`0008_expediente_ubicacion`** (agrega columna + backfill a
+  ADMISION).
+- Los catálogos de estados se **pueblan dentro de las migraciones** (0018/0020/
+  0021), así un `migrate` en limpio deja la BD lista (salvo motivos y ubicaciones).
+
+> ⚠️ **`venv/` quedó trackeado** (~7,761 archivos). No debería ir a `main`.
+> Antes de fusionar conviene: `git rm -r --cached venv && echo "venv/" >> .gitignore`.
 
 ---
 
-**Fecha de comparación:** 2026-05-20
-**Rama actual:** `feature/prestamos-expediente`
-**Commits adelante de main:** verificar con `git log --oneline origin/main..HEAD | wc -l`
+# 🚀 Instalación en un equipo nuevo
+
+### Requisitos previos
+- Python 3.12, MySQL 8.0.16+ (soporta `CHECK` constraints), Git.
+- Acceso a un **dump de la base de datos** del hospital (contiene pacientes,
+  expedientes, `servicio` (unidades), `rrhh`, usuarios). El módulo s_exp NO crea
+  esos datos base — los consume.
+
+### Pasos
+
+```bash
+# 1) Clonar el repositorio
+git clone <URL_DEL_REPO> SIWIH
+cd SIWIH
+
+# 2) Entorno virtual + dependencias
+python -m venv venv
+venv\Scripts\activate            # Windows  (Linux/Mac: source venv/bin/activate)
+pip install -r requirements.txt
+
+# 3) Configurar variables de entorno (.env o variables del sistema)
+#    SECRET_KEY, credenciales de la BD MySQL, DEBUG, etc.
+#    (ver SIWI/settings.py: usa os.getenv para SECRET_KEY/DEBUG/BD)
+
+# 4) Restaurar el dump de la BD base (servicio, rrhh, paciente, expediente...)
+mysql -u <user> -p <nombre_bd> < dump_base.sql
+
+# 5) Aplicar migraciones (crea el esquema s_exp + puebla catálogos de estados)
+python manage.py migrate
+```
+
+### Datos OBLIGATORIOS a insertar
+
+| Dato | Cómo | Obligatorio |
+|------|------|-------------|
+| Estados (solicitud, físico, préstamo, devolución), acciones, tipos de objeto | **Automático** en `migrate` (migr. 0018/0020/0021) | ✅ (ya queda) |
+| **Motivos de solicitud** (16 del hospital) | `mysql ... < s_exp_datos_v2.sql` | ✅ **manual** |
+| **Catálogo de ubicaciones** `expediente_ubicacion` | `python manage.py poblar_ubicaciones` | ✅ |
+| Unidad **ADMISION** en `servicio_unidad` | debe existir en el dump base (la usan devoluciones y el backfill de `expediente.ubicacion`) | ✅ |
+
+```bash
+# 6) Cargar los motivos del hospital (catálogo no incluido en migraciones)
+mysql -u <user> -p <nombre_bd> < s_exp_datos_v2.sql
+
+# 7) Poblar el catálogo unificado de ubicaciones desde las unidades de servicio
+python manage.py poblar_ubicaciones
+
+# 8) (opcional, idempotente) reasegurar los catálogos de estados
+python manage.py poblar_catalogos
+
+# 9) Crear superusuario (si la BD no trae uno)
+python manage.py createsuperuser
+```
+
+### Vincular usuarios al módulo (importante)
+El acceso a s_exp se basa en la **cadena RRHH**:
+`auth_user → rrhh_empleado (usuario_id) → rrhh_personalnoclinico (servicio_unidad)`.
+Al crear un usuario, **el empleado debe quedar enlazado a la cuenta**
+(`rrhh_empleado.usuario`); de lo contrario no verá "Préstamos Exp." ni podrá
+entrar al módulo.
+
+### Verificación final
+```bash
+python manage.py check                       # sin issues
+python manage.py makemigrations --check --dry-run   # "No changes detected"
+python manage.py runserver
+# Login con un usuario NO clínico (Estadística/Admisión/UAU) →
+# debe ver "Préstamos Exp." y poder hacer el flujo completo:
+# solicitar → aprobar → entregar → devolver.
+```
+
+---
+
+**Última actualización:** 2026-06-05
+**Rama actual:** `expedientesV2`
+**Relación con main:** fast-forward (135 commits adelante, 0 divergentes, sin conflictos)
+**Commits adelante de main:** `git rev-list --count main..HEAD`
