@@ -520,7 +520,10 @@ def generar_pdf_solicitud(solicitud, admin_actual=None):
         t = Table(
             contenido,
             colWidths=[col_ancho, sep_ancho, col_ancho],
-            rowHeights=[1.1 * cm, 2 * cm, 0.55 * cm, 0.5 * cm],
+            # Fila de áreas (última) más alta (1.1cm) para que quepan nombres
+            # de unidad largos en 2 líneas (ej: "SUBDIRECCION GESTION DE LA
+            # INFORMACION") sin desbordar el cuadro. Crece hacia abajo (VALIGN TOP).
+            rowHeights=[1.1 * cm, 2 * cm, 0.55 * cm, 1.1 * cm],
         )
         t.setStyle(TableStyle([
             # Título atravesado en fila 0
