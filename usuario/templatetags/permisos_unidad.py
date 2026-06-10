@@ -82,6 +82,50 @@ def tiene_unidad(user, unidades_str):
 
 
 @register.filter
+def es_no_clinico(user):
+    """
+    True si el usuario pertenece a una unidad NO CLÍNICA (personal
+    administrativo: Estadística, Admisión, UAU, Archivo, etc.).
+
+    ORIGEN DEL DATO (fuente de verdad, sin nombres escritos a mano):
+        auth_user
+          -> rrhh_empleado (usuario_id)
+            -> rrhh_personalnoclinico (empleado_id) con servicio_unidad
+    Si el empleado está en PersonalNoClinico con unidad asignada, es no clínico.
+    El personal de salud (rrhh_personalsalud) NO cumple, por lo que no ve el
+    acceso a "Préstamos de Expedientes".
+
+    Uso en plantilla:
+        {% if request.user|es_no_clinico %} ... {% endif %}
+
+    Reemplaza al patrón frágil:
+        {% if request.user|tiene_unidad:"Estadistica:Sala:Admision:UAU" %}
+    que obligaba a enumerar cada unidad nueva. Ahora cualquier unidad no
+    clínica que exista en RRHH obtiene acceso automáticamente.
+
+    Superusuarios siempre True (para administración).
+
+    RENDIMIENTO: dos consultas indexadas por id (empleado y personalnoclinico),
+    sin joins pesados; se evalúa una vez al renderizar el menú.
+    """
+    if not user.is_authenticated:
+        return False
+    if user.is_superuser:
+        return True
+    try:
+        from rrhh.models import Empleado, PersonalNoClinico
+        empleado = Empleado.objects.filter(usuario_id=user.id).only('id').first()
+        if not empleado:
+            return False
+        return PersonalNoClinico.objects.filter(
+            empleado_id=empleado.id,
+            servicio_unidad_id__isnull=False
+        ).exists()
+    except Exception:
+        return False
+
+
+@register.filter
 def en_grupo(user, grupos_str):
     """
     Verifica si el usuario pertenece a alguno de los grupos indicados.

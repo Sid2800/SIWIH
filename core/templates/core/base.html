@@ -140,7 +140,10 @@
             {% endif %}
 
 
-            {% if request.user|tiene_unidad:"Estadistica:Sala:Admision:UAU" %}
+            {# Solo unidades NO CLÍNICAS (Estadística, Admisión, UAU, Archivo...).
+               Se deriva de RRHH (rrhh_personalnoclinico), no de nombres escritos
+               a mano: cualquier unidad no clínica nueva obtiene acceso solo. #}
+            {% if request.user|es_no_clinico %}
             <li>
                <a href="{% url 's_exp_buscador' %}" class="bn-navegacion__enlace">
                   <i class="bi bi-folder-symlink bn-navegacion-enlace__logo"></i>
@@ -148,6 +151,7 @@
                </a>
             </li>
             {% endif %}
+
 
 
             <li>
