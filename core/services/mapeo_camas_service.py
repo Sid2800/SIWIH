@@ -1314,81 +1314,36 @@ class MapeoOperacionesMapaService:
         ingreso_anterior,
         requiere_cierre_prealta,
         requiere_cierre_ocupada_a_ocupada,
-        requiere_registro_alta_a_vacia,
     ):
         registrar_historial, _registrar_detalle, sincronizar_cama = _mc_sesion_helpers()
         OBS = _mc_constants()
         from mapeo_camas.models import DetalleMapeoCama, MovimientoCama
 
         estado_vacia = MapeoCamasService.get_estado_mapeo("VACIA", "ESTADO_CAMA")
-        estado_alta = MapeoCamasService.get_estado_mapeo("ALTA", "ESTADO_CAMA")
 
         with transaction.atomic():
             estado_historial_anterior = estado_anterior
 
-            # [2026-06-09 FIX] Si el ingreso saliente ya tiene cama activa en otro lugar,
-            # no corresponde registrar ALTA: corresponde salida por traslado del origen.
-            asig_ingreso_anterior_en_otra_cama = None
-            if requiere_cierre_ocupada_a_ocupada and ingreso_anterior:
-                asig_ingreso_anterior_en_otra_cama = (
-                    AsignacionCamaPaciente.objects
-                    .select_related("cama", "estado")
-                    .filter(
-                        ingreso_id=ingreso_anterior.id,
-                        estado__codigo__in=ESTADOS_OCUPADA_PREALTA,
-                        estado__categoria="ESTADO_CAMA",
-                    )
-                    .exclude(cama_id=cama.pk)
-                    .order_by("-fecha_inicio", "-id")
-                    .first()
-                )
-
+            # [2026-06-11] Regla operativa: no generar ALTA historica automatica.
+            # En reasignaciones, la cama saliente se libera en VACIA y luego se registra
+            # el nuevo estado final (p.ej. VACIA -> OCUPADA) en el historial principal.
             if requiere_cierre_prealta:
                 registrar_historial(
-                    cama=cama, estado_anterior=estado_anterior, estado_nuevo=estado_alta,
-                    ingreso=ingreso_anterior, usuario=usuario,
-                    observacion=get_observacion_mapeo("Alta historica por reasignacion desde PRE_ALTA"),
-                    sesion_mapeo=sesion_mapeo, forzar_nuevo=True,
-                )
-                registrar_historial(
-                    cama=cama, estado_anterior=estado_alta, estado_nuevo=estado_vacia,
+                    cama=cama, estado_anterior=estado_anterior, estado_nuevo=estado_vacia,
                     ingreso=None, usuario=usuario,
-                    observacion=get_observacion_mapeo("Liberacion de cama tras alta historica"),
+                    observacion=get_observacion_mapeo(OBS_AJUSTE_MAPEO_SIN_ALTA),
                     sesion_mapeo=sesion_mapeo, forzar_nuevo=True,
                 )
                 estado_historial_anterior = estado_vacia
 
             if requiere_cierre_ocupada_a_ocupada:
-                if asig_ingreso_anterior_en_otra_cama:
-                    registrar_historial(
-                        cama=cama, estado_anterior=estado_anterior, estado_nuevo=estado_vacia,
-                        ingreso=None, usuario=usuario,
-                        observacion=get_observacion_mapeo(OBS_AJUSTE_MAPEO_SIN_ALTA),
-                        sesion_mapeo=sesion_mapeo, forzar_nuevo=True,
-                    )
-                else:
-                    registrar_historial(
-                        cama=cama, estado_anterior=estado_anterior, estado_nuevo=estado_alta,
-                        ingreso=ingreso_anterior, usuario=usuario,
-                        observacion=get_observacion_mapeo("Alta historica por reasignacion directa de cama"),
-                        sesion_mapeo=sesion_mapeo, forzar_nuevo=True,
-                    )
-                    registrar_historial(
-                        cama=cama, estado_anterior=estado_alta, estado_nuevo=estado_vacia,
-                        ingreso=None, usuario=usuario,
-                        observacion=get_observacion_mapeo("Liberacion de cama tras alta historica"),
-                        sesion_mapeo=sesion_mapeo, forzar_nuevo=True,
-                    )
-                estado_historial_anterior = estado_vacia
-
-            if requiere_registro_alta_a_vacia:
                 registrar_historial(
-                    cama=cama, estado_anterior=estado_anterior, estado_nuevo=estado_alta,
-                    ingreso=ingreso_anterior, usuario=usuario,
-                    observacion=get_observacion_mapeo("Alta historica por cambio manual a VACIA"),
-                    sesion_mapeo=sesion_mapeo,
+                    cama=cama, estado_anterior=estado_anterior, estado_nuevo=estado_vacia,
+                    ingreso=None, usuario=usuario,
+                    observacion=get_observacion_mapeo(OBS_AJUSTE_MAPEO_SIN_ALTA),
+                    sesion_mapeo=sesion_mapeo, forzar_nuevo=True,
                 )
-                estado_historial_anterior = estado_alta
+                estado_historial_anterior = estado_vacia
 
             if asig_previa_paciente:
                 estado_anterior_previa = asig_previa_paciente.estado

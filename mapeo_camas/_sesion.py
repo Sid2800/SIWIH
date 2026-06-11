@@ -97,9 +97,9 @@ def _registrar_historial_mapeo(
 ):
     """Registra historial de cama; en mapeo activo actualiza el último registro de la sesión.
 
-    [2026-05-29] `forzar_nuevo=True` evita la fusion con el ultimo historial de la sesion
-    (necesario para cierres intermedios como el alta historica del paciente saliente en
-    reasignaciones OCUPADA->OCUPADA o PRE_ALTA->OCUPADA con paciente distinto).
+    [2026-06-11] `forzar_nuevo=True` evita la fusion con el ultimo historial de la sesion
+    (necesario para cierres intermedios en reasignaciones, p.ej. liberar a VACIA
+    antes de registrar la nueva ocupacion en OCUPADA).
     """
     sesion = sesion_mapeo or _obtener_sesion_mapeo_activa(usuario)
     observacion_catalogada = get_observacion_mapeo(observacion)

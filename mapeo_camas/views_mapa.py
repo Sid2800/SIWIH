@@ -40,7 +40,6 @@ from core.constants.mapeo_camas_constants import (
     OBSERVACION_MOVIMIENTO_PACIENTE_MAPA_SUPERADMIN,
 )
 from .constants.view_constants import (
-    ESTADOS_CON_HISTORIAL_ALTA_VACIA,
     ESTADOS_EDICION_DIRECTA_ROL_RESTRINGIDO,
     ESTADOS_MANTIENEN_INGRESO_SIN_NUEVO,
     ESTADOS_OCUPADA_PREALTA,
@@ -63,6 +62,7 @@ from ._permisos import (
     _puede_gestionar_sesion_mapeo,
     _sala_real_id_desde_cama,
     _tiene_permiso_cambios_mapa,
+    _tiene_permiso_dashboard,
     _tiene_permiso_historiales,
     _tiene_permiso_mapear,
     _validar_limite_intentos_salas,
@@ -192,6 +192,8 @@ class MapeoCamasMapaView(UnidadRolRequiredMixin, TemplateView):
         context["puede_mapear"] = _puede_gestionar_sesion_mapeo(self.request.user)
         context["puede_hacer_cambios_mapa"] = _puede_editar_cama_en_mapa(self.request.user)
         context["puede_ver_historiales"] = _tiene_permiso_historiales(self.request.user)
+        # [2026-06-11] Dashboard se controla con permiso propio, separado de historiales.
+        context["puede_ver_dashboard"] = _tiene_permiso_dashboard(self.request.user)
         context["es_superusuario"] = bool(getattr(self.request.user, "is_superuser", False))
         context["es_rol_intentos_restringido"] = es_rol_intentos_restringido
         context["es_editor"] = context["puede_hacer_cambios_mapa"]
@@ -235,15 +237,16 @@ def mapa_camas_data(request):
     asignacion_por_cama = MapeoCamasService.obtener_ultimas_asignaciones_por_cama()
     historial_por_cama = MapeoCamasService.obtener_ultimos_historiales_por_cama()
 
-    cambios_por_sala = {
-        item["sala_real_id"]: item["total"]
+    # [2026-06-11] El contador operativo del mapa debe mostrarse por servicio.
+    cambios_por_servicio = {
+        item["servicio_real_id"]: item["total"]
         for item in HistorialEstadoCama.objects.filter(
             fecha_hora__gte=_inicio_ventana_limite_sala(),
         )
         .filter(_filtro_observaciones_movimiento_limite())
-        .annotate(sala_real_id=F("cama__sala_id"))
+        .annotate(servicio_real_id=F("cama__sala__servicio_id"))
         .exclude(estado_anterior=F("estado_nuevo"))
-        .values("sala_real_id")
+        .values("servicio_real_id")
         .annotate(total=Count("id"))
     }
     max_cambios_usuario = _max_cambios_para_usuario(request.user)
@@ -286,7 +289,7 @@ def mapa_camas_data(request):
                     camas_data.append(_cama_payload(
                         cama,
                         asig,
-                        cambios_por_sala.get(sala.id, 0),
+                        cambios_por_servicio.get(servicio.id, 0),
                         max_cambios_usuario,
                         meta_actualizacion
                     ))
@@ -314,7 +317,7 @@ def mapa_camas_data(request):
                 cubiculo_bucket["camas"].append(_cama_payload(
                     cama,
                     asig,
-                    cambios_por_sala.get(sala.id, 0),
+                    cambios_por_servicio.get(servicio.id, 0),
                     max_cambios_usuario,
                     meta_actualizacion
                 ))
@@ -332,7 +335,7 @@ def mapa_camas_data(request):
                 camas_directas_data.append(_cama_payload(
                     cama,
                     asig,
-                    cambios_por_sala.get(sala.id, 0),
+                    cambios_por_servicio.get(servicio.id, 0),
                     max_cambios_usuario,
                     meta_actualizacion
                 ))
@@ -581,13 +584,6 @@ def actualizar_cama_mapa(request):
         and ingreso_anterior and ingreso_nuevo
         and ingreso_anterior.id != ingreso_nuevo.id
     )
-    requiere_registro_alta_a_vacia = (
-        estado_codigo == "VACIA"
-        and ingreso_anterior is not None
-        and estado_anterior is not None
-        and estado_anterior.codigo in ESTADOS_CON_HISTORIAL_ALTA_VACIA
-    )
-
     if estado_codigo == "VACIA":
         ingreso_nuevo = None
     elif estado_codigo in ESTADOS_MANTIENEN_INGRESO_SIN_NUEVO and ingreso_nuevo is None:
@@ -637,7 +633,6 @@ def actualizar_cama_mapa(request):
                 ingreso_anterior=ingreso_anterior,
                 requiere_cierre_prealta=bool(requiere_cierre_prealta),
                 requiere_cierre_ocupada_a_ocupada=bool(requiere_cierre_ocupada_a_ocupada),
-                requiere_registro_alta_a_vacia=bool(requiere_registro_alta_a_vacia),
             )
     except DjangoValidationError as exc:
         msg = exc.message if hasattr(exc, "message") else "; ".join(exc.messages)
@@ -652,7 +647,7 @@ def actualizar_cama_mapa(request):
         usuario=request.user, cama=cama, asignacion=asignacion,
         tipo_accion=(
             DetalleMapeoCama.TipoAccion.ALTA
-            if estado_codigo == "ALTA" or requiere_registro_alta_a_vacia
+            if estado_codigo == "ALTA"
             else DetalleMapeoCama.TipoAccion.CAMBIO
         ),
         hubo_cambio=True,

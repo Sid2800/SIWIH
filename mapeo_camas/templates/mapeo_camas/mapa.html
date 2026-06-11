@@ -26,7 +26,9 @@
       <a href="{% url 'mapeo_camas_historiales' %}" class="dt-button" id="btn-historiales-camas" title="Ver historiales de camas">
         <i class="bi bi-clock-history boton-exportacion"></i>
       </a>
-      {# [2026-05-28] Acceso al dashboard de KPIs de mapeo de camas. #}
+      {% endif %}
+      {% if puede_ver_dashboard %}
+      {# [2026-06-11] Dashboard usa permiso propio MAPEO_CAMAS_DASHBOARD_*. #}
       <a href="{% url 'mapeo_camas_dashboard' %}" class="dt-button" id="btn-dashboard-camas" title="Dashboard de mapeo de camas">
         <i class="bi bi-bar-chart-line boton-exportacion"></i>
       </a>
@@ -157,5 +159,7 @@
     }
   };
 </script>
-<script src="{% static 'core/scripts/mapeo/mapaCamasAsignacion.js' %}?v=20260601a"></script>
+<!-- [2026-06-11] Cache-bust: fuerza recarga del JS con contador de intentos por servicio. -->
+<!-- [2026-06-11] Cache-bust: fix de modo solo lectura en inicio/cierre de sesión de mapeo. -->
+<script src="{% static 'core/scripts/mapeo/mapaCamasAsignacion.js' %}?v=20260611b"></script>
 {% endblock %}

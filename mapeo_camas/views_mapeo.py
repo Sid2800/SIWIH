@@ -74,11 +74,8 @@ def iniciar_mapeo(request):
     if not _tiene_permiso_mapear(request.user):
         return JsonResponse({"ok": False, "error": "Acceso denegado."}, status=403)
 
-    if _es_rol_intentos_restringido(request.user):
-        return JsonResponse(
-            {"ok": False, "error": "Este rol no puede iniciar sesiones de mapeo."},
-            status=403,
-        )
+    # [2026-06-11] El inicio de sesión se controla por MAPEO_CAMAS_MAPEAR_*.
+    # Las restricciones de intentos se aplican durante movimientos/edición de camas.
     sesion_activa = _obtener_sesion_mapeo_activa(request.user)
     if sesion_activa:
         servicios_ids = _obtener_servicios_ids_sesion(sesion_activa)

@@ -36,6 +36,9 @@ document.addEventListener("DOMContentLoaded", function () {
   var camasMapeadasSesion = new Set();
   var filtroEstadoIndicador = "";
   var filtroSalaIndicador = "";
+  // [2026-06-11] Estado base de solo lectura al cargar la pagina.
+  // Se usa para no perder el permiso de cambios directos cuando no hay sesion.
+  var MAPA_SOLO_LECTURA_BASE = Boolean(window.MAPA_SOLO_LECTURA);
 
   var ESTADOS_INDICADORES = [
     { id: "VACIA", etiqueta: "Vacias", icono: "bi bi-door-open-fill" },
@@ -81,6 +84,11 @@ document.addEventListener("DOMContentLoaded", function () {
     if (mapaBannerMapeo) {
       mapaBannerMapeo.style.display = activo ? "flex" : "none";
     }
+
+    // [2026-06-11] Si el usuario entra al flujo MAPEAR_*, al activar sesión
+    // se habilita edición aunque no tenga CAMBIOS_*. Al cerrar, se restaura
+    // el modo original basado en permisos de carga inicial.
+    window.MAPA_SOLO_LECTURA = Boolean(MAPA_SOLO_LECTURA_BASE && !activo);
   }
 
   async function confirmarCamaSinCambios(camaEl) {
@@ -702,6 +710,21 @@ document.addEventListener("DOMContentLoaded", function () {
     aplicarFiltro();
   }
 
+  // [2026-06-11] Sincroniza el contador de intentos en todas las camas del mismo servicio.
+  function sincronizarContadorIntentosServicio(nombreServicio, cambiosRealizados, maxCambios) {
+    var servicio = String(nombreServicio || "").trim();
+    if (!servicio) {
+      return;
+    }
+    document.querySelectorAll(".mapa-cama").forEach(function (item) {
+      if (String(item.dataset.servicio || "").trim() !== servicio) {
+        return;
+      }
+      item.dataset.cambiosRealizados = String(cambiosRealizados || 0);
+      item.dataset.maxCambios = maxCambios != null ? String(maxCambios) : "";
+    });
+  }
+
   // Rellena un <select> con las camas disponibles (VACIA) para mover un paciente
   function renderCamaDestinoSelect(camas, selectEl) {
     selectEl.innerHTML = camas.length
@@ -1318,6 +1341,21 @@ document.addEventListener("DOMContentLoaded", function () {
           }
         }
 
+        var servicioOrigen = camaEl.dataset.servicio || "";
+        var servicioDestino = camaDestinoCard ? (camaDestinoCard.dataset.servicio || "") : "";
+        sincronizarContadorIntentosServicio(
+          servicioOrigen,
+          dataMover.cama_origen ? dataMover.cama_origen.cambios_realizados : 0,
+          dataMover.cama_origen ? dataMover.cama_origen.max_cambios : null
+        );
+        if (servicioDestino && servicioDestino !== servicioOrigen) {
+          sincronizarContadorIntentosServicio(
+            servicioDestino,
+            dataMover.cama_destino ? dataMover.cama_destino.cambios_realizados : 0,
+            dataMover.cama_destino ? dataMover.cama_destino.max_cambios : null
+          );
+        }
+
         toastr.success(dataMover.mensaje || "Paciente movido correctamente.", "Exito");
 
       } else {
@@ -1341,6 +1379,11 @@ document.addEventListener("DOMContentLoaded", function () {
         }
 
         actualizarCardDesdeRespuesta(camaEl, data.cama);
+        sincronizarContadorIntentosServicio(
+          camaEl.dataset.servicio || "",
+          data.cama ? data.cama.cambios_realizados : 0,
+          data.cama ? data.cama.max_cambios : null
+        );
         // [2026-05-04 IMPROVEMENT] Marcar cama como mapeada sin reload de página.
         if (sesionMapeoActivaId) {
           marcarCamaComoMapeada(camaEl);

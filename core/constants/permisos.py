@@ -31,7 +31,7 @@ EXPEDIENTE_VISUALIZACION_UNIDADES = ["ADMI"]
 
 
 # -----------------------------
-# PERMISOS APP IMAGENOLOGIA
+# PERMISOS APP IMAGENOLOGIA  
 # -----------------------------
 
 # Acceso de edición (Add, Inactivar)
@@ -100,10 +100,10 @@ MAPEO_CAMAS_MAPEAR_ROLES = ["admin","digitador","visitante"]
 MAPEO_CAMAS_MAPEAR_UNIDADES = ["ADMI"]
 
 # [2026-05-18] Acceso para cambios manuales en el mapa (edición directa).
-MAPEO_CAMAS_CAMBIOS_ROLES = ["visitante"]
+MAPEO_CAMAS_CAMBIOS_ROLES = ["visitante","admin"]
 MAPEO_CAMAS_CAMBIOS_UNIDADES = ["ADMI"]
 
-# [2026-05-18] Usuarios a los que se les aplica el límite de 5 io mas ntentos de cambio por sala. Solo Puede Movimientos. Pre-Altas, Vacia
+# [2026-06-11] Ajuste operativo: el limite de intentos aplica.
 MAPEO_CAMAS_INTENTOS_CAMBIO_ROLES = ["visitante"]
 MAPEO_CAMAS_INTENTOS_CAMBIO_UNIDADES = ["ADMI"]
 
@@ -116,5 +116,6 @@ MAPEO_CAMAS_HISTORIALES_UNIDADES = ["ADMI"]
 # Propósito exclusivo: vista y endpoints JSON del dashboard de mapeo_camas.
 # Hoy coincide en valores con HISTORIALES_*, pero se separa para evitar
 # acoplamiento de permisos (auditoría vs. monitoreo operativo).
-MAPEO_CAMAS_DASHBOARD_ROLES = ["admin","digitador"]
+MAPEO_CAMAS_DASHBOARD_ROLES = ["digitador","admin"]
 MAPEO_CAMAS_DASHBOARD_UNIDADES = ["ADMI"]
+
