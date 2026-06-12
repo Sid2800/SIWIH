@@ -57,7 +57,8 @@ def prestamos_activos_api(request):
         )
 
         if estado_filtro:
-            qs = qs.filter(estado=estado_filtro)
+            # estado_filtro es el CÓDIGO de texto que envían los botones del front.
+            qs = qs.filter(estado__codigo=estado_filtro)
 
         if search_value:
             qs = qs.filter(
