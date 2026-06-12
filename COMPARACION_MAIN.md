@@ -144,7 +144,7 @@ Estos archivos solo **agregan** cosas, no modifican código existente:
 | `s_exp_estadodevolucion` | 3 | id | migración 0020 |
 | `s_exp_tipoaccionlog` | 8 | id | migración 0020 |
 | `s_exp_tipoobjetolog` | 3 | id | migración 0021 |
-| `expediente_ubicacion` | ~35 | id | `poblar_ubicaciones` + signals |
+| `expediente_ubicacion` | ~35 | id | migr. `expediente/0009` + signals (alta/baja) |
 
 **Transaccionales** (crecen con el uso):
 
@@ -213,12 +213,22 @@ generación de PDF/Excel vive aquí.
   100% relacional vía FK `ubicacion` a `expediente_ubicacion`.
 
 ## 4) Ubicaciones unificadas (`expediente_ubicacion`)
-- Catálogo único de ubicaciones clínicas (tipo=1) y no clínicas (tipo=2).
+- Catálogo único de ubicaciones clínicas (tipo=1) y no clínicas (tipo=2),
+  por **ID** (no texto).
 - **Nueva columna `expediente_expediente.ubicacion`** (FK por id). Transición
   híbrida: convive con `localizacion_id` (legacy) y a futuro lo reemplaza.
 - Flujo de préstamo: al **entregar** → ubicación = unidad del solicitante;
   al **devolver** → ADMISION. Se actualiza tanto en `ExpedientePrestamo` como
   en `Expediente`.
+- **Sincronización automática (signals, en ambos sentidos):**
+  - Alta/reactivación de una `Unidad_clinica`/`Unidad` activa → crea/reactiva su
+    fila en `expediente_ubicacion`.
+  - Baja (estado=0) de la unidad → **desactiva** su fila (no la borra: la FK es
+    PROTECT por estar referenciada). Todo por id, así que si la unidad cambia,
+    la relación se mantiene correcta sin conflictos.
+- **Carga inicial por migración** (`expediente/0009_poblar_ubicaciones`): al
+  hacer `migrate` se crea una fila por cada unidad activa existente en ese
+  momento. Después, los signals lo mantienen al día.
 
 ## 5) UX / correcciones
 - Menú "Préstamos Exp." gateado por el filtro `es_no_clinico` (derivado de RRHH
@@ -241,8 +251,9 @@ generación de PDF/Excel vive aquí.
   estados, acciones, tipos de objeto **y los 16 motivos**). Se eliminaron las
   21 migraciones incrementales anteriores (que creaban catálogos con `codigo`
   como PK y luego los convertían) — ya no hay churn.
-- `expediente/` … **`0008_expediente_ubicacion`** (agrega columna + backfill a
-  ADMISION).
+- `expediente/`: **`0008_expediente_ubicacion`** (agrega columna + backfill a
+  ADMISION) + **`0009_poblar_ubicaciones`** (siembra `expediente_ubicacion`
+  desde las unidades activas de `servicio`).
 - Resultado: un `migrate` en limpio deja la BD **lista** (esquema + catálogos +
   motivos). Solo falta `poblar_ubicaciones` (depende de las unidades de servicio).
 - **Ya NO se usan scripts SQL** (`s_exp_datos*.sql` eliminados).
@@ -287,17 +298,20 @@ python manage.py migrate
 
 | Dato | Cómo | Estado |
 |------|------|--------|
-| Estados (solicitud, físico, préstamo, devolución), acciones, tipos de objeto | **Automático** en `migrate` (migr. `0002_datos_iniciales`) | ✅ ya queda |
-| **Motivos de solicitud** (16 del hospital) | **Automático** en `migrate` (migr. `0002_datos_iniciales`) | ✅ ya queda |
-| **Catálogo de ubicaciones** `expediente_ubicacion` | `python manage.py poblar_ubicaciones` | ⚙️ 1 comando |
+| Estados (solicitud, físico, préstamo, devolución), acciones, tipos de objeto | **Automático** en `migrate` (migr. `s_exp/0002_datos_iniciales`) | ✅ ya queda |
+| **Motivos de solicitud** (16 del hospital) | **Automático** en `migrate` (migr. `s_exp/0002_datos_iniciales`) | ✅ ya queda |
+| **Catálogo de ubicaciones** `expediente_ubicacion` | **Automático** en `migrate` (migr. `expediente/0009_poblar_ubicaciones`), siempre que el dump base con las unidades de `servicio` ya esté restaurado. Luego los signals lo mantienen | ✅ ya queda |
 | Unidad **ADMISION** en `servicio_unidad` | debe existir en el dump base (la usan devoluciones y el backfill de `expediente.ubicacion`) | ✅ dump |
 
-```bash
-# 6) Poblar el catálogo unificado de ubicaciones desde las unidades de servicio
-python manage.py poblar_ubicaciones
+> ⚠️ **Orden importante:** restaurar el dump base (paso 4) **antes** del `migrate`
+> (paso 5), porque `0009_poblar_ubicaciones` lee las unidades de `servicio`. Si
+> migraste antes de tener las unidades, basta con:
+> `python manage.py poblar_ubicaciones` (idempotente).
 
-# (opcional, idempotente) reasegurar catálogos de estados/motivos:
+```bash
+# (opcional, idempotente) re-sincronizar catálogos/ubicaciones si hizo falta:
 python manage.py poblar_catalogos
+python manage.py poblar_ubicaciones
 
 # 9) Crear superusuario (si la BD no trae uno)
 python manage.py createsuperuser

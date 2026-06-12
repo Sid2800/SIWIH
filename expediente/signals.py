@@ -8,50 +8,61 @@ tablas origen de servicio:
   - servicio.Unidad_clinica  (unidades CLÍNICAS)
   - servicio.Unidad          (unidades NO CLÍNICAS)
 
-Cuando se CREA una unidad nueva (o se reactiva una existente), se crea
-automáticamente su fila correspondiente en ExpedienteUbicacion, tomando su
-ID. Así, al agregar áreas nuevas en el sistema, el catálogo de ubicaciones
-queda actualizado sin intervención manual.
+Sincroniza en AMBOS sentidos (alta y baja), por ID:
 
-Idempotente: usa get_or_create, por lo que nunca duplica filas.
+  - Unidad ACTIVA (estado=1)   → asegura su fila en expediente_ubicacion y la
+                                 deja ACTIVA (la crea si falta, la reactiva si
+                                 estaba desactivada).
+  - Unidad INACTIVA (estado≠1) → DESACTIVA su fila (estado=False) si existe.
+    No se borra físicamente porque la FK es PROTECT (puede estar referenciada
+    por préstamos/expedientes); desactivar conserva la integridad y el id.
+
+Nota sobre borrado físico: una Unidad con ubicación NO se puede eliminar en
+duro (FK PROTECT). El "quitar" real del sistema es la desactivación (estado=0),
+que sí se refleja aquí. Idempotente: nunca duplica filas.
 """
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
 
-@receiver(post_save, sender='servicio.Unidad_clinica')
-def sincronizar_ubicacion_clinica(sender, instance, created, **kwargs):
+def _sincronizar_ubicacion(filtro, tipo, instance):
     """
-    Al guardar una Unidad_clinica activa, asegura su fila en
-    expediente_ubicacion (tipo=1, Clínica).
+    Lógica común: refleja el estado (activo/inactivo) de una unidad de servicio
+    en su fila de expediente_ubicacion, identificada por la FK (`filtro`).
 
-    Se ejecuta tanto en creación como en actualización: si la unidad pasó
-    a estado activo y aún no tenía ubicación, la crea.
+    Args:
+        filtro: dict con la FK, p.ej. {'unidad_clinica': instance}.
+        tipo:   ExpedienteUbicacion.TIPO_CLINICA o TIPO_NO_CLINICA.
+        instance: la unidad guardada (se lee su .estado).
     """
     from expediente.models import ExpedienteUbicacion
 
-    # Solo unidades activas (estado=1). Si está inactiva, no la registramos.
-    if getattr(instance, 'estado', None) != 1:
-        return
+    activa = getattr(instance, 'estado', None) == 1
 
-    ExpedienteUbicacion.objects.get_or_create(
-        unidad_clinica=instance,
-        defaults={'tipo': ExpedienteUbicacion.TIPO_CLINICA},
-    )
+    if activa:
+        # Crear si falta; reactivar si existía desactivada.
+        obj, created = ExpedienteUbicacion.objects.get_or_create(
+            defaults={'tipo': tipo, 'estado': True}, **filtro
+        )
+        if not created and not obj.estado:
+            obj.estado = True
+            obj.save(update_fields=['estado'])
+    else:
+        # Unidad dada de baja: desactivar su ubicación (sin borrar, por PROTECT).
+        ExpedienteUbicacion.objects.filter(estado=True, **filtro).update(estado=False)
+
+
+@receiver(post_save, sender='servicio.Unidad_clinica')
+def sincronizar_ubicacion_clinica(sender, instance, created, **kwargs):
+    """Sincroniza la ubicación CLÍNICA (tipo=1) con el estado de la Unidad_clinica."""
+    from expediente.models import ExpedienteUbicacion
+    _sincronizar_ubicacion({'unidad_clinica': instance},
+                           ExpedienteUbicacion.TIPO_CLINICA, instance)
 
 
 @receiver(post_save, sender='servicio.Unidad')
 def sincronizar_ubicacion_no_clinica(sender, instance, created, **kwargs):
-    """
-    Al guardar una Unidad (no clínica) activa, asegura su fila en
-    expediente_ubicacion (tipo=2, No Clínica).
-    """
+    """Sincroniza la ubicación NO CLÍNICA (tipo=2) con el estado de la Unidad."""
     from expediente.models import ExpedienteUbicacion
-
-    if getattr(instance, 'estado', None) != 1:
-        return
-
-    ExpedienteUbicacion.objects.get_or_create(
-        unidad_no_clinica=instance,
-        defaults={'tipo': ExpedienteUbicacion.TIPO_NO_CLINICA},
-    )
+    _sincronizar_ubicacion({'unidad_no_clinica': instance},
+                           ExpedienteUbicacion.TIPO_NO_CLINICA, instance)
