@@ -235,12 +235,17 @@ generación de PDF/Excel vive aquí.
 - `python manage.py limpiar_transaccional [--dry-run] [--noinput]` — borra datos
   transaccionales de prueba conservando catálogos.
 
-## 7) Migraciones
-- `s_exp/0001` … **`0021_tipoobjetolog_and_more`** (21 migraciones).
+## 7) Migraciones (consolidadas y limpias)
+- `s_exp/`: **`0001_initial`** (esquema completo, catálogos con **id PK desde el
+  inicio**) + **`0002_datos_iniciales`** (siembra TODOS los catálogos:
+  estados, acciones, tipos de objeto **y los 16 motivos**). Se eliminaron las
+  21 migraciones incrementales anteriores (que creaban catálogos con `codigo`
+  como PK y luego los convertían) — ya no hay churn.
 - `expediente/` … **`0008_expediente_ubicacion`** (agrega columna + backfill a
   ADMISION).
-- Los catálogos de estados se **pueblan dentro de las migraciones** (0018/0020/
-  0021), así un `migrate` en limpio deja la BD lista (salvo motivos y ubicaciones).
+- Resultado: un `migrate` en limpio deja la BD **lista** (esquema + catálogos +
+  motivos). Solo falta `poblar_ubicaciones` (depende de las unidades de servicio).
+- **Ya NO se usan scripts SQL** (`s_exp_datos*.sql` eliminados).
 
 > ⚠️ **`venv/` quedó trackeado** (~7,761 archivos). No debería ir a `main`.
 > Antes de fusionar conviene: `git rm -r --cached venv && echo "venv/" >> .gitignore`.
@@ -278,23 +283,20 @@ mysql -u <user> -p <nombre_bd> < dump_base.sql
 python manage.py migrate
 ```
 
-### Datos OBLIGATORIOS a insertar
+### Datos OBLIGATORIOS
 
-| Dato | Cómo | Obligatorio |
-|------|------|-------------|
-| Estados (solicitud, físico, préstamo, devolución), acciones, tipos de objeto | **Automático** en `migrate` (migr. 0018/0020/0021) | ✅ (ya queda) |
-| **Motivos de solicitud** (16 del hospital) | `mysql ... < s_exp_datos_v2.sql` | ✅ **manual** |
-| **Catálogo de ubicaciones** `expediente_ubicacion` | `python manage.py poblar_ubicaciones` | ✅ |
-| Unidad **ADMISION** en `servicio_unidad` | debe existir en el dump base (la usan devoluciones y el backfill de `expediente.ubicacion`) | ✅ |
+| Dato | Cómo | Estado |
+|------|------|--------|
+| Estados (solicitud, físico, préstamo, devolución), acciones, tipos de objeto | **Automático** en `migrate` (migr. `0002_datos_iniciales`) | ✅ ya queda |
+| **Motivos de solicitud** (16 del hospital) | **Automático** en `migrate` (migr. `0002_datos_iniciales`) | ✅ ya queda |
+| **Catálogo de ubicaciones** `expediente_ubicacion` | `python manage.py poblar_ubicaciones` | ⚙️ 1 comando |
+| Unidad **ADMISION** en `servicio_unidad` | debe existir en el dump base (la usan devoluciones y el backfill de `expediente.ubicacion`) | ✅ dump |
 
 ```bash
-# 6) Cargar los motivos del hospital (catálogo no incluido en migraciones)
-mysql -u <user> -p <nombre_bd> < s_exp_datos_v2.sql
-
-# 7) Poblar el catálogo unificado de ubicaciones desde las unidades de servicio
+# 6) Poblar el catálogo unificado de ubicaciones desde las unidades de servicio
 python manage.py poblar_ubicaciones
 
-# 8) (opcional, idempotente) reasegurar los catálogos de estados
+# (opcional, idempotente) reasegurar catálogos de estados/motivos:
 python manage.py poblar_catalogos
 
 # 9) Crear superusuario (si la BD no trae uno)
