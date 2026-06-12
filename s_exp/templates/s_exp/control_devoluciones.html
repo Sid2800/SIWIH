@@ -89,11 +89,22 @@ function cargarDevoluciones(esPolling = false) {
         url: window.urls.s_exp_prestamos_devolucion_api,
         method: 'GET',
         headers: headers,
+        // cache:false evita que el navegador sirva una respuesta vieja al
+        // pulsar "Actualizar" (jQuery agrega un parámetro anti-caché, igual
+        // que hace DataTables en Gestión de Solicitudes). Sin esto, la nueva
+        // devolución podía no aparecer al recargar.
+        cache: false,
         success: function(resp) {
             renderDevoluciones(resp.data);
         },
-        error: function() {
-            if (!esPolling) toastr.error("Error al cargar las devoluciones");
+        error: function(xhr) {
+            // En recarga manual (no polling) avisamos del error para no dejar
+            // al admin sin pistas de por qué no se actualizó.
+            if (!esPolling) {
+                toastr.error("Error al cargar las devoluciones");
+            } else {
+                console.error('[Devoluciones] Error al recargar:', xhr && xhr.status);
+            }
         }
     });
 }
