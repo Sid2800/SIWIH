@@ -37,6 +37,12 @@ from core.constants.mapeo_camas_constants import (
 )
 from ._sesion import _obtener_sesion_mapeo_activa
 
+# [2026-06-12] Flujo interno del módulo:
+# 1) Permisos base por capacidad (ver, cambiar, mapear, dashboard).
+# 2) Resolución del contexto real de trabajo (sala/servicio).
+# 3) Aplicación de límite operativo para perfiles restringidos.
+# 4) Respuesta uniforme con JsonResponse cuando se rebasa el límite.
+
 # [2026-05-19] Helpers de permisos para mantener una sola fuente de verdad.
 def _tiene_permiso_historiales(usuario):
     """Permite acceso de solo visualización al mapa e historiales."""
@@ -82,6 +88,13 @@ def _tiene_permiso_dashboard(usuario):
 #   2) Edición DENTRO de una sesión activa de mapeo → requiere MAPEO_CAMAS_MAPEAR_*
 #      y que el usuario tenga sesión EN_PROGRESO.
 def _puede_editar_cama_en_mapa(usuario):
+    """Determina si el usuario puede editar camas desde el mapa.
+
+    Flujo:
+    1) Si tiene permiso de cambios manuales, permite edición directa.
+    2) Si no, valida permiso de mapeo y sesión activa EN_PROGRESO.
+    3) Si ninguna condición se cumple, deniega.
+    """
     if _tiene_permiso_cambios_mapa(usuario):
         return True
     if _tiene_permiso_mapear(usuario) and _obtener_sesion_mapeo_activa(usuario) is not None:
@@ -114,17 +127,13 @@ def _filtro_observaciones_movimiento_limite():
     ])
 
 
-# [2026-06-11] El limite operativo se mide por servicio completo, no por sala.
-def _contar_cambios_manual_por_sala(sala_id):
-    if not sala_id:
-        return 0
+# [2026-06-12] Refactor: centralizar conteo por servicio para evitar duplicación.
+def _contar_cambios_por_servicio(servicio_id):
+    """Cuenta cambios efectivos de cama dentro de la ventana por servicio.
 
-    servicio_id = (
-        Sala.objects
-        .filter(pk=sala_id)
-        .values_list("servicio_id", flat=True)
-        .first()
-    )
+    Considera solo observaciones que consumen límite operativo y descarta
+    transiciones sin cambio real de estado.
+    """
     if not servicio_id:
         return 0
 
@@ -143,6 +152,27 @@ def _contar_cambios_manual_por_sala(sala_id):
     )
 
 
+# [2026-06-11] El limite operativo se mide por servicio completo, no por sala.
+def _contar_cambios_manual_por_sala(sala_id):
+    """Resuelve servicio desde sala y delega el conteo al helper central.
+
+    Nota: el límite es por servicio completo, no por sala individual.
+    """
+    if not sala_id:
+        return 0
+
+    servicio_id = (
+        Sala.objects
+        .filter(pk=sala_id)
+        .values_list("servicio_id", flat=True)
+        .first()
+    )
+    if not servicio_id:
+        return 0
+
+    return _contar_cambios_por_servicio(servicio_id)
+
+
 def _sala_real_id_desde_cama(cama):
     """Retorna la sala a la que pertenece la cama (siempre cama.sala)."""
     if not cama:
@@ -152,6 +182,7 @@ def _sala_real_id_desde_cama(cama):
 
 # [2026-05-18] Helper para decidir si aplica límite de intentos al usuario
 def _aplica_limite_intentos(usuario):
+    """Indica si al usuario le aplica límite de intentos operativos."""
     if not usuario or getattr(usuario, "is_superuser", False):
         return False
     return verificar_permisos_usuario(
@@ -162,6 +193,7 @@ def _aplica_limite_intentos(usuario):
 
 
 def _max_cambios_para_usuario(usuario):
+    """Devuelve el máximo permitido para UI/API o None si no aplica límite."""
     return MAX_CAMBIOS_CAMA if _aplica_limite_intentos(usuario) else None
 
 
@@ -171,7 +203,14 @@ def _es_rol_intentos_restringido(usuario):
 
 
 def _validar_limite_intentos_salas(usuario, sala_ids):
-    """Valida el límite operativo por servicio para usuarios con permiso limitado."""
+    """Valida el límite operativo por servicio para usuarios con permiso limitado.
+
+    Flujo:
+    1) Omite validación para usuarios sin restricción.
+    2) Traduce sala_ids a servicio_ids únicos.
+    3) Cuenta cambios por servicio en ventana vigente.
+    4) Retorna JsonResponse 400 si el límite fue alcanzado; en caso contrario None.
+    """
     if not _aplica_limite_intentos(usuario):
         return None
 
@@ -181,18 +220,7 @@ def _validar_limite_intentos_salas(usuario, sala_ids):
     )
 
     for servicio_id in servicio_ids:
-        cambios_realizados = (
-            HistorialEstadoCama.objects.annotate(
-                servicio_real_id=F("cama__sala__servicio_id")
-            )
-            .filter(
-                servicio_real_id=servicio_id,
-                fecha_hora__gte=_inicio_ventana_limite_sala(),
-            )
-            .filter(_filtro_observaciones_movimiento_limite())
-            .exclude(estado_anterior=F("estado_nuevo"))
-            .count()
-        )
+        cambios_realizados = _contar_cambios_por_servicio(servicio_id)
         if cambios_realizados >= MAX_CAMBIOS_CAMA:
             return JsonResponse(
                 {

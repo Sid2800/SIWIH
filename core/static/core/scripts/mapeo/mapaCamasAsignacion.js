@@ -23,6 +23,7 @@ document.addEventListener("DOMContentLoaded", function () {
   var tipoBusqueda = document.getElementById("mapa-tipo-busqueda");
   var btnLimpiar = document.getElementById("btn-limpiar-busqueda");
   var btnHistoriales = document.getElementById("btn-historiales-camas");
+  var btnDashboard = document.getElementById("btn-dashboard-camas");
   var btnSincronizarCamas = document.getElementById("btn-sincronizar-camas");
   var btnIniciarMapeo = document.getElementById("btn-iniciar-mapeo");
   var btnCancelarMapeo = document.getElementById("btn-cancelar-mapeo");
@@ -73,6 +74,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     ocultar(btnIniciarMapeo, activo);
     ocultar(btnHistoriales, activo);
+    ocultar(btnDashboard, activo);
     
     // [2026-05-20 OPT] Consolida btnTerminarMapeo y btnTerminarMapeoPie en selector unificado
     document.querySelectorAll('[data-action="terminar-mapeo"]').forEach(function(btn) {
