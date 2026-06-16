@@ -113,9 +113,6 @@ MAPEO_CAMAS_HISTORIALES_ROLES = ["digitador"]
 MAPEO_CAMAS_HISTORIALES_UNIDADES = ["ADMI"]
 
 # [2026-05-28] Acceso al dashboard operativo de KPIs/gráficas en tiempo real.
-# Propósito exclusivo: vista y endpoints JSON del dashboard de mapeo_camas.
-# Hoy coincide en valores con HISTORIALES_*, pero se separa para evitar
-# acoplamiento de permisos (auditoría vs. monitoreo operativo).
 MAPEO_CAMAS_DASHBOARD_ROLES = ["digitador","admin"]
 MAPEO_CAMAS_DASHBOARD_UNIDADES = ["ADMI"]
 

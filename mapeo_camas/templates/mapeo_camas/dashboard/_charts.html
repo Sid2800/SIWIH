@@ -1,34 +1,22 @@
 {# Fecha: 2026-05-28 — Parcial de gráficas ApexCharts del dashboard #}
 <section class="dash-charts" aria-label="Gráficas operativas">
-  <article id="card-ocupacion-servicio" class="dash-card dash-charts__servicio">
-    <header class="dash-card__head">
-      <h3 class="dash-card__title">Ocupación por servicio</h3>
-    </header>
-    <div class="dash-card__body">
-      <div id="chart-ocupacion-servicio"></div>
-      <div class="dash-state" data-state="loading"><span class="dash-state__spinner"></span><span>Cargando…</span></div>
-      <div class="dash-state" data-state="empty">Sin datos</div>
-      <div class="dash-state dash-state--err" data-state="err" role="alert">Error</div>
-    </div>
-  </article>
-
-  <article id="card-distribucion-camas" class="dash-card dash-charts__distribucion">
-    <header class="dash-card__head">
-      <h3 class="dash-card__title">Distribución por estado</h3>
-    </header>
-    <div class="dash-card__body">
-      <div id="chart-distribucion-camas"></div>
-      <div class="dash-state" data-state="loading"><span class="dash-state__spinner"></span><span>Cargando…</span></div>
-      <div class="dash-state" data-state="empty">Sin datos</div>
-      <div class="dash-state dash-state--err" data-state="err" role="alert">Error</div>
-    </div>
-  </article>
-
   <article id="card-ocupacion-hora" class="dash-card dash-charts__hora">
     <header class="dash-card__head">
       <h3 class="dash-card__title">Ocupación en el tiempo</h3>
+      {# [2026-06-16] Viñeta de colapso del card (patrón de mapa de camas). #}
+      <button
+        type="button"
+        class="dash-card-colapsar"
+        data-card-collapse
+        aria-expanded="true"
+        aria-controls="card-ocupacion-hora-body"
+        title="Colapsar card"
+      >
+        <i class="bi bi-chevron-up" aria-hidden="true"></i>
+        <span>Colapsar</span>
+      </button>
     </header>
-    <div class="dash-card__body">
+    <div id="card-ocupacion-hora-body" class="dash-card__body">
       <div id="chart-ocupacion-hora"></div>
       <div class="dash-state" data-state="loading"><span class="dash-state__spinner"></span><span>Cargando…</span></div>
       <div class="dash-state" data-state="empty">Sin datos</div>
@@ -36,15 +24,90 @@
     </div>
   </article>
 
-  <article id="card-saturacion-sala" class="dash-card dash-charts__saturacion">
+  <article id="card-tabla-ingresos" class="dash-card dash-charts__ingresos" aria-label="Últimos ingresos al mapa">
     <header class="dash-card__head">
-      <h3 class="dash-card__title">Saturación por sala</h3>
+      <h3 class="dash-card__title">Últimos ingresos al mapa</h3>
+      <div class="dash-card__acciones">
+        <span class="dash-pill">Top 30</span>
+        {# [2026-06-16] Viñeta de colapso del card (patrón de mapa de camas). #}
+        <button
+          type="button"
+          class="dash-card-colapsar"
+          data-card-collapse
+          aria-expanded="true"
+          aria-controls="card-tabla-ingresos-body"
+          title="Colapsar card"
+        >
+          <i class="bi bi-chevron-up" aria-hidden="true"></i>
+          <span>Colapsar</span>
+        </button>
+      </div>
     </header>
-    <div class="dash-card__body">
-      <div id="chart-saturacion-sala"></div>
+    <div id="card-tabla-ingresos-body" class="dash-card__body dash-card__body--table">
+      <div class="dash-table-scroll">
+        <table class="dash-table" role="table">
+          <thead>
+            <tr>
+              <th scope="col">Fecha</th>
+              <th scope="col">Estado cama</th>
+              <th scope="col">Cama destino</th>
+              <th scope="col">Paciente</th>
+              <th scope="col">Servicio</th>
+              <th scope="col">Usuario</th>
+            </tr>
+          </thead>
+          <tbody id="tabla-ingresos-body">
+            <tr><td colspan="6" class="dash-muted" style="text-align:center;padding:1rem;">Cargando…</td></tr>
+          </tbody>
+        </table>
+      </div>
       <div class="dash-state" data-state="loading"><span class="dash-state__spinner"></span><span>Cargando…</span></div>
-      <div class="dash-state" data-state="empty">Sin datos</div>
+      <div class="dash-state" data-state="empty">Sin ingresos recientes</div>
       <div class="dash-state dash-state--err" data-state="err" role="alert">Error</div>
     </div>
   </article>
+
+  <article id="card-tabla-movimientos" class="dash-card dash-charts__ingresos" aria-label="Últimos movimientos de cama">
+    <header class="dash-card__head">
+      <h3 class="dash-card__title">Últimos movimientos de cama</h3>
+      <div class="dash-card__acciones">
+        <span class="dash-pill">Top 30</span>
+        {# [2026-06-16] Viñeta de colapso del card (patrón de mapa de camas). #}
+        <button
+          type="button"
+          class="dash-card-colapsar"
+          data-card-collapse
+          aria-expanded="true"
+          aria-controls="card-tabla-movimientos-body"
+          title="Colapsar card"
+        >
+          <i class="bi bi-chevron-up" aria-hidden="true"></i>
+          <span>Colapsar</span>
+        </button>
+      </div>
+    </header>
+    <div id="card-tabla-movimientos-body" class="dash-card__body dash-card__body--table">
+      <div class="dash-table-scroll">
+        <table class="dash-table" role="table">
+          <thead>
+            <tr>
+              <th scope="col">Fecha</th>
+              <th scope="col">Tipo</th>
+              <th scope="col">Cama (origen → destino)</th>
+              <th scope="col">Paciente</th>
+              <th scope="col">Servicio</th>
+              <th scope="col">Usuario</th>
+            </tr>
+          </thead>
+          <tbody id="tabla-movimientos-body">
+            <tr><td colspan="6" class="dash-muted" style="text-align:center;padding:1rem;">Cargando…</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="dash-state" data-state="loading"><span class="dash-state__spinner"></span><span>Cargando…</span></div>
+      <div class="dash-state" data-state="empty">Sin movimientos recientes</div>
+      <div class="dash-state dash-state--err" data-state="err" role="alert">Error</div>
+    </div>
+  </article>
+
 </section>

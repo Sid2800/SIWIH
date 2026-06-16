@@ -1,29 +1,15 @@
-{# [2026-05-28] Barra de filtro temporal del dashboard.
-   Presets rápidos + rango personalizado (fecha + hora). #}
-<section class="dash-filtros" aria-label="Filtro de rango temporal">
-  <div class="dash-filtros__presets" role="group" aria-label="Rangos rápidos">
-    <button type="button" class="dash-chip" data-preset="hoy">Hoy</button>
-    <button type="button" class="dash-chip" data-preset="ayer">Ayer</button>
-    <button type="button" class="dash-chip" data-preset="ultimas-24h">Últimas 24h</button>
-    <button type="button" class="dash-chip" data-preset="esta-semana">Esta semana</button>
-    <button type="button" class="dash-chip" data-preset="semana-pasada">Semana pasada</button>
-    <button type="button" class="dash-chip" data-preset="este-mes">Este mes</button>
-    <button type="button" class="dash-chip" data-preset="mes-pasado">Mes pasado</button>
-    <button type="button" class="dash-chip" data-preset="ultimos-7">Últimos 7 días</button>
-    <button type="button" class="dash-chip" data-preset="ultimos-30">Últimos 30 días</button>
-    <button type="button" class="dash-chip" data-preset="personalizado">Personalizado</button>
-  </div>
 
-  <div class="dash-filtros__rango" id="dash-filtros-rango" hidden>
-    <label class="dash-filtros__label">
-      Desde
-      <input type="datetime-local" id="dash-filtro-desde" class="dash-filtros__input">
+<section class="dash-filtros" aria-label="Filtro mensual de analisis">
+  <div class="dash-filtros__rango" id="dash-filtros-rango">
+    <label class="dash-filtros__label" for="dash-filtro-mes-desde">
+      Mes inicial
+      <input type="month" id="dash-filtro-mes-desde" class="dash-filtros__input">
     </label>
-    <label class="dash-filtros__label">
-      Hasta
-      <input type="datetime-local" id="dash-filtro-hasta" class="dash-filtros__input">
+
+    <label class="dash-filtros__label" for="dash-filtro-mes-hasta">
+      Mes final
+      <input type="month" id="dash-filtro-mes-hasta" class="dash-filtros__input">
     </label>
-    <button type="button" id="dash-filtro-aplicar" class="dash-refresh-btn">Aplicar</button>
   </div>
 
   <p class="dash-filtros__resumen" id="dash-filtros-resumen" aria-live="polite">—</p>

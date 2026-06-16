@@ -1,15 +1,15 @@
 
 <section id="card-kpis" class="dash-kpis" aria-label="KPIs principales" aria-live="polite">
   <article class="dash-kpi" role="status">
-    <p class="dash-kpi__label">Total camas</p>
+    <p class="dash-kpi__label" id="kpi-label-total-camas">Total camas</p>
     <p class="dash-kpi__value" id="kpi-total-camas">—</p>
   </article>
   <article class="dash-kpi mapa-cama--ocupada" role="status">
-    <p class="dash-kpi__label">Ocupadas</p>
+    <p class="dash-kpi__label" id="kpi-label-ocupadas">Ocupadas</p>
     <p class="dash-kpi__value" id="kpi-ocupadas">—</p>
   </article>
   <article class="dash-kpi mapa-cama--vacia" role="status">
-    <p class="dash-kpi__label">Disponibles</p>
+    <p class="dash-kpi__label" id="kpi-label-disponibles">Disponibles</p>
     <p class="dash-kpi__value" id="kpi-disponibles">—</p>
   </article>
   <article class="dash-kpi mapa-cama--fuera-servicio" role="status">
@@ -24,13 +24,9 @@
       <span class="dash-progress__bar" id="kpi-ocupacion-bar"></span>
     </div>
   </article>
-  <article class="dash-kpi mapa-cama--alta" role="status">
-    <p class="dash-kpi__label">Altas del día</p>
-    <p class="dash-kpi__value" id="kpi-altas-dia">—</p>
-  </article>
   <article class="dash-kpi" role="status">
-    <p class="dash-kpi__label">Traslados (hoy)</p>
-    <p class="dash-kpi__value" id="kpi-traslados">—</p>
+    <p class="dash-kpi__label">Movimientos (rango)</p>
+    <p class="dash-kpi__value" id="kpi-movimientos">—</p>
   </article>
   <article class="dash-kpi" role="status">
     <p class="dash-kpi__label">Cambios detectados</p>
@@ -41,11 +37,6 @@
     <p class="dash-kpi__label">Camas validadas</p>
     <p class="dash-kpi__value" id="kpi-camas-validadas">—</p>
     <p class="dash-kpi__hint">Sesión de mapeo activa</p>
-  </article>
-  <article class="dash-kpi" role="status">
-    <p class="dash-kpi__label">Tiempo prom. ocupación</p>
-    <p class="dash-kpi__value" id="kpi-tiempo-promedio">—</p>
-    <p class="dash-kpi__hint">Egresos del día</p>
   </article>
   <div id="dash-kpis-error" class="dash-state dash-state--err" role="alert"></div>
 </section>

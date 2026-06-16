@@ -7,10 +7,11 @@
 {% block extra_css %}
   <!-- 2026-06-09: estáticos de mapeo centralizados en core/static/core/css -->
   <link rel="stylesheet" href="{% static 'core/css/mapeo/dashboard/dashboard.css' %}">
+  <!-- 2026-06-16: capa local de accesibilidad visual para tipografía ampliada. -->
+  <link rel="stylesheet" href="{% static 'mapeo_camas/dashboard/dashboard-accessibilidad.css' %}">
 {% endblock extra_css %}
 
 {% block content %}
-{# [2026-05-28] Se envuelve en `contenedor2` para reutilizar el layout estándar del proyecto. #}
 <div class="contenedor2">
   <div class="tituloFormulario" style="margin-bottom: 1.5rem;">
     <div class="tituloFormulario-texto">
@@ -28,22 +29,19 @@
       <button id="dash-refresh-btn" type="button" class="dash-refresh-btn" aria-label="Refrescar ahora">
         Refrescar
       </button>
-      {# [2026-06-01] Modal de guía operativa del dashboard para área administrativa. #}
-      <button id="dash-info-btn" type="button" class="dash-refresh-btn dash-refresh-btn--ghost"
-          title="Ver guía de lectura del dashboard" aria-label="Ver guía de lectura">
-        <i class="bi bi-info-circle"></i>
-        <span>Guía</span>
+      <button id="dash-export-excel-btn" type="button" class="dash-refresh-btn" aria-label="Descargar reporte Excel">
+        Descargar Excel
       </button>
+      {# [2026-06-16] Se retira la guía del dashboard a solicitud de usuario. #}
     </div>
 
-    {# [2026-05-28] Cabecera: filtro (izq.) + tarjeta resumen radial (der.) #}
+    {# [2026-06-15] Fase 1: filtros arriba; resumen y KPIs comparten la fila superior. #}
+    {% include 'mapeo_camas/dashboard/_filtros.html' %}
     <div class="dash-top">
-      {% include 'mapeo_camas/dashboard/_filtros.html' %}
+      {% include 'mapeo_camas/dashboard/_kpi_cards.html' %}
       {% include 'mapeo_camas/dashboard/_estados_resumen.html' %}
     </div>
-    {% include 'mapeo_camas/dashboard/_kpi_cards.html' %}
     {% include 'mapeo_camas/dashboard/_charts.html' %}
-    {% include 'mapeo_camas/dashboard/_tabla_movimientos.html' %}
   </div>
 </div>
 
@@ -52,10 +50,9 @@
   window.DASHBOARD_CFG = {
     urls: {
       kpis:               "{% url 'mapeo_camas_dashboard_kpis' %}",
-      ocupacionServicio:  "{% url 'mapeo_camas_dashboard_ocupacion_servicio' %}",
-      distribucionCamas:  "{% url 'mapeo_camas_dashboard_distribucion_camas' %}",
       ocupacionHora:      "{% url 'mapeo_camas_dashboard_ocupacion_hora' %}",
-      saturacionSala:     "{% url 'mapeo_camas_dashboard_saturacion_sala' %}",
+      exportOcupacionExcel:"{% url 'mapeo_camas_dashboard_export_ocupacion_excel' %}",
+      ultimosIngresos:    "{% url 'mapeo_camas_dashboard_ultimos_ingresos' %}",
       ultimosMovimientos: "{% url 'mapeo_camas_dashboard_ultimos_movimientos' %}"
     }
   };
@@ -67,14 +64,12 @@
   <script src="{% static 'core/vendor/apexcharts/apexcharts.min.js' %}"></script>
 
   <script src="{% static 'core/scripts/mapeo/dashboard/api.js' %}"></script>
-  <script src="{% static 'core/scripts/mapeo/dashboard/filters.js' %}"></script>
-  <script src="{% static 'core/scripts/mapeo/dashboard/kpis.js' %}"></script>
-  <script src="{% static 'core/scripts/mapeo/dashboard/charts/estados-resumen.js' %}"></script>
-  <script src="{% static 'core/scripts/mapeo/dashboard/charts/ocupacion-servicio.js' %}"></script>
-  <script src="{% static 'core/scripts/mapeo/dashboard/charts/distribucion-camas.js' %}"></script>
+  <script src="{% static 'mapeo_camas/dashboard/filters.js' %}"></script>
+  <script src="{% static 'mapeo_camas/dashboard/kpis.js' %}"></script>
+  <script src="{% static 'mapeo_camas/dashboard/estados-resumen.js' %}"></script>
   <script src="{% static 'core/scripts/mapeo/dashboard/charts/ocupacion-hora.js' %}"></script>
-  <script src="{% static 'core/scripts/mapeo/dashboard/charts/saturacion-sala.js' %}"></script>
+  <script src="{% static 'mapeo_camas/dashboard/tabla-ingresos.js' %}"></script>
   <script src="{% static 'core/scripts/mapeo/dashboard/tabla-movimientos.js' %}"></script>
-  <script src="{% static 'core/scripts/mapeo/dashboard/info-modal.js' %}"></script>
-  <script src="{% static 'core/scripts/mapeo/dashboard/dashboard.js' %}"></script>
+  <script src="{% static 'mapeo_camas/dashboard/tabla-movimientos-local.js' %}"></script>
+  <script src="{% static 'mapeo_camas/dashboard/dashboard.js' %}"></script>
 {% endblock extra_js %}

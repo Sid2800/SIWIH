@@ -156,6 +156,9 @@
   min-height: 240px;
   position: relative;
 }
+.dash-card__body--table {
+  min-height: 300px;
+}
 
 /* Estados loading / empty / error compartidos */
 .dash-state {
@@ -185,16 +188,12 @@
 @keyframes dashSpin { to { transform: rotate(360deg); } }
 
 /* Distribución del grid de charts */
-.dash-charts__servicio { grid-column: span 12; }
-.dash-charts__distribucion { grid-column: span 12; }
 .dash-charts__hora { grid-column: span 12; }
-.dash-charts__saturacion { grid-column: span 12; }
+.dash-charts__ingresos { grid-column: span 12; }
 
 @media (min-width: 992px) {
-  .dash-charts__servicio { grid-column: span 8; }
-  .dash-charts__distribucion { grid-column: span 4; }
-  .dash-charts__hora { grid-column: span 7; }
-  .dash-charts__saturacion { grid-column: span 5; }
+  .dash-charts__hora { grid-column: span 6; }
+  .dash-charts__ingresos { grid-column: span 6; }
 }
 
 /* ---------------- Tabla de movimientos ---------------- */

@@ -265,11 +265,12 @@ class HistorialEstadoCama(models.Model):
 # =============================================================================
 class MovimientoCama(models.Model):
 
-    # Tipo de movimiento registrado. Por ahora: "TRASLADO".
+    # Tipo de movimiento registrado según regla de negocio:
+    # mismo servicio => MOVIMIENTO, distinto servicio => TRASLADO.
     # Se deja como CharField para permitir nuevos tipos sin migraciones.
     tipo_movimiento = models.CharField(
         max_length=50,
-        default="TRASLADO",
+        default="MOVIMIENTO",
         verbose_name="Tipo de movimiento",
         db_index=True,
     )
@@ -334,6 +335,41 @@ class MovimientoCama(models.Model):
             # [2026-05-26 AUDIT] Historial por ingreso para reingresos y trazabilidad.
             models.Index(fields=["ingreso", "fecha_hora"], name="idx_mov_ingreso_fecha"),
         ]
+
+    def _tipo_movimiento_por_regla(self):
+        """2026-06-16: Regla central de negocio para clasificar movimiento/traslado."""
+        if not self.cama_origen_id or not self.cama_destino_id:
+            return self.tipo_movimiento or "MOVIMIENTO"
+        servicio_origen_id = getattr(getattr(self.cama_origen, "sala", None), "servicio_id", None)
+        servicio_destino_id = getattr(getattr(self.cama_destino, "sala", None), "servicio_id", None)
+        if servicio_origen_id and servicio_destino_id and servicio_origen_id != servicio_destino_id:
+            return "TRASLADO"
+        return "MOVIMIENTO"
+
+    def clean(self):
+        # 2026-06-16: Fuerza clasificación consistente en toda la app mapeo_camas.
+        self.tipo_movimiento = self._tipo_movimiento_por_regla()
+
+        # 2026-06-16: Normaliza observación técnica para evitar que todo quede como "traslado".
+        observacion_codigo = (
+            getattr(self.observacion, "codigo", "") or ""
+        ).strip().lower()
+        observacion_generica = {
+            "traslado",
+            "movimiento",
+            "movimiento de paciente",
+            "movimiento de paciente desde mapa.",
+            "cambio/traslado desde mapeo.",
+        }
+        if (not self.observacion) or (observacion_codigo in observacion_generica):
+            if self.tipo_movimiento == "TRASLADO":
+                self.observacion = get_observacion_mapeo("Traslado entre servicios.")
+            else:
+                self.observacion = get_observacion_mapeo("Movimiento interno entre camas del mismo servicio.")
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
 
     def __str__(self):
         hora_local = timezone.localtime(self.fecha_hora)

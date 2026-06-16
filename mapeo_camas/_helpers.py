@@ -18,7 +18,6 @@ from core.utils.utilidades_textos import (
 )
 from ingreso.models import Ingreso
 from mapeo_camas.models import AsignacionCamaPaciente, HistorialEstadoCama
-from servicio.models import Cama
 
 # 2026-06-09: compatibilidad temporal con imports existentes en core/services.
 # Mantiene alineación porque delega al helper general de core.utils.utilidades_fechas.
@@ -209,72 +208,44 @@ def _dashboard_granularidad(desde, hasta):
 
 
 def _snapshot_estado_camas(hasta):
-    """{codigo_estado: cantidad} de camas activas al momento hasta."""
-    ahora = timezone.now()
-    delta = (ahora - hasta).total_seconds() if hasta <= ahora else 0
-    if 0 <= delta <= 60:
-        ultima_asig_id = (
-            AsignacionCamaPaciente.objects
-            .filter(cama_id=OuterRef("cama_id"))
-            .order_by("-fecha_inicio", "-id")
-            .values("id")[:1]
-        )
-        rows = (
-            AsignacionCamaPaciente.objects
-            .filter(id=Subquery(ultima_asig_id))
-            .values("cama_id", "estado__codigo")
-        )
-        estado_por_cama = {r["cama_id"]: r["estado__codigo"] for r in rows}
-    else:
-        ult_hist = (
-            HistorialEstadoCama.objects
-            .filter(cama_id=OuterRef("pk"), fecha_hora__lte=hasta)
-            .order_by("-fecha_hora", "-id")
-            .values("estado_nuevo__codigo")[:1]
-        )
-        rows = (
-            Cama.objects.filter(estado=1)
-            .annotate(_estado_hist=Subquery(ult_hist))
-            .values("numero_cama", "_estado_hist")
-        )
-        estado_por_cama = {r["numero_cama"]: r["_estado_hist"] for r in rows}
-
+    """{codigo_estado: cantidad} usando solo fuentes del módulo mapeo_camas."""
+    estado_por_cama = _snapshot_estado_por_cama(hasta)
     conteo = {}
-    for cama_id in Cama.objects.filter(estado=1).values_list("numero_cama", flat=True):
-        cod = estado_por_cama.get(cama_id) or "VACIA"
+    for cod in estado_por_cama.values():
+        cod = cod or "VACIA"
         conteo[cod] = conteo.get(cod, 0) + 1
     return conteo
 
 
 def _snapshot_estado_por_cama(hasta):
-    """{cama_id: codigo_estado} en el momento hasta."""
-    ahora = timezone.now()
-    delta = (ahora - hasta).total_seconds() if hasta <= ahora else 0
-    if 0 <= delta <= 60:
-        ultima_asig_id = (
-            AsignacionCamaPaciente.objects
-            .filter(cama_id=OuterRef("cama_id"))
-            .order_by("-fecha_inicio", "-id")
-            .values("id")[:1]
-        )
-        return {
-            r["cama_id"]: r["estado__codigo"]
-            for r in AsignacionCamaPaciente.objects
-            .filter(id=Subquery(ultima_asig_id))
-            .values("cama_id", "estado__codigo")
-        }
-    ult_hist = (
-        HistorialEstadoCama.objects
-        .filter(cama_id=OuterRef("pk"), fecha_hora__lte=hasta)
-        .order_by("-fecha_hora", "-id")
-        .values("estado_nuevo__codigo")[:1]
+    """{cama_id: codigo_estado} en el momento hasta usando tablas de mapeo_camas."""
+    ultima_asig_id = (
+        AsignacionCamaPaciente.objects
+        .filter(cama_id=OuterRef("cama_id"), fecha_inicio__lte=hasta)
+        .order_by("-fecha_inicio", "-id")
+        .values("id")[:1]
     )
-    return {
-        r["numero_cama"]: r["_estado_hist"] or "VACIA"
-        for r in Cama.objects.filter(estado=1)
-        .annotate(_estado_hist=Subquery(ult_hist))
-        .values("numero_cama", "_estado_hist")
+
+    estado_por_cama = {
+        r["cama_id"]: (r["estado_nuevo__codigo"] or "VACIA")
+        for r in HistorialEstadoCama.objects
+        .filter(id=Subquery(
+            HistorialEstadoCama.objects
+            .filter(cama_id=OuterRef("cama_id"), fecha_hora__lte=hasta)
+            .order_by("-fecha_hora", "-id")
+            .values("id")[:1]
+        ))
+        .values("cama_id", "estado_nuevo__codigo")
     }
+
+    for row in (
+        AsignacionCamaPaciente.objects
+        .filter(id=Subquery(ultima_asig_id))
+        .values("cama_id", "estado__codigo")
+    ):
+        estado_por_cama[row["cama_id"]] = row["estado__codigo"] or "VACIA"
+
+    return estado_por_cama
 
 
 def _rango_meta(desde, hasta):
