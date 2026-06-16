@@ -445,10 +445,12 @@ def dashboard_ocupacion_hora(request):
         conteo_inicio = _snapshot_estado_camas(desde)
         ocupadas_inicio = conteo_inicio.get("OCUPADA", 0)
 
+        # 2026-06-16: usa transición anterior->nuevo para delta real de ocupación y evitar caídas artificiales.
+        estados_ocupados = {"OCUPADA", "PRE_ALTA"}
         eventos = (
             HistorialEstadoCama.objects
             .filter(fecha_hora__gte=desde, fecha_hora__lte=hasta)
-            .values("fecha_hora", "estado_nuevo__codigo")
+            .values("fecha_hora", "estado_anterior__codigo", "estado_nuevo__codigo")
         )
 
         def _bin_key(dt):
@@ -482,22 +484,24 @@ def dashboard_ocupacion_hora(request):
             bins.append(cursor)
             cursor = _bin_next(cursor)
 
-        ocupa = {b: 0 for b in bins}
-        libera = {b: 0 for b in bins}
+        delta = {b: 0 for b in bins}
         for ev in eventos:
             b = _bin_key(ev["fecha_hora"])
-            if b not in ocupa:
+            if b not in delta:
                 continue
-            cod = ev["estado_nuevo__codigo"]
-            if cod == "OCUPADA":
-                ocupa[b] += 1
-            elif cod in ("VACIA", "LIBRE", "ALTA"):
-                libera[b] += 1
+            estado_anterior = ev.get("estado_anterior__codigo")
+            estado_nuevo = ev.get("estado_nuevo__codigo")
+            antes_ocupada = estado_anterior in estados_ocupados
+            ahora_ocupada = estado_nuevo in estados_ocupados
+            if (not antes_ocupada) and ahora_ocupada:
+                delta[b] += 1
+            elif antes_ocupada and (not ahora_ocupada):
+                delta[b] -= 1
 
         items = []
         ocupadas = ocupadas_inicio
         for b in bins:
-            ocupadas = max(0, ocupadas + ocupa[b] - libera[b])
+            ocupadas = max(0, ocupadas + delta[b])
             items.append({
                 "hora": _bin_label(b),
                 "porcentaje": round((ocupadas / total_camas) * 100, 1),
