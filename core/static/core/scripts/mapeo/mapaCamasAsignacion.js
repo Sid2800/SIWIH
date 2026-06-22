@@ -256,7 +256,7 @@ document.addEventListener("DOMContentLoaded", function () {
       cancelButtonText: 'Cancelar',
       focusConfirm: false,
       customClass: {
-        popup: "contener-modal-defuncion",
+        popup: "contener-modal-defuncion mapeo-alerta-sesion",
         title: "contener-modal-titulo",
         content: "contener-modal-contenido",
         confirmButton: "contener-modal-boton-confirmar",
@@ -1693,10 +1693,14 @@ document.addEventListener("DOMContentLoaded", function () {
   // Acciones de barra superior (filtros, utilidades y control de sesion)
   // ========================================================================
 
-  // Limpia filtros y devuelve foco al input de busqueda.
-  btnLimpiar.addEventListener("click", function () {
-    inputBusqueda.value = "";
-    tipoBusqueda.value = "todo";
+  // [2026-06-21 IMPROVEMENT] Centraliza limpieza para iniciar mapeo sin filtros activos.
+  function limpiarFiltrosMapa(enfocarBusqueda) {
+    if (inputBusqueda) {
+      inputBusqueda.value = "";
+    }
+    if (tipoBusqueda) {
+      tipoBusqueda.value = "todo";
+    }
     filtroEstadoIndicador = "";
     filtroSalaIndicador = "";
     // [2026-05-05 FEATURE] Al limpiar, también resetear el valor persistido.
@@ -1706,7 +1710,14 @@ document.addEventListener("DOMContentLoaded", function () {
     actualizarEstadoActivoIndicadoresSala();
     sincronizarFiltrosMoviles();
     aplicarFiltro();
-    inputBusqueda.focus();
+    if (enfocarBusqueda && inputBusqueda) {
+      inputBusqueda.focus();
+    }
+  }
+
+  // Limpia filtros y devuelve foco al input de busqueda.
+  btnLimpiar.addEventListener("click", function () {
+    limpiarFiltrosMapa(true);
   });
 
   if (btnSincronizarCamas) {
@@ -1832,6 +1843,7 @@ document.addEventListener("DOMContentLoaded", function () {
           return String(v);
         }));
         establecerModoMapeoActivo(Boolean(sesionMapeoActivaId));
+        limpiarFiltrosMapa(false);
         await cargarMapa();
         aplicarMarcasSesionEnRender();
         toastr.success(data.mensaje || "Mapeo iniciado.", "Exito");
@@ -1850,7 +1862,7 @@ document.addEventListener("DOMContentLoaded", function () {
           '<fieldset class="modalAtencionCampos">' +
             '<legend>Camas pendientes</legend>' +
             '<div style="max-height: 18rem; overflow:auto; text-align:left;">' +
-              '<table class="tabla-general" style="width:100%; font-size:0.86rem;">' +
+              '<table class="tabla-general" style="width:100%;">' +
                 '<thead><tr><th>Cama</th><th>Servicio</th><th>Sala</th><th>Cubículo</th></tr></thead>' +
                 '<tbody>' +
                   listado.map(function (item) {
@@ -1880,7 +1892,7 @@ document.addEventListener("DOMContentLoaded", function () {
         icon: "warning",
         confirmButtonText: "Entendido",
         customClass: {
-          popup: "contener-modal-defuncion",
+          popup: "contener-modal-defuncion mapeo-alerta-sesion",
           title: "contener-modal-titulo",
           content: "contener-modal-contenido",
           confirmButton: "contener-modal-boton-confirmar",
@@ -1900,6 +1912,13 @@ document.addEventListener("DOMContentLoaded", function () {
       showCancelButton: true,
       confirmButtonText: "Finalizar",
       cancelButtonText: "Cancelar",
+      customClass: {
+        popup: "contener-modal-defuncion mapeo-alerta-sesion",
+        title: "contener-modal-titulo",
+        content: "contener-modal-contenido",
+        confirmButton: "contener-modal-boton-confirmar",
+        cancelButton: "contener-modal-boton-cancelar"
+      },
     }).then(async function (result) {
       if (!result.isConfirmed) {
         return;
@@ -1950,7 +1969,13 @@ document.addEventListener("DOMContentLoaded", function () {
           showCancelButton: true,
           confirmButtonText: "Si, cancelar",
           cancelButtonText: "Volver",
-          confirmButtonColor: "#b91c1c",
+          customClass: {
+            popup: "contener-modal-defuncion mapeo-alerta-sesion",
+            title: "contener-modal-titulo",
+            content: "contener-modal-contenido",
+            confirmButton: "contener-modal-boton-confirmar",
+            cancelButton: "contener-modal-boton-cancelar"
+          },
         });
         if (!confirmarCancelacion.isConfirmed) {
           return;

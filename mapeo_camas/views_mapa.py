@@ -597,14 +597,32 @@ def actualizar_cama_mapa(request):
     max_cambios_usuario = _max_cambios_para_usuario(request.user)
 
     if not hubo_cambio:
-        _registrar_detalle_mapeo(
-            usuario=request.user, cama=cama, asignacion=asignacion,
-            tipo_accion=DetalleMapeoCama.TipoAccion.CONFIRMACION, hubo_cambio=False,
-            observacion=get_observacion_mapeo("Confirmacion sin cambios desde mapa."),
-        )
+        with transaction.atomic():
+            # [2026-06-21 AUDIT] El guardado desde modal con mismo estado debe comportarse como una confirmación real.
+            AsignacionCamaPaciente.objects.filter(pk=asignacion.pk).update(
+                ingreso=ingreso_nuevo,
+                estado=estado_nuevo_obj,
+                usuario_asignacion=request.user,
+                fecha_inicio=timezone.now(),
+            )
+            asignacion.refresh_from_db()
+            historial = _registrar_historial_mapeo(
+                cama=cama,
+                estado_anterior=estado_anterior,
+                estado_nuevo=estado_nuevo_obj,
+                ingreso=asignacion.ingreso,
+                usuario=request.user,
+                observacion=get_observacion_mapeo("Confirmacion de mapeo sin cambios"),
+                sesion_mapeo=_obtener_sesion_mapeo_activa(request.user),
+            )
+            _registrar_detalle_mapeo(
+                usuario=request.user, cama=cama, asignacion=asignacion,
+                tipo_accion=DetalleMapeoCama.TipoAccion.CONFIRMACION, hubo_cambio=False,
+                observacion=get_observacion_mapeo("Confirmacion sin cambios desde mapa."),
+            )
         return JsonResponse({
             "ok": True,
-            "mensaje": "No se detectaron cambios para guardar.",
+            "mensaje": "Cama confirmada sin cambios.",
             "cama": {
                 "numero_cama": int(cama_id),
                 "estado_visual": asignacion.estado.codigo,
@@ -614,6 +632,8 @@ def actualizar_cama_mapa(request):
                 ),
                 "cambios_realizados": cambios_realizados,
                 "max_cambios": max_cambios_usuario,
+                "ultima_actualizacion": hora_local_iso(historial.fecha_hora) if historial else "",
+                "usuario_ultima_actualizacion": _nombre_usuario(historial.usuario) if historial else "",
             },
         })
 

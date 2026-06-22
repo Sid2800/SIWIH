@@ -18,8 +18,8 @@
     <div class="dt-buttons mapa-botones-acciones">
       {# [2026-05-18] Botones de mapeo según permiso de mapear. #}
       {% if puede_mapear %}
-      <button type="button" class="dt-button" id="btn-iniciar-mapeo" title="Iniciar mapeo de camas">
-        <i class="bi bi-play-circle boton-exportacion"></i>
+      <button type="button" class="formularioBotones-boton" id="btn-iniciar-mapeo" title="Iniciar mapeo de camas">
+        <span>Iniciar mapeo</span>
       </button>
       {% endif %}
       {% if puede_ver_historiales %}
@@ -41,11 +41,11 @@
       {% endif %}
       {# [2026-05-18] Botones de control de sesión para usuarios con permiso de mapear. #}
       {% if puede_mapear %}
-      <button type="button" class="dt-button mapa-control-mapeo--oculto" data-action="terminar-mapeo" title="Terminar mapeo">
-        <i class="bi bi-check2-circle boton-exportacion"></i>
+      <button type="button" class="formularioBotones-boton mapa-control-mapeo--oculto" data-action="terminar-mapeo" title="Finalizar mapeo">
+        <span>Finalizar mapeo</span>
       </button>
-      <button type="button" class="dt-button mapa-control-mapeo--oculto" id="btn-cancelar-mapeo" title="Cancelar mapeo">
-        <i class="bi bi-x-octagon boton-exportacion"></i>
+      <button type="button" class="formularioBotones-boton mapa-control-mapeo--oculto" id="btn-cancelar-mapeo" title="Cancelar mapeo">
+        <span>Cancelar mapeo</span>
       </button>
       {% endif %}
     </div>
@@ -135,6 +135,96 @@
 {% block extra_css %}
 <!-- 2026-06-09: estáticos de mapeo centralizados en core/static/core/css -->
 <link rel="stylesheet" href="{% static 'core/css/mapeo/mapaCamas.css' %}?v=20260526c">
+<style>
+  /* [2026-06-21 IMPROVEMENT] Reutiliza el boton textual del sistema para las acciones de sesión de mapeo. */
+  .mapa-botones-acciones .formularioBotones-boton {
+    width: auto;
+    min-width: 16rem;
+    margin: 0;
+  }
+
+  /* [2026-06-21 IMPROVEMENT] Aumenta visibilidad de alertas de sesion para lectura comoda. */
+  .mapeo-alerta-sesion {
+    width: min(92vw, 62rem) !important;
+    max-width: 62rem !important;
+    padding: 1.5rem !important;
+  }
+
+  .mapeo-alerta-sesion .swal2-title,
+  .mapeo-alerta-sesion .contener-modal-titulo {
+    font-size: 2.7rem !important;
+    line-height: 1.18 !important;
+    margin-bottom: 0.85rem !important;
+  }
+
+  .mapeo-alerta-sesion .swal2-html-container,
+  .mapeo-alerta-sesion .swal2-text,
+  .mapeo-alerta-sesion .swal2-input-label,
+  .mapeo-alerta-sesion .swal2-validation-message,
+  .mapeo-alerta-sesion .modal-mapeo-servicios__texto,
+  .mapeo-alerta-sesion .modalAtencionCampos legend {
+    font-size: 1.75rem !important;
+    line-height: 1.6 !important;
+  }
+
+  .mapeo-alerta-sesion .swal2-input-label,
+  .mapeo-alerta-sesion .modalAtencionCampos label,
+  .mapeo-alerta-sesion .modalAtencionCampos strong,
+  .mapeo-alerta-sesion .modalAtencionCampos p {
+    font-size: 1.65rem !important;
+    line-height: 1.55 !important;
+  }
+
+  .mapeo-alerta-sesion .modal-mapeo-servicios__resumen,
+  .mapeo-alerta-sesion .modal-mapeo-servicios__texto-item,
+  .mapeo-alerta-sesion .modal-mapeo-servicios__nombre,
+  .mapeo-alerta-sesion .ck-formulario__label {
+    font-size: 1.55rem !important;
+    line-height: 1.45 !important;
+  }
+
+  .mapeo-alerta-sesion .modal-mapeo-servicios__lista {
+    row-gap: 0.8rem !important;
+  }
+
+  .mapeo-alerta-sesion .modal-mapeo-servicios__item {
+    min-height: 3.4rem !important;
+  }
+
+  .mapeo-alerta-sesion .swal2-html-container .tabla-general {
+    font-size: 1.55rem !important;
+  }
+
+  .mapeo-alerta-sesion .swal2-textarea {
+    min-height: 12rem !important;
+    font-size: 1.55rem !important;
+    padding: 1rem !important;
+  }
+
+  .mapeo-alerta-sesion .swal2-confirm,
+  .mapeo-alerta-sesion .swal2-cancel,
+  .mapeo-alerta-sesion .contener-modal-boton-confirmar,
+  .mapeo-alerta-sesion .contener-modal-boton-cancelar {
+    font-size: 1.5rem !important;
+    min-height: 3.45rem !important;
+    padding: 0.95rem 1.5rem !important;
+  }
+
+  .mapeo-alerta-sesion .tabla-general th,
+  .mapeo-alerta-sesion .tabla-general td {
+    font-size: 1.5rem !important;
+    padding: 0.8rem 0.7rem !important;
+  }
+
+  .mapeo-alerta-sesion .modalAtencionCampos {
+    margin-top: 1rem !important;
+  }
+
+  .mapeo-alerta-sesion .swal2-actions {
+    gap: 0.8rem !important;
+    margin-top: 1.25rem !important;
+  }
+</style>
 {% endblock %}
 
 {% block extra_js %}
@@ -161,5 +251,5 @@
 </script>
 <!-- [2026-06-11] Cache-bust: fuerza recarga del JS con contador de intentos por servicio. -->
 <!-- [2026-06-11] Cache-bust: fix de modo solo lectura en inicio/cierre de sesión de mapeo. -->
-<script src="{% static 'core/scripts/mapeo/mapaCamasAsignacion.js' %}?v=20260611b"></script>
+<script src="{% static 'core/scripts/mapeo/mapaCamasAsignacion.js' %}?v=20260621c"></script>
 {% endblock %}
