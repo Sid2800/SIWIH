@@ -187,6 +187,7 @@ const API_URLS = {
    validarImpactoPeriodoLaboral: urls["validarImpactoPeriodoLaboral"],
    obtenerPeriodoLaboral: urls["obtenerPeriodoLaboral"],
    listarTiposAtencion: urls["listarTiposAtencion"],
+   guardarDiaPeriodoLaboral: urls["guardarDiaPeriodoLaboral"]
 
 };
 

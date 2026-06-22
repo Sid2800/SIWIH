@@ -739,7 +739,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (data.success) {
                 toastr.success("Proceso realizado correctamente");
                 setTimeout(() => {
-                  window.location.href = data.redirect_url;
+                    window.location.href = data.redirect_url;
                 }, 1000);
                 return;
             } else {

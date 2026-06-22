@@ -1,5 +1,7 @@
 document.addEventListener('DOMContentLoaded', function () {
 
+
+    console.table(contextoAgenda);
     //#region  Listener Generales
     const contenedorTarjetasDias = document.querySelector(".contenedor-dias-semana");
 
@@ -12,9 +14,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const diaSemana = tarjeta.dataset.diaSemana 
         const idDiaLaboral = tarjeta.dataset.idDiaLaboral || null;
-        ManejarDiaLaboral.open(
+        const modal = await ManejarDiaLaboral.open(
             {diaNumero:diaSemana, diaID:idDiaLaboral, contexto:contextoAgenda }
         )
+
+        console.table(modal);
     })
     //#endregion
 

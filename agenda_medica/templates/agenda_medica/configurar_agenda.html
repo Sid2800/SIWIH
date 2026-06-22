@@ -9,7 +9,7 @@
         <div class="tituloFormulario" style="margin-bottom: 1rem;">
             <div class="tituloFormulario-texto"> 
                 <i class="bi bi-calendar-range"></i>
-                <h2 class="sin-margen">Configuración de Agenda  {{ periodo.jornada_laboral.duracion_minutos }}</h2>
+                <h2 class="sin-margen">Configuración de Agenda</h2>
             </div>
         </div>
 
@@ -203,6 +203,7 @@
 
 <script>
     const contextoAgenda = {
+    periodoId: "{{ periodo.id|escapejs }}",
     personalClinicoNombre: "{{ periodo.personal_salud.empleado.nombre_completo|escapejs }}",
     periodoTexto: "{{ periodo.periodo_formateado|escapejs }}",
     jornada: {

@@ -16,6 +16,7 @@ from core.utils.utilidades_fechas import formatear_fecha_dd_mm_yyyy
 from agenda_medica.models import Periodo_laboral
 from agenda_medica import validators as agenda_validators
 from core.services.agenda_medica.periodo_laboral_service import PeriodoLaboralService
+from core.services.agenda_medica.configuracion_dia_service  import  ConfiguracionDiaService
 from usuario.permisos import verificar_permisos_usuario
 from core.utils.utilidades_textos import generar_slug
 
@@ -284,3 +285,46 @@ def validarImpactoPeriodoLaboral(request):
         print(e)
         return JsonResponse({'error': 'No se pudo procesar el periodo'}, status=500)
 
+
+def guardarDiaLaboral(request):
+    
+    if not verificar_permisos_usuario(request.user, AGENDA_MEDICA_EDITOR_ROLES, AGENDA_MEDICA_EDITOR_UNIDADES):
+        return JsonResponse({'error': 'No tienes permisos para realizar esta accion'}, status=403)
+    
+    try:
+        data = parse_json_request(request)
+    except ValueError as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+
+    try:
+        diaLaboralConfigurado = agenda_validators.validarArgumentosDiaLaboral(data, request.user.id)
+    except ValueError as e:
+        return JsonResponse(
+            {'error':  e.messages[0]},
+            status=400
+        )
+    except ValidationError as e:
+        return JsonResponse(
+            {'error': e.messages[0]},
+            status=400
+        )
+
+
+    
+
+    try:
+        #PeriodoLaboralService.analizarImpactoPeriodoLaboral(periodo)
+        #resultadoGuardado = PeriodoLaboralService.procesarPeriodoLaboral(diaLaboralConfigurado,request.user)
+        resultado = ConfiguracionDiaService.crear_dia_laboral(diaLaboralConfigurado,request.user)
+        if True:#resultadoGuardado:
+            return JsonResponse({'guardo': True}, status=200)
+        else:
+            return JsonResponse({'guardo': False}, status=200)
+
+    except ValidationError as e:
+        return JsonResponse({'error': e.messages[0]}, status=400)
+
+    except Exception as e:
+        print(e)
+        return JsonResponse({'error': 'No se pudo guardar el periodo'}, status=500)

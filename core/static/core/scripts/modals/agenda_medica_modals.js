@@ -592,7 +592,7 @@ const ManejarDiaLaboral = (function (){
         diaID: null,
         diaNumero: null,
         contexto: null,
-        diaRegistro: null
+        diaRegistro: null,
     };
 
     let TiposAtencionregistros = [];
@@ -600,14 +600,17 @@ const ManejarDiaLaboral = (function (){
 
     async function open(config ={}) {
         estado = {
-            titulo = `Definir configuracion `,
-            diaNumero = null,
-            diaID = null,
-            contexto = null
-        } = config;
+                titulo: "Definir configuracion",
+                diaNumero: null,
+                diaID: null,
+                contexto: null,
+                ...config
+            };
+        
+        TiposAtencionregistros = [];
 
         const modal = await Swal.fire({
-            title: `<i class="bi bi-calendar-date"></i> ${estado.titulo} - ${DiaSemanaMap.get(parseInt(diaNumero))} `,
+            title: `<i class="bi bi-calendar-date"></i> ${estado.titulo} - ${DiaSemanaMap.get(parseInt(estado.diaNumero))} `,
             html: `
                 <div class="tituloFormulario-subrallado"></div>
 
@@ -710,6 +713,13 @@ const ManejarDiaLaboral = (function (){
             },
         });
 
+        let indicador = ""
+        if (modal.isConfirmed) {
+            indicador = modal.value
+
+        }
+
+        return indicador
     }
 
 
@@ -1032,25 +1042,105 @@ const ManejarDiaLaboral = (function (){
         }
 
 
-        /*
+        
 
         return  {
-                personal,
-                jornada,
-                fechaInicio,
-                fechaFinal,
-                estadoRegistro,
-                detallesRegistro,
-                estadoTemporal,
-                fechaModificado,
-                fechaModificadoImpacto: null
-            };*/
+                horaInicio,
+                horaFin,
+            };
     }
 
     async function procesarGuardado() {
         Swal.resetValidationMessage();
-        validarCampos();
+        
+        const formData = validarCampos();
+        if (!formData){
+            return
+        }
+
+        console.log(formData);
+
+        //ojo si hay registro es edicion
+        if (estado && estado.diaRegistro){// indica que estamos editando 
+            // validad impacto 
+                const confirmado = await confirmarAccion({
+                titulo: "jlsadkjalskdas",
+                mensajes: [ "mensaje1","mensaje2","mensaje3"],
+                icono: "warning"
+            });
+        }else {// estamos agregandio llamado a guardado
+            guardarPeriodo(formData);
+            return "guradao agregar"
+        }
+
+        
+        
+        if (!confirmado){
+            return "cancelo"
+        }else{
+            return "aprobo cambios"
+            // llmar a guardar
+        }
     }
+
+
+
+    async function guardarPeriodo(formData){
+        if (!formData){
+            return
+        }
+
+
+        try {
+            const csrfToken = window.CSRF_TOKEN;
+            if (!Array.isArray(TiposAtencionregistros) || TiposAtencionregistros.length === 0) {
+                toastr.error("Debe agregar al menos un estudio antes de continuar.");
+                return;
+            }
+            const configuraciones = TiposAtencionregistros.map(registro => ({
+                id: registro.id,
+                cupos: registro.cupos,
+                duracion: registro.duracion,
+                diaId: estado.diaID,
+            }));
+
+            const response = await fetch(API_URLS.guardarDiaPeriodoLaboral, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": csrfToken 
+                },
+                body: JSON.stringify({
+                    horaInicio: formData.horaInicio, 
+                    horaFin: formData.horaFin,
+                    configuraciones: configuraciones,
+                    diaNumero: estado.diaNumero,
+                    periodoId: contextoAgenda.periodoId
+                })
+            });
+
+            const data = await response.json(); 
+
+            console.log(data);
+            // VALIDACIONES CONTROLADAS
+            if (response.status === 400) {
+                toastr.warning(data.error, "Error de Validacion");
+                return false;
+            }
+
+            // ERRORES REALES
+                if (response.status >= 500) {
+                    throw new Error(
+                        data.error ||
+                        "No se pudo guardar el período"
+                    );
+                }
+
+        } catch (error) {
+            toastr.error(error.message, "Error al guardar el dia laboral ");
+        }
+    }
+
 
     return {  open };
 

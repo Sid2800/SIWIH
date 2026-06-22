@@ -84,3 +84,25 @@ class DiaSemana(models.IntegerChoices):
 class PrioridadAtencion(models.IntegerChoices):
     ORDINARIA = 1, "ORDINARIA"
     PREFERENTE = 2, "PREFERENTE"
+
+
+class EstadoCupoAgenda(models.IntegerChoices):
+    # Cupo libre y disponible para asignar una cita
+    DISPONIBLE = 1, "DISPONIBLE"
+    # Cupo asociado actualmente a una cita activa
+    ASIGNADO = 2, "ASIGNADO"
+    # Cupo bloqueado por ausencia, permiso o restricción operativa
+    BLOQUEADO = 3, "BLOQUEADO"
+    # Cupo deshabilitado por cambios administrativos:
+    # reducción de cupos, modificación de agenda,
+    # eliminación de configuración o cambios de horario
+    INACTIVO = 4, "INACTIVO"
+
+
+class TipoAusencia(models.IntegerChoices):
+    VACACIONES = 1, "VACACIONES"
+    INCAPACIDAD = 2, "INCAPACIDAD"
+    PERMISO = 3, "PERMISO"
+    CAPACITACION = 4, "CAPACITACIÓN"
+    CONGRESO = 5, "CONGRESO"
+    OTROS = 6, "OTROS"

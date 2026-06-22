@@ -278,3 +278,26 @@ def filtro_rango_fecha(campo, inicio, fin):
     return {f"{campo}__range": (inicio, fin)}
 
 
+
+
+def obtener_fechas_por_dia_semana(fecha_inicio, fecha_fin, dia_semana ):
+    """
+    Retorna todas las fechas de un día específico
+    dentro de un rango de fechas.
+    """
+
+    fechas = []
+
+    # Python:
+    # 0 = lunes
+    # 6 = domingo
+    dia_python = int(dia_semana) - 1
+
+    fecha_actual = fecha_inicio
+
+    while fecha_actual <= fecha_fin:
+        if fecha_actual.weekday() == dia_python:
+            fechas.append(fecha_actual)
+        fecha_actual += timedelta(days=1)
+
+    return fechas

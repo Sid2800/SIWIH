@@ -1,11 +1,11 @@
 from django.contrib import admin
-from agenda_medica.models import Periodo_laboral, Dia_laboral, Cupo_atencion
+from agenda_medica.models import Periodo_laboral, Dia_laboral, Configuracion_cupo
 from rrhh.models import PersonalSalud
 # Register your models here.
 
 
 class CupoAtencionInline(admin.TabularInline):
-    model = Cupo_atencion
+    model = Configuracion_cupo
     extra = 1
     autocomplete_fields = ['tipo_atencion']
 
@@ -57,7 +57,7 @@ class DiaLaboralAdmin(admin.ModelAdmin):
 
     ordering = ('periodo_laboral', 'dia_semana')
 
-class CupoAtencionAdmin(admin.ModelAdmin):
+class ConfiguracionCupoAdmin(admin.ModelAdmin):
     list_display = ('dia_laboral', 'tipo_atencion', 'cupos', 'duracion_minutos', 'estado')
     list_filter = ('estado', 'tipo_atencion')
     search_fields = (
@@ -72,4 +72,4 @@ class CupoAtencionAdmin(admin.ModelAdmin):
 
 admin.site.register(Periodo_laboral, PeriodoLaboralAdmin)
 admin.site.register(Dia_laboral, DiaLaboralAdmin)
-admin.site.register(Cupo_atencion, CupoAtencionAdmin)
+admin.site.register(Configuracion_cupo, ConfiguracionCupoAdmin)

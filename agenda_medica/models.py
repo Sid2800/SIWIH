@@ -2,7 +2,7 @@ from django.db import models
 from datetime import date
 from rrhh.models import PersonalSalud, Jornada_laboral
 from clinico.models import Tipo_atencion
-from core.constants.choices_constants import EstadoRegistro, DiaSemana
+from core.constants.choices_constants import EstadoRegistro, DiaSemana, EstadoCupoAgenda, TipoAusencia
 from core.constants.domain_constants import EstadoTemporalPeriodo
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
@@ -71,8 +71,11 @@ class Dia_laboral(models.Model):
         choices=EstadoRegistro.choices,
         default=EstadoRegistro.ACTIVO
     )
+    fecha_creado = models.DateTimeField(verbose_name="Fecha Creado", auto_now_add=True)
+    creado_por = models.ForeignKey(User, on_delete=models.PROTECT, related_name='dia_laboral_creados', null=True, blank=True)
+    fecha_modificado = models.DateTimeField(verbose_name="Fecha Editado", auto_now=True )
+    modificado_por = models.ForeignKey(User, on_delete=models.PROTECT, related_name='dia_laboral_modificados', null=True, blank=True )
 
-    
     class Meta: 
         unique_together = ("periodo_laboral", "dia_semana") 
         ordering = ["dia_semana"]
@@ -97,7 +100,7 @@ class Dia_laboral(models.Model):
         return f"{self.get_dia_semana_display()} - {self.periodo_laboral}"
     
 
-class Cupo_atencion(models.Model):
+class Configuracion_cupo(models.Model):
     dia_laboral = models.ForeignKey(Dia_laboral, verbose_name=("Dia laboral"), on_delete=models.CASCADE, related_name="cupos")
     tipo_atencion = models.ForeignKey(Tipo_atencion, verbose_name="Tipo Atencion", on_delete=models.PROTECT)
     cupos = models.PositiveSmallIntegerField(verbose_name="Cupos")
@@ -110,8 +113,8 @@ class Cupo_atencion(models.Model):
     class Meta: 
         unique_together = ("dia_laboral", "tipo_atencion") 
         ordering = ["id"]
-        verbose_name = "Cupo atencion"
-        verbose_name_plural = "Cupos Atenciones"
+        verbose_name = "Configuracion cupo"
+        verbose_name_plural = "Configuracion cupos"
         indexes = [
             models.Index(fields=["estado"])
         ]
@@ -124,3 +127,82 @@ class Cupo_atencion(models.Model):
             raise ValidationError("La duración debe ser mayor a cero.") 
     
     def __str__(self): return f"{self.tipo_atencion} - {self.cupos} cupos"
+
+
+
+
+class Ausencia(models.Model):
+    personal_salud = models.ForeignKey(PersonalSalud, on_delete=models.PROTECT, related_name="ausencias")
+    fecha_inicio = models.DateField(verbose_name="Fecha inicio")
+    fecha_fin = models.DateField(verbose_name="Fecha Fin")
+    tipo = models.SmallIntegerField(choices=TipoAusencia.choices)
+    observaciones = models.TextField(null=True, blank=True)
+    estado = models.SmallIntegerField(
+        choices=EstadoRegistro.choices,
+        default=EstadoRegistro.ACTIVO
+    )
+    fecha_creado = models.DateTimeField(verbose_name="Fecha Creado", auto_now_add=True)
+    creado_por = models.ForeignKey(User, on_delete=models.PROTECT, related_name='ausencias_creadas', null=True, blank=True)
+    fecha_modificado = models.DateTimeField(verbose_name="Fecha Editado", auto_now=True )
+    modificado_por = models.ForeignKey(User, on_delete=models.PROTECT, related_name='ausencias_modificadas', null=True, blank=True )
+    
+    class Meta:
+        verbose_name = "Ausencia"
+        verbose_name_plural = "Ausencias"
+        ordering = ["-fecha_inicio"]
+
+        indexes = [
+            models.Index(fields=["estado"]),
+            models.Index(fields=["personal_salud"]),
+            models.Index(fields=["fecha_inicio", "fecha_fin"]),
+        ]
+
+    def __str__(self):
+        return (
+            f"{self.personal_salud} "
+            f"{self.fecha_inicio} - {self.fecha_fin}"
+        )
+
+
+
+
+class Cupo_agenda(models.Model):
+    personal_salud = models.ForeignKey(PersonalSalud, on_delete=models.PROTECT, related_name="cupos_agenda")
+    configuracion_cupo = models.ForeignKey(Configuracion_cupo, on_delete=models.PROTECT,  related_name="cupos_agenda")
+    tipo_atencion = models.ForeignKey(Tipo_atencion, on_delete=models.PROTECT, related_name="cupos_agenda")
+    ausencia = models.ForeignKey(Ausencia, on_delete=models.PROTECT, related_name="cupos_afectados", null=True, blank=True )
+    fecha = models.DateField(verbose_name="Fecha cupo")
+    hora_inicio = models.TimeField()
+    hora_fin = models.TimeField()
+    estado = models.SmallIntegerField(
+        choices=EstadoCupoAgenda.choices,
+        default=EstadoCupoAgenda.DISPONIBLE
+    )
+    fecha_creado = models.DateTimeField(verbose_name="Fecha Creado", auto_now_add=True)
+    creado_por = models.ForeignKey(User, on_delete=models.PROTECT, related_name='cupos_agenda_creados', null=True, blank=True)
+    fecha_modificado = models.DateTimeField(verbose_name="Fecha Editado", auto_now=True )
+    modificado_por = models.ForeignKey(User, on_delete=models.PROTECT, related_name='cupos_agenda_modificados', null=True, blank=True )
+
+    @property
+    def especialidad(self):
+        return self.personal_salud.especialidad
+
+    class Meta:
+        verbose_name = "Cupo agenda"
+        verbose_name_plural = "Cupos agenda"
+        ordering = ["fecha", "hora_inicio"]
+
+        indexes = [
+            models.Index(fields=["estado"]),
+            models.Index(fields=["fecha"]),
+            models.Index(fields=["personal_salud", "fecha"]),
+            models.Index(fields=["tipo_atencion", "fecha"]),
+        ]
+
+    def __str__(self):
+        return (
+            f"{self.personal_salud} "
+            f"{self.tipo_atencion} "
+            f"{self.fecha} "
+            f"{self.hora_inicio}"
+        )

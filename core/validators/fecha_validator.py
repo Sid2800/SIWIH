@@ -47,6 +47,7 @@ def validar_rango_fechas(
                     "que la fecha inicial."
                 )
 
+
 def validar_anio(anio):
     anio_actual = date.today().year
     try:
@@ -66,3 +67,29 @@ def validar_mes(mes):
     except:
         pass
     raise ValueError("El mes debe estar entre 1 y 12.")
+
+
+def validar_horario(hora_inicio, hora_fin):
+
+    try:
+        hora_inicio = datetime.strptime(
+            hora_inicio,
+            "%H:%M"
+        ).time()
+
+        hora_fin = datetime.strptime(
+            hora_fin,
+            "%H:%M"
+        ).time()
+
+    except (ValueError, TypeError):
+        raise ValidationError(
+            "Formato de hora inválido."
+        )
+
+    if hora_fin <= hora_inicio:
+        raise ValidationError(
+            "La hora final debe ser mayor que la hora inicial."
+        )
+
+    return hora_inicio, hora_fin
