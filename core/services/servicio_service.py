@@ -1,5 +1,6 @@
 from servicio import models as modelosServicio
 from servicio.models import Institucion_salud
+from mapeo_camas.models import AsignacionCamaPaciente, EstadoMapeo  # [2026-05-07] Se agregó EstadoMapeo para filtrar camas por estado VACIA
 from core.constants.domain_constants import HEAC_INSTITUCION_ID
 from core.constants.domain_constants import SALAS_EXCLUIDAS, SERVICIOS_AUX_EXTERNOS
 
@@ -49,8 +50,24 @@ class ServicioService:
 
     @staticmethod
     def obtener_camas_activas():
-        qs = modelosServicio.Cama.objects.filter(estado=1)  # Filtramos las camas activas (estado=1)
-        return qs
+        # La disponibilidad se define unicamente por el estado de asignacion de cama.
+        # [2026-05-07] Se reemplazó AsignacionCamaPaciente.Estado.VACIA (enum) por EstadoMapeo DB lookup
+        try:
+            estado_vacia = EstadoMapeo.objects.get(codigo="VACIA", categoria="ESTADO_CAMA")
+        except EstadoMapeo.DoesNotExist:
+            # Si no existe el estado VACIA, retornar lista vacía
+            return modelosServicio.Cama.objects.none()
+            
+        camas_disponibles_ids = AsignacionCamaPaciente.objects.filter(
+            estado=estado_vacia  # [2026-05-07] Antes: estado=AsignacionCamaPaciente.Estado.VACIA
+        ).values_list("cama_id", flat=True)
+
+        return (
+            modelosServicio.Cama.objects
+            .filter(numero_cama__in=camas_disponibles_ids)
+            .select_related("sala")
+            .order_by("numero_cama")
+        )
     
 
     @staticmethod

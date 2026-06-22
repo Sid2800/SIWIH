@@ -12,12 +12,15 @@ from django import forms
 from django.db import transaction
 from django.utils.timezone import now 
 from django.http.response import JsonResponse, HttpResponseRedirect
+from django.views.decorators.http import require_POST
 from django.shortcuts import get_object_or_404, redirect
 from core.utils.utilidades_fechas import  formatear_fecha_simple,calcular_edad_texto, formatear_fecha2, formatear_fecha_dd_mm_yyyy,formatear_fecha_dd_mm_yyyy_hh_mm
 from core.utils.utilidades_textos import formatear_nombre_completo, formatear_ubicacion_completo
 
 from core.services.expediente_service import ExpedienteService
 from core.services.ingreso.ingreso_service import IngresoService
+# [2026-05-07] Integracion de Ingreso con mapa/asignacion de camas.
+from core.services.mapeo_camas_service import MapeoCamasService
 from core.constants.permisos import (
     INGRESO_EDITOR_ROLES,
     INGRESO_EDITOR_UNIDADES,
@@ -55,6 +58,15 @@ class IngresoAddView(UnidadRolRequiredMixin, CreateView):
         #paceinte validaddo en form clean 
         pacienteId = form.cleaned_data.get('idPaciente') or self.request.POST.get('idPaciente')
 
+        # [2026-05-29] Bloqueo si hay sesion de mapeo de camas EN_PROGRESO sobre el servicio destino.
+        sala_destino = form.cleaned_data.get("sala")
+        sala_destino_id = getattr(sala_destino, "pk", None) or self.request.POST.get("sala")
+        mensaje_bloqueo = MapeoCamasService.validar_ingreso_no_bloqueado_por_mapeo(
+            sala_id=sala_destino_id,
+        )
+        if mensaje_bloqueo:
+            messages.warning(self.request, mensaje_bloqueo)
+            return JsonResponse({"success": False, "error": mensaje_bloqueo}, status=409)
 
         if pacienteId or zona:
             # Buscar el tipo del paciente (por eficiencia: values_list y first)
@@ -92,7 +104,18 @@ class IngresoAddView(UnidadRolRequiredMixin, CreateView):
                     if not cambio:
                         raise Exception("No se logro cambiar la ubicacion del expediente")
 
-                response = super().form_valid(form) # gurada l ingreo 
+                response = super().form_valid(form) # gurada l ingreo
+
+                # [2026-05-07] Cambio relacionado con cama:
+                # si el ingreso se guarda con cama y paciente, sincroniza la tabla
+                # de asignacion para reutilizar o activar el registro de esa cama.
+                if self.object.cama_id and self.object.paciente_id:
+                    # [2026-05-26 AUDIT] Pivote operativo de sincronización: ingreso_id.
+                    MapeoCamasService.sincronizar_cama_con_ingreso(
+                        cama_id=self.object.cama_id,
+                        ingreso_id=self.object.id,
+                        usuario=self.request.user,
+                    )
 
                 # Mensaje de éxito
                 # URL del PDF
@@ -238,10 +261,32 @@ class IngresoEditView(UnidadRolRequiredMixin, UpdateView):
             INGRESO_EDITOR_ROLES,
             INGRESO_EDITOR_UNIDADES):
             return JsonResponse({"success": False, "error": f"No tiene permiso para editar el ingreso"})
+
+        # [2026-05-29] Bloqueo si hay sesion de mapeo de camas EN_PROGRESO sobre el servicio actual
+        # del ingreso o sobre el servicio destino (cambio de sala/cama/traslado).
+        sala_destino = form.cleaned_data.get("sala")
+        sala_destino_id = getattr(sala_destino, "pk", None) or self.request.POST.get("sala")
+        mensaje_bloqueo = MapeoCamasService.validar_ingreso_no_bloqueado_por_mapeo(
+            ingreso_id=self.object.pk,
+            sala_id=sala_destino_id,
+        )
+        if mensaje_bloqueo:
+            messages.warning(self.request, mensaje_bloqueo)
+            return JsonResponse({"success": False, "error": mensaje_bloqueo}, status=409)
         
 
         if usuario.id:
             form.instance.modificado_por_id = usuario.id
+
+        # [2026-05-07] Cambio relacionado con cama:
+        # se toma una foto del ingreso antes de guardar para saber cual era la
+        # cama anterior y poder cerrar esa asignacion correctamente.
+        ingreso_anterior = Ingreso.objects.filter(pk=self.object.pk).values(
+            "cama_id",
+            "paciente_id",
+        ).first()
+        cama_anterior_id = ingreso_anterior.get("cama_id") if ingreso_anterior else None
+        paciente_anterior_id = ingreso_anterior.get("paciente_id") if ingreso_anterior else None
 
         datos_acompaniante = self.extraer_datos_acompaniante()
 
@@ -263,7 +308,42 @@ class IngresoEditView(UnidadRolRequiredMixin, UpdateView):
                     form.instance.acompaniante = acompaniante
                 #Cmabiar el eastdo de expediente
 
-                response = super().form_valid(form) # gurada l ingreo 
+                response = super().form_valid(form) # gurada l ingreo
+
+                # [2026-05-07] Cambio relacionado con cama:
+                # solo sincronizamos camas si el paciente sigue siendo el mismo.
+                # En ese caso la cama anterior se cierra y la cama nueva se activa.
+                if paciente_anterior_id == self.object.paciente_id and self.object.paciente_id:
+                    # [2026-05-26 AUDIT] Cambio de cama por ingreso_id para evitar filtros legacy por paciente.
+                    MapeoCamasService.sincronizar_cambio_cama_en_ingreso(
+                        cama_anterior_id=cama_anterior_id,
+                        cama_nueva_id=self.object.cama_id,
+                        ingreso_id=self.object.id,
+                        usuario=usuario,
+                    )
+                else:
+                    # [2026-05-21] Si cambió el paciente o cambió el vínculo cama/paciente,
+                    # forzar sincronización explícita para evitar desfasajes en mapa de camas.
+                    if paciente_anterior_id and paciente_anterior_id != self.object.paciente_id:
+                        MapeoCamasService.cerrar_asignacion_activa_paciente(
+                            ingreso_id=self.object.id,
+                            usuario=usuario,
+                            cama_id=cama_anterior_id,
+                        )
+
+                    if self.object.cama_id and self.object.paciente_id:
+                        MapeoCamasService.sincronizar_cama_con_ingreso(
+                            cama_id=self.object.cama_id,
+                            ingreso_id=self.object.id,
+                            usuario=usuario,
+                        )
+                    elif self.object.paciente_id and cama_anterior_id:
+                        # Si se quitó la cama en edición, liberar la cama anterior del paciente actual.
+                        MapeoCamasService.cerrar_asignacion_activa_paciente(
+                            ingreso_id=self.object.id,
+                            usuario=usuario,
+                            cama_id=cama_anterior_id,
+                        )
 
                 return JsonResponse({"success": True,"redirect_url": reverse_lazy('listar_ingresos') })
 
@@ -273,10 +353,6 @@ class IngresoEditView(UnidadRolRequiredMixin, UpdateView):
             messages.error(self.request, f"Se presento un error al registrar el ingreso: {str(e)}")
             return JsonResponse({"success": False, "error": f"Hubo un error al registrar el ingreso: {str(e)}"})
         return response
-
-
-
-        return super().form_valid(form)
     
 
     def form_invalid(self, form):
@@ -757,7 +833,15 @@ def inactivarIngreso(request):
             idIngreso = data.get('id')
             if idIngreso:
                 if Ingreso.objects.filter(id=idIngreso).exists():
-                    resultado = IngresoService.inactivar_ingreso(idIngreso)
+                    # [2026-05-29] Bloqueo si hay sesion de mapeo de camas EN_PROGRESO sobre el servicio del ingreso.
+                    mensaje_bloqueo = MapeoCamasService.validar_ingreso_no_bloqueado_por_mapeo(
+                        ingreso_id=idIngreso,
+                    )
+                    if mensaje_bloqueo:
+                        return JsonResponse({"success": False, "error": mensaje_bloqueo}, status=409)
+                    # La inactivacion delega el cierre de cama al servicio para que
+                    # el ingreso y la asignacion queden consistentes en una sola operacion.
+                    resultado = IngresoService.inactivar_ingreso(idIngreso, request.user)
                     if resultado:
                         return JsonResponse({"success": resultado })
                     else:

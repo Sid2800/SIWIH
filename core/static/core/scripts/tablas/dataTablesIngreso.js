@@ -387,6 +387,11 @@ document.addEventListener("DOMContentLoaded", () => {
         if (selectedRow) {
             if (!selectedRow.id) return;
 
+            if (selectedRow.fecha_recepcion_sdgi) {
+                toastr.warning("No es posible inactivar un ingreso ya recibido en SDGI.");
+                return;
+            }
+
             const titulo = `Desactivar ingreso`;
             const mensaje = `¿ Realmente desea desactivar el ingreso, es un proceso irreversible ?`;
 
@@ -394,8 +399,8 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!resultado) return;
 
             try {
-                await inactivarIngreso(selectedRow.id);
-                if (table){
+                const inactivacionExitosa = await inactivarIngreso(selectedRow.id);
+                if (inactivacionExitosa && table){
                     table.ajax.reload();
                 }
             } catch (error) {

@@ -1,0 +1,42 @@
+
+<section id="card-kpis" class="dash-kpis" aria-label="KPIs principales" aria-live="polite">
+  <article class="dash-kpi" role="status">
+    <p class="dash-kpi__label" id="kpi-label-total-camas">Total camas</p>
+    <p class="dash-kpi__value" id="kpi-total-camas">—</p>
+  </article>
+  <article class="dash-kpi mapa-cama--ocupada" role="status">
+    <p class="dash-kpi__label" id="kpi-label-ocupadas">Ocupadas</p>
+    <p class="dash-kpi__value" id="kpi-ocupadas">—</p>
+  </article>
+  <article class="dash-kpi mapa-cama--vacia" role="status">
+    <p class="dash-kpi__label" id="kpi-label-disponibles">Disponibles</p>
+    <p class="dash-kpi__value" id="kpi-disponibles">—</p>
+  </article>
+  <article class="dash-kpi mapa-cama--fuera-servicio" role="status">
+    <p class="dash-kpi__label">Fuera de servicio</p>
+    <p class="dash-kpi__value" id="kpi-fuera-servicio">—</p>
+  </article>
+  <article class="dash-kpi" role="status">
+    <p class="dash-kpi__label">% Ocupación</p>
+    <p class="dash-kpi__value"><span id="kpi-porcentaje-ocupacion">—</span></p>
+    <div class="dash-progress" id="kpi-ocupacion-progress-wrap"
+         role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+      <span class="dash-progress__bar" id="kpi-ocupacion-bar"></span>
+    </div>
+  </article>
+  <article class="dash-kpi" role="status">
+    <p class="dash-kpi__label">Movimientos (rango)</p>
+    <p class="dash-kpi__value" id="kpi-movimientos">—</p>
+  </article>
+  <article class="dash-kpi" role="status">
+    <p class="dash-kpi__label">Cambios detectados</p>
+    <p class="dash-kpi__value" id="kpi-cambios-mapeo">—</p>
+    <p class="dash-kpi__hint">Sesión de mapeo activa</p>
+  </article>
+  <article class="dash-kpi" role="status">
+    <p class="dash-kpi__label">Camas validadas</p>
+    <p class="dash-kpi__value" id="kpi-camas-validadas">—</p>
+    <p class="dash-kpi__hint">Sesión de mapeo activa</p>
+  </article>
+  <div id="dash-kpis-error" class="dash-state dash-state--err" role="alert"></div>
+</section>

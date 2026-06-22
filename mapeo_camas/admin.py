@@ -1,0 +1,93 @@
+from django.contrib import admin
+
+from mapeo_camas.models import AsignacionCamaPaciente, HistorialEstadoCama, MovimientoCama
+
+
+@admin.register(AsignacionCamaPaciente)
+class AsignacionCamaPacienteAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "cama",
+        "ingreso",
+        "estado",
+        "fecha_inicio",
+        "usuario_asignacion",
+    )
+    list_filter = ("estado", "fecha_inicio")
+    search_fields = (
+        "cama__numero_cama",
+        "ingreso__id",
+    )
+    
+    # PROTECCIÓN: Esta tabla es histórica y nunca debe modificarse manualmente
+    # Se necesitan todos los registros (incluso los CERRADA) para mapeos posteriores
+    def has_add_permission(self, request):
+        return False
+    
+    def has_change_permission(self, request, obj=None):
+        return False
+    
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(HistorialEstadoCama)
+class HistorialEstadoCamaAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "cama",
+        "estado_anterior",
+        "estado_nuevo",
+        "ingreso",
+        "usuario",
+        "fecha_hora",
+        "observacion",
+    )
+    list_filter = ("estado_nuevo", "estado_anterior", "fecha_hora")
+    search_fields = (
+        "cama__numero_cama",
+        "ingreso__id",
+        "observacion__codigo",
+    )
+    # Solo lectura: el historial nunca se modifica manualmente
+    def has_add_permission(self, request):
+        return False
+    
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(MovimientoCama)
+class MovimientoCamaAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "tipo_movimiento",
+        "cama_origen",
+        "cama_destino",
+        "ingreso",
+        "usuario",
+        "fecha_hora",
+        "observacion",
+    )
+    list_filter = ("tipo_movimiento", "fecha_hora")
+    search_fields = (
+        "cama_origen__numero_cama",
+        "cama_destino__numero_cama",
+        "ingreso__id",
+        "observacion__codigo",
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+    
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False

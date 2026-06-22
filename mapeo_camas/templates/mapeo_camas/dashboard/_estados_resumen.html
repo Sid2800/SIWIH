@@ -1,0 +1,27 @@
+
+<article id="card-estados-resumen" class="dash-card dash-top__resumen">
+  <header class="dash-card__head">
+    <h3 class="dash-card__title">Resumen de estados</h3>
+    <div class="dash-card__acciones">
+      <span class="dash-pill" id="estados-resumen-total">—</span>
+      {# [2026-06-16] Viñeta de colapso del card (patrón de mapa de camas). #}
+      <button
+        type="button"
+        class="dash-card-colapsar"
+        data-card-collapse
+        aria-expanded="true"
+        aria-controls="card-estados-resumen-body"
+        title="Colapsar card"
+      >
+        <i class="bi bi-chevron-up" aria-hidden="true"></i>
+        <span>Colapsar</span>
+      </button>
+    </div>
+  </header>
+  <div id="card-estados-resumen-body" class="dash-card__body dash-card__body--centered">
+    <div id="chart-estados-resumen"></div>
+    <div class="dash-state" data-state="loading"><span class="dash-state__spinner"></span><span>Cargando…</span></div>
+    <div class="dash-state" data-state="empty">Sin datos</div>
+    <div class="dash-state dash-state--err" data-state="err" role="alert">Error</div>
+  </div>
+</article>

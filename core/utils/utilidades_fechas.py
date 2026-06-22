@@ -276,3 +276,26 @@ def filtro_rango_fecha(campo, inicio, fin):
     { "campo__range": (inicio, fin) }
     """
     return {f"{campo}__range": (inicio, fin)}
+
+# 2026-05-29: extraido de mapeo_camas/views.py (refactor B). Helpers globales
+def hora_local_iso(dt):
+    """Convierte un datetime aware a ISO en zona horaria local; '' si es falsy."""
+    if not dt:
+        return ""
+    return timezone.localtime(dt).isoformat()
+
+
+def parse_fecha_filtro_dia(fecha_texto, fin_del_dia=False):
+    """Convierte 'YYYY-MM-DD' a datetime aware en zona local (inicio o fin de dia)."""
+    if not fecha_texto:
+        return None
+    try:
+        fecha = datetime.strptime(fecha_texto, '%Y-%m-%d')
+    except ValueError:
+        return None
+    if fin_del_dia:
+        fecha = fecha.replace(hour=23, minute=59, second=59, microsecond=999999)
+    else:
+        fecha = fecha.replace(hour=0, minute=0, second=0, microsecond=0)
+    return timezone.make_aware(fecha, timezone.get_current_timezone())
+

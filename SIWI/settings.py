@@ -61,6 +61,7 @@ INSTALLED_APPS = [
     'clinico',
     'usuario',
     's_exp',
+    'mapeo_camas',
     'rrhh'
 ]
 
@@ -193,6 +194,7 @@ SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 SESSION_COOKIE_AGE = 1800  # 30 minutos
 
 # Reinicia el tiempo de expiraci�n con cada solicitud activa
+
 SESSION_SAVE_EVERY_REQUEST = True
 
 
@@ -286,3 +288,4 @@ LOGGING = {
         },
     },
 }
+

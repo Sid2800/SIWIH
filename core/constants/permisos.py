@@ -31,7 +31,7 @@ EXPEDIENTE_VISUALIZACION_UNIDADES = ["ADMI"]
 
 
 # -----------------------------
-# PERMISOS APP IMAGENOLOGIA
+# PERMISOS APP IMAGENOLOGIA  
 # -----------------------------
 
 # Acceso de edición (Add, Inactivar)
@@ -102,3 +102,29 @@ S_EXP_ADMIN_UNIDADES = ['Admision', 'DIRECTIVOS']
 # Acceso de usuario solicitante (buscar, solicitar, seguimiento)
 S_EXP_USUARIO_ROLES = ['exp_admin', 'exp_solicitante', 'admin']
 S_EXP_USUARIO_UNIDADES = ['Admision', 'DIRECTIVOS', 'Sala', 'Imagenologia', 'Referencia']
+
+
+# -----------------------------
+# PERMISOS APP MAPEO_CAMAS
+# -----------------------------
+
+# [2026-05-18] Acceso para entrar y ejecutar flujo de mapeo.
+MAPEO_CAMAS_MAPEAR_ROLES = ["admin","digitador","visitante"]
+MAPEO_CAMAS_MAPEAR_UNIDADES = ["ADMI"]
+
+# [2026-05-18] Acceso para cambios manuales en el mapa (edición directa).
+MAPEO_CAMAS_CAMBIOS_ROLES = ["visitante","admin"]
+MAPEO_CAMAS_CAMBIOS_UNIDADES = ["ADMI"]
+
+# [2026-06-11] Ajuste operativo: el limite de intentos aplica.
+MAPEO_CAMAS_INTENTOS_CAMBIO_ROLES = ["visitante"]
+MAPEO_CAMAS_INTENTOS_CAMBIO_UNIDADES = ["ADMI"]
+
+# Acceso de auditoría (historiales, detalle de historial)
+# [2026-05-11] Visitante habilitado para visualizar templates de historial.
+MAPEO_CAMAS_HISTORIALES_ROLES = ["digitador"]
+MAPEO_CAMAS_HISTORIALES_UNIDADES = ["ADMI"]
+
+# [2026-05-28] Acceso al dashboard operativo de KPIs/gráficas en tiempo real.
+MAPEO_CAMAS_DASHBOARD_ROLES = ["digitador","admin"]
+MAPEO_CAMAS_DASHBOARD_UNIDADES = ["ADMI"]

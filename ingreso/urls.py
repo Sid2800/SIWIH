@@ -18,7 +18,6 @@ urlpatterns = [
     path('listar_ingresos_API/', views.listarIngresosAPI, name='listar_ingresos_API'),
     path('listar_ingresos_paciente_API/', views.listarIngresosPacienteAPI, name='listar-ingresos-paciente-API'),
 
-
     path('registrar_recepcion_ingresos_sala/', views.registrarRecepcionIngresosSala, name='registrar-recepcion-ingresos-sala'),
     path('registrar_recepcion_ingresos_sdgi/', views.registrarRecepcionIngresosSDGI, name='registrar-recepcion-ingresos-sdgi'),
     
