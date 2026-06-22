@@ -104,7 +104,7 @@ MAPEO_CAMAS_MAPEAR_ROLES = ["admin", ]
 MAPEO_CAMAS_MAPEAR_UNIDADES = ["ADMI"]
 
 # [2026-05-18] Acceso para cambios manuales en el mapa (edición directa).
-MAPEO_CAMAS_CAMBIOS_ROLES = ["admin"]
+MAPEO_CAMAS_CAMBIOS_ROLES = []
 MAPEO_CAMAS_CAMBIOS_UNIDADES = ["ADMI"]
 
 # [2026-06-11] Ajuste operativo: el limite de intentos aplica.

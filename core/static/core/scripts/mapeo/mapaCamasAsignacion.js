@@ -6,6 +6,13 @@ document.addEventListener("DOMContentLoaded", function () {
   // [2026-06-01] Endpoints inyectados por el template via window.MAPA_CFG — no hardcodear URLs aquí.
   var API_URLS = (window.MAPA_CFG && window.MAPA_CFG.urls) || {};
 
+  // [2026-06-22] Filtro operativo para ingreso en modal de cama.
+  var ESTADOS_FILTRO_INGRESO = [
+    "VACIA",
+    "CONSULTA_EXTERNA",
+    "PRE_ALTA"
+  ];
+
   var ESTADOS_CAMA = [
     "VACIA",
     "OCUPADA",
@@ -827,7 +834,13 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // ── HTML para cama VACIA (u otro estado sin paciente) ────────────────────
     // Permite cambiar el estado; si se elige OCUPADA aparece busqueda de paciente
-    var estadosDisponibles = ESTADOS_CAMA.slice();
+    var estadosDisponibles = ESTADOS_FILTRO_INGRESO.slice();
+    if (estadosDisponibles.indexOf("OCUPADA") === -1) {
+      estadosDisponibles.push("OCUPADA");
+    }
+    if (estadoActual && estadosDisponibles.indexOf(estadoActual) === -1) {
+      estadosDisponibles.unshift(estadoActual);
+    }
     if (window.MAPA_ROL_INTENTOS_RESTRINGIDO && esOcupada) {
       estadosDisponibles = ["VACIA", "PRE_ALTA"];
     }
@@ -840,6 +853,7 @@ document.addEventListener("DOMContentLoaded", function () {
       htmlInformacion +
       '<fieldset class="modalAtencionCampos">' +
       "  <legend>Estado de la cama</legend>" +
+      '  <p><strong>Estado actual:</strong> ' + escaparHtml(estadoActualTexto) + '</p>' +
       '  <div class="formularioCampoModal">' +
       '    <label for="modal-mapa-estado">Cambiar a estado</label>' +
       '    <select id="modal-mapa-estado" class="formularioCampo-select">' +
@@ -904,6 +918,7 @@ document.addEventListener("DOMContentLoaded", function () {
       "</fieldset>" +
       '<fieldset id="bloque-cambiar-estado" class="modalAtencionCampos">' +
       "  <legend>Nuevo estado</legend>" +
+      '  <p><strong>Estado actual:</strong> ' + escaparHtml(estadoActualTexto) + '</p>' +
       '  <div class="formularioCampoModal">' +
       '    <label for="modal-mapa-estado">Estado</label>' +
       '    <select id="modal-mapa-estado" class="formularioCampo-select">' +

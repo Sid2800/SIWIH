@@ -22,9 +22,11 @@ from core.constants.permisos import (
     MAPEO_CAMAS_INTENTOS_CAMBIO_UNIDADES as MAPEO_CAMAS_INTENTO_CAMBIO_UNIDADES,
     MAPEO_CAMAS_MAPEAR_ROLES,
     MAPEO_CAMAS_MAPEAR_UNIDADES,
+    ROLES_GLOBALES,
     MAPEO_CAMAS_VISUALIZACION_ROLES,
     MAPEO_CAMAS_VISUALIZACION_UNIDADES,
 )
+from core.services.usuario_service import UsuarioService
 from usuario.permisos import verificar_permisos_usuario
 
 from mapeo_camas.models import HistorialEstadoCama
@@ -55,13 +57,15 @@ def _tiene_permiso_visualizacion_mapa(usuario):
     )
 
 
+# [2026-06-22 AUDIT] Historiales y dashboard quedaron definidos como acceso especial:
+# solo superusuario o cualquier perfil con alcance GLOBAL, sin permiso extra.
+def _tiene_acceso_global_mapeo(usuario):
+    return bool(usuario and (usuario.is_superuser or UsuarioService.es_global(usuario)))
+
+
 def _tiene_permiso_historiales(usuario):
     """Permite acceso de solo visualización al mapa e historiales."""
-    return verificar_permisos_usuario(
-        usuario,
-        MAPEO_CAMAS_HISTORIALES_ROLES,
-        MAPEO_CAMAS_HISTORIALES_UNIDADES,
-    )
+    return _tiene_acceso_global_mapeo(usuario)
 
 
 def _tiene_permiso_cambios_mapa(usuario):
@@ -86,11 +90,7 @@ def _tiene_permiso_mapear(usuario):
 # para evitar acoplamiento de permisos entre auditoría y monitoreo operativo.
 def _tiene_permiso_dashboard(usuario):
     """Permite acceso al dashboard operativo de KPIs/gráficas en tiempo real."""
-    return verificar_permisos_usuario(
-        usuario,
-        MAPEO_CAMAS_DASHBOARD_ROLES,
-        MAPEO_CAMAS_DASHBOARD_UNIDADES,
-    )
+    return _tiene_acceso_global_mapeo(usuario)
 
 
 # [2026-05-28] FIX: los endpoints de edición de cama desde el mapa (actualizar_cama_mapa,
@@ -120,6 +120,15 @@ def _puede_gestionar_sesion_mapeo(usuario):
     las restricciones de intentos aplican a movimientos/edición, no al botón de sesión.
     """
     return _tiene_permiso_mapear(usuario)
+
+
+def _puede_cancelar_mapeo(usuario):
+    """Permite cancelar sesiones de mapeo a superusuario y perfiles globales."""
+    return verificar_permisos_usuario(
+        usuario,
+        ROLES_GLOBALES,
+        MAPEO_CAMAS_MAPEAR_UNIDADES,
+    )
 
 
 # [2026-05-07] Helper para calcular inicio de ventana de límite de movimientos

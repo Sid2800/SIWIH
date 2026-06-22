@@ -892,7 +892,10 @@ class MapeoCamasService:
                     .first()
                 )
 
+                # [2026-06-22] Obtener estado anterior real de la cama si existe.
+                estado_anterior_real = estado_vacia
                 if asignacion:
+                    estado_anterior_real = asignacion.estado or estado_vacia
                     asignacion.ingreso_id = ingreso_id
                     asignacion.usuario_asignacion = usuario
                     asignacion.estado = estado_ocupada
@@ -915,10 +918,10 @@ class MapeoCamasService:
                     asignacion.save()
 
                 # FASE 6: registrar en historial de estado
-                # Ingreso: la cama pasa de Vacia → Ocupada
+                # Ingreso: la cama pasa de estado anterior real → Ocupada
                 MapeoCamasService.registrar_historial_estado_cama(
                     cama_id=cama_id,
-                    estado_anterior=estado_vacia,
+                    estado_anterior=estado_anterior_real,
                     estado_nuevo=estado_ocupada,
                     ingreso_id=ingreso_id,
                     usuario=usuario,
@@ -1072,6 +1075,7 @@ class MapeoCamasService:
             asignacion_activa.save(update_fields=["estado", "ingreso"])
 
             # La nueva cama reutiliza su ultimo registro historico si existe.
+            # [2026-06-22] Obtener estado anterior real de la nueva cama.
             nueva_asignacion = (
                 AsignacionCamaPaciente.objects.select_for_update()
                 .filter(cama_id=cama_nueva_id)
@@ -1079,7 +1083,9 @@ class MapeoCamasService:
                 .first()
             )
 
+            estado_anterior_nueva_cama = estado_vacia
             if nueva_asignacion:
+                estado_anterior_nueva_cama = nueva_asignacion.estado or estado_vacia
                 nueva_asignacion.ingreso_id = ingreso_id
                 nueva_asignacion.usuario_asignacion = usuario
                 nueva_asignacion.estado = estado_ocupada
@@ -1102,7 +1108,7 @@ class MapeoCamasService:
 
             MapeoCamasService.registrar_historial_estado_cama(
                 cama_id=cama_nueva_id,
-                estado_anterior=estado_vacia,
+                estado_anterior=estado_anterior_nueva_cama,
                 estado_nuevo=estado_ocupada,
                 ingreso_id=ingreso_id,
                 usuario=usuario,

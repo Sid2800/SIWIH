@@ -4,12 +4,13 @@ historial por cama y movimientos)."""
 
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
+from django.shortcuts import redirect
 from django.views.decorators.http import require_GET
 from django.views.generic import TemplateView
 
 from core.constants.permisos import (
-    MAPEO_CAMAS_HISTORIALES_ROLES,
-    MAPEO_CAMAS_HISTORIALES_UNIDADES,
+    MAPEO_CAMAS_VISUALIZACION_ROLES,
+    MAPEO_CAMAS_VISUALIZACION_UNIDADES,
 )
 from core.constants.mapeo_camas_constants import DETALLE_PAGE_SIZE_DEFAULT, DETALLE_PAGE_SIZE_MAX
 from core.mixins import UnidadRolRequiredMixin
@@ -30,8 +31,15 @@ __all__ = [
 
 class MapeoCamasHistorialView(UnidadRolRequiredMixin, TemplateView):
     template_name = "mapeo_camas/historiales.html"
-    required_roles = MAPEO_CAMAS_HISTORIALES_ROLES
-    required_unidades = MAPEO_CAMAS_HISTORIALES_UNIDADES
+    # [2026-06-22 AUDIT] Se mantiene el mixin en la vista, pero el acceso real
+    # a historiales es el criterio especial superusuario/global sin permiso extra.
+    required_roles = MAPEO_CAMAS_VISUALIZACION_ROLES
+    required_unidades = MAPEO_CAMAS_VISUALIZACION_UNIDADES
+
+    def dispatch(self, request, *args, **kwargs):
+        if not _tiene_permiso_historiales(request.user):
+            return redirect("acceso_denegado")
+        return TemplateView.dispatch(self, request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -42,8 +50,15 @@ class MapeoCamasHistorialView(UnidadRolRequiredMixin, TemplateView):
 
 class MapeoCamasHistorialDetalleView(UnidadRolRequiredMixin, TemplateView):
     template_name = "mapeo_camas/historiales_detalle.html"
-    required_roles = MAPEO_CAMAS_HISTORIALES_ROLES
-    required_unidades = MAPEO_CAMAS_HISTORIALES_UNIDADES
+    # [2026-06-22 AUDIT] Se mantiene el mixin en la vista, pero el acceso real
+    # a historiales es el criterio especial superusuario/global sin permiso extra.
+    required_roles = MAPEO_CAMAS_VISUALIZACION_ROLES
+    required_unidades = MAPEO_CAMAS_VISUALIZACION_UNIDADES
+
+    def dispatch(self, request, *args, **kwargs):
+        if not _tiene_permiso_historiales(request.user):
+            return redirect("acceso_denegado")
+        return TemplateView.dispatch(self, request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

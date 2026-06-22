@@ -6,6 +6,7 @@ from collections import defaultdict
 
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
+from django.shortcuts import redirect
 from django.utils import timezone
 from django.views.decorators.http import require_GET
 from django.views.generic import TemplateView
@@ -16,8 +17,8 @@ from openpyxl.utils import get_column_letter
 from core.utils.utilidades_fechas import hora_local_iso
 from core.services.reporte.EXCEL.reporte_service_excel import ServiceExcel
 from core.constants.permisos import (
-    MAPEO_CAMAS_DASHBOARD_ROLES,
-    MAPEO_CAMAS_DASHBOARD_UNIDADES,
+    MAPEO_CAMAS_VISUALIZACION_ROLES,
+    MAPEO_CAMAS_VISUALIZACION_UNIDADES,
 )
 from core.mixins import UnidadRolRequiredMixin
 from servicio.models import Cama
@@ -371,8 +372,15 @@ def _generar_excel_ocupacion(desde, hasta, filas, username):
 class DashboardMapeoCamasView(UnidadRolRequiredMixin, TemplateView):
     """[2026-05-28] Dashboard operativo de KPIs y gráficas en tiempo real."""
     template_name = "mapeo_camas/dashboard/dashboard.html"
-    required_roles = MAPEO_CAMAS_DASHBOARD_ROLES
-    required_unidades = MAPEO_CAMAS_DASHBOARD_UNIDADES
+    # [2026-06-22 AUDIT] Se mantiene el mixin en la vista, pero el acceso real
+    # al dashboard es el criterio especial superusuario/global sin permiso extra.
+    required_roles = MAPEO_CAMAS_VISUALIZACION_ROLES
+    required_unidades = MAPEO_CAMAS_VISUALIZACION_UNIDADES
+
+    def dispatch(self, request, *args, **kwargs):
+        if not _tiene_permiso_dashboard(request.user):
+            return redirect("acceso_denegado")
+        return TemplateView.dispatch(self, request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
