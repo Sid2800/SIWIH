@@ -95,24 +95,28 @@ ROLES_GLOBALES = ['directivo', 'admin']
 # PERMISOS APP MAPEO_CAMAS
 # -----------------------------
 
+# [2026-06-22] Acceso de solo visualización al template del mapa de camas.
+MAPEO_CAMAS_VISUALIZACION_ROLES = ["admin", "digitador", "visitante", "directivo"]
+MAPEO_CAMAS_VISUALIZACION_UNIDADES = ["ADMI"]
+
 # [2026-05-18] Acceso para entrar y ejecutar flujo de mapeo.
-MAPEO_CAMAS_MAPEAR_ROLES = ["admin","digitador","visitante"]
+MAPEO_CAMAS_MAPEAR_ROLES = ["admin", ]
 MAPEO_CAMAS_MAPEAR_UNIDADES = ["ADMI"]
 
 # [2026-05-18] Acceso para cambios manuales en el mapa (edición directa).
-MAPEO_CAMAS_CAMBIOS_ROLES = ["visitante","admin"]
+MAPEO_CAMAS_CAMBIOS_ROLES = ["admin"]
 MAPEO_CAMAS_CAMBIOS_UNIDADES = ["ADMI"]
 
 # [2026-06-11] Ajuste operativo: el limite de intentos aplica.
-MAPEO_CAMAS_INTENTOS_CAMBIO_ROLES = ["visitante"]
+MAPEO_CAMAS_INTENTOS_CAMBIO_ROLES = []
 MAPEO_CAMAS_INTENTOS_CAMBIO_UNIDADES = ["ADMI"]
 
 # Acceso de auditoría (historiales, detalle de historial)
 # [2026-05-11] Visitante habilitado para visualizar templates de historial.
-MAPEO_CAMAS_HISTORIALES_ROLES = ["digitador"]
+MAPEO_CAMAS_HISTORIALES_ROLES = []
 MAPEO_CAMAS_HISTORIALES_UNIDADES = ["ADMI"]
 
 # [2026-05-28] Acceso al dashboard operativo de KPIs/gráficas en tiempo real.
-MAPEO_CAMAS_DASHBOARD_ROLES = ["digitador","admin"]
+MAPEO_CAMAS_DASHBOARD_ROLES = []
 MAPEO_CAMAS_DASHBOARD_UNIDADES = ["ADMI"]
 

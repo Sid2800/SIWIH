@@ -14,8 +14,8 @@ from core.utils.utilidades_fechas import hora_local_iso
 from core.constants.permisos import (
     MAPEO_CAMAS_HISTORIALES_ROLES,
     MAPEO_CAMAS_HISTORIALES_UNIDADES,
-    MAPEO_CAMAS_MAPEAR_ROLES,
-    MAPEO_CAMAS_MAPEAR_UNIDADES,
+    MAPEO_CAMAS_VISUALIZACION_ROLES,
+    MAPEO_CAMAS_VISUALIZACION_UNIDADES,
 )
 from core.mixins import UnidadRolRequiredMixin
 from core.services.mapeo_camas_service import MapeoCamasService
@@ -65,6 +65,7 @@ from ._permisos import (
     _tiene_permiso_dashboard,
     _tiene_permiso_historiales,
     _tiene_permiso_mapear,
+    _tiene_permiso_visualizacion_mapa,
     _validar_limite_intentos_salas,
 )
 from ._sesion import (
@@ -154,8 +155,9 @@ def _servicio_payload(servicio, salas_data, conflicto_mapeo=None):
 # [2026-05-28] MC-PERM-001: el acceso al mapa es parte del flujo de mapeo.
 class MapeoCamasMapaView(UnidadRolRequiredMixin, TemplateView):
     template_name = "mapeo_camas/mapa.html"
-    required_roles = MAPEO_CAMAS_MAPEAR_ROLES
-    required_unidades = MAPEO_CAMAS_MAPEAR_UNIDADES
+    # [2026-06-22] Permiso exclusivo de visualización para renderizar el template del mapa.
+    required_roles = MAPEO_CAMAS_VISUALIZACION_ROLES
+    required_unidades = MAPEO_CAMAS_VISUALIZACION_UNIDADES
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -207,7 +209,8 @@ class MapeoCamasMapaView(UnidadRolRequiredMixin, TemplateView):
 @login_required
 @require_GET
 def mapa_camas_data(request):
-    if not _tiene_permiso_mapear(request.user):
+    # [2026-06-22] Data de lectura del mapa usa permiso de visualización.
+    if not _tiene_permiso_visualizacion_mapa(request.user):
         return JsonResponse({"ok": False, "error": "Acceso denegado."}, status=403)
 
     sesion_activa = _obtener_sesion_mapeo_activa(request.user)

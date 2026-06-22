@@ -22,6 +22,8 @@ from core.constants.permisos import (
     MAPEO_CAMAS_INTENTOS_CAMBIO_UNIDADES as MAPEO_CAMAS_INTENTO_CAMBIO_UNIDADES,
     MAPEO_CAMAS_MAPEAR_ROLES,
     MAPEO_CAMAS_MAPEAR_UNIDADES,
+    MAPEO_CAMAS_VISUALIZACION_ROLES,
+    MAPEO_CAMAS_VISUALIZACION_UNIDADES,
 )
 from usuario.permisos import verificar_permisos_usuario
 
@@ -44,6 +46,15 @@ from ._sesion import _obtener_sesion_mapeo_activa
 # 4) Respuesta uniforme con JsonResponse cuando se rebasa el límite.
 
 # [2026-05-19] Helpers de permisos para mantener una sola fuente de verdad.
+def _tiene_permiso_visualizacion_mapa(usuario):
+    """Permite acceso de solo lectura al template y data del mapa."""
+    return verificar_permisos_usuario(
+        usuario,
+        MAPEO_CAMAS_VISUALIZACION_ROLES,
+        MAPEO_CAMAS_VISUALIZACION_UNIDADES,
+    )
+
+
 def _tiene_permiso_historiales(usuario):
     """Permite acceso de solo visualización al mapa e historiales."""
     return verificar_permisos_usuario(
