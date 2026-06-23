@@ -59,6 +59,7 @@ from ._permisos import (
     _es_rol_intentos_restringido,
     _filtro_observaciones_movimiento_limite,
     _inicio_ventana_limite_sala,
+    _puede_cancelar_mapeo_banner,
     _max_cambios_para_usuario,
     _puede_cancelar_mapeo,
     _puede_editar_cama_en_mapa,
@@ -200,6 +201,8 @@ class MapeoCamasMapaView(UnidadRolRequiredMixin, TemplateView):
         ]
         context["puede_mapear"] = _puede_gestionar_sesion_mapeo(self.request.user)
         context["puede_cancelar_mapeo"] = _puede_cancelar_mapeo(self.request.user)
+        # [2026-06-23] Botón del banner (mapeos ajenos): solo superadmin o GLOBAL.
+        context["puede_cancelar_mapeo_banner"] = _puede_cancelar_mapeo_banner(self.request.user)
         context["puede_hacer_cambios_mapa"] = _puede_editar_cama_en_mapa(self.request.user)
         context["puede_ver_historiales"] = _tiene_permiso_historiales(self.request.user)
         # [2026-06-11] Dashboard se controla con permiso propio, separado de historiales.

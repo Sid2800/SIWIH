@@ -97,11 +97,11 @@ ROLES_GLOBALES = ['directivo', 'admin']
 
 # [2026-06-22] Acceso de solo visualización al template del mapa de camas.
 MAPEO_CAMAS_VISUALIZACION_ROLES = ["admin", "digitador", "visitante", "directivo"]
-MAPEO_CAMAS_VISUALIZACION_UNIDADES = ["ADMI"]
+MAPEO_CAMAS_VISUALIZACION_UNIDADES = ["ADMI", 'SALA']
 
 # [2026-05-18] Acceso para entrar y ejecutar flujo de mapeo.
-MAPEO_CAMAS_MAPEAR_ROLES = ["admin", ]
-MAPEO_CAMAS_MAPEAR_UNIDADES = ["ADMI"]
+MAPEO_CAMAS_MAPEAR_ROLES = ["visitante"]
+MAPEO_CAMAS_MAPEAR_UNIDADES = ["ADMI",'SALA']
 
 # [2026-05-18] Acceso para cambios manuales en el mapa (edición directa).
 MAPEO_CAMAS_CAMBIOS_ROLES = []

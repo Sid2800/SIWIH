@@ -100,7 +100,7 @@
               <span>&middot; Inicio: {{ sesion.hora_inicio }}</span>
             {% endif %}
           </div>
-          {% if puede_cancelar_mapeo %}
+          {% if puede_cancelar_mapeo_banner %}
           <form method="post" action="{% url 'mapeo_camas_cancelar_mapeo' %}" class="mapa-banner-advertencia__accion-form">
             {% csrf_token %}
             <input type="hidden" name="sesion_mapeo_id" value="{{ sesion.sesion_id }}">

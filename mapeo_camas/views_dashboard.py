@@ -378,9 +378,13 @@ class DashboardMapeoCamasView(UnidadRolRequiredMixin, TemplateView):
     required_unidades = MAPEO_CAMAS_VISUALIZACION_UNIDADES
 
     def dispatch(self, request, *args, **kwargs):
+        # [2026-06-23] super() primero para que LoginRequiredMixin redirija a login si no autenticado
+        respuesta_mixin = super().dispatch(request, *args, **kwargs)
+        if not request.user.is_authenticated:
+            return respuesta_mixin
         if not _tiene_permiso_dashboard(request.user):
             return redirect("acceso_denegado")
-        return TemplateView.dispatch(self, request, *args, **kwargs)
+        return respuesta_mixin
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

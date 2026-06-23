@@ -36,6 +36,7 @@ from ._permisos import (
     _tiene_permiso_cambios_mapa,
     _tiene_permiso_historiales,
     _tiene_permiso_mapear,
+    _tiene_permiso_visualizacion_mapa,
 )
 
 
@@ -270,6 +271,7 @@ def debug_permisos_mapa(request):
 
     match_alcance_global_vista = PerfilUnidad.objects.filter(
         usuario=usuario,
+        rol__in=MAPEO_CAMAS_VISUALIZACION_ROLES,
         alcance=AlcanceUsuario.GLOBAL,
     ).exists()
 
@@ -308,7 +310,7 @@ def debug_permisos_mapa(request):
             },
             "perfiles": perfiles,
             "evaluacion": {
-                "puede_ver_mapa": _tiene_permiso_historiales(usuario),
+                "puede_ver_mapa": _tiene_permiso_visualizacion_mapa(usuario),
                 "puede_mapear": _tiene_permiso_mapear(usuario),
                 "puede_gestionar_sesion_mapeo": _puede_gestionar_sesion_mapeo(usuario),
                 "puede_hacer_cambios_mapa": _tiene_permiso_cambios_mapa(usuario),
