@@ -261,6 +261,19 @@ def historial_prestamos_expediente_api(request, expediente_id):
 
         from s_exp.services.datos_solicitud import DatosDetalleSolicitud, DatosSolicitud
 
+        # Ubicación ACTUAL del expediente (dónde está físicamente AHORA). Es un
+        # dato único del expediente (no por préstamo), así que se resuelve UNA
+        # vez. Fuente: catálogo unificado expediente_ubicacion (FK por id),
+        # con fallback legacy — ver _resolver_ubicacion_expediente.
+        ubicacion_actual = ''
+        try:
+            exp_obj = Expediente.objects.select_related('ubicacion', 'localizacion').filter(id=expediente_id).first()
+            info_exp = ExpedientePrestamo.objects.select_related('ubicacion').filter(expediente_id=expediente_id).first()
+            if exp_obj:
+                ubicacion_actual = _resolver_ubicacion_expediente(exp_obj, info_exp)
+        except Exception as _e:
+            log_warning(f"No se pudo resolver ubicacion actual del expediente {expediente_id}: {_e}", app=LogApp.S_EXP)
+
         data = []
         en_prestamo_actual = False
 
@@ -277,10 +290,18 @@ def historial_prestamos_expediente_api(request, expediente_id):
                 "solicitante": DatosSolicitud.usuario_nombre_completo(s),
                 "estado": DatosSolicitud.estado_nombre(s),
                 "devuelto": d.devuelto,
+                # Área a la que se prestó EN ESE MOMENTO (snapshot por la FK
+                # servicio_unidad capturada al crear la solicitud; NO cambia
+                # aunque el solicitante luego cambie de puesto).
                 "area_destino": DatosSolicitud.unidad_nombre(s),
             })
 
-        return JsonResponse({"data": data, "en_prestamo": en_prestamo_actual})
+        return JsonResponse({
+            "data": data,
+            "en_prestamo": en_prestamo_actual,
+            # Ubicación física actual del expediente (igual para todo el historial).
+            "ubicacion_actual": ubicacion_actual,
+        })
 
     except Exception as e:
         log_error(f"Error en historial_prestamos_expediente_api: {e}", app=LogApp.S_EXP)

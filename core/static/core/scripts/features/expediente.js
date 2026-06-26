@@ -167,14 +167,22 @@ $(document).ready(function () {
             $.get(ajaxUrl, function (response) {
                 const prestamos = response.data || [];
 
-                // Mostrar badge de estado actual
+                // Mostrar badge de estado actual + UBICACIÓN ACTUAL del expediente.
+                // 'ubicacion_actual' viene de la API (dónde está el expediente AHORA),
+                // mientras que la columna "Área donde se prestó" de la tabla es el
+                // destino histórico de cada préstamo (snapshot, no cambia).
                 const badgeContainer = document.getElementById('prestamos-estado-badge');
                 if (badgeContainer) {
+                    let badges = '';
                     if (response.en_prestamo) {
-                        badgeContainer.innerHTML = '<span style="background:rgba(245,158,11,0.2);color:var(--negro);padding:0.3rem 0.8rem;border-radius:20px;font-size:1.3rem;font-weight:600;"><i class="bi bi-exclamation-triangle"></i> Expediente actualmente en préstamo</span>';
+                        badges += '<span style="background:rgba(245,158,11,0.2);color:var(--negro);padding:0.3rem 0.8rem;border-radius:20px;font-size:1.3rem;font-weight:600;"><i class="bi bi-exclamation-triangle"></i> Expediente actualmente en préstamo</span>';
                     } else if (prestamos.length > 0) {
-                        badgeContainer.innerHTML = '<span style="background:rgba(34,197,94,0.2);color:var(--negro);padding:0.3rem 0.8rem;border-radius:20px;font-size:1.3rem;font-weight:600;"><i class="bi bi-check-circle"></i> Sin préstamos activos</span>';
+                        badges += '<span style="background:rgba(34,197,94,0.2);color:var(--negro);padding:0.3rem 0.8rem;border-radius:20px;font-size:1.3rem;font-weight:600;"><i class="bi bi-check-circle"></i> Sin préstamos activos</span>';
                     }
+                    if (response.ubicacion_actual) {
+                        badges += ' <span style="background:rgba(59,130,246,0.18);color:var(--negro);padding:0.3rem 0.8rem;border-radius:20px;font-size:1.3rem;font-weight:600;margin-left:0.4rem;"><i class="bi bi-geo-alt"></i> Ubicación actual: ' + response.ubicacion_actual + '</span>';
+                    }
+                    badgeContainer.innerHTML = badges;
                 }
 
                 tablePrestamos = $(`#${tableId}`).DataTable({
