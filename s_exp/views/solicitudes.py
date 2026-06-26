@@ -13,6 +13,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST, require_GET
 from django.views.decorators.csrf import csrf_protect
 
+from django.db import transaction
 from django.db.models import Count, Q
 
 from s_exp.models import MotivoSolicitud, ExpedientePrestamo, SolicitudPrestamo, SolicitudExpedienteDetalle, Prestamo, ExpedienteEstadoLog
@@ -676,59 +677,68 @@ def crear_solicitud_api(request):
                     "error": f"El expediente #{exp.numero} ya no está disponible"
                 }, status=400)
 
-        # Crear solicitud (sin snapshots de texto; solo referencia FK)
-        solicitud = SolicitudPrestamo.objects.create(
-            usuario=request.user,
-            motivo=motivo,
-            estado_flujo_id=EstadoSolicitud.id_de('SOL_PENDIENTE'),
-            observaciones=observaciones or None,
-            servicio_unidad=servicio_unidad,  # ubicación del solicitante (FK a servicio.Unidad)
-            tiempo_sugerido_horas=tiempo_sugerido_horas,
-        )
+        apartado_id = EstadoExpedienteFisico.id_de('EXP_APARTADO')
 
-        # Crear detalles guardando SOLO el paciente_id (FK).
-        # Los datos del paciente (DNI/nombre) se consultan en vivo cuando se
-        # muestran, usando DatosDetalleSolicitud.
-        for exp in expedientes:
-            # Obtener o crear ExpedientePrestamo (estado físico actual)
-            ep, created_ep = ExpedientePrestamo.objects.get_or_create(
-                expediente=exp,
-                defaults={'estado_id': EstadoExpedienteFisico.id_de('EXP_APARTADO')}
+        # TODO atómico: la solicitud, sus detalles y los logs se crean dentro de
+        # una transacción. Si algo falla a la mitad, NO se persiste nada (no quedan
+        # solicitudes "huérfanas" sin detalles). Los detalles y logs se insertan en
+        # bloque con bulk_create (1 query por tabla en vez de N).
+        with transaction.atomic():
+            # Crear solicitud (sin snapshots de texto; solo referencia FK)
+            solicitud = SolicitudPrestamo.objects.create(
+                usuario=request.user,
+                motivo=motivo,
+                estado_flujo_id=EstadoSolicitud.id_de('SOL_PENDIENTE'),
+                observaciones=observaciones or None,
+                servicio_unidad=servicio_unidad,  # ubicación del solicitante (FK a servicio.Unidad)
+                tiempo_sugerido_horas=tiempo_sugerido_horas,
             )
-            if not created_ep:
-                estado_anterior = ep.estado
-                ep.estado_id = EstadoExpedienteFisico.id_de('EXP_APARTADO')
-                ep.save()
-                ExpedienteEstadoLog.objects.create(
+
+            # Acumular detalles y logs para insertarlos en bloque.
+            detalles_a_crear = []
+            logs_a_crear = []
+            for exp in expedientes:
+                # Obtener o crear ExpedientePrestamo (estado físico actual)
+                ep, created_ep = ExpedientePrestamo.objects.get_or_create(
+                    expediente=exp,
+                    defaults={'estado_id': apartado_id}
+                )
+                if not created_ep:
+                    # Ya existía: registramos el estado anterior y lo apartamos.
+                    estado_anterior = ep.estado
+                    if ep.estado_id != apartado_id:
+                        ep.estado_id = apartado_id
+                        ep.save(update_fields=['estado'])
+                    observacion = "Expediente apartado por solicitud"
+                else:
+                    estado_anterior = None
+                    observacion = None
+
+                logs_a_crear.append(ExpedienteEstadoLog(
                     expediente=exp,
                     estado_anterior=estado_anterior,
-                    estado_nuevo_id=EstadoExpedienteFisico.id_de('EXP_APARTADO'),
+                    estado_nuevo_id=apartado_id,
                     usuario=request.user,
                     solicitud=solicitud,
-                    observacion="Expediente apartado por solicitud"
-                )
-            else:
-                ExpedienteEstadoLog.objects.create(
-                    expediente=exp,
-                    estado_anterior=None,
-                    estado_nuevo_id=EstadoExpedienteFisico.id_de('EXP_APARTADO'),
-                    usuario=request.user,
-                    solicitud=solicitud
-                )
+                    observacion=observacion,
+                ))
 
-            # Buscar el paciente asignado AL MOMENTO de la solicitud.
-            # Si después el expediente se reasigna a otro paciente, esta
-            # solicitud conserva el paciente original via FK.
-            asig = PacienteAsignacion.objects.filter(
-                expediente=exp, estado='1'
-            ).select_related('paciente').first()
-            paciente_actual = asig.paciente if asig else None
+                # Paciente asignado AL MOMENTO de la solicitud (snapshot por FK):
+                # si luego el expediente se reasigna, esta solicitud conserva el
+                # paciente original.
+                asig = PacienteAsignacion.objects.filter(
+                    expediente=exp, estado='1'
+                ).select_related('paciente').first()
 
-            SolicitudExpedienteDetalle.objects.create(
-                solicitud=solicitud,
-                expediente_prestamo=ep,
-                paciente=paciente_actual,  # FK al paciente (no snapshot)
-            )
+                detalles_a_crear.append(SolicitudExpedienteDetalle(
+                    solicitud=solicitud,
+                    expediente_prestamo=ep,
+                    paciente=(asig.paciente if asig else None),  # FK al paciente (no snapshot)
+                ))
+
+            # Inserción masiva (1 query por tabla).
+            SolicitudExpedienteDetalle.objects.bulk_create(detalles_a_crear)
+            ExpedienteEstadoLog.objects.bulk_create(logs_a_crear)
 
         _registrar_log(
             request.user, 'SOLICITUD_CREADA',
