@@ -61,7 +61,9 @@ INSTALLED_APPS = [
     'clinico',
     'usuario',
     'mapeo_camas',
-    'rrhh'
+    'rrhh',
+    # Registra el modulo para que Django cargue modelos, admin, migraciones y templates.
+    'equipos_biomedicos',
 ]
 
 MIDDLEWARE = [

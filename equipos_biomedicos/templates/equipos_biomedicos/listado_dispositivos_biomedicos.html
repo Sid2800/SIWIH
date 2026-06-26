@@ -1,0 +1,280 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Listado de equipos{% endblock title %}
+
+{% block content %}
+<div class="contenedor2 biomedicos-pagina biomedicos-pagina--ancha">
+    <div class="biomedicos-listado__encabezado">
+        <div>
+            <a class="biomedicos-volver" href="{% url 'inicio_biomedicos' %}">
+                <i class="bi bi-arrow-left"></i> Equipos
+            </a>
+            <div class="tituloFormulario">
+                <div class="tituloFormulario-texto">
+            <i class="bi bi-motherboard"></i>
+                    <div>
+                        <h2 class="sin-margen">Listado de equipos</h2>
+                        <p class="biomedicos-listado__subtitulo">
+                            Consulta y gestión de los equipos del hospital.
+                        </p>
+                    </div>
+                </div>
+                <div class="tituloFormulario-subrallado"></div>
+            </div>
+        </div>
+
+        <a class="formularioBotones-boton biomedicos-listado__registrar"
+           href="{% url 'registrar_dispositivo_biomedicos' %}">
+            <i class="bi bi-plus-lg"></i>
+            Registrar equipo
+        </a>
+    </div>
+
+    {# Filtros GET: views.py lee estos parametros y devuelve la tabla paginada. #}
+    <form class="biomedicos-listado__controles" method="get">
+        <div class="biomedicos-listado__busqueda">
+            <label for="buscar_listado_dispositivo">Buscar</label>
+            <div class="biomedicos-listado__busqueda-campo">
+                <i class="bi bi-search"></i>
+                <input class="formularioCampo-text"
+                       id="buscar_listado_dispositivo"
+                       name="q"
+                       type="search"
+                       value="{{ filtros.q }}"
+                       placeholder="Buscar por código interno, inventario, ficha, serie, tipo, marca o modelo">
+            </div>
+        </div>
+
+        <div class="biomedicos-listado__filtros">
+            <div class="biomedicos-listado__filtro">
+                <label for="filtro_area"><i class="bi bi-geo-alt"></i> Área</label>
+                <select class="formularioCampo-select" id="filtro_area" name="area">
+                    <option value="">Todas las áreas</option>
+                    {% for area in area_choices %}
+                        <option value="{{ area.value }}" {% if filtros.area == area.value %}selected{% endif %}>
+                            {{ area.label }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="biomedicos-listado__filtro">
+                <label for="filtro_estado"><i class="bi bi-eye"></i> Estado</label>
+                <select class="formularioCampo-select" id="filtro_estado" name="estado">
+                    <option value="">Estados activos</option>
+                    {% for estado in estado_choices %}
+                        <option value="{{ estado.value }}" {% if filtros.estado == estado.value %}selected{% endif %}>
+                            {{ estado.label }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="biomedicos-listado__filtro">
+                <label for="filtro_criticidad"><i class="bi bi-activity"></i> Criticidad</label>
+                <select class="formularioCampo-select" id="filtro_criticidad" name="criticidad">
+                    <option value="">Todas las criticidades</option>
+                    {% for criticidad in criticidad_choices %}
+                        <option value="{{ criticidad.value }}" {% if filtros.criticidad == criticidad.value %}selected{% endif %}>
+                            {{ criticidad.label }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="biomedicos-listado__filtro">
+                <label for="filtro_tipo"><i class="bi bi-funnel"></i> Tipo de equipo</label>
+                <select class="formularioCampo-select" id="filtro_tipo" name="tipo">
+                    <option value="">Todos los tipos</option>
+                    {% for tipo in tipo_choices %}
+                        <option value="{{ tipo.id }}" {% if filtros.tipo == tipo.id|stringformat:"s" %}selected{% endif %}>
+                            {{ tipo.nombre }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="biomedicos-listado__filtro">
+                <label for="filtro_tecnologia"><i class="bi bi-lightning-charge"></i> Tecnología</label>
+                <select class="formularioCampo-select" id="filtro_tecnologia" name="tecnologia">
+                    <option value="">Todas las tecnologías</option>
+                    {% for tecnologia in tecnologia_choices %}
+                        <option value="{{ tecnologia.value }}" {% if filtros.tecnologia == tecnologia.value %}selected{% endif %}>
+                            {{ tecnologia.label }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="biomedicos-listado__filtro">
+                <label for="filtro_marca"><i class="bi bi-tag"></i> Marca</label>
+                <select class="formularioCampo-select" id="filtro_marca" name="marca">
+                    <option value="">Todas las marcas</option>
+                    {% for marca in marca_choices %}
+                        <option value="{{ marca.id }}" {% if filtros.marca == marca.id|stringformat:"s" %}selected{% endif %}>
+                            {{ marca.nombre }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="biomedicos-listado__filtro">
+                <label for="filtro_modelo"><i class="bi bi-hdd"></i> Modelo</label>
+                <select class="formularioCampo-select" id="filtro_modelo" name="modelo">
+                    <option value="">Todos los modelos</option>
+                    {% for modelo in modelo_choices %}
+                        <option value="{{ modelo.id }}" {% if filtros.modelo == modelo.id|stringformat:"s" %}selected{% endif %}>
+                            {{ modelo.nombre }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="biomedicos-listado__filtro-acciones">
+                <a class="formularioBotones-boton biomedicos-listado__boton-filtro biomedicos-listado__boton-filtro--secundario"
+                   href="{% url 'listado_dispositivos_biomedicos' %}">
+                    <i class="bi bi-filter-circle"></i>
+                    Limpiar filtros
+                </a>
+                <button class="formularioBotones-boton biomedicos-listado__boton-filtro"
+                        type="submit">
+                    <i class="bi bi-funnel-fill"></i>
+                    Aplicar filtros
+                </button>
+            </div>
+        </div>
+    </form>
+
+    {# La tabla recibe objetos ya preparados con asignacion_actual, estado_css y garantia_css. #}
+    <div class="biomedicos-listado__tabla-contenedor">
+        <table class="dataTable stripe hover row-border biomedicos-listado__tabla">
+            <thead>
+                <tr>
+                    <th>Código</th>
+                    <th>Tipo de equipo</th>
+                    <th>Tecnología</th>
+                    <th>Marca</th>
+                    <th>Modelo</th>
+                    <th>Número de serie</th>
+                    <th>Inventario BN</th>
+                    <th>Inventario ficha</th>
+                    <th>Área</th>
+                    <th>Empleado a cargo</th>
+                    <th>Estado</th>
+                    <th>Criticidad</th>
+                    <th>Garantía</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for dispositivo in dispositivos %}
+                    {% with asignacion=dispositivo.asignacion_actual %}
+                        <tr>
+                            <td>
+                                <a class="biomedicos-listado__codigo"
+                                   href="{% url 'detalle_dispositivo_biomedicos' dispositivo.id %}">
+                                    {{ dispositivo.codigo }}
+                                </a>
+                            </td>
+                            <td>{{ dispositivo.tipo }}</td>
+                            <td>{{ dispositivo.get_tipo_tecnologia_display|default:"SIN DEFINIR"|upper }}</td>
+                            <td>{{ dispositivo.marca|default:"INDEFINIDO" }}</td>
+                            <td>{{ dispositivo.modelo|default:"INDEFINIDO" }}</td>
+                            <td>{{ dispositivo.numero_serie|default:"INDEFINIDO" }}</td>
+                            <td>{{ dispositivo.inventario_bienes_nacionales|default:"NO APLICA" }}</td>
+                            <td>{{ dispositivo.inventario_numero_ficha|default:"NO APLICA" }}</td>
+                            <td>
+                                {% if asignacion %}
+                                    {{ asignacion.ubicacion }}
+                                {% else %}
+                                    Sin asignación
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if asignacion %}
+                                    {{ asignacion.responsable }}
+                                {% else %}
+                                    Sin responsable
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="biomedicos-estado {{ dispositivo.estado_css }}">
+                                    {{ dispositivo.get_estado_display }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="biomedicos-estado {{ dispositivo.criticidad_css }}">
+                                    {{ dispositivo.get_criticidad_display }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="biomedicos-estado {{ dispositivo.garantia_css }}">
+                                    {{ dispositivo.garantia_estado }}
+                                </span>
+                            </td>
+                            <td>
+                                <div class="biomedicos-listado__acciones">
+                                    <a class="biomedicos-listado__accion"
+                                       href="{% url 'detalle_dispositivo_biomedicos' dispositivo.id %}"
+                                       title="Ver detalle">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    <a class="biomedicos-listado__accion"
+                                       href="{% url 'qr_dispositivo_biomedicos' dispositivo.id %}"
+                                       title="Ver / Imprimir QR">
+                                        <i class="bi bi-qr-code"></i>
+                                    </a>
+                                    <a class="biomedicos-listado__accion"
+                                       href="{% url 'editar_dispositivo_biomedicos' dispositivo.id %}"
+                                       title="Editar equipo">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endwith %}
+                {% empty %}
+                    <tr>
+                        <td class="biomedicos-listado__vacio" colspan="14">
+                            <i class="bi bi-inbox"></i>
+                            <strong>No se encontraron equipos</strong>
+                            <span>Prueba limpiar los filtros o registra un nuevo equipo.</span>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {# La paginacion conserva los filtros usando querystring. #}
+    <footer class="biomedicos-listado__pie">
+        {% if total_dispositivos %}
+            <span>
+                Mostrando {{ page_obj.start_index }} - {{ page_obj.end_index }}
+                de {{ total_dispositivos }} equipos
+            </span>
+        {% else %}
+            <span>Mostrando 0 equipos</span>
+        {% endif %}
+
+        {% if page_obj.has_other_pages %}
+            <div class="biomedicos-listado__paginacion">
+                {% if page_obj.has_previous %}
+                    <a href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ page_obj.previous_page_number }}">
+                        <i class="bi bi-chevron-left"></i>
+                    </a>
+                {% endif %}
+
+                {% for pagina in rango_paginas %}
+                    {% if pagina == page_obj.paginator.ELLIPSIS %}
+                        <span>{{ pagina }}</span>
+                    {% elif pagina == page_obj.number %}
+                        <span class="biomedicos-listado__pagina-activa">{{ pagina }}</span>
+                    {% else %}
+                        <a href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ pagina }}">{{ pagina }}</a>
+                    {% endif %}
+                {% endfor %}
+
+                {% if page_obj.has_next %}
+                    <a href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ page_obj.next_page_number }}">
+                        <i class="bi bi-chevron-right"></i>
+                    </a>
+                {% endif %}
+            </div>
+        {% endif %}
+    </footer>
+</div>
+{% endblock content %}

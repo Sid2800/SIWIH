@@ -5,15 +5,16 @@ from servicio.models import Zona  # Importa tu modelo Zona
 
 class CustomLoginForm(AuthenticationForm):
     zona = forms.ModelChoiceField(
-        queryset=Zona.objects.filter(estado=1), 
-        required=True, 
+        queryset=Zona.objects.none(),
+        required=True,
         empty_label=None,
-        initial=Zona.objects.get(codigo=1),
         to_field_name="codigo"
     )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["zona"].queryset = Zona.objects.filter(estado=1)
+        self.fields["zona"].initial = Zona.objects.filter(codigo=1).first()
         self.fields["username"].widget.attrs.update({
             "class": "input-field",
             "placeholder": "Usuario"  # Agregar placeholder

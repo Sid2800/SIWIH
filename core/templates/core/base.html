@@ -145,7 +145,16 @@
             {% endif %}
 
 
-            <li>  
+            <!-- Enlace principal del modulo Equipos: resuelve la URL inicio_biomedicos. -->
+            <li>
+               <a href="{% url 'inicio_biomedicos' %}" class="bn-navegacion__enlace">
+                  <i class="bi bi-motherboard bn-navegacion-enlace__logo"></i>
+                  <span class="bn-navegacion-enlace__texto">Equipos</span>
+               </a>
+            </li>
+
+
+            <li>
                <a href="{% url 'generador_reporte' %}" class="bn-navegacion__enlace">
                   <i class="bi bi-journal-text bn-navegacion-enlace__logo"></i>
                   <span class="bn-navegacion-enlace__texto">Reporte</span>

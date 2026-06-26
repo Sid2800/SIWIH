@@ -1,0 +1,292 @@
+{% extends 'core/base.html' %}
+
+{% block title %}{{ titulo_pagina|default:"Registrar equipo" }}{% endblock title %}
+
+{% block content %}
+<div class="contenedor2 biomedicos-pagina">
+    <a class="biomedicos-volver" href="{{ url_regresar }}">
+        <i class="bi bi-arrow-left"></i> Equipos
+    </a>
+
+    <div class="tituloFormulario">
+        <div class="tituloFormulario-texto">
+            <i class="{{ icono_formulario|default:'bi bi-clipboard2-plus' }}"></i>
+            <h2 class="sin-margen">{{ titulo_formulario|default:"Registrar equipo" }}</h2>
+        </div>
+        <div class="tituloFormulario-subrallado"></div>
+    </div>
+
+    {# Este template se reutiliza para registrar y editar. Los textos/URLs vienen desde views.py. #}
+    <form class="biomedicos-registro" method="post" autocomplete="off">
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+            <div class="biomedicos-registro__errores biomedicos-registro__errores--general">
+                {{ form.non_field_errors }}
+            </div>
+        {% endif %}
+
+        {# Datos propios del equipo. Los selects de tipo/marca/modelo vienen filtrados desde forms.py. #}
+        <section class="biomedicos-registro__seccion biomedicos-registro__seccion--informacion">
+            <h3 class="biomedicos-registro__titulo">
+                <i class="bi bi-info-circle"></i>
+                Información del equipo
+            </h3>
+
+            <div class="biomedicos-registro__campos biomedicos-registro__campos--dos">
+                <div class="biomedicos-registro__campo">
+                    <label for="tipo_dispositivo">Tipo de equipo *</label>
+                    {{ form.tipo }}
+                    {{ form.tipo.errors }}
+                </div>
+                <div class="biomedicos-registro__campo">
+                    <label for="tipo_tecnologia_dispositivo">Tipo de tecnología *</label>
+                    {{ form.tipo_tecnologia }}
+                    {{ form.tipo_tecnologia.errors }}
+                </div>
+                <div class="biomedicos-registro__campo">
+                    <label for="marca_dispositivo">Marca</label>
+                    {{ form.marca }}
+                    {{ form.marca.errors }}
+                </div>
+                <div class="biomedicos-registro__campo">
+                    <label for="modelo_dispositivo">Modelo</label>
+                    {{ form.modelo }}
+                    {{ form.modelo.errors }}
+                </div>
+                <div class="biomedicos-registro__campo">
+                    <label for="serie_dispositivo">Número de serie</label>
+                    {{ form.numero_serie }}
+                    {{ form.numero_serie.errors }}
+                </div>
+                <div class="biomedicos-registro__campo">
+                    <label for="inventario_bienes_nacionales">Inventario de bienes nacionales</label>
+                    {{ form.inventario_bienes_nacionales }}
+                    {{ form.inventario_bienes_nacionales.errors }}
+                </div>
+                <div class="biomedicos-registro__campo">
+                    <label for="inventario_numero_ficha">Inventario número de ficha</label>
+                    {{ form.inventario_numero_ficha }}
+                    {{ form.inventario_numero_ficha.errors }}
+                </div>
+            </div>
+        </section>
+
+        {# Ubicacion inicial o actual: clinica y no clinica son campos distintos en la base. #}
+        <section class="biomedicos-registro__seccion biomedicos-registro__seccion--ubicacion">
+            <h3 class="biomedicos-registro__titulo">
+                <i class="bi bi-geo-alt"></i>
+                Ubicación y responsable
+            </h3>
+
+            <div class="biomedicos-registro__campos">
+                <div class="biomedicos-registro__campo">
+                    <label for="tipo_area_dispositivo">Tipo de área *</label>
+                    {{ form.tipo_area }}
+                    {{ form.tipo_area.errors }}
+                </div>
+
+                <div class="biomedicos-registro__campo"
+                     id="campo_area_clinica"
+                     hidden>
+                    <label for="area_clinica_dispositivo">Área clínica *</label>
+                    {{ form.area_clinica }}
+                    {{ form.area_clinica.errors }}
+                </div>
+
+                <div class="biomedicos-registro__campo"
+                     id="campo_area_no_clinica"
+                     hidden>
+                    <label for="area_no_clinica_dispositivo">Área no clínica *</label>
+                    {{ form.unidad_no_clinica }}
+                    {{ form.unidad_no_clinica.errors }}
+                </div>
+
+                <div class="biomedicos-registro__campo">
+                    <label for="responsable_dispositivo">Empleado a cargo *</label>
+                    {{ form.responsable }}
+                    {{ form.responsable.errors }}
+                </div>
+            </div>
+        </section>
+
+        {# Estado, criticidad y frecuencia controlan inventario y futura logica de mantenimiento. #}
+        <section class="biomedicos-registro__seccion biomedicos-registro__seccion--control">
+            <h3 class="biomedicos-registro__titulo">
+                <i class="bi bi-shield"></i>
+                Control del equipo
+            </h3>
+
+            <div class="biomedicos-registro__campos biomedicos-registro__campos--dos">
+                <div class="biomedicos-registro__campo">
+                    <label for="estado_dispositivo">{{ estado_label|default:"Estado inicial *" }}</label>
+                    {{ form.estado }}
+                    {{ form.estado.errors }}
+                </div>
+                <div class="biomedicos-registro__campo">
+                    <label for="criticidad_dispositivo">Criticidad *</label>
+                    {{ form.criticidad }}
+                    {{ form.criticidad.errors }}
+                </div>
+                <div class="biomedicos-registro__campo biomedicos-registro__campo--completo">
+                    <label for="frecuencia_dispositivo">Frecuencia de mantenimiento</label>
+                    {{ form.frecuencia_mantenimiento_meses }}
+                    {{ form.frecuencia_mantenimiento_meses.errors }}
+                </div>
+            </div>
+        </section>
+
+        {# Datos opcionales de compra/garantia. La regla fuerte de garantia vive en models.py. #}
+        <section class="biomedicos-registro__seccion biomedicos-registro__seccion--administrativa">
+            <h3 class="biomedicos-registro__titulo">
+                <i class="bi bi-briefcase"></i>
+                Información administrativa
+            </h3>
+
+            <div class="biomedicos-registro__campos biomedicos-registro__campos--dos">
+                <div class="biomedicos-registro__campo">
+                    <label for="instalacion_dispositivo">Fecha de instalación</label>
+                    {{ form.fecha_instalacion }}
+                    {{ form.fecha_instalacion.errors }}
+                </div>
+                <div class="biomedicos-registro__campo">
+                    <label for="garantia_dispositivo">Fin de garantía</label>
+                    {{ form.fin_garantia }}
+                    {{ form.fin_garantia.errors }}
+                </div>
+                <div class="biomedicos-registro__campo">
+                    <label for="costo_dispositivo">Costo de adquisición</label>
+                    <div class="biomedicos-registro__costo">
+                        <span>L/</span>
+                        {{ form.costo_adquisicion }}
+                    </div>
+                    {{ form.costo_adquisicion.errors }}
+                </div>
+                <div class="biomedicos-registro__campo biomedicos-registro__campo--completo">
+                    <label for="observaciones_dispositivo">Observaciones</label>
+                    {{ form.observaciones }}
+                    {{ form.observaciones.errors }}
+                </div>
+            </div>
+        </section>
+
+        {# Fotos queda reservado para una etapa futura; aun no guarda archivos. #}
+        <section class="biomedicos-registro__seccion biomedicos-registro__seccion--fotos">
+            <h3 class="biomedicos-registro__titulo">
+                <i class="bi bi-camera"></i>
+                Fotos del equipo
+            </h3>
+
+            <div class="biomedicos-registro__campos biomedicos-registro__campos--dos">
+                <div class="biomedicos-registro__campo">
+                    <label>Foto principal</label>
+                    <div class="biomedicos-registro__foto controles_clic_desactivados texto_desactivados">
+                        <i class="bi bi-cloud-arrow-up"></i>
+                        <strong>Seleccionar imagen principal</strong>
+                        <small>Formatos permitidos: JPG, PNG</small>
+                    </div>
+                </div>
+                <div class="biomedicos-registro__campo">
+                    <label>Fotos adicionales</label>
+                    <div class="biomedicos-registro__foto controles_clic_desactivados texto_desactivados">
+                        <i class="bi bi-plus-circle"></i>
+                        <strong>Agregar fotos</strong>
+                        <small>Disponible en la siguiente etapa</small>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <div class="biomedicos-registro__acciones">
+            {# En edicion views.py envia url_baja; en registro no aparece este boton. #}
+            {% if url_baja %}
+                <a class="formularioBotones-boton biomedicos-registro__boton biomedicos-baja__boton"
+                   href="{{ url_baja }}">
+                    <i class="bi bi-exclamation-octagon"></i>
+                    Dar de baja
+                </a>
+            {% endif %}
+            <div class="biomedicos-registro__acciones-principales">
+                <button class="formularioBotones-boton biomedicos-registro__boton" type="submit">
+                    <i class="bi bi-floppy"></i>
+                    {{ texto_boton_guardar|default:"Guardar equipo" }}
+                </button>
+                <a class="formularioBotones-boton biomedicos-registro__boton biomedicos-registro__boton--secundario"
+                   href="{{ url_regresar }}">
+                    <i class="bi bi-arrow-left"></i>
+                    Regresar
+                </a>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // Muestra solo el selector de area que corresponde al tipo elegido.
+    const tipoArea = document.getElementById('tipo_area_dispositivo');
+    const campoClinica = document.getElementById('campo_area_clinica');
+    const campoNoClinica = document.getElementById('campo_area_no_clinica');
+    const areaClinica = document.getElementById('area_clinica_dispositivo');
+    const areaNoClinica = document.getElementById('area_no_clinica_dispositivo');
+
+    function actualizarSelectorArea() {
+        const mostrarClinica = tipoArea.value === 'clinica';
+        const mostrarNoClinica = tipoArea.value === 'no_clinica';
+
+        campoClinica.hidden = !mostrarClinica;
+        campoNoClinica.hidden = !mostrarNoClinica;
+        areaClinica.disabled = !mostrarClinica;
+        areaNoClinica.disabled = !mostrarNoClinica;
+
+        if (!mostrarClinica) {
+            areaClinica.value = '';
+        }
+        if (!mostrarNoClinica) {
+            areaNoClinica.value = '';
+        }
+    }
+
+    tipoArea.addEventListener('change', actualizarSelectorArea);
+    actualizarSelectorArea();
+
+    // Select2 consulta empleados por AJAX para no cargar toda la tabla en el HTML.
+    const responsableSelect = $('#responsable_dispositivo');
+
+    if (responsableSelect.length && responsableSelect.select2) {
+        responsableSelect.select2({
+            width: '100%',
+            placeholder: 'Buscar por ID, DNI o nombre',
+            minimumInputLength: 1,
+            ajax: {
+                url: "{% url 'buscar_empleados_biomedicos' %}",
+                dataType: 'json',
+                delay: 250,
+                data: function (params) {
+                    return {
+                        q: params.term || ''
+                    };
+                },
+                processResults: function (data) {
+                    return data;
+                },
+                cache: true
+            },
+            language: {
+                inputTooShort: function () {
+                    return 'Escriba el ID, DNI o nombre del empleado';
+                },
+                noResults: function () {
+                    return 'No se encontraron empleados';
+                },
+                searching: function () {
+                    return 'Buscando...';
+                }
+            }
+        });
+    }
+});
+</script>
+{% endblock extra_js %}

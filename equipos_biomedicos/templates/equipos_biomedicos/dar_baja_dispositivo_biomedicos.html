@@ -1,0 +1,81 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Dar de baja equipo{% endblock title %}
+
+{% block content %}
+<div class="contenedor2 biomedicos-pagina biomedicos-pagina--detalle">
+    <a class="biomedicos-volver" href="{{ url_regresar }}">
+        <i class="bi bi-arrow-left"></i> Detalle del equipo
+    </a>
+
+    <div class="tituloFormulario">
+        <div class="tituloFormulario-texto">
+            <i class="bi bi-exclamation-octagon"></i>
+            <div>
+                <h2 class="sin-margen">Dar de baja equipo</h2>
+                <p class="biomedicos-listado__subtitulo">
+                    Registrar la baja administrativa del equipo {{ dispositivo.codigo }}.
+                </p>
+            </div>
+        </div>
+        <div class="tituloFormulario-subrallado"></div>
+    </div>
+
+    {# Advertencia visual: la baja no borra el equipo, solo cambia su estado y crea historial. #}
+    <section class="biomedicos-baja__advertencia" role="alert">
+        <i class="bi bi-exclamation-triangle"></i>
+        <div>
+            <strong>Esta acción marcará el equipo como dado de baja.</strong>
+            <p>
+                El equipo no se eliminará. Su ficha y QR seguirán disponibles,
+                pero dejará de mostrarse en el listado normal de inventario activo.
+            </p>
+        </div>
+    </section>
+
+    {# El formulario guarda BajaDispositivo; views.py actualiza el estado del equipo. #}
+    <form class="biomedicos-registro biomedicos-baja__formulario" method="post" autocomplete="off">
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+            <div class="biomedicos-registro__errores biomedicos-registro__errores--general">
+                {{ form.non_field_errors }}
+            </div>
+        {% endif %}
+
+        <section class="biomedicos-registro__seccion">
+            <h3 class="biomedicos-registro__titulo">
+                <i class="bi bi-file-earmark-x"></i>
+                Información de baja
+            </h3>
+
+            <div class="biomedicos-registro__campos biomedicos-registro__campos--dos">
+                <div class="biomedicos-registro__campo">
+                    <label for="fecha_baja_dispositivo">Fecha de baja *</label>
+                    {{ form.fecha_baja }}
+                    {{ form.fecha_baja.errors }}
+                </div>
+
+                <div class="biomedicos-registro__campo biomedicos-registro__campo--completo">
+                    <label for="motivo_baja_dispositivo">Motivo de baja *</label>
+                    {{ form.motivo }}
+                    {{ form.motivo.errors }}
+                </div>
+            </div>
+        </section>
+
+        <div class="biomedicos-registro__acciones">
+            <button class="formularioBotones-boton biomedicos-registro__boton biomedicos-baja__boton"
+                    type="submit">
+                <i class="bi bi-exclamation-octagon"></i>
+                Confirmar baja
+            </button>
+            <a class="formularioBotones-boton biomedicos-registro__boton biomedicos-registro__boton--secundario"
+               href="{{ url_regresar }}">
+                <i class="bi bi-arrow-left"></i>
+                Cancelar
+            </a>
+        </div>
+    </form>
+</div>
+{% endblock content %}

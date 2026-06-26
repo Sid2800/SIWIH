@@ -1,0 +1,177 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+    {% block title %}Buscar equipo{% endblock title %}
+
+{% block content %}
+<div class="contenedor2 biomedicos-pagina biomedicos-pagina--ancha">
+    <a class="biomedicos-volver" href="{% url 'inicio_biomedicos' %}">
+        <i class="bi bi-arrow-left"></i> Equipos
+    </a>
+
+    <div class="tituloFormulario">
+        <div class="tituloFormulario-texto">
+            <i class="bi bi-search"></i>
+            <h2 class="sin-margen">Buscar equipo</h2>
+        </div>
+        <div class="tituloFormulario-subrallado"></div>
+    </div>
+
+    <section class="biomedicos-busqueda">
+        <div>
+            <p class="biomedicos-etiqueta">Consulta rápida</p>
+            <h3>¿Qué equipo deseas encontrar?</h3>
+            <p>Busca por código interno, inventarios, número de serie, tipo, marca o modelo.</p>
+        </div>
+
+        <form class="biomedicos-busqueda__formulario" method="get">
+            <label for="id_busqueda_dispositivo">Datos del equipo</label>
+            <div class="biomedicos-busqueda__campo">
+                <i class="bi bi-search"></i>
+                <input
+                    class="formularioCampo-text"
+                    id="id_busqueda_dispositivo"
+                    name="q"
+                    type="search"
+                    value="{{ consulta }}"
+                    placeholder="Ej. DISP-00001, F/212300, monitor, serie o modelo"
+                    autocomplete="off"
+                >
+                <button class="formularioBotones-boton biomedicos-busqueda__boton" type="submit">
+                    <i class="bi bi-search"></i>
+                    Buscar
+                </button>
+            </div>
+        </form>
+    </section>
+
+    {% if consulta %}
+        <div class="biomedicos-listado__tabla-contenedor">
+            <table class="dataTable stripe hover row-border biomedicos-listado__tabla">
+                <thead>
+                    <tr>
+                        <th>Código</th>
+                        <th>Tipo de equipo</th>
+                        <th>Marca</th>
+                        <th>Modelo</th>
+                        <th>Número de serie</th>
+                        <th>Inventario BN</th>
+                        <th>Inventario ficha</th>
+                        <th>Área</th>
+                        <th>Estado</th>
+                        <th>Garantía</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for dispositivo in dispositivos %}
+                        {% with asignacion=dispositivo.asignacion_actual %}
+                            <tr>
+                                <td>
+                                    <a class="biomedicos-listado__codigo"
+                                       href="{% url 'detalle_dispositivo_biomedicos' dispositivo.id %}">
+                                        {{ dispositivo.codigo }}
+                                    </a>
+                                </td>
+                                <td>{{ dispositivo.tipo }}</td>
+                                <td>{{ dispositivo.marca|default:"INDEFINIDO" }}</td>
+                                <td>{{ dispositivo.modelo|default:"INDEFINIDO" }}</td>
+                                <td>{{ dispositivo.numero_serie|default:"Indefinido" }}</td>
+                                <td>{{ dispositivo.inventario_bienes_nacionales|default:"No aplica" }}</td>
+                                <td>{{ dispositivo.inventario_numero_ficha|default:"No aplica" }}</td>
+                                <td>
+                                    {% if asignacion %}
+                                        {{ asignacion.ubicacion }}
+                                    {% else %}
+                                        Sin asignación
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="biomedicos-estado {{ dispositivo.estado_css }}">
+                                        {{ dispositivo.get_estado_display }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="biomedicos-estado {{ dispositivo.garantia_css }}">
+                                        {{ dispositivo.garantia_estado }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="biomedicos-listado__acciones">
+                                        <a class="biomedicos-listado__accion"
+                                           href="{% url 'detalle_dispositivo_biomedicos' dispositivo.id %}"
+                                           title="Ver detalle">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                        <a class="biomedicos-listado__accion"
+                                           href="{% url 'qr_dispositivo_biomedicos' dispositivo.id %}"
+                                           title="Ver / Imprimir QR">
+                                            <i class="bi bi-qr-code"></i>
+                                        </a>
+                                        <a class="biomedicos-listado__accion"
+                                           href="{% url 'editar_dispositivo_biomedicos' dispositivo.id %}"
+                                           title="Editar equipo">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endwith %}
+                    {% empty %}
+                        <tr>
+                            <td class="biomedicos-listado__vacio" colspan="11">
+                                <i class="bi bi-inbox"></i>
+                                <strong>Sin resultados para “{{ consulta }}”</strong>
+                                <span>Prueba buscar por código, inventario, serie, tipo, marca o modelo.</span>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <footer class="biomedicos-listado__pie">
+            {% if total_dispositivos %}
+                <span>
+                    Mostrando {{ page_obj.start_index }} - {{ page_obj.end_index }}
+                    de {{ total_dispositivos }} equipos encontrados
+                </span>
+            {% else %}
+                <span>Mostrando 0 equipos</span>
+            {% endif %}
+
+            {% if page_obj and page_obj.has_other_pages %}
+                <div class="biomedicos-listado__paginacion">
+                    {% if page_obj.has_previous %}
+                        <a href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ page_obj.previous_page_number }}">
+                            <i class="bi bi-chevron-left"></i>
+                        </a>
+                    {% endif %}
+
+                    {% for pagina in rango_paginas %}
+                        {% if pagina == page_obj.paginator.ELLIPSIS %}
+                            <span>{{ pagina }}</span>
+                        {% elif pagina == page_obj.number %}
+                            <span class="biomedicos-listado__pagina-activa">{{ pagina }}</span>
+                        {% else %}
+                            <a href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ pagina }}">{{ pagina }}</a>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if page_obj.has_next %}
+                        <a href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ page_obj.next_page_number }}">
+                            <i class="bi bi-chevron-right"></i>
+                        </a>
+                    {% endif %}
+                </div>
+            {% endif %}
+        </footer>
+    {% else %}
+        <div class="biomedicos-vacio centrar">
+            <i class="bi bi-upc-scan"></i>
+            <h3>Ingresa los datos del equipo</h3>
+            <p>Los resultados aparecerán en este espacio.</p>
+        </div>
+    {% endif %}
+</div>
+{% endblock content %}

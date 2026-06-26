@@ -1,0 +1,87 @@
+{% extends 'core/base.html' %}
+
+{% block title %}QR del equipo{% endblock title %}
+
+{% block content %}
+<div class="contenedor2 biomedicos-pagina">
+    <a class="biomedicos-volver" href="{% url 'detalle_dispositivo_biomedicos' dispositivo.id %}">
+        <i class="bi bi-arrow-left"></i> Detalle del equipo
+    </a>
+
+    <div class="tituloFormulario">
+        <div class="tituloFormulario-texto">
+            <i class="bi bi-qr-code"></i>
+            <h2 class="sin-margen">QR del equipo</h2>
+        </div>
+        <div class="tituloFormulario-subrallado"></div>
+    </div>
+
+    {# qr_data_uri y detalle_url se generan en views.qr_dispositivo(). #}
+    <section class="biomedicos-qr">
+        <article class="biomedicos-qr__tarjeta">
+            <div class="biomedicos-qr__encabezado">
+                <span class="biomedicos-qr__icono">
+                    <i class="bi bi-motherboard"></i>
+                </span>
+                <div>
+                    <p class="biomedicos-etiqueta">Identificación del equipo</p>
+                    <h3>{{ dispositivo.tipo }}</h3>
+                    <span>{{ dispositivo.codigo }}</span>
+                </div>
+            </div>
+
+            <img class="biomedicos-qr__imagen"
+                src="{{ qr_data_uri }}"
+                alt="Código QR del equipo {{ dispositivo.codigo }}">
+
+            <dl class="biomedicos-qr__datos">
+                <div><dt>Marca</dt><dd>{{ dispositivo.marca|default:"INDEFINIDO" }}</dd></div>
+                <div><dt>Modelo</dt><dd>{{ dispositivo.modelo|default:"INDEFINIDO" }}</dd></div>
+                <div><dt>Serie</dt><dd>{{ dispositivo.numero_serie|default:"INDEFINIDO" }}</dd></div>
+                <div><dt>Inventario BN</dt><dd>{{ dispositivo.inventario_bienes_nacionales|default:"NO APLICA" }}</dd></div>
+                <div><dt>Inventario ficha</dt><dd>{{ dispositivo.inventario_numero_ficha|default:"NO APLICA" }}</dd></div>
+            </dl>
+        </article>
+
+        <aside class="biomedicos-qr__panel">
+            <h3><i class="bi bi-info-circle"></i> Contenido del QR</h3>
+            <p>
+                Este código abre la ficha actualizada del equipo. Si los datos cambian
+                en el sistema, el QR sigue apuntando al mismo registro.
+            </p>
+            <div class="biomedicos-qr__url">
+                {{ detalle_url }}
+            </div>
+
+            <div class="biomedicos-qr__acciones">
+                <button class="formularioBotones-boton biomedicos-qr__boton"
+                        type="button"
+                        id="imprimir_qr_equipo">
+                    <i class="bi bi-printer"></i>
+                    Imprimir QR
+                </button>
+                <a class="formularioBotones-boton biomedicos-qr__boton biomedicos-qr__boton--secundario"
+                   href="{% url 'detalle_dispositivo_biomedicos' dispositivo.id %}">
+                    <i class="bi bi-eye"></i>
+                    Ver ficha
+                </a>
+            </div>
+        </aside>
+    </section>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // Imprime la vista actual, con estilos especificos de impresion en el CSS.
+    const botonImprimir = document.getElementById('imprimir_qr_equipo');
+
+    if (botonImprimir) {
+        botonImprimir.addEventListener('click', function () {
+            window.print();
+        });
+    }
+});
+</script>
+{% endblock extra_js %}
