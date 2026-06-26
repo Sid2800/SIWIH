@@ -2,6 +2,8 @@
 """Vistas y APIs del mapa de camas: render principal, lectura del mapa,
 buscadores y operaciones de edición (mover paciente, actualizar cama)."""
 
+from copy import deepcopy
+
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.db.models import Count, F, Prefetch, Q
@@ -43,6 +45,10 @@ from .constants.view_constants import (
     ESTADOS_EDICION_DIRECTA_ROL_RESTRINGIDO,
     ESTADOS_MANTIENEN_INGRESO_SIN_NUEVO,
     ESTADOS_OCUPADA_PREALTA,
+    MAPEO_CAMAS_SALA_NEONATOLOGIA_ID,
+    MAPEO_CAMAS_SERVICIO_PEDIATRIA_ID,
+    MAPEO_CAMAS_SERVICIO_VIRTUAL_NEONATOLOGIA_ID,
+    MAPEO_CAMAS_SERVICIO_VIRTUAL_NEONATOLOGIA_NOMBRE,
     OBS_INGRESO_DESDE_CONSULTA_EXTERNA_A_OCUPADA,
     OBS_INGRESO_DESDE_PREALTA_A_OCUPADA,
 )
@@ -75,6 +81,7 @@ from ._permisos import (
 from ._sesion import (
     _cerrar_sesiones_mapeo_sin_sesion_django,
     _obtener_sesion_mapeo_activa,
+    _obtener_salas_ids_sesion,
     _obtener_servicios_ids_sesion,
     _registrar_detalle_mapeo,
     _registrar_historial_mapeo,
@@ -154,6 +161,22 @@ def _servicio_payload(servicio, salas_data, conflicto_mapeo=None):
     }
 
 
+def _servicio_virtual_neonatologia_payload(servicio_pediatria, conflicto_mapeo=None):
+    """Representa Neonatologia como opcion aislada de inicio de mapeo."""
+    conflicto_mapeo = conflicto_mapeo or {}
+    return {
+        "id": MAPEO_CAMAS_SERVICIO_VIRTUAL_NEONATOLOGIA_ID,
+        "nombre": MAPEO_CAMAS_SERVICIO_VIRTUAL_NEONATOLOGIA_NOMBRE,
+        "nombre_corto": "NEO",
+        "mapeo_bloqueado": bool(conflicto_mapeo.get("bloqueado", False)),
+        "mapeo_usuario": conflicto_mapeo.get("usuario", ""),
+        "mapeo_sesion_id": conflicto_mapeo.get("sesion_id"),
+        "salas": [],
+        "servicio_real_id": getattr(servicio_pediatria, "id", None),
+        "scope_sala_ids": [MAPEO_CAMAS_SALA_NEONATOLOGIA_ID],
+    }
+
+
 # =============================================================================
 # MapeoCamasMapaView
 # =============================================================================
@@ -229,6 +252,7 @@ def mapa_camas_data(request):
 
     sesion_activa = _obtener_sesion_mapeo_activa(request.user)
     servicios_ids_sesion = _obtener_servicios_ids_sesion(sesion_activa)
+    salas_ids_sesion = _obtener_salas_ids_sesion(sesion_activa)
 
     conflictos_servicio = {}
     sesiones_activas_servicio = (
@@ -295,6 +319,16 @@ def mapa_camas_data(request):
     for servicio in servicios:
         salas_data = []
         for sala in servicio.salas_servicio.all():
+            # [2026-06-26 SCOPE] El recorte por sala solo aplica con sesion activa de mapeo.
+            if servicios_ids_sesion:
+                if salas_ids_sesion and sala.id not in salas_ids_sesion:
+                    continue
+                if (
+                    not salas_ids_sesion
+                    and MAPEO_CAMAS_SERVICIO_PEDIATRIA_ID in servicios_ids_sesion
+                    and sala.id == MAPEO_CAMAS_SALA_NEONATOLOGIA_ID
+                ):
+                    continue
             cubiculos_data = []
             for cubiculo in sala.cubiculos.all():
                 camas_data = []
@@ -360,7 +394,28 @@ def mapa_camas_data(request):
                 salas_data.append(_sala_payload(sala, cubiculos_data, camas_directas_data))
         if salas_data:
             data.append(_servicio_payload(servicio, salas_data, conflictos_servicio.get(servicio.id)))
-    return JsonResponse({"servicios": data})
+
+    # [2026-06-26 SCOPE] El mapa visual siempre se entrega "normal".
+    # La separacion de Neonatologia solo aplica a opciones de inicio de mapeo.
+    servicios_mapeo = deepcopy(data)
+    if not servicios_ids_sesion:
+        servicio_pediatria = next((s for s in servicios if s.id == MAPEO_CAMAS_SERVICIO_PEDIATRIA_ID), None)
+        if servicio_pediatria is not None:
+            for item in servicios_mapeo:
+                if item.get("id") == MAPEO_CAMAS_SERVICIO_PEDIATRIA_ID:
+                    item["salas"] = [
+                        sala for sala in item.get("salas", [])
+                        if sala.get("id") != MAPEO_CAMAS_SALA_NEONATOLOGIA_ID
+                    ]
+                    break
+            servicios_mapeo.append(
+                _servicio_virtual_neonatologia_payload(
+                    servicio_pediatria,
+                    conflictos_servicio.get(MAPEO_CAMAS_SERVICIO_PEDIATRIA_ID),
+                )
+            )
+
+    return JsonResponse({"servicios": data, "servicios_mapeo": servicios_mapeo})
 
 
 # =============================================================================
@@ -384,8 +439,9 @@ def buscar_pacientes_mapa(request):
 @login_required
 @require_GET
 def camas_disponibles_mapa(request):
-    if not _tiene_permiso_mapear(request.user):
-        return JsonResponse({"ok": False, "error": "Acceso denegado."}, status=403)
+    # [2026-06-26 PERM] Alinea este GET con la misma regla del modal de movimiento.
+    if not _puede_editar_cama_en_mapa(request.user):
+        return JsonResponse({"ok": False, "error": "Está en modo vista."}, status=403)
     excluir_cama = request.GET.get("excluir") or None
     servicio_restringido_id = None
 

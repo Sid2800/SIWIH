@@ -32,6 +32,9 @@ from .constants.view_constants import (
     ACCIONES_MAPEO_PERMITIDAS_ROL_RESTRINGIDO,
     ACCIONES_MAPEO_VALIDAS,
     ESTADOS_OCUPADA_PREALTA,
+    MAPEO_CAMAS_SALA_NEONATOLOGIA_ID,
+    MAPEO_CAMAS_SERVICIO_PEDIATRIA_ID,
+    MAPEO_CAMAS_SERVICIO_VIRTUAL_NEONATOLOGIA_ID,
 )
 from ._helpers import (
     _nombre_usuario,
@@ -50,7 +53,9 @@ from ._permisos import (
 from ._sesion import (
     _camas_mapeadas_sesion,
     _cerrar_sesiones_mapeo_sin_sesion_django,
+    _guardar_scope_sesion,
     _obtener_sesion_mapeo_activa,
+    _obtener_salas_ids_sesion,
     _obtener_servicios_ids_sesion,
     _registrar_detalle_mapeo,
     _registrar_historial_mapeo,
@@ -104,6 +109,7 @@ def iniciar_mapeo(request):
         payload = {}
 
     servicio_ids = payload.get("servicio_ids") or []
+    sala_ids_scope = []
     # 2026-06-09: valida servicio_ids desde validators antes de consultar modelos.
     try:
         servicios_ids_normalizados = validar_servicios_ids_mapeo(servicio_ids)
@@ -114,6 +120,29 @@ def iniciar_mapeo(request):
         if "al menos un servicio" in msg:
             return JsonResponse({"ok": False, "error": "Debe seleccionar al menos un servicio para iniciar el mapeo."}, status=400)
         return JsonResponse({"ok": False, "error": "La lista de servicios contiene valores invalidos."}, status=400)
+
+    # [2026-06-26 SCOPE] Regla de negocio:
+    # - Neonatologia se inicia de forma aislada (scope de sala).
+    # - No se permite mezclar Pediatria + Neonatologia en una misma sesion.
+    seleccion_neonatologia = MAPEO_CAMAS_SERVICIO_VIRTUAL_NEONATOLOGIA_ID in servicios_ids_normalizados
+    seleccion_pediatria = MAPEO_CAMAS_SERVICIO_PEDIATRIA_ID in servicios_ids_normalizados
+    if seleccion_neonatologia and seleccion_pediatria:
+        return JsonResponse(
+            {
+                "ok": False,
+                "error": "Neonatologia se mapea de forma aislada. Seleccione Pediatria o Neonatologia, pero no ambas.",
+            },
+            status=400,
+        )
+    if seleccion_neonatologia:
+        # Convierte el servicio virtual de UI al servicio real para persistencia.
+        servicios_ids_normalizados = [
+            sid for sid in servicios_ids_normalizados
+            if sid != MAPEO_CAMAS_SERVICIO_VIRTUAL_NEONATOLOGIA_ID
+        ]
+        servicios_ids_normalizados.append(MAPEO_CAMAS_SERVICIO_PEDIATRIA_ID)
+        servicios_ids_normalizados = sorted(set(servicios_ids_normalizados))
+        sala_ids_scope = [MAPEO_CAMAS_SALA_NEONATOLOGIA_ID]
 
     servicios_validos_ids = list(
         Servicio.objects.filter(estado=1, id__in=servicios_ids_normalizados)
@@ -171,6 +200,8 @@ def iniciar_mapeo(request):
             MapeoSesionServicio(sesion_mapeo=sesion, servicio_id=servicio_id)
             for servicio_id in servicios_validos_ids
         ])
+        # [2026-06-26 SCOPE] Si aplica, guarda alcance técnico de sala en la sesion.
+        _guardar_scope_sesion(sesion, sala_ids=sala_ids_scope)
 
     return JsonResponse(
         {
@@ -180,6 +211,7 @@ def iniciar_mapeo(request):
             "hora_inicio": hora_local_iso(sesion.fecha_inicio),
             "camas_mapeadas": [],
             "servicio_ids": servicios_validos_ids,
+            "sala_ids": sala_ids_scope,
             "mensaje": "Mapeo iniciado correctamente.",
         },
         status=201,
@@ -209,6 +241,7 @@ def estado_mapeo(request):
             },
             "camas_mapeadas": _camas_mapeadas_sesion(sesion),
             "servicio_ids": _obtener_servicios_ids_sesion(sesion),
+            "sala_ids": _obtener_salas_ids_sesion(sesion),
         }
     )
 
@@ -227,12 +260,17 @@ def terminar_mapeo(request):
     observacion_sesion = _normalizar_observacion_sesion(_obtener_observacion_desde_request(request))
 
     servicios_ids_sesion = _obtener_servicios_ids_sesion(sesion)
+    salas_ids_sesion = _obtener_salas_ids_sesion(sesion)
     total_camas_qs = Cama.objects.filter(
         sala__estado=1,
         sala__servicio__estado=1,
     )
     if servicios_ids_sesion:
         total_camas_qs = total_camas_qs.filter(sala__servicio_id__in=servicios_ids_sesion)
+    if salas_ids_sesion:
+        total_camas_qs = total_camas_qs.filter(sala_id__in=salas_ids_sesion)
+    elif MAPEO_CAMAS_SERVICIO_PEDIATRIA_ID in servicios_ids_sesion:
+        total_camas_qs = total_camas_qs.exclude(sala_id=MAPEO_CAMAS_SALA_NEONATOLOGIA_ID)
     total_camas_objetivo = total_camas_qs.count()
     camas_mapeadas_ids = list(
         DetalleMapeoCama.objects.filter(sesion_mapeo=sesion)
@@ -445,10 +483,25 @@ def procesar_cama_mapeo(request):
         )
 
     servicios_ids_sesion = _obtener_servicios_ids_sesion(sesion)
+    salas_ids_sesion = _obtener_salas_ids_sesion(sesion)
     sala_real = cama.sala
     if servicios_ids_sesion and sala_real.servicio_id not in servicios_ids_sesion:
         return JsonResponse(
             {"ok": False, "error": "La cama seleccionada no pertenece a los servicios de esta sesion de mapeo."},
+            status=403,
+        )
+    if salas_ids_sesion and sala_real.id not in salas_ids_sesion:
+        return JsonResponse(
+            {"ok": False, "error": "La cama seleccionada no pertenece al alcance de salas de esta sesion de mapeo."},
+            status=403,
+        )
+    if (
+        not salas_ids_sesion
+        and MAPEO_CAMAS_SERVICIO_PEDIATRIA_ID in servicios_ids_sesion
+        and sala_real.id == MAPEO_CAMAS_SALA_NEONATOLOGIA_ID
+    ):
+        return JsonResponse(
+            {"ok": False, "error": "Neonatologia se mapea en sesion aislada. Inicie una sesion especifica para esa sala."},
             status=403,
         )
 

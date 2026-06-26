@@ -23,6 +23,11 @@ document.addEventListener("DOMContentLoaded", function () {
 
   var contenedor = document.getElementById("mapa-servicios");
   var contenedorIndicadores = document.getElementById("mapa-indicadores");
+
+  // [2026-06-26] Tooltip global fijo al body para evitar recorte por overflow de contenedores
+  var mapaTooltipGlobal = document.createElement("div");
+  mapaTooltipGlobal.id = "mapa-tooltip-global";
+  document.body.appendChild(mapaTooltipGlobal);
   var contenedorIndicadoresSala = document.getElementById("mapa-indicadores-sala");
   var filtroEstadoMovil = document.getElementById("mapa-filtro-estado-movil");
   var filtroSalaMovil = document.getElementById("mapa-filtro-sala-movil");
@@ -41,6 +46,9 @@ document.addEventListener("DOMContentLoaded", function () {
   var serviciosDisponiblesMapeo = [];
   var sesionMapeoActivaId = null;
   var serviciosSesionActivaIds = [];
+  // [2026-06-26 SCOPE] IDs de negocio para aislamiento de Neonatologia.
+  var SERVICIO_PEDIATRIA_ID = 300;
+  var SERVICIO_VIRTUAL_NEONATOLOGIA_ID = 300360;
   var camasMapeadasSesion = new Set();
   var filtroEstadoIndicador = "";
   var filtroSalaIndicador = "";
@@ -162,6 +170,7 @@ document.addEventListener("DOMContentLoaded", function () {
   function construirOpcionesServiciosMapeo() {
     return serviciosDisponiblesMapeo.map(function (servicio) {
       var bloqueado = Boolean(servicio && servicio.mapeo_bloqueado);
+      var esVirtualNeonatologia = Boolean(servicio && Number(servicio.id) === SERVICIO_VIRTUAL_NEONATOLOGIA_ID);
       var clasesItem = bloqueado
         ? "ck-formulario modal-mapeo-servicios__item modal-mapeo-servicios__item--bloqueado"
         : "ck-formulario modal-mapeo-servicios__item";
@@ -171,6 +180,7 @@ document.addEventListener("DOMContentLoaded", function () {
           '<div class="ck-formulario__base"><div class="ck-formulario__bolita"></div></div>' +
           '<span class="ck-formulario__label modal-mapeo-servicios__texto-item">' +
             '<span class="modal-mapeo-servicios__nombre">' + escaparHtml(servicio.nombre) + '</span>' +
+            (esVirtualNeonatologia ? '<span class="modal-mapeo-servicios__texto"> </span>' : '') +
           '</span>' +
         '</label>'
       );
@@ -287,6 +297,27 @@ document.addEventListener("DOMContentLoaded", function () {
 
         checks.forEach(function (check) {
           check.addEventListener("change", actualizarResumenServiciosMapeo);
+          check.addEventListener("change", function () {
+            var valor = Number(check.value);
+            if (isNaN(valor)) {
+              return;
+            }
+            // [2026-06-26 SCOPE] Pediatria y Neonatologia aislada no se mezclan en la misma sesion.
+            if (valor === SERVICIO_VIRTUAL_NEONATOLOGIA_ID && check.checked) {
+              checks.forEach(function (item) {
+                if (Number(item.value) === SERVICIO_PEDIATRIA_ID) {
+                  item.checked = false;
+                }
+              });
+            }
+            if (valor === SERVICIO_PEDIATRIA_ID && check.checked) {
+              checks.forEach(function (item) {
+                if (Number(item.value) === SERVICIO_VIRTUAL_NEONATOLOGIA_ID) {
+                  item.checked = false;
+                }
+              });
+            }
+          });
         });
 
         actualizarResumenServiciosMapeo();
@@ -1525,6 +1556,20 @@ document.addEventListener("DOMContentLoaded", function () {
           camaEl.appendChild(dni);
           camaEl.appendChild(actualizacion);
 
+          // [2026-06-26] Tooltip global: muestra usuario y fecha al hacer hover sobre la card
+          camaEl.addEventListener("mouseenter", function () {
+            var usuario = camaEl.dataset.usuarioUltimaActualizacion || "—";
+            var fecha = formatearFechaHoraCorta(camaEl.dataset.ultimaActualizacion || "");
+            mapaTooltipGlobal.innerHTML = "<strong>\u00dalt. actualizaci\u00f3n</strong><br>" + usuario + "<br>" + fecha;
+            var rect = camaEl.getBoundingClientRect();
+            mapaTooltipGlobal.style.left = (rect.left + rect.width / 2) + "px";
+            mapaTooltipGlobal.style.top = (rect.top - 10) + "px";
+            mapaTooltipGlobal.style.display = "block";
+          });
+          camaEl.addEventListener("mouseleave", function () {
+            mapaTooltipGlobal.style.display = "none";
+          });
+
           // --- Interaccion: doble clic (escritorio) o pulsacion larga (tactil)
           // Simple clic  -> abre modal de edicion
           // Doble clic   -> confirma cama sin cambios (solo en sesion de mapeo activa)
@@ -1641,8 +1686,8 @@ document.addEventListener("DOMContentLoaded", function () {
         return response.json();
       })
       .then(function (data) {
-        serviciosDisponiblesMapeo = data.servicios || [];
-        renderMapa(serviciosDisponiblesMapeo);
+        serviciosDisponiblesMapeo = data.servicios_mapeo || data.servicios || [];
+        renderMapa(data.servicios || []);
       })
       .catch(function () {
         contenedor.innerHTML = '<p class="mapa-vacio">Error cargando mapa de camas.</p>';

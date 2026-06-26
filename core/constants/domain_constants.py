@@ -23,6 +23,8 @@ class LogApp:
     GENERAL = "general"
     PACIENTE = "paciente"
     INGRESOS = "ingresos"
+    # [2026-06-26 LOG] Canal dedicado para trazas del flujo de mapeo de camas.
+    MAPEO_CAMAS = "mapeo_camas"
     RX = "rx"
     REFERENCIAS = "referencias"
     REPORTE = "reportes"

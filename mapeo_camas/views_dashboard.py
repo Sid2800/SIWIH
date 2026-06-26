@@ -5,6 +5,7 @@ from datetime import timedelta
 from collections import defaultdict
 
 from django.contrib.auth.decorators import login_required
+from django.db.models import OuterRef, Subquery
 from django.http import HttpResponse
 from django.shortcuts import redirect
 from django.utils import timezone
@@ -56,23 +57,45 @@ __all__ = [
 ]
 
 
-ESTADOS_OCUPADOS_REPORTE = {"OCUPADA", "PRE_ALTA"}
+# [2026-06-26] En el reporte Excel de ocupacion se contabiliza solo estado OCUPADA
+# para alinear con lectura operativa del historial por cama.
+ESTADOS_OCUPADOS_REPORTE = {"OCUPADA"}
 
 
 def _iterar_dias_intervalo(inicio, fin):
     """2026-06-16: Devuelve días tocados por el intervalo [inicio, fin)."""
     if not inicio or not fin or fin <= inicio:
         return
-    cursor = inicio.date()
-    ultimo = (fin - timedelta(seconds=1)).date()
+    # [2026-06-26] Normaliza a hora local para evitar desfases de día por UTC en el conteo.
+    inicio_local = timezone.localtime(inicio)
+    fin_local = timezone.localtime(fin)
+    cursor = inicio_local.date()
+    ultimo = (fin_local - timedelta(seconds=1)).date()
     while cursor <= ultimo:
         yield cursor
         cursor = cursor + timedelta(days=1)
 
 
+def _snapshot_estado_por_cama_desde_historial(corte):
+    """2026-06-26: Snapshot historico estricto por cama usando solo HistorialEstadoCama."""
+    return {
+        r["cama_id"]: (r["estado_nuevo__codigo"] or "VACIA")
+        for r in HistorialEstadoCama.objects
+        .filter(id=Subquery(
+            HistorialEstadoCama.objects
+            .filter(cama_id=OuterRef("cama_id"), fecha_hora__lte=corte)
+            .order_by("-fecha_hora", "-id")
+            .values("id")[:1]
+        ))
+        .values("cama_id", "estado_nuevo__codigo")
+    }
+
+
 def _calcular_metricas_ocupacion_por_cama(desde, hasta):
     """2026-06-16: Calcula horas/días ocupados e ingresos por cama para el rango."""
-    snapshot_desde = _snapshot_estado_por_cama(desde)
+    # [2026-06-26] Para reporte historico de ocupacion, usar solo historial evita arrastre
+    # de estado actual desde AsignacionCamaPaciente y reduce inflado de horas/dias.
+    snapshot_desde = _snapshot_estado_por_cama_desde_historial(desde)
 
     eventos = list(
         HistorialEstadoCama.objects
@@ -81,12 +104,15 @@ def _calcular_metricas_ocupacion_por_cama(desde, hasta):
         .order_by("cama_id", "fecha_hora", "id")
     )
 
+    # [2026-06-26] Para mantener coherencia con horas/dias del reporte, ingresos/pacientes
+    # también se calculan desde historial (evento de ocupación) en lugar de asignaciones.
     ingresos_rows = list(
-        AsignacionCamaPaciente.objects
+        HistorialEstadoCama.objects
         .filter(
-            fecha_inicio__gte=desde,
-            fecha_inicio__lte=hasta,
+            fecha_hora__gte=desde,
+            fecha_hora__lte=hasta,
             ingreso_id__isnull=False,
+            estado_nuevo__codigo="OCUPADA",
         )
         .values("cama_id", "ingreso_id")
     )
@@ -403,7 +429,8 @@ def dashboard_kpis(request):
         # 2026-06-16: KPIs del dashboard alimentados solo con tablas de mapeo_camas.
         conteo_por_estado = _snapshot_estado_camas(hasta)
         total_camas = sum(conteo_por_estado.values())
-        ocupadas = conteo_por_estado.get("OCUPADA", 0)
+        # [2026-06-26] Alinea KPI con el resto del dashboard: PRE_ALTA también cuenta como ocupada.
+        ocupadas = conteo_por_estado.get("OCUPADA", 0) + conteo_por_estado.get("PRE_ALTA", 0)
         disponibles = conteo_por_estado.get("VACIA", 0) + conteo_por_estado.get("LIBRE", 0)
         fuera_servicio = (
             conteo_por_estado.get("FUERA_SERVICIO", 0) + conteo_por_estado.get("MANTENIMIENTO", 0)
@@ -455,7 +482,8 @@ def dashboard_ocupacion_hora(request):
         total_camas = max(len(_snapshot_estado_por_cama(hasta)), 1)
 
         conteo_inicio = _snapshot_estado_camas(desde)
-        ocupadas_inicio = conteo_inicio.get("OCUPADA", 0)
+        # [2026-06-26] El punto inicial de la serie debe incluir PRE_ALTA para evitar desfase.
+        ocupadas_inicio = conteo_inicio.get("OCUPADA", 0) + conteo_inicio.get("PRE_ALTA", 0)
 
         # 2026-06-16: usa transición anterior->nuevo para delta real de ocupación y evitar caídas artificiales.
         estados_ocupados = {"OCUPADA", "PRE_ALTA"}

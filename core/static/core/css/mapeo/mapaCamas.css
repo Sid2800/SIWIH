@@ -282,6 +282,33 @@
   -webkit-user-select: none;
 }
 
+/* [2026-06-26] Tooltip global de última actualización (position: fixed en body, sin recorte) */
+#mapa-tooltip-global {
+  display: none;
+  position: fixed;
+  z-index: 9999;
+  background: var(--color-fondo-oscuro, #1e293b);
+  color: var(--color-texto-claro, #f8fafc);
+  font-size: 1.75rem;
+  line-height: 1.6;
+  padding: 0.85rem 1.25rem;
+  border-radius: 8px;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.3);
+  transform: translate(-50%, -100%);
+}
+
+#mapa-tooltip-global::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: var(--color-fondo-oscuro, #1e293b);
+}
+
 .mapa-cama:hover {
   transform: translateY(-2px);
   box-shadow: 0 3px 10px rgba(15, 23, 42, 0.15);
@@ -301,15 +328,15 @@
 }
 
 .mapa-cama-numero {
-  font-size: 2.4rem;
+  font-size: 2.9rem;
   font-weight: 700;
   line-height: 1.1;
 }
 
 .mapa-cama-estado,
 .mapa-cama-paciente {
-  font-size: 1.6rem;
-  margin-top: 0.25rem;
+  font-size: 1.9rem;
+  margin-top: 0.3rem;
   white-space: normal;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -318,11 +345,19 @@
 
 /* DNI del paciente: tono más tenue para distinguirlo del nombre */
 .mapa-cama-dni {
-  font-size: 1.4rem;
+  font-size: 1.7rem;
   color: var(--mapa-texto-dni);
   white-space: normal;
   overflow: hidden;
   text-overflow: ellipsis;
+  width: 100%;
+}
+
+/* [2026-06-26] Fecha de última actualización en la card */
+.mapa-cama-actualizacion {
+  font-size: 1.5rem;
+  margin-top: 0.2rem;
+  opacity: 0.85;
   width: 100%;
 }
 

@@ -33,6 +33,20 @@
     return new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59);
   }
 
+  function resolveHasta(mesHasta) {
+    const finMes = monthEnd(mesHasta);
+    const now = new Date();
+    // [2026-06-26] Si el mes final es el mes actual, cortar al momento actual
+    // para evitar inflar horas/dias con proyeccion de dias futuros.
+    if (
+      mesHasta.getFullYear() === now.getFullYear() &&
+      mesHasta.getMonth() === now.getMonth()
+    ) {
+      return now;
+    }
+    return finMes;
+  }
+
   function toLocalISO(d) {
     return (
       d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) +
@@ -132,7 +146,7 @@
     ensureDefaults();
     return {
       desde: toLocalISO(monthStart(state.mesDesde)),
-      hasta: toLocalISO(monthEnd(state.mesHasta)),
+      hasta: toLocalISO(resolveHasta(state.mesHasta)),
       agrupacion: "mensual",
     };
   }
