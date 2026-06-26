@@ -44,6 +44,8 @@
       <button type="button" class="formularioBotones-boton mapa-control-mapeo--oculto" data-action="terminar-mapeo" title="Finalizar mapeo">
         <span>Finalizar mapeo</span>
       </button>
+      {% endif %}
+      {% if puede_cancelar_mapeo %}
       <button type="button" class="formularioBotones-boton mapa-control-mapeo--oculto" id="btn-cancelar-mapeo" title="Cancelar mapeo">
         <span>Cancelar mapeo</span>
       </button>
@@ -86,12 +88,27 @@
       </span>
       <ul class="mapa-banner-advertencia__lista">
         {% for sesion in sesiones_ajenas %}
-        <li>
-          <strong>{{ sesion.usuario }}</strong>
-          {% if sesion.servicios %}
-            &mdash; {{ sesion.servicios|join:", " }}
-          {% else %}
-            &mdash; Sin servicios asociados
+        <li class="mapa-banner-advertencia__item">
+          <div class="mapa-banner-advertencia__detalle">
+            <strong>{{ sesion.usuario }}</strong>
+            {% if sesion.servicios %}
+              &mdash; {{ sesion.servicios|join:", " }}
+            {% else %}
+              &mdash; Sin servicios asociados
+            {% endif %}
+            {% if sesion.hora_inicio %}
+              <span>&middot; Inicio: {{ sesion.hora_inicio }}</span>
+            {% endif %}
+          </div>
+          {% if puede_cancelar_mapeo_banner %}
+          <form method="post" action="{% url 'mapeo_camas_cancelar_mapeo' %}" class="mapa-banner-advertencia__accion-form">
+            {% csrf_token %}
+            <input type="hidden" name="sesion_mapeo_id" value="{{ sesion.sesion_id }}">
+            <input type="hidden" name="next" value="{{ request.path }}">
+            <button type="submit" class="formularioBotones-boton mapa-banner-advertencia__accion" title="Cancelar este mapeo">
+              <span>Cancelar</span>
+            </button>
+          </form>
           {% endif %}
         </li>
         {% endfor %}
@@ -104,6 +121,9 @@
   <div id="mapa-banner-mapeo" class="mapa-banner-mapeo mapa-control-mapeo--oculto">
     <i class="bi bi-record-circle-fill mapa-banner-mapeo__icono"></i>
     <span class="mapa-banner-mapeo__texto">Mapeo en progreso &mdash; revisa cada cama y confirma o corrige su estado</span>
+    {% if sesion_activa %}
+    <span class="mapa-banner-mapeo__texto">Inicio: {{ sesion_activa.fecha_inicio|date:"d/m/Y H:i" }}</span>
+    {% endif %}
   </div>
 
   <section class="mapa-indicadores" aria-label="Indicadores de estado y sala de camas">
@@ -224,6 +244,39 @@
     gap: 0.8rem !important;
     margin-top: 1.25rem !important;
   }
+
+  /* [2026-06-22] Accion compacta para cancelar mapeos ajenos desde el aviso superior. */
+  .mapa-banner-advertencia__lista {
+    width: 100%;
+  }
+
+  .mapa-banner-advertencia__accion-form {
+    display: inline-flex;
+    margin-left: auto;
+    flex-shrink: 0;
+    align-self: center;
+    justify-self: end;
+  }
+
+  .mapa-banner-advertencia__accion {
+    min-width: auto !important;
+    width: auto !important;
+    padding: 0.45rem 0.85rem !important;
+    line-height: 1.2 !important;
+  }
+
+  .mapa-banner-advertencia__item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.85rem;
+    width: 100%;
+  }
+
+  .mapa-banner-advertencia__detalle {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
 </style>
 {% endblock %}
 
@@ -234,6 +287,7 @@
   window.MAPA_SOLO_LECTURA = {% if es_editor %}false{% else %}true{% endif %};
   window.MAPA_ROL_INTENTOS_RESTRINGIDO = {% if es_rol_intentos_restringido %}true{% else %}false{% endif %};
   window.MAPA_CFG = {
+    sesionMaxHoras: {{ sesion_max_horas|default:24 }},
     urls: {
       estadoMapeo:      "{% url 'mapeo_camas_estado_mapeo' %}",
       iniciarMapeo:     "{% url 'mapeo_camas_iniciar_mapeo' %}",
@@ -248,8 +302,36 @@
       procesarCamaMapeo:"{% url 'mapeo_camas_procesar_cama_mapeo' %}"
     }
   };
+
+  document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll(".mapa-banner-advertencia__accion-form").forEach(function (formulario) {
+      formulario.addEventListener("submit", function (event) {
+        event.preventDefault();
+
+        Swal.fire({
+          title: "Cancelar mapeo",
+          text: "La sesión de mapeo seleccionada se cancelará y no podrá retomarse. ¿Desea continuar?",
+          icon: "warning",
+          showCancelButton: true,
+          confirmButtonText: "Sí, cancelar",
+          cancelButtonText: "Volver",
+          customClass: {
+            popup: "contener-modal-defuncion mapeo-alerta-sesion",
+            title: "contener-modal-titulo",
+            content: "contener-modal-contenido",
+            confirmButton: "contener-modal-boton-confirmar",
+            cancelButton: "contener-modal-boton-cancelar"
+          }
+        }).then(function (resultado) {
+          if (resultado.isConfirmed) {
+            formulario.submit();
+          }
+        });
+      });
+    });
+  });
 </script>
 <!-- [2026-06-11] Cache-bust: fuerza recarga del JS con contador de intentos por servicio. -->
 <!-- [2026-06-11] Cache-bust: fix de modo solo lectura en inicio/cierre de sesión de mapeo. -->
-<script src="{% static 'core/scripts/mapeo/mapaCamasAsignacion.js' %}?v=20260621c"></script>
+<script src="{% static 'core/scripts/mapeo/mapaCamasAsignacion.js' %}?v=20260622a"></script>
 {% endblock %}

@@ -14,7 +14,10 @@ from core.constants.permisos import (
     MAPEO_CAMAS_HISTORIALES_UNIDADES,
     MAPEO_CAMAS_MAPEAR_ROLES,
     MAPEO_CAMAS_MAPEAR_UNIDADES,
+    MAPEO_CAMAS_VISUALIZACION_ROLES,
+    MAPEO_CAMAS_VISUALIZACION_UNIDADES,
 )
+from core.services.usuario_service import UsuarioService
 from ingreso.models import Ingreso
 from usuario.models import AlcanceUsuario, PerfilUnidad
 
@@ -33,6 +36,7 @@ from ._permisos import (
     _tiene_permiso_cambios_mapa,
     _tiene_permiso_historiales,
     _tiene_permiso_mapear,
+    _tiene_permiso_visualizacion_mapa,
 )
 
 
@@ -265,17 +269,17 @@ def debug_permisos_mapa(request):
         )
     )
 
-    match_global_vista = PerfilUnidad.objects.filter(
+    match_alcance_global_vista = PerfilUnidad.objects.filter(
         usuario=usuario,
-        rol__in=MAPEO_CAMAS_HISTORIALES_ROLES,
+        rol__in=MAPEO_CAMAS_VISUALIZACION_ROLES,
         alcance=AlcanceUsuario.GLOBAL,
     ).exists()
 
     match_unidad_vista = PerfilUnidad.objects.filter(
         usuario=usuario,
-        rol__in=MAPEO_CAMAS_HISTORIALES_ROLES,
+        rol__in=MAPEO_CAMAS_VISUALIZACION_ROLES,
         alcance=AlcanceUsuario.UNIDAD,
-        servicio_unidad__nombre_corto_unidad__in=MAPEO_CAMAS_HISTORIALES_UNIDADES,
+        servicio_unidad__nombre_corto_unidad__in=MAPEO_CAMAS_VISUALIZACION_UNIDADES,
     ).exists()
 
     return JsonResponse(
@@ -289,8 +293,12 @@ def debug_permisos_mapa(request):
                 "is_superuser": usuario.is_superuser,
             },
             "requerido_vista_mapa": {
-                "roles": MAPEO_CAMAS_HISTORIALES_ROLES,
-                "unidades": MAPEO_CAMAS_HISTORIALES_UNIDADES,
+                "roles": MAPEO_CAMAS_VISUALIZACION_ROLES,
+                "unidades": MAPEO_CAMAS_VISUALIZACION_UNIDADES,
+            },
+            "requerido_historiales_dashboard": {
+                "regla": "superusuario o alcance global sin permiso extra",
+                "es_global": UsuarioService.es_global(usuario),
             },
             "requerido_flujo_mapeo": {
                 "roles": MAPEO_CAMAS_MAPEAR_ROLES,
@@ -302,14 +310,14 @@ def debug_permisos_mapa(request):
             },
             "perfiles": perfiles,
             "evaluacion": {
-                "puede_ver_mapa": _tiene_permiso_historiales(usuario),
+                "puede_ver_mapa": _tiene_permiso_visualizacion_mapa(usuario),
                 "puede_mapear": _tiene_permiso_mapear(usuario),
                 "puede_gestionar_sesion_mapeo": _puede_gestionar_sesion_mapeo(usuario),
                 "puede_hacer_cambios_mapa": _tiene_permiso_cambios_mapa(usuario),
                 "es_rol_intentos_restringido": _es_rol_intentos_restringido(usuario),
-                "mixin_vista_global": match_global_vista,
+                "mixin_alcance_global": match_alcance_global_vista,
                 "mixin_vista_unidad": match_unidad_vista,
-                "mixin_vista_resultado": bool(usuario.is_superuser or match_global_vista or match_unidad_vista),
+                "mixin_vista_resultado": bool(usuario.is_superuser or match_alcance_global_vista or match_unidad_vista),
             },
         }
     )

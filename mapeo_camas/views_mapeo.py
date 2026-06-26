@@ -6,6 +6,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.http import JsonResponse
+from django.shortcuts import redirect
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
@@ -41,12 +42,14 @@ from ._helpers import (
 )
 from ._permisos import (
     _es_rol_intentos_restringido,
+    _puede_cancelar_mapeo,
     _puede_gestionar_sesion_mapeo,
     _tiene_permiso_mapear,
     _validar_limite_intentos_salas,
 )
 from ._sesion import (
     _camas_mapeadas_sesion,
+    _cerrar_sesiones_mapeo_sin_sesion_django,
     _obtener_sesion_mapeo_activa,
     _obtener_servicios_ids_sesion,
     _registrar_detalle_mapeo,
@@ -73,6 +76,9 @@ def iniciar_mapeo(request):
     """Inicia una sesion de mapeo para el usuario actual."""
     if not _tiene_permiso_mapear(request.user):
         return JsonResponse({"ok": False, "error": "Acceso denegado."}, status=403)
+
+    # [2026-06-22] Depura sesiones huérfanas cuando la sesión Django del usuario ya expiró.
+    _cerrar_sesiones_mapeo_sin_sesion_django()
 
     # [2026-06-11] El inicio de sesión se controla por MAPEO_CAMAS_MAPEAR_*.
     # Las restricciones de intentos se aplican durante movimientos/edición de camas.
@@ -186,6 +192,8 @@ def estado_mapeo(request):
     """Devuelve la sesion de mapeo activa y camas ya procesadas para restaurar UI."""
     if not _tiene_permiso_mapear(request.user):
         return JsonResponse({"ok": False, "error": "Acceso denegado."}, status=403)
+
+    _cerrar_sesiones_mapeo_sin_sesion_django()
 
     sesion = _obtener_sesion_mapeo_activa(request.user)
     if not sesion:
@@ -302,26 +310,58 @@ def terminar_mapeo(request):
 @require_POST
 def cancelar_mapeo(request):
     """Cancela la sesion activa de mapeo del usuario."""
-    if not _puede_gestionar_sesion_mapeo(request.user):
+    if not _puede_cancelar_mapeo(request.user):
         return JsonResponse({"ok": False, "error": "Acceso denegado."}, status=403)
 
-    sesion = _obtener_sesion_mapeo_activa(request.user)
-    if not sesion:
-        return JsonResponse({"ok": False, "error": "No hay una sesion de mapeo activa."}, status=400)
-
-    observacion_sesion = _normalizar_observacion_sesion(_obtener_observacion_desde_request(request))
-
-    # 2026-06-01: asegura atomic en actualización de cancelación de sesión de mapeo.
+    next_url = (request.POST.get("next") or "").strip()
+    sesion_mapeo_id = request.POST.get("sesion_mapeo_id") or None
     with transaction.atomic():
+        if sesion_mapeo_id:
+            try:
+                sesion_mapeo_id = int(sesion_mapeo_id)
+            except (TypeError, ValueError):
+                if next_url:
+                    return redirect(next_url)
+                return JsonResponse({"ok": False, "error": "La sesion indicada no es valida."}, status=400)
+
+            sesion = (
+                MapeoSesionCama.objects.select_for_update()
+                .select_related("usuario")
+                .filter(
+                    pk=sesion_mapeo_id,
+                    estado=get_estado_mapeo("EN_PROGRESO", "ESTADO_SESION"),
+                    fecha_fin__isnull=True,
+                )
+                .first()
+            )
+        else:
+            sesion = (
+                MapeoSesionCama.objects.select_for_update()
+                .select_related("usuario")
+                .filter(
+                    usuario=request.user,
+                    estado=get_estado_mapeo("EN_PROGRESO", "ESTADO_SESION"),
+                    fecha_fin__isnull=True,
+                )
+                .order_by("-fecha_inicio")
+                .first()
+            )
+
+        if not sesion:
+            if next_url:
+                return redirect(next_url)
+            return JsonResponse({"ok": False, "error": "No hay una sesion de mapeo activa."}, status=400)
+
+        observacion_sesion = _normalizar_observacion_sesion(_obtener_observacion_desde_request(request))
+
         sesion.estado = get_estado_mapeo("CANCELADO", "ESTADO_SESION")
         sesion.fecha_fin = timezone.now()
         sesion.observacion = get_observacion_mapeo(OBSERVACION_SESION_SIN_OBSERVACIONES)
         sesion.observacion_texto = observacion_sesion
         sesion.save(update_fields=["estado", "fecha_fin", "observacion", "observacion_texto"])
 
-    total_detalles = DetalleMapeoCama.objects.filter(sesion_mapeo=sesion).count()
-    return JsonResponse(
-        {
+        total_detalles = DetalleMapeoCama.objects.filter(sesion_mapeo=sesion).count()
+        respuesta = {
             "ok": True,
             "sesion_id": sesion.id,
             "estado": sesion.estado.codigo if hasattr(sesion.estado, "codigo") else str(sesion.estado),
@@ -329,7 +369,11 @@ def cancelar_mapeo(request):
             "total_detalles": total_detalles,
             "mensaje": "Mapeo cancelado correctamente.",
         }
-    )
+
+    if next_url:
+        return redirect(next_url)
+
+    return JsonResponse(respuesta)
 
 
 # [2026-05-07] API: Procesar acción de mapeo en cama

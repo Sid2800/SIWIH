@@ -8,6 +8,7 @@ from django.db.models import OuterRef, Subquery
 from django.http import JsonResponse
 from django.utils import timezone
 
+from core.constants.permisos import ROLES_GLOBALES
 from core.services.mapeo_camas_service import MapeoCamasService
 from core.services.usuario_service import UsuarioService
 from core.utils.utilidades_fechas import hora_local_iso
@@ -113,7 +114,7 @@ def _obtener_observacion_desde_request(request):
 
 # 2026-06-01: reutiliza helper global existente en UsuarioService; evita mantener utilidades_usuario.py.
 def _es_superadmin(usuario):
-    return bool(usuario and UsuarioService.es_global_roles(usuario))
+    return bool(usuario and (usuario.is_superuser or UsuarioService.es_global_roles(usuario, ROLES_GLOBALES)))
 
 
 def _meta_ultima_actualizacion(historial):

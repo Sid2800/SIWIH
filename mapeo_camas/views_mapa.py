@@ -14,8 +14,8 @@ from core.utils.utilidades_fechas import hora_local_iso
 from core.constants.permisos import (
     MAPEO_CAMAS_HISTORIALES_ROLES,
     MAPEO_CAMAS_HISTORIALES_UNIDADES,
-    MAPEO_CAMAS_MAPEAR_ROLES,
-    MAPEO_CAMAS_MAPEAR_UNIDADES,
+    MAPEO_CAMAS_VISUALIZACION_ROLES,
+    MAPEO_CAMAS_VISUALIZACION_UNIDADES,
 )
 from core.mixins import UnidadRolRequiredMixin
 from core.services.mapeo_camas_service import MapeoCamasService
@@ -43,6 +43,8 @@ from .constants.view_constants import (
     ESTADOS_EDICION_DIRECTA_ROL_RESTRINGIDO,
     ESTADOS_MANTIENEN_INGRESO_SIN_NUEVO,
     ESTADOS_OCUPADA_PREALTA,
+    OBS_INGRESO_DESDE_CONSULTA_EXTERNA_A_OCUPADA,
+    OBS_INGRESO_DESDE_PREALTA_A_OCUPADA,
 )
 from ._helpers import (
     _es_superadmin,
@@ -57,7 +59,9 @@ from ._permisos import (
     _es_rol_intentos_restringido,
     _filtro_observaciones_movimiento_limite,
     _inicio_ventana_limite_sala,
+    _puede_cancelar_mapeo_banner,
     _max_cambios_para_usuario,
+    _puede_cancelar_mapeo,
     _puede_editar_cama_en_mapa,
     _puede_gestionar_sesion_mapeo,
     _sala_real_id_desde_cama,
@@ -65,9 +69,11 @@ from ._permisos import (
     _tiene_permiso_dashboard,
     _tiene_permiso_historiales,
     _tiene_permiso_mapear,
+    _tiene_permiso_visualizacion_mapa,
     _validar_limite_intentos_salas,
 )
 from ._sesion import (
+    _cerrar_sesiones_mapeo_sin_sesion_django,
     _obtener_sesion_mapeo_activa,
     _obtener_servicios_ids_sesion,
     _registrar_detalle_mapeo,
@@ -154,12 +160,14 @@ def _servicio_payload(servicio, salas_data, conflicto_mapeo=None):
 # [2026-05-28] MC-PERM-001: el acceso al mapa es parte del flujo de mapeo.
 class MapeoCamasMapaView(UnidadRolRequiredMixin, TemplateView):
     template_name = "mapeo_camas/mapa.html"
-    required_roles = MAPEO_CAMAS_MAPEAR_ROLES
-    required_unidades = MAPEO_CAMAS_MAPEAR_UNIDADES
+    # [2026-06-22] Permiso exclusivo de visualización para renderizar el template del mapa.
+    required_roles = MAPEO_CAMAS_VISUALIZACION_ROLES
+    required_unidades = MAPEO_CAMAS_VISUALIZACION_UNIDADES
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         es_rol_intentos_restringido = _es_rol_intentos_restringido(self.request.user)
+        _cerrar_sesiones_mapeo_sin_sesion_django()
         context["titulo"] = "Mapa de Camas"
         context["subtitulo"] = "Asignacion por paciente y estado de cama"
         # [2026-05-26 FEATURE] Avisar de mapeos ajenos en progreso.
@@ -181,6 +189,8 @@ class MapeoCamasMapaView(UnidadRolRequiredMixin, TemplateView):
         context["sesiones_ajenas"] = [
             {
                 "usuario": _nombre_usuario(sesion.usuario),
+                "sesion_id": sesion.id,
+                "hora_inicio": hora_local_iso(sesion.fecha_inicio),
                 "servicios": [
                     ss.servicio.nombre_servicio
                     for ss in sesion.servicios_incluidos.all()
@@ -190,6 +200,9 @@ class MapeoCamasMapaView(UnidadRolRequiredMixin, TemplateView):
             for sesion in sesiones_ajenas
         ]
         context["puede_mapear"] = _puede_gestionar_sesion_mapeo(self.request.user)
+        context["puede_cancelar_mapeo"] = _puede_cancelar_mapeo(self.request.user)
+        # [2026-06-23] Botón del banner (mapeos ajenos): solo superadmin o GLOBAL.
+        context["puede_cancelar_mapeo_banner"] = _puede_cancelar_mapeo_banner(self.request.user)
         context["puede_hacer_cambios_mapa"] = _puede_editar_cama_en_mapa(self.request.user)
         context["puede_ver_historiales"] = _tiene_permiso_historiales(self.request.user)
         # [2026-06-11] Dashboard se controla con permiso propio, separado de historiales.
@@ -197,6 +210,7 @@ class MapeoCamasMapaView(UnidadRolRequiredMixin, TemplateView):
         context["es_superusuario"] = bool(getattr(self.request.user, "is_superuser", False))
         context["es_rol_intentos_restringido"] = es_rol_intentos_restringido
         context["es_editor"] = context["puede_hacer_cambios_mapa"]
+        context["sesion_activa"] = _obtener_sesion_mapeo_activa(self.request.user)
         return context
 
 
@@ -207,8 +221,11 @@ class MapeoCamasMapaView(UnidadRolRequiredMixin, TemplateView):
 @login_required
 @require_GET
 def mapa_camas_data(request):
-    if not _tiene_permiso_mapear(request.user):
+    # [2026-06-22] Data de lectura del mapa usa permiso de visualización.
+    if not _tiene_permiso_visualizacion_mapa(request.user):
         return JsonResponse({"ok": False, "error": "Acceso denegado."}, status=403)
+
+    _cerrar_sesiones_mapeo_sin_sesion_django()
 
     sesion_activa = _obtener_sesion_mapeo_activa(request.user)
     servicios_ids_sesion = _obtener_servicios_ids_sesion(sesion_activa)
@@ -662,6 +679,20 @@ def actualizar_cama_mapa(request):
 
     asignacion = resultado["asignacion"]
     historial = resultado["historial"]
+
+    # [2026-06-22] Mantener el estado anterior real de la cama en el historial principal.
+    if estado_anterior and historial and historial.estado_anterior_id != estado_anterior.id:
+        historial.estado_anterior = estado_anterior
+        historial.save(update_fields=["estado_anterior"])
+
+    # [2026-06-22] En ingreso a OCUPADA, conservar observación explícita según estado origen.
+    if estado_codigo == "OCUPADA" and estado_anterior and historial:
+        if estado_anterior.codigo == "CONSULTA_EXTERNA":
+            historial.observacion = get_observacion_mapeo(OBS_INGRESO_DESDE_CONSULTA_EXTERNA_A_OCUPADA)
+            historial.save(update_fields=["observacion"])
+        elif estado_anterior.codigo == "PRE_ALTA":
+            historial.observacion = get_observacion_mapeo(OBS_INGRESO_DESDE_PREALTA_A_OCUPADA)
+            historial.save(update_fields=["observacion"])
 
     _registrar_detalle_mapeo(
         usuario=request.user, cama=cama, asignacion=asignacion,

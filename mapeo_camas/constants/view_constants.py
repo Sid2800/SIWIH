@@ -33,3 +33,11 @@ OBS_REASIGNACION_SIN_ORIGEN_DETALLE = (
 OBS_AJUSTE_MAPEO_SIN_ALTA = (
     "Actualizacion de cama en mapeo por discrepancia fisica (sin alta)"
 )
+
+# 2026-06-22: observaciones específicas para transición de ingreso a OCUPADA.
+OBS_INGRESO_DESDE_CONSULTA_EXTERNA_A_OCUPADA = (
+    "Ingreso: cambio de CONSULTA_EXTERNA a OCUPADA"
+)
+OBS_INGRESO_DESDE_PREALTA_A_OCUPADA = (
+    "Ingreso: cambio de PRE_ALTA a OCUPADA"
+)

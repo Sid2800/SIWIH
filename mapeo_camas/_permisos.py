@@ -22,7 +22,11 @@ from core.constants.permisos import (
     MAPEO_CAMAS_INTENTOS_CAMBIO_UNIDADES as MAPEO_CAMAS_INTENTO_CAMBIO_UNIDADES,
     MAPEO_CAMAS_MAPEAR_ROLES,
     MAPEO_CAMAS_MAPEAR_UNIDADES,
+    ROLES_GLOBALES,
+    MAPEO_CAMAS_VISUALIZACION_ROLES,
+    MAPEO_CAMAS_VISUALIZACION_UNIDADES,
 )
+from core.services.usuario_service import UsuarioService
 from usuario.permisos import verificar_permisos_usuario
 
 from mapeo_camas.models import HistorialEstadoCama
@@ -44,17 +48,31 @@ from ._sesion import _obtener_sesion_mapeo_activa
 # 4) Respuesta uniforme con JsonResponse cuando se rebasa el límite.
 
 # [2026-05-19] Helpers de permisos para mantener una sola fuente de verdad.
-def _tiene_permiso_historiales(usuario):
-    """Permite acceso de solo visualización al mapa e historiales."""
+def _tiene_permiso_visualizacion_mapa(usuario):
+    """Permite acceso de solo lectura al template y data del mapa."""
     return verificar_permisos_usuario(
         usuario,
-        MAPEO_CAMAS_HISTORIALES_ROLES,
-        MAPEO_CAMAS_HISTORIALES_UNIDADES,
+        MAPEO_CAMAS_VISUALIZACION_ROLES,
+        MAPEO_CAMAS_VISUALIZACION_UNIDADES,
     )
+
+
+# [2026-06-22 AUDIT] Historiales y dashboard quedaron definidos como acceso especial:
+# solo superusuario o cualquier perfil con alcance GLOBAL, sin permiso extra.
+def _tiene_acceso_global_mapeo(usuario):
+    return bool(usuario and (usuario.is_superuser or UsuarioService.es_global(usuario)))
+
+
+def _tiene_permiso_historiales(usuario):
+    """Permite acceso de solo visualización al mapa e historiales."""
+    return _tiene_acceso_global_mapeo(usuario)
 
 
 def _tiene_permiso_cambios_mapa(usuario):
     """Permite cambios manuales de estado/movimiento en camas."""
+    # [2026-06-23] Permitir usuario GLOBAL además de roles explícitos
+    if usuario and UsuarioService.es_global(usuario):
+        return True
     return verificar_permisos_usuario(
         usuario,
         MAPEO_CAMAS_CAMBIOS_ROLES,
@@ -64,6 +82,9 @@ def _tiene_permiso_cambios_mapa(usuario):
 
 def _tiene_permiso_mapear(usuario):
     """Permite iniciar/finalizar/cancelar sesiones de mapeo."""
+    # [2026-06-23] Permitir usuario GLOBAL además de roles explícitos
+    if usuario and UsuarioService.es_global(usuario):
+        return True
     return verificar_permisos_usuario(
         usuario,
         MAPEO_CAMAS_MAPEAR_ROLES,
@@ -75,11 +96,7 @@ def _tiene_permiso_mapear(usuario):
 # para evitar acoplamiento de permisos entre auditoría y monitoreo operativo.
 def _tiene_permiso_dashboard(usuario):
     """Permite acceso al dashboard operativo de KPIs/gráficas en tiempo real."""
-    return verificar_permisos_usuario(
-        usuario,
-        MAPEO_CAMAS_DASHBOARD_ROLES,
-        MAPEO_CAMAS_DASHBOARD_UNIDADES,
-    )
+    return _tiene_acceso_global_mapeo(usuario)
 
 
 # [2026-05-28] FIX: los endpoints de edición de cama desde el mapa (actualizar_cama_mapa,
@@ -109,6 +126,32 @@ def _puede_gestionar_sesion_mapeo(usuario):
     las restricciones de intentos aplican a movimientos/edición, no al botón de sesión.
     """
     return _tiene_permiso_mapear(usuario)
+
+
+def _puede_cancelar_mapeo(usuario):
+    """Permite cancelar/finalizar sesiones de mapeo de otros usuarios.
+    
+    [2026-06-23] Acceso para: superusuario, GLOBAL, o rol en ROLES_GLOBALES.
+    Permite que usuario GLOBAL finalice mapeos ajenos sin necesidad de rol específico.
+    """
+    if usuario and usuario.is_superuser:
+        return True
+    # Usuario GLOBAL puede finalizar mapeos de otros usuarios
+    if usuario and UsuarioService.es_global(usuario):
+        return True
+    return verificar_permisos_usuario(
+        usuario,
+        ROLES_GLOBALES,
+        MAPEO_CAMAS_MAPEAR_UNIDADES,
+    )
+
+
+def _puede_cancelar_mapeo_banner(usuario):
+    """Permite mostrar el botón de cancelar en alerta de mapeos ajenos.
+
+    [2026-06-23] Regla UI: solo superusuario o usuario con alcance GLOBAL.
+    """
+    return bool(usuario and (usuario.is_superuser or UsuarioService.es_global(usuario)))
 
 
 # [2026-05-07] Helper para calcular inicio de ventana de límite de movimientos

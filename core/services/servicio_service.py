@@ -49,17 +49,21 @@ class ServicioService:
 
 
     @staticmethod
-    def obtener_camas_activas():
+    def obtener_camas_activas(codigos_estado_permitidos=None):
         # La disponibilidad se define unicamente por el estado de asignacion de cama.
-        # [2026-05-07] Se reemplazó AsignacionCamaPaciente.Estado.VACIA (enum) por EstadoMapeo DB lookup
-        try:
-            estado_vacia = EstadoMapeo.objects.get(codigo="VACIA", categoria="ESTADO_CAMA")
-        except EstadoMapeo.DoesNotExist:
-            # Si no existe el estado VACIA, retornar lista vacía
+        # [2026-06-22] Permite filtrar por codigos de estado para reutilizar en ingreso/mapeo.
+        codigos_estado = codigos_estado_permitidos or ["VACIA"]
+        estados_permitidos_ids = list(
+            EstadoMapeo.objects.filter(
+                codigo__in=codigos_estado,
+                categoria="ESTADO_CAMA",
+            ).values_list("id", flat=True)
+        )
+        if not estados_permitidos_ids:
             return modelosServicio.Cama.objects.none()
-            
+
         camas_disponibles_ids = AsignacionCamaPaciente.objects.filter(
-            estado=estado_vacia  # [2026-05-07] Antes: estado=AsignacionCamaPaciente.Estado.VACIA
+            estado_id__in=estados_permitidos_ids
         ).values_list("cama_id", flat=True)
 
         return (
