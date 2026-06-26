@@ -6,7 +6,6 @@ Parte del paquete s_exp.views (antes views.py monolitico).
 
 
 import json
-import logging
 from datetime import timedelta
 
 from django.http import JsonResponse, HttpResponse
@@ -32,7 +31,8 @@ from .comunes import (
 from s_exp.models import EstadoSolicitud, EstadoExpedienteFisico, EstadoPrestamo, EstadoDevolucion
 
 
-logger = logging.getLogger("s_exp")
+from core.utils.utilidades_logging import log_info, log_warning, log_error
+from core.constants.domain_constants import LogApp
 
 
 # ============================================
@@ -127,7 +127,7 @@ def listar_solicitudes_api(request):
             "data": data,
         })
     except Exception as e:
-        logger.error(f"Error en listar_solicitudes_api: {e}", exc_info=True)
+        log_error(f"Error en listar_solicitudes_api: {e}", app=LogApp.S_EXP)
         return JsonResponse({"error": "Error interno del servidor"}, status=500)
 
 
@@ -291,11 +291,11 @@ def aprobar_solicitud_api(request):
             'Prestamo', prestamo.id
         )
 
-        logger.info(f"Solicitud #{solicitud.id} aprobada por {request.user.username}")
+        log_info(f"Solicitud #{solicitud.id} aprobada por {request.user.username}", app=LogApp.S_EXP)
         return JsonResponse({"success": True, "todos_rechazados": False, "prestamo_id": prestamo.id})
 
     except Exception as e:
-        logger.error(f"Error en aprobar_solicitud_api: {e}", exc_info=True)
+        log_error(f"Error en aprobar_solicitud_api: {e}", app=LogApp.S_EXP)
         return JsonResponse({"error": "Error interno del servidor"}, status=500)
 
 
@@ -361,7 +361,7 @@ def expedientes_solicitud_api(request, solicitud_id):
             "motivo": solicitud.motivo.nombre if solicitud.motivo_id else "",
         })
     except Exception as e:
-        logger.error(f"Error en expedientes_solicitud_api: {e}", exc_info=True)
+        log_error(f"Error en expedientes_solicitud_api: {e}", app=LogApp.S_EXP)
         return JsonResponse({"error": "Error interno del servidor"}, status=500)
 
 
@@ -392,7 +392,7 @@ def imprimir_solicitud_pdf(request, solicitud_id):
         # la solicitud aún no tiene admin_aprobador (organizando/sin préstamo).
         pdf_bytes = generar_pdf_solicitud(solicitud, admin_actual=request.user)
     except Exception as e:
-        logger.error(f"Error generando PDF solicitud {solicitud_id}: {e}", exc_info=True)
+        log_error(f"Error generando PDF solicitud {solicitud_id}: {e}", app=LogApp.S_EXP)
         return JsonResponse({"error": "Error al generar el PDF"}, status=500)
 
     response = HttpResponse(pdf_bytes, content_type='application/pdf')
@@ -488,7 +488,7 @@ def revisar_entrega_api(request):
             "todos_rechazados": aprobados_restantes == 0,
         })
     except Exception as e:
-        logger.error(f"Error en revisar_entrega_api: {e}", exc_info=True)
+        log_error(f"Error en revisar_entrega_api: {e}", app=LogApp.S_EXP)
         return JsonResponse({"error": "Error interno del servidor"}, status=500)
 
 
@@ -521,7 +521,7 @@ def marcar_listo_recojer_api(request):
     except SolicitudPrestamo.DoesNotExist:
         return JsonResponse({"error": "Solicitud no encontrada o no está en proceso de organización"}, status=404)
     except Exception as e:
-        logger.error(f"Error en marcar_listo_recojer_api: {e}", exc_info=True)
+        log_error(f"Error en marcar_listo_recojer_api: {e}", app=LogApp.S_EXP)
         return JsonResponse({"error": "Error interno del servidor"}, status=500)
 
 
@@ -589,11 +589,11 @@ def rechazar_solicitud_api(request):
             'SolicitudPrestamo', solicitud.id
         )
 
-        logger.info(f"Solicitud #{solicitud.id} rechazada por {request.user.username}")
+        log_info(f"Solicitud #{solicitud.id} rechazada por {request.user.username}", app=LogApp.S_EXP)
         return JsonResponse({"success": True})
 
     except Exception as e:
-        logger.error(f"Error en rechazar_solicitud_api: {e}", exc_info=True)
+        log_error(f"Error en rechazar_solicitud_api: {e}", app=LogApp.S_EXP)
         return JsonResponse({"error": "Error interno del servidor"}, status=500)
 
 
@@ -736,7 +736,7 @@ def crear_solicitud_api(request):
             'SolicitudPrestamo', solicitud.id
         )
 
-        logger.info(f"Solicitud #{solicitud.id} creada por {request.user.username}")
+        log_info(f"Solicitud #{solicitud.id} creada por {request.user.username}", app=LogApp.S_EXP)
         return JsonResponse({
             "success": True,
             "solicitud_id": solicitud.id,
@@ -744,7 +744,7 @@ def crear_solicitud_api(request):
         })
 
     except Exception as e:
-        logger.error(f"Error en crear_solicitud_api: {e}", exc_info=True)
+        log_error(f"Error en crear_solicitud_api: {e}", app=LogApp.S_EXP)
         return JsonResponse({"error": "Error interno del servidor"}, status=500)
 
 
@@ -852,5 +852,5 @@ def mis_solicitudes_api(request):
         return JsonResponse({"data": data})
 
     except Exception as e:
-        logger.error(f"Error en mis_solicitudes_api: {e}", exc_info=True)
+        log_error(f"Error en mis_solicitudes_api: {e}", app=LogApp.S_EXP)
         return JsonResponse({"error": "Error interno del servidor"}, status=500)

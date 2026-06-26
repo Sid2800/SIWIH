@@ -6,7 +6,6 @@ Parte del paquete s_exp.views (antes views.py monolitico).
 
 
 import json
-import logging
 from datetime import timedelta
 
 from django.http import JsonResponse
@@ -30,7 +29,8 @@ from .comunes import (
 from s_exp.models import EstadoSolicitud, EstadoExpedienteFisico, EstadoPrestamo, EstadoDevolucion
 
 
-logger = logging.getLogger("s_exp")
+from core.utils.utilidades_logging import log_info, log_warning, log_error
+from core.constants.domain_constants import LogApp
 
 
 # ============================================
@@ -116,7 +116,7 @@ def prestamos_activos_api(request):
         })
 
     except Exception as e:
-        logger.error(f"Error en prestamos_activos_api: {e}", exc_info=True)
+        log_error(f"Error en prestamos_activos_api: {e}", app=LogApp.S_EXP)
         return JsonResponse({"error": "Error interno del servidor"}, status=500)
 
 
@@ -166,7 +166,7 @@ def marcar_entregado_api(request):
         try:
             ubicacion_destino = CatalogoUbicaciones.ubicacion_del_solicitante(prestamo.solicitud)
         except Exception as _e:
-            logger.warning(f"No se pudo resolver ubicacion del solicitante: {_e}")
+            log_warning(f"No se pudo resolver ubicacion del solicitante: {_e}", app=LogApp.S_EXP)
 
         # Solo marcar como prestados los expedientes aprobados
         for d in prestamo.solicitud.detalles.select_related('expediente_prestamo__expediente').filter(aprobado=True):
@@ -190,7 +190,7 @@ def marcar_entregado_api(request):
                     ubicacion_obj=ubicacion_destino,
                 )
             except Exception as _e:
-                logger.warning(f"No se pudo actualizar ubicacion/localizacion al entregar: {_e}")
+                log_warning(f"No se pudo actualizar ubicacion/localizacion al entregar: {_e}", app=LogApp.S_EXP)
 
             ExpedienteEstadoLog.objects.create(
                 expediente=d.expediente_prestamo.expediente,
@@ -206,7 +206,7 @@ def marcar_entregado_api(request):
             'Prestamo', prestamo.id
         )
 
-        logger.info(f"Préstamo #{prestamo.id} entregado por {request.user.username}")
+        log_info(f"Préstamo #{prestamo.id} entregado por {request.user.username}", app=LogApp.S_EXP)
         return JsonResponse({
             "success": True,
             "fecha_entrega": _fmt_local(ahora),  # 12h local
@@ -214,5 +214,5 @@ def marcar_entregado_api(request):
         })
 
     except Exception as e:
-        logger.error(f"Error en marcar_entregado_api: {e}", exc_info=True)
+        log_error(f"Error en marcar_entregado_api: {e}", app=LogApp.S_EXP)
         return JsonResponse({"error": "Error interno del servidor"}, status=500)

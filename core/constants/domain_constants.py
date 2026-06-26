@@ -32,6 +32,7 @@ class LogApp:
     REPLICACION = "replicacion"
     EXPEDIENTE = "expediente"
     ATENCION = "atencion"
+    S_EXP = "s_exp"          # Solicitud/Préstamo de Expedientes
 
 
 # Salas excluidas para reportes / lógica clínica

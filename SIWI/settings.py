@@ -256,26 +256,17 @@ LOGGING = {
             "formatter": "standard",
             "level": "INFO",
         },
-
-        "s_exp_file": {
-            "class": "logging.handlers.RotatingFileHandler",
-            "filename": LOG_DIR / "s_exp.log",
-            "maxBytes": 1024 * 1024 * 10,  # 10MB
-            "backupCount": 5,
-            "formatter": "standard",
-            "level": "DEBUG",
-        },
     },
 
     "loggers": {
+        # Logger central del sistema. Todas las apps registran aquí vía
+        # core.utils.utilidades_logging (log_info/log_warning/log_error),
+        # identificándose con el campo 'app' (ej. app="s_exp"). El formato
+        # incluye [{app}], así que un solo archivo centraliza todo y se puede
+        # filtrar por módulo. (s_exp dejó de usar su logger dedicado.)
         "siwi": {
             "handlers": ["console", "siwi_file"],
             "level": "INFO",
-            "propagate": False,
-        },
-        "s_exp": {
-            "handlers": ["console", "s_exp_file"],
-            "level": "DEBUG",
             "propagate": False,
         },
         # django.server emite los logs de acceso del runserver/gunicorn.

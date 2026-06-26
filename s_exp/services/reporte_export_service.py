@@ -14,7 +14,6 @@ Notas de diseño:
   - Cada función pública recibe el `request`, valida permisos y devuelve un
     HttpResponse (descarga) o un JsonResponse de error.
 """
-import logging
 from datetime import datetime, time as _dtime
 from io import BytesIO
 
@@ -40,7 +39,8 @@ from s_exp.models import SolicitudPrestamo
 from s_exp.services.permisos import es_exp_admin, get_unidad_usuario
 from s_exp.services.formato import fmt_local
 
-logger = logging.getLogger("s_exp")
+from core.utils.utilidades_logging import log_info, log_warning, log_error
+from core.constants.domain_constants import LogApp
 
 
 def obtener_datos_reporte_areas_motivos(fecha_inicio='', fecha_fin=''):
@@ -239,7 +239,7 @@ def exportar_reporte_excel(request):
         return response
 
     except Exception as e:
-        logger.error(f"Error en exportar_reporte_excel: {e}", exc_info=True)
+        log_error(f"Error en exportar_reporte_excel: {e}", app=LogApp.S_EXP)
         return JsonResponse({"error": "Error al generar Excel"}, status=500)
 
 
@@ -498,5 +498,5 @@ def exportar_reporte_pdf(request):
         return response
 
     except Exception as e:
-        logger.error(f"Error en exportar_reporte_pdf: {e}", exc_info=True)
+        log_error(f"Error en exportar_reporte_pdf: {e}", app=LogApp.S_EXP)
         return JsonResponse({"error": f"Error al generar PDF: {str(e)}"}, status=500)

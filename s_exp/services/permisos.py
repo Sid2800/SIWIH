@@ -14,11 +14,11 @@ Cadena RRHH (fuente de verdad para "quién puede acceder y desde qué unidad"):
 Estas funciones se importan desde las vistas. Tener la lógica aquí evita
 duplicarla y mantiene las vistas delgadas.
 """
-import logging
 
 from usuario.models import PerfilUnidad
 
-logger = logging.getLogger("s_exp")
+from core.utils.utilidades_logging import log_info, log_warning, log_error
+from core.constants.domain_constants import LogApp
 
 
 def es_usuario_valido_rrhh(user):
@@ -39,31 +39,28 @@ def es_usuario_valido_rrhh(user):
     try:
         empleado = Empleado.objects.filter(usuario_id=user.id).first()
         if not empleado:
-            logger.warning(f"Usuario {user.username} (id={user.id}) no existe en rrhh_empleado")
+            log_warning(f"Usuario {user.username} (id={user.id}) no existe en rrhh_empleado", app=LogApp.S_EXP)
             return False
 
         # Personal NO clínico con servicio_unidad asignado
         if PersonalNoClinico.objects.filter(
             empleado_id=empleado.id, servicio_unidad_id__isnull=False
         ).exists():
-            logger.info(f"Usuario {user.username}: Validado - PersonalNoClinico con servicio_unidad")
+            log_info(f"Usuario {user.username}: Validado - PersonalNoClinico con servicio_unidad", app=LogApp.S_EXP)
             return True
 
         # Personal de salud con servicio_unidad asignado
         if PersonalSalud.objects.filter(
             empleado_id=empleado.id, servicio_unidad_id__isnull=False
         ).exists():
-            logger.info(f"Usuario {user.username}: Validado - PersonalSalud con servicio_unidad")
+            log_info(f"Usuario {user.username}: Validado - PersonalSalud con servicio_unidad", app=LogApp.S_EXP)
             return True
 
-        logger.warning(
-            f"Usuario {user.username}: Empleado registrado pero sin "
-            f"PersonalNoClinico/PersonalSalud o sin servicio_unidad asignado"
-        )
+        log_warning(f"Usuario {user.username}: Empleado registrado pero sin PersonalNoClinico/PersonalSalud o sin servicio_unidad asignado", app=LogApp.S_EXP)
         return False
 
     except Exception as e:
-        logger.error(f"Error al validar RRHH para usuario {user.username}: {e}", exc_info=True)
+        log_error(f"Error al validar RRHH para usuario {user.username}: {e}", app=LogApp.S_EXP)
         return False
 
 
@@ -143,7 +140,7 @@ def get_servicio_unidad_from_rrhh(user):
     try:
         empleado = Empleado.objects.filter(usuario_id=user.id).first()
         if not empleado:
-            logger.warning(f"Usuario {user.username} (id={user.id}) no tiene registro en rrhh_empleado")
+            log_warning(f"Usuario {user.username} (id={user.id}) no tiene registro en rrhh_empleado", app=LogApp.S_EXP)
             return None, False
 
         # PersonalNoClinico
@@ -152,9 +149,9 @@ def get_servicio_unidad_from_rrhh(user):
         ).select_related('servicio_unidad').first()
         if pnc:
             if pnc.servicio_unidad_id:
-                logger.info(f"Usuario {user.username}: ServicioUnidad {pnc.servicio_unidad_id} desde PersonalNoClinico")
+                log_info(f"Usuario {user.username}: ServicioUnidad {pnc.servicio_unidad_id} desde PersonalNoClinico", app=LogApp.S_EXP)
                 return pnc.servicio_unidad, True
-            logger.warning(f"Usuario {user.username}: PersonalNoClinico sin servicio_unidad asignado")
+            log_warning(f"Usuario {user.username}: PersonalNoClinico sin servicio_unidad asignado", app=LogApp.S_EXP)
             return None, True  # registrado en RRHH pero sin unidad
 
         # PersonalSalud (alternativo)
@@ -163,14 +160,14 @@ def get_servicio_unidad_from_rrhh(user):
         ).select_related('servicio_unidad').first()
         if ps:
             if ps.servicio_unidad_id:
-                logger.info(f"Usuario {user.username}: ServicioUnidad {ps.servicio_unidad_id} desde PersonalSalud")
+                log_info(f"Usuario {user.username}: ServicioUnidad {ps.servicio_unidad_id} desde PersonalSalud", app=LogApp.S_EXP)
                 return ps.servicio_unidad, True
-            logger.warning(f"Usuario {user.username}: PersonalSalud sin servicio_unidad asignado")
+            log_warning(f"Usuario {user.username}: PersonalSalud sin servicio_unidad asignado", app=LogApp.S_EXP)
             return None, True
 
-        logger.warning(f"Usuario {user.username}: Empleado registrado pero sin PersonalNoClinico ni PersonalSalud")
+        log_warning(f"Usuario {user.username}: Empleado registrado pero sin PersonalNoClinico ni PersonalSalud", app=LogApp.S_EXP)
         return None, True
 
     except Exception as e:
-        logger.error(f"Error al verificar RRHH para usuario {user.username}: {e}", exc_info=True)
+        log_error(f"Error al verificar RRHH para usuario {user.username}: {e}", app=LogApp.S_EXP)
         return None, False

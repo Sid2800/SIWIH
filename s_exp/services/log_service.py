@@ -6,9 +6,9 @@ Registra eventos en LogHistorico. La acción es relacional (FK a TipoAccionLog);
 si llega un código de acción nuevo, se crea al vuelo para que el log nunca
 falle por un código no registrado previamente.
 """
-import logging
 
-logger = logging.getLogger("s_exp")
+from core.utils.utilidades_logging import log_info, log_warning, log_error
+from core.constants.domain_constants import LogApp
 
 
 def registrar_log(usuario, accion, descripcion, objeto_tipo=None, objeto_id=None):

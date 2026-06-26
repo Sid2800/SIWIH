@@ -5,7 +5,6 @@ Parte del paquete s_exp.views (antes views.py monolitico).
 """
 
 
-import logging
 
 from django.http import JsonResponse
 from django.views.generic import TemplateView
@@ -23,7 +22,8 @@ from .comunes import (
 )
 
 
-logger = logging.getLogger("s_exp")
+from core.utils.utilidades_logging import log_info, log_warning, log_error
+from core.constants.domain_constants import LogApp
 
 
 # ============================================
@@ -108,7 +108,7 @@ def historial_solicitudes_api(request):
             "data": data,
         })
     except Exception as e:
-        logger.error(f"Error en historial_solicitudes_api: {e}", exc_info=True)
+        log_error(f"Error en historial_solicitudes_api: {e}", app=LogApp.S_EXP)
         return JsonResponse({"error": "Error interno del servidor"}, status=500)
 
 
@@ -169,5 +169,5 @@ def historial_solicitud_detalle_api(request, solicitud_id):
     except SolicitudPrestamo.DoesNotExist:
         return JsonResponse({"error": "Solicitud no encontrada"}, status=404)
     except Exception as e:
-        logger.error(f"Error en historial_solicitud_detalle_api: {e}", exc_info=True)
+        log_error(f"Error en historial_solicitud_detalle_api: {e}", app=LogApp.S_EXP)
         return JsonResponse({"error": "Error interno del servidor"}, status=500)

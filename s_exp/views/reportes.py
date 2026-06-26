@@ -5,7 +5,6 @@ Parte del paquete s_exp.views (antes views.py monolitico).
 """
 
 
-import logging
 from datetime import datetime
 
 from django.http import JsonResponse
@@ -31,7 +30,8 @@ from .comunes import (
 )
 
 
-logger = logging.getLogger("s_exp")
+from core.utils.utilidades_logging import log_info, log_warning, log_error
+from core.constants.domain_constants import LogApp
 
 
 # ============================================
@@ -215,7 +215,7 @@ def reportes_data_api(request):
         })
 
     except Exception as e:
-        logger.error(f"Error en reportes_data_api: {e}", exc_info=True)
+        log_error(f"Error en reportes_data_api: {e}", app=LogApp.S_EXP)
         return JsonResponse({"error": "Error interno del servidor"}, status=500)
 
 

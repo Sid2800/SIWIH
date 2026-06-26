@@ -5,7 +5,6 @@ Parte del paquete s_exp.views (antes views.py monolitico).
 """
 
 
-import logging
 
 from django.utils import timezone
 
@@ -16,7 +15,8 @@ from s_exp.models import LogHistorico
 from usuario.models import PerfilUnidad
 
 
-logger = logging.getLogger("s_exp")
+from core.utils.utilidades_logging import log_info, log_warning, log_error
+from core.constants.domain_constants import LogApp
 
 
 # ============================================
@@ -133,7 +133,7 @@ def _es_usuario_valido_rrhh(user):
         # Paso 1: Verificar que existe rrhh_empleado
         empleado = Empleado.objects.filter(usuario_id=user.id).first()
         if not empleado:
-            logger.warning(f"Usuario {user.username} (id={user.id}) no existe en rrhh_empleado")
+            log_warning(f"Usuario {user.username} (id={user.id}) no existe en rrhh_empleado", app=LogApp.S_EXP)
             return False
 
         # Paso 2 & 3: Verificar que está en PersonalNoClinico O PersonalSalud CON servicio_unidad
@@ -143,7 +143,7 @@ def _es_usuario_valido_rrhh(user):
         ).exists()
 
         if personal_no_clinico:
-            logger.info(f"Usuario {user.username}: Validado - PersonalNoClinico con servicio_unidad")
+            log_info(f"Usuario {user.username}: Validado - PersonalNoClinico con servicio_unidad", app=LogApp.S_EXP)
             return True
 
         personal_salud = PersonalSalud.objects.filter(
@@ -152,15 +152,15 @@ def _es_usuario_valido_rrhh(user):
         ).exists()
 
         if personal_salud:
-            logger.info(f"Usuario {user.username}: Validado - PersonalSalud con servicio_unidad")
+            log_info(f"Usuario {user.username}: Validado - PersonalSalud con servicio_unidad", app=LogApp.S_EXP)
             return True
 
         # No está en PersonalNoClinico ni PersonalSalud, o no tiene servicio_unidad
-        logger.warning(f"Usuario {user.username}: Empleado registrado pero sin PersonalNoClinico/PersonalSalud o sin servicio_unidad asignado")
+        log_warning(f"Usuario {user.username}: Empleado registrado pero sin PersonalNoClinico/PersonalSalud o sin servicio_unidad asignado", app=LogApp.S_EXP)
         return False
 
     except Exception as e:
-        logger.error(f"Error al validar RRHH para usuario {user.username}: {e}", exc_info=True)
+        log_error(f"Error al validar RRHH para usuario {user.username}: {e}", app=LogApp.S_EXP)
         return False
 
 
@@ -227,7 +227,7 @@ def _get_servicio_unidad_from_rrhh(user):
         # Paso 1: Verificar que existe rrhh_empleado donde usuario_id = user.id
         empleado = Empleado.objects.filter(usuario_id=user.id).first()
         if not empleado:
-            logger.warning(f"Usuario {user.username} (id={user.id}) no tiene registro en rrhh_empleado")
+            log_warning(f"Usuario {user.username} (id={user.id}) no tiene registro en rrhh_empleado", app=LogApp.S_EXP)
             return None, False
 
         # Paso 2: Intentar obtener PersonalNoClinico donde empleado_id = empleado.id
@@ -238,10 +238,10 @@ def _get_servicio_unidad_from_rrhh(user):
         if personal_no_clinico:
             # Paso 3: Verificar que servicio_unidad_id está asignado
             if personal_no_clinico.servicio_unidad_id:
-                logger.info(f"Usuario {user.username}: ServicioUnidad {personal_no_clinico.servicio_unidad_id} desde PersonalNoClinico")
+                log_info(f"Usuario {user.username}: ServicioUnidad {personal_no_clinico.servicio_unidad_id} desde PersonalNoClinico", app=LogApp.S_EXP)
                 return personal_no_clinico.servicio_unidad, True
             else:
-                logger.warning(f"Usuario {user.username}: PersonalNoClinico sin servicio_unidad asignado")
+                log_warning(f"Usuario {user.username}: PersonalNoClinico sin servicio_unidad asignado", app=LogApp.S_EXP)
                 return None, True  # Registrado en RRHH pero sin unidad
 
         # Paso 2 (alternativo): Intentar obtener PersonalSalud si no tiene PersonalNoClinico
@@ -252,18 +252,18 @@ def _get_servicio_unidad_from_rrhh(user):
         if personal_salud:
             # Paso 3: Verificar que servicio_unidad_id está asignado
             if personal_salud.servicio_unidad_id:
-                logger.info(f"Usuario {user.username}: ServicioUnidad {personal_salud.servicio_unidad_id} desde PersonalSalud")
+                log_info(f"Usuario {user.username}: ServicioUnidad {personal_salud.servicio_unidad_id} desde PersonalSalud", app=LogApp.S_EXP)
                 return personal_salud.servicio_unidad, True
             else:
-                logger.warning(f"Usuario {user.username}: PersonalSalud sin servicio_unidad asignado")
+                log_warning(f"Usuario {user.username}: PersonalSalud sin servicio_unidad asignado", app=LogApp.S_EXP)
                 return None, True  # Registrado en RRHH pero sin unidad
 
         # Si llegamos aquí: empleado existe pero sin PersonalNoClinico ni PersonalSalud
-        logger.warning(f"Usuario {user.username}: Empleado registrado pero sin PersonalNoClinico ni PersonalSalud")
+        log_warning(f"Usuario {user.username}: Empleado registrado pero sin PersonalNoClinico ni PersonalSalud", app=LogApp.S_EXP)
         return None, True
 
     except Exception as e:
-        logger.error(f"Error al verificar RRHH para usuario {user.username}: {e}", exc_info=True)
+        log_error(f"Error al verificar RRHH para usuario {user.username}: {e}", app=LogApp.S_EXP)
         return None, False
 
 
@@ -378,7 +378,7 @@ def _set_localizacion_por_solicitud(expediente, solicitud, usuario_admin, ubicac
         expediente.save(update_fields=campos)
         return nombre_ubicacion
     except Exception as e:
-        logger.warning(f"No se pudo actualizar localizacion del expediente #{expediente.numero}: {e}")
+        log_warning(f"No se pudo actualizar localizacion del expediente #{expediente.numero}: {e}", app=LogApp.S_EXP)
         return nombre_ubicacion
 
 
@@ -420,7 +420,7 @@ def _set_localizacion_admision(expediente, usuario_admin, ubicacion_obj=None):
             campos.append('ubicacion')
         expediente.save(update_fields=campos)
     except Exception as e:
-        logger.warning(f"No se pudo regresar a ADMISION el expediente #{expediente.numero}: {e}")
+        log_warning(f"No se pudo regresar a ADMISION el expediente #{expediente.numero}: {e}", app=LogApp.S_EXP)
 
     return 'ADMISION'
 

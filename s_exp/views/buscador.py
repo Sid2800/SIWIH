@@ -5,7 +5,6 @@ Parte del paquete s_exp.views (antes views.py monolitico).
 """
 
 
-import logging
 
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
@@ -24,7 +23,8 @@ from .comunes import (
 )
 
 
-logger = logging.getLogger("s_exp")
+from core.utils.utilidades_logging import log_info, log_warning, log_error
+from core.constants.domain_constants import LogApp
 
 
 @require_GET
@@ -177,7 +177,7 @@ def buscar_expedientes_api(request):
         return JsonResponse({"data": resultados})
 
     except Exception as e:
-        logger.error(f"Error en buscar_expedientes_api: {e}", exc_info=True)
+        log_error(f"Error en buscar_expedientes_api: {e}", app=LogApp.S_EXP)
         return JsonResponse({"error": "Error interno del servidor"}, status=500)
 
 
@@ -239,7 +239,7 @@ def historial_prestamos_paciente_api(request, paciente_id):
         return JsonResponse({"data": data, "en_prestamo": en_prestamo_actual})
 
     except Exception as e:
-        logger.error(f"Error en historial_prestamos_paciente_api: {e}", exc_info=True)
+        log_error(f"Error en historial_prestamos_paciente_api: {e}", app=LogApp.S_EXP)
         return JsonResponse({"error": "Error interno del servidor"}, status=500)
 
 
@@ -283,5 +283,5 @@ def historial_prestamos_expediente_api(request, expediente_id):
         return JsonResponse({"data": data, "en_prestamo": en_prestamo_actual})
 
     except Exception as e:
-        logger.error(f"Error en historial_prestamos_expediente_api: {e}", exc_info=True)
+        log_error(f"Error en historial_prestamos_expediente_api: {e}", app=LogApp.S_EXP)
         return JsonResponse({"error": "Error interno del servidor"}, status=500)

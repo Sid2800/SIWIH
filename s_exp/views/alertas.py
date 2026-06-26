@@ -6,7 +6,6 @@ Parte del paquete s_exp.views (antes views.py monolitico).
 
 
 import json
-import logging
 
 from django.http import JsonResponse
 from django.utils import timezone
@@ -17,7 +16,8 @@ from django.views.decorators.csrf import csrf_exempt
 from s_exp.models import SolicitudPrestamo, Prestamo, LogHistorico
 
 
-logger = logging.getLogger("s_exp")
+from core.utils.utilidades_logging import log_info, log_warning, log_error
+from core.constants.domain_constants import LogApp
 
 
 # ============================================
@@ -221,7 +221,7 @@ def alertas_usuario_api(request):
         return JsonResponse({"alertas": alertas})
 
     except Exception as e:
-        logger.error(f"Error en alertas_usuario_api: {e}", exc_info=True)
+        log_error(f"Error en alertas_usuario_api: {e}", app=LogApp.S_EXP)
         return JsonResponse({"alertas": []})
 
 
@@ -249,7 +249,7 @@ def marcar_notificacion_leida_api(request):
     except SolicitudPrestamo.DoesNotExist:
         return JsonResponse({"error": "Solicitud no encontrada"}, status=404)
     except Exception as e:
-        logger.error(f"Error en marcar_notificacion_leida_api: {e}", exc_info=True)
+        log_error(f"Error en marcar_notificacion_leida_api: {e}", app=LogApp.S_EXP)
         return JsonResponse({"error": "Error interno"}, status=500)
 
 
@@ -277,5 +277,5 @@ def marcar_vencimiento_leido_api(request):
     except Prestamo.DoesNotExist:
         return JsonResponse({"error": "Préstamo no encontrado"}, status=404)
     except Exception as e:
-        logger.error(f"Error en marcar_vencimiento_leido_api: {e}", exc_info=True)
+        log_error(f"Error en marcar_vencimiento_leido_api: {e}", app=LogApp.S_EXP)
         return JsonResponse({"error": "Error interno"}, status=500)

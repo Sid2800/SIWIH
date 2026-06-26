@@ -6,7 +6,6 @@ Parte del paquete s_exp.views (antes views.py monolitico).
 
 
 import json
-import logging
 
 from django.http import JsonResponse
 from django.utils import timezone
@@ -27,7 +26,8 @@ from .comunes import (
 from s_exp.models import EstadoSolicitud, EstadoExpedienteFisico, EstadoPrestamo, EstadoDevolucion
 
 
-logger = logging.getLogger("s_exp")
+from core.utils.utilidades_logging import log_info, log_warning, log_error
+from core.constants.domain_constants import LogApp
 
 
 # ============================================
@@ -98,7 +98,7 @@ def prestamos_para_devolucion_api(request):
         return JsonResponse({"data": data})
 
     except Exception as e:
-        logger.error(f"Error en prestamos_para_devolucion_api: {e}", exc_info=True)
+        log_error(f"Error en prestamos_para_devolucion_api: {e}", app=LogApp.S_EXP)
         return JsonResponse({"error": "Error interno del servidor"}, status=500)
 
 
@@ -133,7 +133,7 @@ def solicitar_devolucion_api(request):
     except SolicitudPrestamo.DoesNotExist:
         return JsonResponse({"error": "Solicitud no encontrada o no está en préstamo"}, status=404)
     except Exception as e:
-        logger.error(f"Error en solicitar_devolucion_api: {e}", exc_info=True)
+        log_error(f"Error en solicitar_devolucion_api: {e}", app=LogApp.S_EXP)
         return JsonResponse({"error": "Error interno del servidor"}, status=500)
 
 
@@ -171,7 +171,7 @@ def procesar_devolucion_api(request):
         try:
             ubicacion_admision = CatalogoUbicaciones.ubicacion_admision()
         except Exception as _e:
-            logger.warning(f"No se pudo resolver ubicacion ADMISION: {_e}")
+            log_warning(f"No se pudo resolver ubicacion ADMISION: {_e}", app=LogApp.S_EXP)
 
         for det_id in detalles_recibidos:
             detalle = SolicitudExpedienteDetalle.objects.get(id=det_id, solicitud=solicitud)
@@ -197,7 +197,7 @@ def procesar_devolucion_api(request):
                     _set_localizacion_admision(ep.expediente, request.user,
                                                ubicacion_obj=ubicacion_admision)
                 except Exception as _e:
-                    logger.warning(f"No se pudo regresar a ADMISION al devolver: {_e}")
+                    log_warning(f"No se pudo regresar a ADMISION al devolver: {_e}", app=LogApp.S_EXP)
 
                 ExpedienteEstadoLog.objects.create(
                     expediente=ep.expediente,
@@ -293,5 +293,5 @@ def procesar_devolucion_api(request):
         return JsonResponse({"success": True, "estado": EstadoSolicitud.codigo_de(solicitud.estado_flujo_id)})
 
     except Exception as e:
-        logger.error(f"Error en procesar_devolucion_api: {e}", exc_info=True)
+        log_error(f"Error en procesar_devolucion_api: {e}", app=LogApp.S_EXP)
         return JsonResponse({"error": "Error interno del servidor"}, status=500)
