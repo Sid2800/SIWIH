@@ -100,7 +100,7 @@ MAPEO_CAMAS_VISUALIZACION_ROLES = ["admin", "digitador", "visitante", "directivo
 MAPEO_CAMAS_VISUALIZACION_UNIDADES = ["ADMI", 'SALA']
 
 # [2026-05-18] Acceso para entrar y ejecutar flujo de mapeo.
-MAPEO_CAMAS_MAPEAR_ROLES = ["visitante"]
+MAPEO_CAMAS_MAPEAR_ROLES = ["admin", "digitador",]
 MAPEO_CAMAS_MAPEAR_UNIDADES = ["ADMI",'SALA']
 
 # [2026-05-18] Acceso para cambios manuales en el mapa (edición directa).
