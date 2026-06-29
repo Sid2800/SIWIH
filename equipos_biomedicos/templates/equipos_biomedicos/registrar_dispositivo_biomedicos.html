@@ -35,6 +35,11 @@
 
             <div class="biomedicos-registro__campos biomedicos-registro__campos--dos">
                 <div class="biomedicos-registro__campo">
+                    <label for="area_gestora_dispositivo">Area gestora *</label>
+                    {{ form.area_gestora }}
+                    {{ form.area_gestora.errors }}
+                </div>
+                <div class="biomedicos-registro__campo">
                     <label for="tipo_dispositivo">Tipo de equipo *</label>
                     {{ form.tipo }}
                     {{ form.tipo.errors }}
@@ -53,6 +58,11 @@
                     <label for="modelo_dispositivo">Modelo</label>
                     {{ form.modelo }}
                     {{ form.modelo.errors }}
+                </div>
+                <div class="biomedicos-registro__campo">
+                    <label for="color_dispositivo">Color</label>
+                    {{ form.color }}
+                    {{ form.color.errors }}
                 </div>
                 <div class="biomedicos-registro__campo">
                     <label for="serie_dispositivo">Número de serie</label>

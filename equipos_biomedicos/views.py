@@ -1,4 +1,4 @@
-import base64
+﻿import base64
 from datetime import timedelta
 from io import BytesIO
 
@@ -18,6 +18,7 @@ from rrhh.models import Empleado
 
 from .forms import BajaDispositivoForm, DispositivoCreateForm
 from .models import (
+    AreaGestora,
     AsignacionDispositivo,
     BajaDispositivo,
     CriticidadDispositivo,
@@ -26,7 +27,6 @@ from .models import (
     MarcaDispositivo,
     ModeloDispositivo,
     TipoDispositivo,
-    TipoTecnologiaDispositivo,
 )
 
 
@@ -210,6 +210,8 @@ def _obtener_dispositivos_base():
         "tipo",
         "marca",
         "modelo",
+        "area_gestora",
+        "color",
     ).prefetch_related(_prefetch_asignacion_activa())
 
 
@@ -222,6 +224,8 @@ def _aplicar_busqueda_dispositivos(dispositivos, consulta):
         Q(tipo__nombre__icontains=consulta)
         | Q(marca__nombre__icontains=consulta)
         | Q(modelo__nombre__icontains=consulta)
+        | Q(area_gestora__nombre__icontains=consulta)
+        | Q(color__nombre__icontains=consulta)
         | Q(numero_serie__icontains=consulta)
         | Q(inventario_bienes_nacionales__icontains=consulta)
         | Q(inventario_numero_ficha__icontains=consulta)
@@ -240,6 +244,8 @@ def _ordenar_dispositivos(dispositivos):
         "tipo__nombre",
         "marca__nombre",
         "modelo__nombre",
+        "area_gestora__nombre",
+        "color__nombre",
         "numero_serie",
     ).distinct()
 
@@ -293,11 +299,10 @@ def listado_dispositivos(request):
     consulta = request.GET.get("q", "").strip()
     filtro_area = request.GET.get("area", "").strip()
     filtro_estado = request.GET.get("estado", "").strip()
-    filtro_criticidad = request.GET.get("criticidad", "").strip()
     filtro_tipo = request.GET.get("tipo", "").strip()
     filtro_marca = request.GET.get("marca", "").strip()
     filtro_modelo = request.GET.get("modelo", "").strip()
-    filtro_tecnologia = request.GET.get("tecnologia", "").strip()
+    filtro_area_gestora = request.GET.get("area_gestora", "").strip()
 
     dispositivos = _aplicar_busqueda_dispositivos(
         _obtener_dispositivos_base(),
@@ -325,9 +330,6 @@ def listado_dispositivos(request):
     else:
         dispositivos = dispositivos.exclude(estado=EstadoDispositivo.DADO_DE_BAJA)
 
-    criticidad_id = _parametro_entero(filtro_criticidad)
-    if criticidad_id:
-        dispositivos = dispositivos.filter(criticidad=criticidad_id)
 
     tipo_id = _parametro_entero(filtro_tipo)
     if tipo_id:
@@ -341,9 +343,10 @@ def listado_dispositivos(request):
     if modelo_id:
         dispositivos = dispositivos.filter(modelo_id=modelo_id)
 
-    tecnologia_id = _parametro_entero(filtro_tecnologia)
-    if tecnologia_id:
-        dispositivos = dispositivos.filter(tipo_tecnologia=tecnologia_id)
+    area_gestora_id = _parametro_entero(filtro_area_gestora)
+    if area_gestora_id:
+        dispositivos = dispositivos.filter(area_gestora_id=area_gestora_id)
+
 
     dispositivos = _ordenar_dispositivos(dispositivos)
     paginador = Paginator(dispositivos, 10)
@@ -370,20 +373,15 @@ def listado_dispositivos(request):
                 "q": consulta,
                 "area": filtro_area,
                 "estado": filtro_estado,
-                "criticidad": filtro_criticidad,
                 "tipo": filtro_tipo,
                 "marca": filtro_marca,
                 "modelo": filtro_modelo,
-                "tecnologia": filtro_tecnologia,
+                "area_gestora": filtro_area_gestora,
             },
             "area_choices": _obtener_opciones_area_listado(),
             "estado_choices": [
                 {"value": str(valor), "label": etiqueta}
                 for valor, etiqueta in EstadoDispositivo.choices
-            ],
-            "criticidad_choices": [
-                {"value": str(valor), "label": etiqueta}
-                for valor, etiqueta in CriticidadDispositivo.choices
             ],
             "tipo_choices": TipoDispositivo.objects.filter(activo=True).order_by(
                 "nombre"
@@ -394,10 +392,9 @@ def listado_dispositivos(request):
             "modelo_choices": ModeloDispositivo.objects.filter(activo=True).order_by(
                 "nombre"
             ),
-            "tecnologia_choices": [
-                {"value": str(valor), "label": etiqueta}
-                for valor, etiqueta in TipoTecnologiaDispositivo.choices
-            ],
+            "area_gestora_choices": AreaGestora.objects.filter(activo=True).order_by(
+                "nombre"
+            ),
         },
     )
 
@@ -409,6 +406,8 @@ def detalle_dispositivo(request, dispositivo_id):
             "tipo",
             "marca",
             "modelo",
+            "area_gestora",
+            "color",
             "baja__registrado_por",
         ),
         pk=dispositivo_id,
@@ -431,7 +430,13 @@ def editar_dispositivo(request, dispositivo_id):
     # Reutiliza DispositivoCreateForm y el template de registro.
     # Si el equipo esta dado de baja, se bloquea la edicion.
     dispositivo = get_object_or_404(
-        Dispositivo.objects.select_related("tipo", "marca", "modelo"),
+        Dispositivo.objects.select_related(
+            "tipo",
+            "marca",
+            "modelo",
+            "area_gestora",
+            "color",
+        ),
         pk=dispositivo_id,
     )
 
@@ -498,7 +503,13 @@ def dar_baja_dispositivo(request, dispositivo_id):
     # Crea BajaDispositivo y marca el equipo como DADO_DE_BAJA.
     # No elimina la ficha, por eso QR y detalle siguen funcionando.
     dispositivo = get_object_or_404(
-        Dispositivo.objects.select_related("tipo", "marca", "modelo"),
+        Dispositivo.objects.select_related(
+            "tipo",
+            "marca",
+            "modelo",
+            "area_gestora",
+            "color",
+        ),
         pk=dispositivo_id,
     )
 
@@ -580,7 +591,13 @@ def _construir_url_qr_equipo(request, dispositivo_id):
 def qr_dispositivo(request, dispositivo_id):
     # Pantalla imprimible: el QR contiene la URL de detalle del equipo.
     dispositivo = get_object_or_404(
-        Dispositivo.objects.select_related("tipo", "marca", "modelo"),
+        Dispositivo.objects.select_related(
+            "tipo",
+            "marca",
+            "modelo",
+            "area_gestora",
+            "color",
+        ),
         pk=dispositivo_id,
     )
     detalle_url = _construir_url_qr_equipo(request, dispositivo.id)
@@ -675,3 +692,4 @@ def buscar_empleados(request):
     ]
 
     return JsonResponse({"results": resultados})
+

@@ -8,7 +8,9 @@ from rrhh.models import Empleado
 from servicio.models import Area_atencion, Unidad
 
 from .models import (
+    AreaGestora,
     BajaDispositivo,
+    ColorDispositivo,
     CriticidadDispositivo,
     Dispositivo,
     EstadoDispositivo,
@@ -145,6 +147,8 @@ class DispositivoCreateForm(forms.ModelForm):
             "tipo_tecnologia",
             "marca",
             "modelo",
+            "area_gestora",
+            "color",
             "numero_serie",
             "inventario_bienes_nacionales",
             "inventario_numero_ficha",
@@ -179,6 +183,18 @@ class DispositivoCreateForm(forms.ModelForm):
                 attrs={
                     "class": "formularioCampo-select",
                     "id": "modelo_dispositivo",
+                }
+            ),
+            "area_gestora": forms.Select(
+                attrs={
+                    "class": "formularioCampo-select",
+                    "id": "area_gestora_dispositivo",
+                }
+            ),
+            "color": forms.Select(
+                attrs={
+                    "class": "formularioCampo-select",
+                    "id": "color_dispositivo",
                 }
             ),
             "numero_serie": forms.TextInput(
@@ -285,6 +301,8 @@ class DispositivoCreateForm(forms.ModelForm):
         filtro_tipo = Q(activo=True)
         filtro_marca = Q(activo=True)
         filtro_modelo = Q(activo=True)
+        filtro_area_gestora = Q(activo=True)
+        filtro_color = Q(activo=True)
 
         if self.instance and self.instance.pk:
             if self.instance.tipo_id:
@@ -293,6 +311,10 @@ class DispositivoCreateForm(forms.ModelForm):
                 filtro_marca |= Q(pk=self.instance.marca_id)
             if self.instance.modelo_id:
                 filtro_modelo |= Q(pk=self.instance.modelo_id)
+            if self.instance.area_gestora_id:
+                filtro_area_gestora |= Q(pk=self.instance.area_gestora_id)
+            if self.instance.color_id:
+                filtro_color |= Q(pk=self.instance.color_id)
 
         self.fields["tipo"].queryset = TipoDispositivo.objects.filter(filtro_tipo)
         self.fields["tipo"].empty_label = "Seleccione el tipo de equipo"
@@ -300,6 +322,12 @@ class DispositivoCreateForm(forms.ModelForm):
         self.fields["marca"].empty_label = "Seleccione la marca o deje INDEFINIDO"
         self.fields["modelo"].queryset = ModeloDispositivo.objects.filter(filtro_modelo)
         self.fields["modelo"].empty_label = "Seleccione el modelo o deje INDEFINIDO"
+        self.fields["area_gestora"].queryset = AreaGestora.objects.filter(
+            filtro_area_gestora
+        ).exclude(nombre="INDEFINIDO")
+        self.fields["area_gestora"].empty_label = "Seleccione el area gestora"
+        self.fields["color"].queryset = ColorDispositivo.objects.filter(filtro_color)
+        self.fields["color"].empty_label = "Seleccione el color o deje INDEFINIDO"
         self.fields["tipo_tecnologia"].choices = [
             ("", "Seleccione el tipo de tecnología"),
             *TipoTecnologiaDispositivo.choices,

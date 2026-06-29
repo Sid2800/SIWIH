@@ -147,6 +147,59 @@ class ModeloDispositivo(models.Model):
     def __str__(self):
         return self.nombre
 
+
+class AreaGestora(models.Model):
+    nombre = models.CharField(max_length=100, unique=True)
+    descripcion = models.CharField(max_length=250, blank=True)
+    activo = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        db_table = "equipo_area_gestora"
+        verbose_name = "Area gestora"
+        verbose_name_plural = "Areas gestoras"
+        ordering = ["nombre"]
+
+    def clean(self):
+        # Area administrativa o tecnica que maneja el registro del equipo.
+        self.nombre = normalizar_nombre_catalogo(self.nombre)
+        if not self.nombre:
+            raise ValidationError({"nombre": "Debe ingresar el area gestora."})
+        if self.nombre == "INDEFINIDO":
+            raise ValidationError({
+                "nombre": "El area gestora debe ser un area real."
+            })
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.nombre
+
+
+class ColorDispositivo(models.Model):
+    nombre = models.CharField(max_length=100, unique=True)
+    descripcion = models.CharField(max_length=250, blank=True)
+    activo = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        db_table = "equipo_color_dispositivo"
+        verbose_name = "Color de equipo"
+        verbose_name_plural = "Colores de equipo"
+        ordering = ["nombre"]
+
+    def clean(self):
+        self.nombre = normalizar_nombre_catalogo(self.nombre)
+        if not self.nombre:
+            raise ValidationError({"nombre": "Debe ingresar el color del equipo."})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.nombre
+
 # Tabla principal del modulo.
 # Guarda la ficha del equipo y apunta a catalogos por FK para mantener la base
 # ligera: se guardan ids numericos, no textos repetidos.
@@ -171,6 +224,18 @@ class Dispositivo(models.Model):
     )
     modelo = models.ForeignKey(
         ModeloDispositivo,
+        on_delete=models.PROTECT,
+        related_name="dispositivos",
+        null=True,
+        blank=True,
+    )
+    area_gestora = models.ForeignKey(
+        AreaGestora,
+        on_delete=models.PROTECT,
+        related_name="dispositivos",
+    )
+    color = models.ForeignKey(
+        ColorDispositivo,
         on_delete=models.PROTECT,
         related_name="dispositivos",
         null=True,
@@ -288,6 +353,9 @@ class Dispositivo(models.Model):
 
         if self.modelo_id is None:
             self.modelo = obtener_catalogo_indefinido(ModeloDispositivo)
+
+        if self.color_id is None:
+            self.color = obtener_catalogo_indefinido(ColorDispositivo)
 
         try:
             self.inventario_bienes_nacionales = (

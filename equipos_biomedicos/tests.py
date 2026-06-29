@@ -9,8 +9,10 @@ from rrhh.models import Empleado
 from servicio.models import Area_atencion, Servicio, Unidad
 
 from .models import (
+    AreaGestora,
     AsignacionDispositivo,
     BajaDispositivo,
+    ColorDispositivo,
     CriticidadDispositivo,
     Dispositivo,
     EstadoDispositivo,
@@ -35,6 +37,8 @@ class EquiposBiomedicosViewsTests(TestCase):
         cls.tipo = TipoDispositivo.objects.create(nombre="MONITOR")
         cls.marca = MarcaDispositivo.objects.create(nombre="MINDRAY")
         cls.modelo = ModeloDispositivo.objects.create(nombre="BENE VIEW")
+        cls.area_gestora, _ = AreaGestora.objects.get_or_create(nombre="BIOMEDICA")
+        cls.color, _ = ColorDispositivo.objects.get_or_create(nombre="BLANCO")
         cls.servicio = Servicio.objects.create(
             nombre_servicio="Emergencia",
             nombre_corto="EMER",
@@ -76,6 +80,8 @@ class EquiposBiomedicosViewsTests(TestCase):
             tipo_tecnologia=TipoTecnologiaDispositivo.ELECTRONICO,
             marca=cls.marca,
             modelo=cls.modelo,
+            area_gestora=cls.area_gestora,
+            color=cls.color,
             numero_serie="SERIE-ORIGINAL",
             estado=EstadoDispositivo.OPERATIVO,
             criticidad=CriticidadDispositivo.MEDIA,
@@ -100,6 +106,8 @@ class EquiposBiomedicosViewsTests(TestCase):
             "tipo_tecnologia": TipoTecnologiaDispositivo.ELECTRONICO,
             "marca": self.marca.id,
             "modelo": self.modelo.id,
+            "area_gestora": self.area_gestora.id,
+            "color": self.color.id,
             "numero_serie": "SERIE-PRUEBA",
             "inventario_bienes_nacionales": "",
             "inventario_numero_ficha": "",
@@ -161,9 +169,45 @@ class EquiposBiomedicosViewsTests(TestCase):
         self.assertEqual(dispositivo.creado_por, self.usuario)
         self.assertEqual(dispositivo.modificado_por, self.usuario)
         self.assertEqual(dispositivo.inventario_bienes_nacionales, "BN-REG-001")
+        self.assertEqual(dispositivo.area_gestora, self.area_gestora)
+        self.assertEqual(dispositivo.color, self.color)
         self.assertEqual(asignacion.area_clinica, self.area_clinica)
         self.assertEqual(asignacion.responsable, self.responsable_original)
         self.assertEqual(asignacion.creado_por, self.usuario)
+
+    def test_area_gestora_no_permite_indefinido(self):
+        area = AreaGestora(nombre="INDEFINIDO")
+
+        with self.assertRaisesMessage(Exception, "El area gestora debe ser un area real."):
+            area.full_clean()
+
+    def test_formulario_no_muestra_area_gestora_indefinida(self):
+        AreaGestora.objects.filter(nombre="INDEFINIDO").update(activo=True)
+
+        respuesta = self.client.get(reverse('registrar_dispositivo_biomedicos'))
+        opciones = list(respuesta.context["form"].fields["area_gestora"].queryset)
+
+        self.assertIn(self.area_gestora, opciones)
+        self.assertFalse(any(area.nombre == "INDEFINIDO" for area in opciones))
+
+    def test_registro_exige_area_gestora(self):
+        respuesta = self.client.post(
+            reverse('registrar_dispositivo_biomedicos'),
+            self._datos_formulario_dispositivo(
+                numero_serie="SERIE-SIN-AREA-GESTORA",
+                area_gestora="",
+            ),
+        )
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertFormError(
+            respuesta.context["form"],
+            "area_gestora",
+            "Este campo es obligatorio.",
+        )
+        self.assertFalse(
+            Dispositivo.objects.filter(numero_serie="SERIE-SIN-AREA-GESTORA").exists()
+        )
 
     def test_registro_permite_fecha_instalacion_futura(self):
         fecha_futura = date.today() + timedelta(days=30)
@@ -216,6 +260,8 @@ class EquiposBiomedicosViewsTests(TestCase):
                 "tipo_tecnologia": TipoTecnologiaDispositivo.NO_ELECTRONICO,
                 "marca": self.marca.id,
                 "modelo": self.modelo.id,
+                "area_gestora": self.area_gestora.id,
+                "color": self.color.id,
                 "numero_serie": "SERIE-EDITADA",
                 "inventario_bienes_nacionales": "F/212300",
                 "inventario_numero_ficha": "FICHA-001",
