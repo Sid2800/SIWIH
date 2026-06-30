@@ -5093,6 +5093,7 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
 }
 
 .biomedicos-pagina--ancha {
+   min-width: 0;
    padding-left: 1.2rem;
    padding-right: 1.2rem;
 }
@@ -5590,6 +5591,7 @@ a.biomedicos-submenu__opcion:hover {
    display: flex;
    flex-direction: column;
    gap: 2rem;
+   min-width: 0;
    padding: 1.8rem;
 }
 
@@ -5597,66 +5599,61 @@ a.biomedicos-submenu__opcion:hover {
    display: flex;
    flex-direction: column;
    gap: .7rem;
-   max-width: 45rem;
+   max-width: min(100%, 45rem);
+   width: 100%;
 }
 
-.biomedicos-listado__busqueda label,
-.biomedicos-listado__filtro label {
-   color: var(--negro);
-   font-size: 1.4rem;
-   font-weight: 700;
+.biomedicos-listado__campo-icono {
+   position: relative;
 }
 
-.biomedicos-listado__busqueda-campo {
-   align-items: center;
-   display: grid;
-   gap: .8rem;
-   grid-template-columns: auto 1fr;
-}
-
-.biomedicos-listado__busqueda-campo i {
+.biomedicos-listado__campo-icono i {
    color: var(--colorTextoMenu);
-   font-size: 1.8rem;
+   font-size: 1.6rem;
+   left: 1.1rem;
+   pointer-events: none;
+   position: absolute;
+   top: 50%;
+   transform: translateY(-50%);
+   z-index: 1;
 }
 
-.biomedicos-listado__busqueda-campo .formularioCampo-text {
+.biomedicos-listado__campo-icono .formularioCampo-text,
+.biomedicos-listado__campo-icono .formularioCampo-select {
+   font-size: 1.4rem;
    min-width: 0;
+   padding-left: 3.4rem;
+   padding-right: 2.8rem;
    text-transform: none;
+   width: 100%;
 }
 
 .biomedicos-listado__filtros {
    align-items: end;
    display: grid;
    gap: 1.2rem;
-   grid-template-columns: repeat(5, minmax(14rem, 1fr)) auto;
+   grid-template-columns: repeat(5, minmax(12rem, 1fr));
 }
 
 .biomedicos-listado__filtro {
    display: flex;
    flex-direction: column;
-   gap: .7rem;
    min-width: 0;
-}
-
-.biomedicos-listado__filtro label {
-   align-items: center;
-   display: flex;
-   gap: .5rem;
 }
 
 .biomedicos-listado__filtro .formularioCampo-select {
    min-height: 3.8rem;
-   min-width: 0;
-   text-transform: none;
 }
 
 .biomedicos-listado__filtro-acciones {
    display: flex;
    gap: .8rem;
+   grid-column: 1 / -1;
+   justify-content: flex-end;
 }
 
 .biomedicos-listado__boton-filtro {
-   font-size: 1.3rem;
+   font-size: 1.2rem;
    height: 3.8rem;
    justify-content: center;
    padding: .6rem 1rem;
@@ -5671,17 +5668,18 @@ a.biomedicos-submenu__opcion:hover {
 }
 
 .biomedicos-listado__boton-filtro i {
-   font-size: 1.8rem;
+   font-size: 1.6rem;
    padding-top: 0;
 }
 
 .biomedicos-listado__tabla-contenedor {
-   overflow-x: auto;
+   overflow: visible;
    width: 100%;
 }
 
 .biomedicos-listado__tabla {
-   min-width: 158rem;
+   min-width: 0;
+   table-layout: fixed;
    width: 100%;
 }
 
@@ -5691,7 +5689,42 @@ a.biomedicos-submenu__opcion:hover {
 }
 
 .biomedicos-listado__tabla tbody td {
+   overflow: hidden;
+   text-overflow: ellipsis;
    vertical-align: middle;
+   white-space: nowrap;
+}
+
+.biomedicos-listado__col-codigo {
+   width: 8.5rem;
+}
+
+.biomedicos-listado__col-tipo {
+   width: 20rem;
+}
+
+.biomedicos-listado__col-marca,
+.biomedicos-listado__col-modelo {
+   width: 13rem;
+}
+
+
+.biomedicos-listado__col-serie {
+   width: 14rem;
+}
+
+.biomedicos-listado__col-area {
+   width: 12rem;
+}
+
+.biomedicos-listado__col-estado {
+   width: 12rem;
+}
+
+.biomedicos-listado__col-acciones {
+   overflow: visible !important;
+   text-align: center;
+   width: 7rem;
 }
 
 .biomedicos-listado__codigo {
@@ -5701,27 +5734,65 @@ a.biomedicos-submenu__opcion:hover {
    white-space: nowrap;
 }
 
-.biomedicos-listado__acciones {
-   display: flex;
-   gap: .6rem;
+.biomedicos-listado__acciones-menu {
+   display: inline-block;
+   position: relative;
 }
 
-.biomedicos-listado__accion {
+.biomedicos-listado__acciones-resumen {
    align-items: center;
    background-color: var(--blanco);
    border: .1rem solid var(--colorTablaceldaBorde);
-   border-radius: .6rem;
-   color: var(--colorBoton);
+   border-radius: .7rem;
+   color: var(--negro);
+   cursor: pointer;
    display: inline-flex;
+   font-size: 2rem;
    height: 3.2rem;
    justify-content: center;
-   text-decoration: none;
+   list-style: none;
    width: 3.2rem;
 }
 
-.biomedicos-listado__accion:disabled {
-   cursor: not-allowed;
-   opacity: .55;
+.biomedicos-listado__acciones-resumen::-webkit-details-marker {
+   display: none;
+}
+
+.biomedicos-listado__acciones-panel {
+   background-color: var(--blanco);
+   border: .1rem solid var(--colorTablaceldaBorde);
+   border-radius: .9rem;
+   box-shadow: 0 .8rem 2rem rgba(0, 0, 0, .16);
+   display: none;
+   gap: .2rem;
+   min-width: 18rem;
+   padding: .5rem;
+   position: absolute;
+   right: 0;
+   top: calc(100% + .5rem);
+   z-index: 30;
+}
+
+.biomedicos-listado__acciones-menu[open] .biomedicos-listado__acciones-panel {
+   display: grid;
+}
+
+.biomedicos-listado__acciones-panel a {
+   align-items: center;
+   border-radius: .7rem;
+   color: var(--negro);
+   display: grid;
+   font-size: 1.3rem;
+   gap: .8rem;
+   grid-template-columns: 2rem 1fr;
+   padding: .8rem 1rem;
+   text-align: left;
+   text-decoration: none;
+   white-space: nowrap;
+}
+
+.biomedicos-listado__acciones-panel a:hover {
+   background-color: var(--colorMenuHover);
 }
 
 table.dataTable tbody td.biomedicos-listado__vacio {
@@ -5773,6 +5844,70 @@ table.dataTable tbody td.biomedicos-listado__vacio {
 .biomedicos-listado__paginacion .biomedicos-listado__pagina-activa {
    background-color: var(--colorBoton);
    color: var(--colorTextoBoton);
+}
+
+
+@media (max-width: 1050px) {
+   .biomedicos-listado__tabla thead th,
+   .biomedicos-listado__tabla tbody td {
+      font-size: 1.25rem;
+   }
+
+   .biomedicos-listado__col-serie,
+   .biomedicos-listado__col-marca,
+   .biomedicos-listado__col-modelo,
+   .biomedicos-listado__col-area {
+      display: none;
+   }
+
+   .biomedicos-listado__col-codigo {
+      width: 7.5rem;
+   }
+
+   .biomedicos-listado__col-tipo {
+      width: auto;
+   }
+
+   .biomedicos-listado__col-estado {
+      width: 10rem;
+   }
+
+   .biomedicos-listado__col-acciones {
+      width: 5rem;
+   }
+}
+
+@media (max-width: 760px) {
+   .biomedicos-listado__tabla thead th,
+   .biomedicos-listado__tabla tbody td {
+      font-size: 1.25rem;
+   }
+
+   .biomedicos-listado__col-marca,
+   .biomedicos-listado__col-modelo,
+   .biomedicos-listado__col-area {
+      display: none;
+   }
+
+   .biomedicos-listado__col-codigo {
+      width: 7.5rem;
+   }
+
+   .biomedicos-listado__col-tipo {
+      width: auto;
+   }
+
+   .biomedicos-listado__col-estado {
+      width: 10rem;
+   }
+
+   .biomedicos-listado__col-acciones {
+      width: 5rem;
+   }
+
+   .biomedicos-listado__acciones-panel {
+      min-width: 16rem;
+   }
 }
 
 @media (max-width: 1250px) {
