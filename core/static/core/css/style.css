@@ -6294,6 +6294,38 @@ table.dataTable tbody td.biomedicos-listado__vacio {
    }
 }
 
+
+/* Detalle de equipos fijo dentro del area principal. */
+.contenedor:has(> .biomedicos-pagina--detalle) {
+   height: 100%;
+   overflow: hidden;
+}
+
+.contenedor2.biomedicos-pagina--detalle {
+   height: calc(100% - 2rem);
+   margin: 1rem 0;
+   overflow: hidden;
+}
+
+.biomedicos-pagina--detalle .biomedicos-detalle__encabezado,
+.biomedicos-pagina--detalle .biomedicos-detalle__resumen,
+.biomedicos-pagina--detalle .biomedicos-baja__resumen {
+   flex: 0 0 auto;
+}
+
+.biomedicos-pagina--detalle .biomedicos-detalle__secciones {
+   flex: 1 1 auto;
+   min-height: 0;
+   overflow-x: hidden;
+   overflow-y: auto;
+   padding-right: .4rem;
+}
+
+.biomedicos-pagina--detalle .biomedicos-detalle__tabla {
+   min-width: 0;
+   table-layout: fixed;
+}
+
 .biomedicos-qr {
    display: grid;
    gap: 2rem;

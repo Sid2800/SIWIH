@@ -157,10 +157,10 @@
                             <td>{{ dispositivo.marca|default:"INDEFINIDO" }}</td>
                             <td>{{ dispositivo.modelo|default:"INDEFINIDO" }}</td>
                             <td>{{ dispositivo.area_gestora|default:"INDEFINIDO" }}</td>
-                            <td>{{ dispositivo.numero_serie|default:"INDEFINIDO" }}</td>
+                            <td title="{{ dispositivo.numero_serie|default:'INDEFINIDO' }}">{{ dispositivo.numero_serie|default:"INDEFINIDO"|truncatechars:18 }}</td>
                             <td>
                                 {% if asignacion %}
-                                    {{ asignacion.ubicacion }}
+                                    <span title="{{ asignacion.ubicacion }}">{{ asignacion.ubicacion|truncatechars:24 }}</span>
                                 {% else %}
                                     Sin asignación
                                 {% endif %}
