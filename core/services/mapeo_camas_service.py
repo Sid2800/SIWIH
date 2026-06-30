@@ -947,10 +947,11 @@ class MapeoCamasService:
         """
         [2026-05-26 AUDIT] Cierra la asignación activa por ingreso (compatibilidad de nombre).
         """
+        # [2026-06-30] Cerrar tambien PRE_ALTA para evitar camas colgadas al liberar ingreso.
         estado_ocupada = MapeoCamasService.get_estado_mapeo("OCUPADA", "ESTADO_CAMA")
         filtros = {
             "ingreso_id": ingreso_id,
-            "estado": estado_ocupada,
+            "estado__codigo__in": ESTADOS_OCUPADA_PREALTA,
         }
         if cama_id is not None:
             filtros["cama_id"] = cama_id
@@ -966,6 +967,7 @@ class MapeoCamasService:
 
         estado_vacia = MapeoCamasService.get_estado_mapeo("VACIA", "ESTADO_CAMA")
         ingreso_id_anterior = asignacion_activa.ingreso_id
+        estado_anterior = asignacion_activa.estado or estado_ocupada
         asignacion_activa.estado = estado_vacia
         asignacion_activa.ingreso = None
         asignacion_activa.save(update_fields=["estado", "ingreso"])
@@ -974,7 +976,7 @@ class MapeoCamasService:
         # Cierre: la cama pasa de Ocupada -> Vacia (libera la cama)
         MapeoCamasService.registrar_historial_estado_cama(
             cama_id=asignacion_activa.cama_id,
-            estado_anterior=estado_ocupada,
+            estado_anterior=estado_anterior,
             estado_nuevo=estado_vacia,
             ingreso_id=ingreso_id_anterior,
             usuario=usuario,
@@ -1017,7 +1019,7 @@ class MapeoCamasService:
                 AsignacionCamaPaciente.objects.select_for_update()
                 .filter(
                     ingreso_id=ingreso_id,
-                    estado=estado_ocupada,
+                    estado__codigo__in=ESTADOS_OCUPADA_PREALTA,
                 )
                 .order_by("-fecha_inicio")
                 .first()
@@ -1061,9 +1063,12 @@ class MapeoCamasService:
                 )
 
             if cama_anterior_id is not None:
+                estado_anterior_cama = (
+                    asignacion_activa.estado if asignacion_activa and asignacion_activa.estado else estado_ocupada
+                )
                 MapeoCamasService.registrar_historial_estado_cama(
                     cama_id=cama_anterior_id,
-                    estado_anterior=estado_ocupada,
+                    estado_anterior=estado_anterior_cama,
                     estado_nuevo=estado_vacia,
                     ingreso_id=ingreso_id,
                     usuario=usuario,

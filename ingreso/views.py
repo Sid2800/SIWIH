@@ -288,6 +288,15 @@ class IngresoEditView(UnidadRolRequiredMixin, UpdateView):
         cama_anterior_id = ingreso_anterior.get("cama_id") if ingreso_anterior else None
         paciente_anterior_id = ingreso_anterior.get("paciente_id") if ingreso_anterior else None
 
+        # [2026-06-30] Regla operativa: si ya existe cama asignada en el ingreso,
+        # no permitir actualizar la cama a vacia desde edicion.
+        cama_nueva = form.cleaned_data.get("cama")
+        cama_nueva_id = getattr(cama_nueva, "pk", None)
+        if cama_anterior_id and not cama_nueva_id:
+            mensaje = "No se puede actualizar la cama a vacia cuando el ingreso ya tiene una cama asignada."
+            messages.warning(self.request, mensaje)
+            return JsonResponse({"success": False, "error": mensaje}, status=409)
+
         datos_acompaniante = self.extraer_datos_acompaniante()
 
         
