@@ -1,5 +1,7 @@
-﻿import base64
+import base64
+import logging
 from datetime import timedelta
+from functools import wraps
 from io import BytesIO
 
 import qrcode
@@ -8,7 +10,7 @@ from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Prefetch, Q
-from django.http import JsonResponse
+from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -30,6 +32,45 @@ from .models import (
 )
 
 
+logger = logging.getLogger("siwi")
+LOG_EXTRA = {"app": "equipos_biomedicos"}
+
+
+def _registrar_error_vista(mensaje, request, **contexto):
+    # Los logs del modulo registran solo errores tecnicos. No guardan exitos ni
+    # valores del formulario para evitar ruido y datos sensibles innecesarios.
+    usuario = getattr(getattr(request, "user", None), "username", "") or "anonimo"
+    detalles = {
+        "usuario": usuario,
+        "metodo": getattr(request, "method", ""),
+        "ruta": getattr(request, "path", ""),
+        **contexto,
+    }
+    contexto_log = " ".join(
+        f"{clave}={valor}"
+        for clave, valor in detalles.items()
+        if valor not in (None, "")
+    )
+    logger.exception("%s | %s", mensaje, contexto_log, extra=LOG_EXTRA)
+
+
+def registrar_errores_vista(mensaje):
+    def decorador(vista):
+        @wraps(vista)
+        def wrapper(request, *args, **kwargs):
+            try:
+                return vista(request, *args, **kwargs)
+            except Http404:
+                raise
+            except Exception:
+                _registrar_error_vista(mensaje, request, **kwargs)
+                raise
+
+        return wrapper
+
+    return decorador
+
+
 def inicio(request):
     # Pantalla de entrada del modulo. Solo renderiza el menu interno de Equipos.
     return render(
@@ -38,6 +79,7 @@ def inicio(request):
     )
 
 
+@registrar_errores_vista("Error al registrar equipo")
 def registrar_dispositivo(request):
     # GET: muestra formulario vacio.
     # POST valido: crea el equipo y su asignacion inicial en una transaccion.
@@ -264,6 +306,12 @@ def _preparar_dispositivos_para_tabla(dispositivos):
         CriticidadDispositivo.ALTA: "biomedicos-estado--alta",
     }
 
+    estado_etiqueta = {
+        EstadoDispositivo.OPERATIVO: "Oper.",
+        EstadoDispositivo.EN_MANTENIMIENTO: "Mant.",
+        EstadoDispositivo.FUERA_DE_SERVICIO: "F. serv.",
+        EstadoDispositivo.DADO_DE_BAJA: "Baja",
+    }
     for dispositivo in dispositivos:
         dispositivo.asignacion_actual = (
             dispositivo.asignacion_activa_lista[0]
@@ -271,6 +319,10 @@ def _preparar_dispositivos_para_tabla(dispositivos):
             else None
         )
         dispositivo.estado_css = estado_css.get(dispositivo.estado, "")
+        dispositivo.estado_etiqueta = estado_etiqueta.get(
+            dispositivo.estado,
+            dispositivo.get_estado_display(),
+        )
         dispositivo.criticidad_css = criticidad_css.get(dispositivo.criticidad, "")
         dispositivo.garantia_estado, dispositivo.garantia_css = _obtener_estado_garantia(
             dispositivo
@@ -293,6 +345,7 @@ def _obtener_estado_garantia(dispositivo):
     return "Vigente", "biomedicos-estado--vigente"
 
 
+@registrar_errores_vista("Error en listado de equipos")
 def listado_dispositivos(request):
     # Vista principal de inventario. Lee filtros GET, aplica consultas,
     # pagina resultados y renderiza la tabla.
@@ -399,6 +452,7 @@ def listado_dispositivos(request):
     )
 
 
+@registrar_errores_vista("Error al abrir detalle de equipo")
 def detalle_dispositivo(request, dispositivo_id):
     # Ficha solo lectura del equipo. El id llega desde la URL.
     dispositivo = get_object_or_404(
@@ -426,6 +480,7 @@ def detalle_dispositivo(request, dispositivo_id):
     )
 
 
+@registrar_errores_vista("Error al editar equipo")
 def editar_dispositivo(request, dispositivo_id):
     # Reutiliza DispositivoCreateForm y el template de registro.
     # Si el equipo esta dado de baja, se bloquea la edicion.
@@ -499,6 +554,7 @@ def editar_dispositivo(request, dispositivo_id):
     )
 
 
+@registrar_errores_vista("Error al dar de baja equipo")
 def dar_baja_dispositivo(request, dispositivo_id):
     # Crea BajaDispositivo y marca el equipo como DADO_DE_BAJA.
     # No elimina la ficha, por eso QR y detalle siguen funcionando.
@@ -588,6 +644,7 @@ def _construir_url_qr_equipo(request, dispositivo_id):
     return request.build_absolute_uri(ruta_detalle)
 
 
+@registrar_errores_vista("Error al generar QR de equipo")
 def qr_dispositivo(request, dispositivo_id):
     # Pantalla imprimible: el QR contiene la URL de detalle del equipo.
     dispositivo = get_object_or_404(
@@ -613,22 +670,27 @@ def qr_dispositivo(request, dispositivo_id):
     )
 
 
+@registrar_errores_vista("Error en busqueda de equipos")
 def buscar_dispositivo(request):
-    # Busqueda rapida. A diferencia del listado, muestra resultados solo cuando
-    # el usuario ingresa una consulta.
+    # Busqueda rapida. Muestra resultados cuando hay texto o filtro de gestoria.
     consulta = request.GET.get("q", "").strip()
+    filtro_area_gestora = request.GET.get("area_gestora", "").strip()
     dispositivos = Dispositivo.objects.none()
     page_obj = None
     rango_paginas = []
     total_dispositivos = 0
 
-    if consulta:
-        dispositivos = _ordenar_dispositivos(
-            _aplicar_busqueda_dispositivos(
-                _obtener_dispositivos_base(),
-                consulta,
-            )
+    if consulta or filtro_area_gestora:
+        dispositivos = _aplicar_busqueda_dispositivos(
+            _obtener_dispositivos_base(),
+            consulta,
         )
+
+        area_gestora_id = _parametro_entero(filtro_area_gestora)
+        if area_gestora_id:
+            dispositivos = dispositivos.filter(area_gestora_id=area_gestora_id)
+
+        dispositivos = _ordenar_dispositivos(dispositivos)
         paginador = Paginator(dispositivos, 10)
         page_obj = paginador.get_page(request.GET.get("page"))
         _preparar_dispositivos_para_tabla(page_obj.object_list)
@@ -652,10 +714,17 @@ def buscar_dispositivo(request):
             "rango_paginas": rango_paginas,
             "total_dispositivos": total_dispositivos,
             "querystring": query_params.urlencode(),
+            "filtros": {
+                "area_gestora": filtro_area_gestora,
+            },
+            "area_gestora_choices": AreaGestora.objects.filter(activo=True).order_by(
+                "nombre"
+            ),
         },
     )
 
 
+@registrar_errores_vista("Error al buscar empleados para equipos")
 def buscar_empleados(request):
     # Endpoint AJAX usado por Select2 en el formulario de registro/edicion.
     # Devuelve JSON con maximo 10 empleados activos.

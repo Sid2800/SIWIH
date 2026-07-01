@@ -60,6 +60,19 @@
             </div>
             <div class="biomedicos-listado__filtro">
                 <div class="biomedicos-listado__campo-icono">
+                    <i class="bi bi-diagram-3"></i>
+                    <select class="formularioCampo-select" id="filtro_area_gestora" name="area_gestora">
+                        <option value="">Todas las gestorías</option>
+                        {% for area_gestora in area_gestora_choices %}
+                            <option value="{{ area_gestora.id }}" {% if filtros.area_gestora == area_gestora.id|stringformat:"s" %}selected{% endif %}>
+                                {{ area_gestora.nombre }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="biomedicos-listado__filtro">
+                <div class="biomedicos-listado__campo-icono">
                     <i class="bi bi-tag"></i>
                     <select class="formularioCampo-select" id="filtro_marca" name="marca">
                         <option value="">Todas las marcas</option>
@@ -144,14 +157,16 @@
             <tbody>
                 {% for dispositivo in dispositivos %}
                     {% with asignacion=dispositivo.asignacion_actual %}
-                        <tr>
+                        <tr class="biomedicos-listado__fila biomedicos-listado__fila--editable"
+                            data-edit-url="{% url 'editar_dispositivo_biomedicos' dispositivo.id %}"
+                            title="Doble clic para editar {{ dispositivo.codigo }}">
                             <td class="biomedicos-listado__col-codigo">
                                 <a class="biomedicos-listado__codigo"
                                    href="{% url 'detalle_dispositivo_biomedicos' dispositivo.id %}">
                                     {{ dispositivo.codigo }}
                                 </a>
                             </td>
-                            <td class="biomedicos-listado__col-tipo" title="{{ dispositivo.tipo }}">{{ dispositivo.tipo }}</td>
+                            <td class="biomedicos-listado__col-tipo" title="{{ dispositivo.tipo }}">{{ dispositivo.tipo|truncatechars:18 }}</td>
                             <td class="biomedicos-listado__col-marca" title="{{ dispositivo.marca|default:'INDEFINIDO' }}">{{ dispositivo.marca|default:"INDEFINIDO" }}</td>
                             <td class="biomedicos-listado__col-modelo" title="{{ dispositivo.modelo|default:'INDEFINIDO' }}">{{ dispositivo.modelo|default:"INDEFINIDO" }}</td>
                             <td class="biomedicos-listado__col-serie" title="{{ dispositivo.numero_serie|default:'INDEFINIDO' }}">{{ dispositivo.numero_serie|default:"INDEFINIDO"|truncatechars:18 }}</td>
@@ -163,8 +178,8 @@
                                 {% endif %}
                             </td>
                             <td class="biomedicos-listado__col-estado">
-                                <span class="biomedicos-estado {{ dispositivo.estado_css }}">
-                                    {{ dispositivo.get_estado_display }}
+                                <span class="biomedicos-estado {{ dispositivo.estado_css }}" title="{{ dispositivo.get_estado_display }}" aria-label="{{ dispositivo.get_estado_display }}">
+                                    {{ dispositivo.estado_etiqueta }}
                                 </span>
                             </td>
                             <td class="biomedicos-listado__col-acciones">
@@ -244,41 +259,5 @@
 </div>
 {% endblock content %}
 {% block extra_js %}
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    const menusAcciones = document.querySelectorAll('.biomedicos-listado__acciones-menu');
-
-    if (!menusAcciones.length) {
-        return;
-    }
-
-    function cerrarMenus(excepto) {
-        menusAcciones.forEach(function (menu) {
-            if (menu !== excepto) {
-                menu.removeAttribute('open');
-            }
-        });
-    }
-
-    menusAcciones.forEach(function (menu) {
-        menu.addEventListener('toggle', function () {
-            if (menu.open) {
-                cerrarMenus(menu);
-            }
-        });
-    });
-
-    document.addEventListener('click', function (event) {
-        if (!event.target.closest('.biomedicos-listado__acciones-menu')) {
-            cerrarMenus();
-        }
-    });
-
-    document.addEventListener('keydown', function (event) {
-        if (event.key === 'Escape') {
-            cerrarMenus();
-        }
-    });
-});
-</script>
+{% include "equipos_biomedicos/includes/listado_interacciones_js.html" %}
 {% endblock extra_js %}

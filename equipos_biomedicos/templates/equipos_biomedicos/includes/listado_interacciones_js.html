@@ -1,0 +1,44 @@
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const menusAcciones = document.querySelectorAll('.biomedicos-listado__acciones-menu');
+    const filasEditables = document.querySelectorAll('.biomedicos-listado__fila--editable[data-edit-url]');
+
+    function cerrarMenus(excepto) {
+        menusAcciones.forEach(function (menu) {
+            if (menu !== excepto) {
+                menu.removeAttribute('open');
+            }
+        });
+    }
+
+    menusAcciones.forEach(function (menu) {
+        menu.addEventListener('toggle', function () {
+            if (menu.open) {
+                cerrarMenus(menu);
+            }
+        });
+    });
+
+    document.addEventListener('click', function (event) {
+        if (!event.target.closest('.biomedicos-listado__acciones-menu')) {
+            cerrarMenus();
+        }
+    });
+
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') {
+            cerrarMenus();
+        }
+    });
+
+    filasEditables.forEach(function (fila) {
+        fila.addEventListener('dblclick', function (event) {
+            if (event.target.closest('a, button, input, select, textarea, summary, details, label, .biomedicos-listado__acciones-menu, .biomedicos-listado__acciones')) {
+                return;
+            }
+
+            window.location.href = fila.dataset.editUrl;
+        });
+    });
+});
+</script>

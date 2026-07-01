@@ -37,6 +37,17 @@
                     placeholder="Ej. DISP-00001, F/212300, monitor, serie o modelo"
                     autocomplete="off"
                 >
+                <div class="biomedicos-listado__campo-icono biomedicos-busqueda__gestoria">
+                    <i class="bi bi-diagram-3"></i>
+                    <select class="formularioCampo-select" id="buscar_area_gestora" name="area_gestora">
+                        <option value="">Todas las gestorías</option>
+                        {% for area_gestora in area_gestora_choices %}
+                            <option value="{{ area_gestora.id }}" {% if filtros.area_gestora == area_gestora.id|stringformat:"s" %}selected{% endif %}>
+                                {{ area_gestora.nombre }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
                 <button class="formularioBotones-boton biomedicos-busqueda__boton" type="submit">
                     <i class="bi bi-search"></i>
                     Buscar
@@ -45,85 +56,76 @@
         </form>
     </section>
 
-    {% if consulta %}
+    {% if consulta or filtros.area_gestora %}
         <div class="biomedicos-listado__tabla-contenedor">
             <table class="dataTable stripe hover row-border biomedicos-listado__tabla">
                 <thead>
                     <tr>
-                        <th>Código</th>
-                        <th>Tipo de equipo</th>
-                        <th>Marca</th>
-                        <th>Modelo</th>
-                        <th>Area gestora</th>
-                        <th>Color</th>
-                        <th>Número de serie</th>
-                        <th>Inventario BN</th>
-                        <th>Inventario ficha</th>
-                        <th>Área</th>
-                        <th>Estado</th>
-                        <th>Garantía</th>
-                        <th>Acciones</th>
+                        <th class="biomedicos-listado__col-codigo">Código</th>
+                        <th class="biomedicos-listado__col-tipo">Tipo de equipo</th>
+                        <th class="biomedicos-listado__col-marca">Marca</th>
+                        <th class="biomedicos-listado__col-modelo">Modelo</th>
+                        <th class="biomedicos-listado__col-serie">Número de serie</th>
+                        <th class="biomedicos-listado__col-area">Área</th>
+                        <th class="biomedicos-listado__col-estado">Estado</th>
+                        <th class="biomedicos-listado__col-acciones">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for dispositivo in dispositivos %}
                         {% with asignacion=dispositivo.asignacion_actual %}
-                            <tr>
-                                <td>
+                            <tr class="biomedicos-listado__fila biomedicos-listado__fila--editable"
+                                data-edit-url="{% url 'editar_dispositivo_biomedicos' dispositivo.id %}"
+                                title="Doble clic para editar {{ dispositivo.codigo }}">
+                                <td class="biomedicos-listado__col-codigo">
                                     <a class="biomedicos-listado__codigo"
                                        href="{% url 'detalle_dispositivo_biomedicos' dispositivo.id %}">
                                         {{ dispositivo.codigo }}
                                     </a>
                                 </td>
-                                <td>{{ dispositivo.tipo }}</td>
-                                <td>{{ dispositivo.marca|default:"INDEFINIDO" }}</td>
-                                <td>{{ dispositivo.modelo|default:"INDEFINIDO" }}</td>
-                                <td>{{ dispositivo.area_gestora|default:"INDEFINIDO" }}</td>
-                                <td>{{ dispositivo.color|default:"INDEFINIDO" }}</td>
-                                <td>{{ dispositivo.numero_serie|default:"INDEFINIDO" }}</td>
-                                <td>{{ dispositivo.inventario_bienes_nacionales|default:"No aplica" }}</td>
-                                <td>{{ dispositivo.inventario_numero_ficha|default:"No aplica" }}</td>
-                                <td>
+                                <td class="biomedicos-listado__col-tipo" title="{{ dispositivo.tipo }}">{{ dispositivo.tipo|truncatechars:18 }}</td>
+                                <td class="biomedicos-listado__col-marca" title="{{ dispositivo.marca|default:'INDEFINIDO' }}">{{ dispositivo.marca|default:"INDEFINIDO" }}</td>
+                                <td class="biomedicos-listado__col-modelo" title="{{ dispositivo.modelo|default:'INDEFINIDO' }}">{{ dispositivo.modelo|default:"INDEFINIDO" }}</td>
+                                <td class="biomedicos-listado__col-serie" title="{{ dispositivo.numero_serie|default:'INDEFINIDO' }}">{{ dispositivo.numero_serie|default:"INDEFINIDO"|truncatechars:18 }}</td>
+                                <td class="biomedicos-listado__col-area">
                                     {% if asignacion %}
-                                        {{ asignacion.ubicacion }}
+                                        <span title="{{ asignacion.ubicacion }}">{{ asignacion.ubicacion|truncatechars:16 }}</span>
                                     {% else %}
                                         Sin asignación
                                     {% endif %}
                                 </td>
-                                <td>
-                                    <span class="biomedicos-estado {{ dispositivo.estado_css }}">
-                                        {{ dispositivo.get_estado_display }}
+                                <td class="biomedicos-listado__col-estado">
+                                    <span class="biomedicos-estado {{ dispositivo.estado_css }}" title="{{ dispositivo.get_estado_display }}" aria-label="{{ dispositivo.get_estado_display }}">
+                                        {{ dispositivo.estado_etiqueta }}
                                     </span>
                                 </td>
-                                <td>
-                                    <span class="biomedicos-estado {{ dispositivo.garantia_css }}">
-                                        {{ dispositivo.garantia_estado }}
-                                    </span>
-                                </td>
-                                <td>
-                                    <div class="biomedicos-listado__acciones">
-                                        <a class="biomedicos-listado__accion"
-                                           href="{% url 'detalle_dispositivo_biomedicos' dispositivo.id %}"
-                                           title="Ver detalle">
-                                            <i class="bi bi-eye"></i>
-                                        </a>
-                                        <a class="biomedicos-listado__accion"
-                                           href="{% url 'qr_dispositivo_biomedicos' dispositivo.id %}"
-                                           title="Ver / Imprimir QR">
-                                            <i class="bi bi-qr-code"></i>
-                                        </a>
-                                        <a class="biomedicos-listado__accion"
-                                           href="{% url 'editar_dispositivo_biomedicos' dispositivo.id %}"
-                                           title="Editar equipo">
-                                            <i class="bi bi-pencil"></i>
-                                        </a>
-                                    </div>
+                                <td class="biomedicos-listado__col-acciones">
+                                    <details class="biomedicos-listado__acciones-menu">
+                                        <summary class="biomedicos-listado__acciones-resumen"
+                                                 aria-label="Acciones de {{ dispositivo.codigo }}">
+                                            <i class="bi bi-list"></i>
+                                        </summary>
+                                        <div class="biomedicos-listado__acciones-panel">
+                                            <a href="{% url 'detalle_dispositivo_biomedicos' dispositivo.id %}">
+                                                <i class="bi bi-eye"></i>
+                                                <span>Ver detalle</span>
+                                            </a>
+                                            <a href="{% url 'qr_dispositivo_biomedicos' dispositivo.id %}">
+                                                <i class="bi bi-qr-code"></i>
+                                                <span>Ver / Imprimir QR</span>
+                                            </a>
+                                            <a href="{% url 'editar_dispositivo_biomedicos' dispositivo.id %}">
+                                                <i class="bi bi-pencil"></i>
+                                                <span>Editar equipo</span>
+                                            </a>
+                                        </div>
+                                    </details>
                                 </td>
                             </tr>
                         {% endwith %}
                     {% empty %}
                         <tr>
-                            <td class="biomedicos-listado__vacio" colspan="13">
+                            <td class="biomedicos-listado__vacio" colspan="8">
                                 <i class="bi bi-inbox"></i>
                                 <strong>Sin resultados para “{{ consulta }}”</strong>
                                 <span>Prueba buscar por código, inventario, serie, tipo, marca o modelo.</span>
@@ -179,3 +181,6 @@
     {% endif %}
 </div>
 {% endblock content %}
+{% block extra_js %}
+{% include "equipos_biomedicos/includes/listado_interacciones_js.html" %}
+{% endblock extra_js %}
