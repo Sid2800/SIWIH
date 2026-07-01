@@ -123,6 +123,14 @@ def _cama_payload(cama, asig, cambios_realizados, max_cambios, meta_actualizacio
         "max_cambios": max_cambios,
         "ultima_actualizacion": meta_actualizacion.get("ultima_actualizacion", ""),
         "usuario_ultima_actualizacion": meta_actualizacion.get("usuario_ultima_actualizacion", ""),
+        "origen_ultima_actualizacion": meta_actualizacion.get("origen_ultima_actualizacion", "SIN_REGISTRO"),
+        "estado_anterior_ultima_actualizacion": meta_actualizacion.get("estado_anterior_ultima_actualizacion", "SIN_ESTADO"),
+        "estado_nuevo_ultima_actualizacion": meta_actualizacion.get("estado_nuevo_ultima_actualizacion", "SIN_ESTADO"),
+        "actualizacion_anterior": meta_actualizacion.get("actualizacion_anterior", ""),
+        "usuario_actualizacion_anterior": meta_actualizacion.get("usuario_actualizacion_anterior", ""),
+        "origen_actualizacion_anterior": meta_actualizacion.get("origen_actualizacion_anterior", "SIN_REGISTRO"),
+        "estado_anterior_actualizacion_anterior": meta_actualizacion.get("estado_anterior_actualizacion_anterior", "SIN_ESTADO"),
+        "estado_nuevo_actualizacion_anterior": meta_actualizacion.get("estado_nuevo_actualizacion_anterior", "SIN_ESTADO"),
     }
 
 
@@ -174,6 +182,57 @@ def _servicio_virtual_neonatologia_payload(servicio_pediatria, conflicto_mapeo=N
         "salas": [],
         "servicio_real_id": getattr(servicio_pediatria, "id", None),
         "scope_sala_ids": [MAPEO_CAMAS_SALA_NEONATOLOGIA_ID],
+    }
+
+
+# [2026-07-01] Clasifica el origen de actualización solo para el flujo del mapa.
+def _clasificar_origen_actualizacion_mapa(observacion_codigo="", ingreso_id=None):
+    codigo = (observacion_codigo or "").strip().upper()
+    if "SALA" in codigo or "TRASLADO" in codigo:
+        return "CAMBIO_SALA"
+    if "MAPEO" in codigo or "MAPA" in codigo:
+        return "MAPEO"
+    if (
+        "INGRESO" in codigo
+        or "ASIGNACION" in codigo
+        or "CAMBIO DE CAMA" in codigo
+        or "CIERRE" in codigo
+    ):
+        return "INGRESO"
+    return "INGRESO" if ingreso_id else "MAPEO"
+
+
+# [2026-07-01] Reutiliza el segundo evento histórico para poblar tooltip de "actualización anterior".
+def _meta_actualizacion_anterior_por_cama(cama_id):
+    historial = list(
+        HistorialEstadoCama.objects.select_related("estado_anterior", "estado_nuevo", "usuario", "observacion")
+        .filter(cama_id=cama_id)
+        .order_by("-fecha_hora", "-id")[:2]
+    )
+    if len(historial) < 2:
+        return {
+            "actualizacion_anterior": "",
+            "usuario_actualizacion_anterior": "",
+            "origen_actualizacion_anterior": "SIN_REGISTRO",
+            "estado_anterior_actualizacion_anterior": "SIN_ESTADO",
+            "estado_nuevo_actualizacion_anterior": "SIN_ESTADO",
+        }
+
+    anterior = historial[1]
+    observacion_codigo = getattr(getattr(anterior, "observacion", None), "codigo", "") or ""
+    return {
+        "actualizacion_anterior": hora_local_iso(anterior.fecha_hora),
+        "usuario_actualizacion_anterior": _nombre_usuario(anterior.usuario),
+        "origen_actualizacion_anterior": _clasificar_origen_actualizacion_mapa(
+            observacion_codigo=observacion_codigo,
+            ingreso_id=anterior.ingreso_id,
+        ),
+        "estado_anterior_actualizacion_anterior": (
+            getattr(getattr(anterior, "estado_anterior", None), "codigo", "SIN_ESTADO") or "SIN_ESTADO"
+        ),
+        "estado_nuevo_actualizacion_anterior": (
+            getattr(getattr(anterior, "estado_nuevo", None), "codigo", "SIN_ESTADO") or "SIN_ESTADO"
+        ),
     }
 
 
@@ -277,6 +336,19 @@ def mapa_camas_data(request):
     # 2026-06-09: ORM pesado extraído a service reutilizable para adelgazar la vista.
     asignacion_por_cama = MapeoCamasService.obtener_ultimas_asignaciones_por_cama()
     historial_por_cama = MapeoCamasService.obtener_ultimos_historiales_por_cama()
+    historial_anterior_por_cama = {}
+    if historial_por_cama:
+        historial_reciente_qs = (
+            HistorialEstadoCama.objects.select_related("estado_anterior", "estado_nuevo", "usuario", "observacion")
+            .filter(cama_id__in=list(historial_por_cama.keys()))
+            .order_by("cama_id", "-fecha_hora", "-id")
+        )
+        contador_por_cama = {}
+        for historial_evento in historial_reciente_qs:
+            contador = contador_por_cama.get(historial_evento.cama_id, 0) + 1
+            contador_por_cama[historial_evento.cama_id] = contador
+            if contador == 2:
+                historial_anterior_por_cama[historial_evento.cama_id] = historial_evento
 
     # [2026-06-11] El contador operativo del mapa debe mostrarse por servicio.
     cambios_por_servicio = {
@@ -337,6 +409,21 @@ def mapa_camas_data(request):
                         continue
                     asig = asignacion_por_cama.get(cama.numero_cama)
                     meta_actualizacion = _meta_ultima_actualizacion(historial_por_cama.get(cama.numero_cama))
+                    historial_anterior = historial_anterior_por_cama.get(cama.numero_cama)
+                    if historial_anterior:
+                        meta_actualizacion["actualizacion_anterior"] = hora_local_iso(historial_anterior.fecha_hora)
+                        meta_actualizacion["usuario_actualizacion_anterior"] = _nombre_usuario(historial_anterior.usuario)
+                        observacion_prev = getattr(getattr(historial_anterior, "observacion", None), "codigo", "") or ""
+                        meta_actualizacion["origen_actualizacion_anterior"] = _clasificar_origen_actualizacion_mapa(
+                            observacion_codigo=observacion_prev,
+                            ingreso_id=historial_anterior.ingreso_id,
+                        )
+                        meta_actualizacion["estado_anterior_actualizacion_anterior"] = (
+                            getattr(getattr(historial_anterior, "estado_anterior", None), "codigo", "SIN_ESTADO") or "SIN_ESTADO"
+                        )
+                        meta_actualizacion["estado_nuevo_actualizacion_anterior"] = (
+                            getattr(getattr(historial_anterior, "estado_nuevo", None), "codigo", "SIN_ESTADO") or "SIN_ESTADO"
+                        )
                     camas_data.append(_cama_payload(
                         cama,
                         asig,
@@ -365,6 +452,21 @@ def mapa_camas_data(request):
                 )
                 asig = asignacion_por_cama.get(cama.numero_cama)
                 meta_actualizacion = _meta_ultima_actualizacion(historial_por_cama.get(cama.numero_cama))
+                historial_anterior = historial_anterior_por_cama.get(cama.numero_cama)
+                if historial_anterior:
+                    meta_actualizacion["actualizacion_anterior"] = hora_local_iso(historial_anterior.fecha_hora)
+                    meta_actualizacion["usuario_actualizacion_anterior"] = _nombre_usuario(historial_anterior.usuario)
+                    observacion_prev = getattr(getattr(historial_anterior, "observacion", None), "codigo", "") or ""
+                    meta_actualizacion["origen_actualizacion_anterior"] = _clasificar_origen_actualizacion_mapa(
+                        observacion_codigo=observacion_prev,
+                        ingreso_id=historial_anterior.ingreso_id,
+                    )
+                    meta_actualizacion["estado_anterior_actualizacion_anterior"] = (
+                        getattr(getattr(historial_anterior, "estado_anterior", None), "codigo", "SIN_ESTADO") or "SIN_ESTADO"
+                    )
+                    meta_actualizacion["estado_nuevo_actualizacion_anterior"] = (
+                        getattr(getattr(historial_anterior, "estado_nuevo", None), "codigo", "SIN_ESTADO") or "SIN_ESTADO"
+                    )
                 cubiculo_bucket["camas"].append(_cama_payload(
                     cama,
                     asig,
@@ -383,6 +485,21 @@ def mapa_camas_data(request):
             for cama in sala.camas_sala.all():
                 asig = asignacion_por_cama.get(cama.numero_cama)
                 meta_actualizacion = _meta_ultima_actualizacion(historial_por_cama.get(cama.numero_cama))
+                historial_anterior = historial_anterior_por_cama.get(cama.numero_cama)
+                if historial_anterior:
+                    meta_actualizacion["actualizacion_anterior"] = hora_local_iso(historial_anterior.fecha_hora)
+                    meta_actualizacion["usuario_actualizacion_anterior"] = _nombre_usuario(historial_anterior.usuario)
+                    observacion_prev = getattr(getattr(historial_anterior, "observacion", None), "codigo", "") or ""
+                    meta_actualizacion["origen_actualizacion_anterior"] = _clasificar_origen_actualizacion_mapa(
+                        observacion_codigo=observacion_prev,
+                        ingreso_id=historial_anterior.ingreso_id,
+                    )
+                    meta_actualizacion["estado_anterior_actualizacion_anterior"] = (
+                        getattr(getattr(historial_anterior, "estado_anterior", None), "codigo", "SIN_ESTADO") or "SIN_ESTADO"
+                    )
+                    meta_actualizacion["estado_nuevo_actualizacion_anterior"] = (
+                        getattr(getattr(historial_anterior, "estado_nuevo", None), "codigo", "SIN_ESTADO") or "SIN_ESTADO"
+                    )
                 camas_directas_data.append(_cama_payload(
                     cama,
                     asig,
@@ -518,6 +635,8 @@ def mover_paciente_cama(request):
 
     max_cambios_usuario = _max_cambios_para_usuario(request.user)
     ingreso_operativo = resultado["ingreso_operativo"]
+    meta_anterior_origen = _meta_actualizacion_anterior_por_cama(cama_origen_id)
+    meta_anterior_destino = _meta_actualizacion_anterior_por_cama(cama_destino_id)
     return JsonResponse({
         "ok": True,
         "mensaje": f"Paciente movido a la cama {cama_destino_id} correctamente.",
@@ -529,6 +648,10 @@ def mover_paciente_cama(request):
             "max_cambios": max_cambios_usuario,
             "ultima_actualizacion": hora_local_iso(resultado["historial_origen"].fecha_hora),
             "usuario_ultima_actualizacion": _nombre_usuario(resultado["historial_origen"].usuario),
+            "origen_ultima_actualizacion": "CAMBIO_SALA",
+            "estado_anterior_ultima_actualizacion": getattr(getattr(resultado["historial_origen"], "estado_anterior", None), "codigo", "SIN_ESTADO") or "SIN_ESTADO",
+            "estado_nuevo_ultima_actualizacion": getattr(getattr(resultado["historial_origen"], "estado_nuevo", None), "codigo", "SIN_ESTADO") or "SIN_ESTADO",
+            **meta_anterior_origen,
         },
         "cama_destino": {
             "numero_cama": int(cama_destino_id),
@@ -538,6 +661,10 @@ def mover_paciente_cama(request):
             "max_cambios": max_cambios_usuario,
             "ultima_actualizacion": hora_local_iso(resultado["historial_destino"].fecha_hora),
             "usuario_ultima_actualizacion": _nombre_usuario(resultado["historial_destino"].usuario),
+            "origen_ultima_actualizacion": "CAMBIO_SALA",
+            "estado_anterior_ultima_actualizacion": getattr(getattr(resultado["historial_destino"], "estado_anterior", None), "codigo", "SIN_ESTADO") or "SIN_ESTADO",
+            "estado_nuevo_ultima_actualizacion": getattr(getattr(resultado["historial_destino"], "estado_nuevo", None), "codigo", "SIN_ESTADO") or "SIN_ESTADO",
+            **meta_anterior_destino,
         },
     })
 
@@ -707,6 +834,13 @@ def actualizar_cama_mapa(request):
                 "max_cambios": max_cambios_usuario,
                 "ultima_actualizacion": hora_local_iso(historial.fecha_hora) if historial else "",
                 "usuario_ultima_actualizacion": _nombre_usuario(historial.usuario) if historial else "",
+                "origen_ultima_actualizacion": _clasificar_origen_actualizacion_mapa(
+                    observacion_codigo=getattr(getattr(historial, "observacion", None), "codigo", "") if historial else "",
+                    ingreso_id=getattr(historial, "ingreso_id", None) if historial else None,
+                ) if historial else "SIN_REGISTRO",
+                "estado_anterior_ultima_actualizacion": getattr(getattr(historial, "estado_anterior", None), "codigo", "SIN_ESTADO") if historial else "SIN_ESTADO",
+                "estado_nuevo_ultima_actualizacion": getattr(getattr(historial, "estado_nuevo", None), "codigo", "SIN_ESTADO") if historial else "SIN_ESTADO",
+                **_meta_actualizacion_anterior_por_cama(cama_id),
             },
         })
 
@@ -776,5 +910,12 @@ def actualizar_cama_mapa(request):
             "max_cambios": max_cambios_usuario,
             "ultima_actualizacion": hora_local_iso(historial.fecha_hora),
             "usuario_ultima_actualizacion": _nombre_usuario(historial.usuario),
+            "origen_ultima_actualizacion": _clasificar_origen_actualizacion_mapa(
+                observacion_codigo=getattr(getattr(historial, "observacion", None), "codigo", ""),
+                ingreso_id=historial.ingreso_id,
+            ),
+            "estado_anterior_ultima_actualizacion": getattr(getattr(historial, "estado_anterior", None), "codigo", "SIN_ESTADO") or "SIN_ESTADO",
+            "estado_nuevo_ultima_actualizacion": getattr(getattr(historial, "estado_nuevo", None), "codigo", "SIN_ESTADO") or "SIN_ESTADO",
+            **_meta_actualizacion_anterior_por_cama(cama_id),
         },
     })

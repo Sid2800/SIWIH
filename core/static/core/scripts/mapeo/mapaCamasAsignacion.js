@@ -414,6 +414,32 @@ document.addEventListener("DOMContentLoaded", function () {
     return dd + "/" + mm + "/" + yyyy + " " + hh + ":" + min;
   }
 
+  // [2026-07-01] Separar fecha y hora para tooltip de actualización anterior.
+  function formatearFechaHoraTooltip(valor) {
+    if (!valor) {
+      return { fecha: "Sin registro", hora: "Sin registro" };
+    }
+    var fecha = new Date(valor);
+    if (isNaN(fecha.getTime())) {
+      return { fecha: "Sin registro", hora: "Sin registro" };
+    }
+    var dd = String(fecha.getDate()).padStart(2, "0");
+    var mm = String(fecha.getMonth() + 1).padStart(2, "0");
+    var yyyy = String(fecha.getFullYear());
+    var hh24 = fecha.getHours();
+    var min = String(fecha.getMinutes()).padStart(2, "0");
+    var ampm = hh24 >= 12 ? "PM" : "AM";
+    var hh12 = hh24 % 12;
+    if (hh12 === 0) {
+      hh12 = 12;
+    }
+    var hh = String(hh12).padStart(2, "0");
+    return {
+      fecha: dd + "/" + mm + "/" + yyyy,
+      hora: hh + ":" + min + " " + ampm,
+    };
+  }
+
   function escaparHtml(valor) {
     return String(valor || "")
       .replace(/&/g, "&amp;")
@@ -726,11 +752,21 @@ document.addEventListener("DOMContentLoaded", function () {
     camaEl.dataset.maxCambios = camaActualizada.max_cambios != null ? String(camaActualizada.max_cambios) : "";
     camaEl.dataset.ultimaActualizacion = camaActualizada.ultima_actualizacion || "";
     camaEl.dataset.usuarioUltimaActualizacion = camaActualizada.usuario_ultima_actualizacion || "";
+    camaEl.dataset.origenUltimaActualizacion = camaActualizada.origen_ultima_actualizacion || "SIN_REGISTRO";
+    camaEl.dataset.estadoAnteriorUltimaActualizacion = camaActualizada.estado_anterior_ultima_actualizacion || "SIN_ESTADO";
+    camaEl.dataset.estadoNuevoUltimaActualizacion = camaActualizada.estado_nuevo_ultima_actualizacion || "SIN_ESTADO";
+    camaEl.dataset.actualizacionAnterior = camaActualizada.actualizacion_anterior || "";
+    camaEl.dataset.usuarioActualizacionAnterior = camaActualizada.usuario_actualizacion_anterior || "";
+    camaEl.dataset.origenActualizacionAnterior = camaActualizada.origen_actualizacion_anterior || "SIN_REGISTRO";
+    camaEl.dataset.estadoAnteriorActualizacionAnterior = camaActualizada.estado_anterior_actualizacion_anterior || "SIN_ESTADO";
+    camaEl.dataset.estadoNuevoActualizacionAnterior = camaActualizada.estado_nuevo_actualizacion_anterior || "SIN_ESTADO";
 
     var estadoEl = camaEl.querySelector(".mapa-cama-estado");
     var pacienteEl = camaEl.querySelector(".mapa-cama-paciente");
     var dniEl = camaEl.querySelector(".mapa-cama-dni");
     var actualizacionEl = camaEl.querySelector(".mapa-cama-actualizacion");
+    var usuarioActualizacionEl = camaEl.querySelector(".mapa-cama-actualizacion-usuario");
+    var origenActualizacionEl = camaEl.querySelector(".mapa-cama-actualizacion-origen");
 
     if (estadoEl) {
       estadoEl.textContent = camaActualizada.estado_visual || "VACIA";
@@ -744,6 +780,12 @@ document.addEventListener("DOMContentLoaded", function () {
     if (actualizacionEl) {
       // [2026-05-21] Mostrar fecha y hora en una sola línea en la card.
       actualizacionEl.textContent = "Ult. act.: " + formatearFechaHoraCorta(camaActualizada.ultima_actualizacion || "");
+    }
+    if (usuarioActualizacionEl) {
+      usuarioActualizacionEl.textContent = "Usuario: " + (camaActualizada.usuario_ultima_actualizacion || "Sin registro");
+    }
+    if (origenActualizacionEl) {
+      origenActualizacionEl.textContent = "Origen: " + (camaActualizada.origen_ultima_actualizacion || "SIN_REGISTRO");
     }
 
     renderIndicadoresEstado();
@@ -816,7 +858,7 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   // Modal principal para operar una cama: cambio de estado o movimiento de paciente.
-  async function abrirModalEdicionCama(camaEl) {
+  async function abrirModalEdicionCama(camaEl, soloVista) {
     // Datos base tomados de la card seleccionada.
     // Se usan para:
     // 1) precargar el modal,
@@ -831,7 +873,21 @@ document.addEventListener("DOMContentLoaded", function () {
     var limiteTexto = maxCambios === null ? "Sin limite" : (cambiosRealizados + " / " + maxCambios);
     var ultimaActualizacion = formatearFechaHoraCorta(camaEl.dataset.ultimaActualizacion || "");
     var usuarioUltimaActualizacion = camaEl.dataset.usuarioUltimaActualizacion || "Sin registro";
-    var estadoActualTexto = estadoActual || "VACIA";
+    var origenUltimaActualizacion = camaEl.dataset.origenUltimaActualizacion || "SIN_REGISTRO";
+    // [2026-07-01] Datos de la actualización anterior para tooltip y modal en modo vista.
+    var actualizacionAnteriorRaw = camaEl.dataset.actualizacionAnterior || "";
+    var usuarioActualizacionAnterior = camaEl.dataset.usuarioActualizacionAnterior || "Sin registro";
+    var origenActualizacionAnterior = camaEl.dataset.origenActualizacionAnterior || "SIN_REGISTRO";
+    var fechaHoraActualizacionAnterior = formatearFechaHoraTooltip(actualizacionAnteriorRaw);
+    /*var origenUltimaActualizacion = camaEl.dataset.origenUltimaActualizacion || "SIN_REGISTRO";
+    var estadoAnteriorUltimaActualizacion = camaEl.dataset.estadoAnteriorUltimaActualizacion || "SIN_ESTADO";
+    var estadoNuevoUltimaActualizacion = camaEl.dataset.estadoNuevoUltimaActualizacion || "SIN_ESTADO";
+    var actualizacionAnterior = formatearFechaHoraCorta(camaEl.dataset.actualizacionAnterior || "");
+    var usuarioActualizacionAnterior = camaEl.dataset.usuarioActualizacionAnterior || "Sin registro";
+    var origenActualizacionAnterior = camaEl.dataset.origenActualizacionAnterior || "SIN_REGISTRO";
+    var estadoAnteriorActualizacionAnterior = camaEl.dataset.estadoAnteriorActualizacionAnterior || "SIN_ESTADO";
+    var estadoNuevoActualizacionAnterior = camaEl.dataset.estadoNuevoActualizacionAnterior || "SIN_ESTADO";
+    */var estadoActualTexto = estadoActual || "VACIA";
     var htmlInformacion =
       '<fieldset class="modalAtencionCampos">' +
       "  <legend>Informacion</legend>" +
@@ -846,8 +902,103 @@ document.addEventListener("DOMContentLoaded", function () {
       '  <div class="formularioCampoModal">' +
       "    <label>Actualizado por</label>" +
       '    <input type="text" class="formularioCampo-text" readonly value="' + escaparHtml(usuarioUltimaActualizacion) + '">' +
+     /* "  </div>" +
+      '  <div class="formularioCampoModal">' +
+      "    <label>Origen de actualización</label>" +
+      '    <input type="text" class="formularioCampo-text" readonly value="' + escaparHtml(origenUltimaActualizacion) + '">' +
       "  </div>" +
+      '  <div class="formularioCampoModal">' +
+      "    <label>Transición última</label>" +
+      '    <input type="text" class="formularioCampo-text" readonly value="' + escaparHtml(estadoAnteriorUltimaActualizacion + " -> " + estadoNuevoUltimaActualizacion) + '">' +
+      "  </div>" +
+      '  <div class="formularioCampoModal">' +
+      "    <label>Actualización anterior</label>" +
+      '    <input type="text" class="formularioCampo-text" readonly value="' + escaparHtml(actualizacionAnterior) + '">' +
+      "  </div>" +
+      '  <div class="formularioCampoModal">' +
+      "    <label>Anterior actualizada por</label>" +
+      '    <input type="text" class="formularioCampo-text" readonly value="' + escaparHtml(usuarioActualizacionAnterior) + '">' +
+      "  </div>" +
+      '  <div class="formularioCampoModal">' +
+      "    <label>Origen anterior</label>" +
+      '    <input type="text" class="formularioCampo-text" readonly value="' + escaparHtml(origenActualizacionAnterior) + '">' +
+      "  </div>" +
+      '  <div class="formularioCampoModal">' +
+      "    <label>Transición anterior</label>" +
+      '    <input type="text" class="formularioCampo-text" readonly value="' + escaparHtml(estadoAnteriorActualizacionAnterior + " -> " + estadoNuevoActualizacionAnterior) + '">' +
+      */"  </div>" +
       "</fieldset>";
+
+    // [2026-07-01] Modo vista: permite abrir el modal solo con datos del card.
+    if (soloVista) {
+      var htmlActualizacionAnterior =
+        !actualizacionAnteriorRaw
+          ? '<div class="formularioCampoModal"><label>Actualizacion anterior</label><input type="text" class="formularioCampo-text" readonly value="Sin actualizacion anterior."></div>'
+          : (
+            '<div class="formularioCampoModal">' +
+            "    <label>Anterior actualizada por</label>" +
+            '    <input type="text" class="formularioCampo-text" readonly value="' + escaparHtml(usuarioActualizacionAnterior) + '">' +
+            "  </div>" +
+            '<div class="formularioCampoModal">' +
+            "    <label>Fecha anterior</label>" +
+            '    <input type="text" class="formularioCampo-text" readonly value="' + escaparHtml(fechaHoraActualizacionAnterior.fecha) + '">' +
+            "  </div>" +
+            '<div class="formularioCampoModal">' +
+            "    <label>Hora anterior</label>" +
+            '    <input type="text" class="formularioCampo-text" readonly value="' + escaparHtml(fechaHoraActualizacionAnterior.hora) + '">' +
+            "  </div>" +
+            '<div class="formularioCampoModal">' +
+            "    <label>Origen anterior</label>" +
+            '    <input type="text" class="formularioCampo-text" readonly value="' + escaparHtml(origenActualizacionAnterior) + '">' +
+            "  </div>"
+          );
+
+      var htmlSoloVista =
+        '<fieldset class="modalAtencionCampos">' +
+        "  <legend>Informacion</legend>" +
+        '  <div class="formularioCampoModal">' +
+        "    <label>Estado actual</label>" +
+        '    <input type="text" class="formularioCampo-text" readonly value="' + escaparHtml(estadoActualTexto) + '">' +
+        "  </div>" +
+        '  <div class="formularioCampoModal">' +
+        "    <label>Paciente</label>" +
+        '    <input type="text" class="formularioCampo-text" readonly value="' + escaparHtml(pacienteActual || "Sin paciente") + '">' +
+        "  </div>" +
+        '  <div class="formularioCampoModal">' +
+        "    <label>Identidad</label>" +
+        '    <input type="text" class="formularioCampo-text" readonly value="' + escaparHtml(dniActual || "Sin registro") + '">' +
+        "  </div>" +
+        '  <div class="formularioCampoModal">' +
+        "    <label>Ultima actualizacion</label>" +
+        '    <input type="text" class="formularioCampo-text" readonly value="' + escaparHtml(ultimaActualizacion) + '">' +
+        "  </div>" +
+        '  <div class="formularioCampoModal">' +
+        "    <label>Actualizado por</label>" +
+        '    <input type="text" class="formularioCampo-text" readonly value="' + escaparHtml(usuarioUltimaActualizacion) + '">' +
+        "  </div>" +
+        '  <div class="formularioCampoModal">' +
+        "    <label>Origen</label>" +
+        '    <input type="text" class="formularioCampo-text" readonly value="' + escaparHtml(origenUltimaActualizacion) + '">' +
+        "  </div>" +
+        htmlActualizacionAnterior +
+        '  <p class="modal-cama-limite">Cambios realizados: ' + escaparHtml(limiteTexto) + "</p>" +
+        "</fieldset>";
+
+      await Swal.fire({
+        title: "Cama " + numeroCama,
+        html: htmlSoloVista,
+        showCancelButton: false,
+        showCloseButton: true,
+        confirmButtonText: "Cerrar",
+        customClass: {
+          popup: "contener-modal-defuncion",
+          title: "contener-modal-titulo",
+          content: "contener-modal-contenido",
+          confirmButton: "contener-modal-boton-confirmar"
+        }
+      });
+      return;
+    }
 
     // La cama esta OCUPADA (o PRE_ALTA) cuando tiene paciente asignado.
     // Esta bandera define toda la estructura del modal.
@@ -1528,6 +1679,14 @@ document.addEventListener("DOMContentLoaded", function () {
           camaEl.dataset.maxCambios = cama.max_cambios != null ? String(cama.max_cambios) : "";
           camaEl.dataset.ultimaActualizacion = cama.ultima_actualizacion || "";
           camaEl.dataset.usuarioUltimaActualizacion = cama.usuario_ultima_actualizacion || "";
+          camaEl.dataset.origenUltimaActualizacion = cama.origen_ultima_actualizacion || "SIN_REGISTRO";
+          camaEl.dataset.estadoAnteriorUltimaActualizacion = cama.estado_anterior_ultima_actualizacion || "SIN_ESTADO";
+          camaEl.dataset.estadoNuevoUltimaActualizacion = cama.estado_nuevo_ultima_actualizacion || "SIN_ESTADO";
+          camaEl.dataset.actualizacionAnterior = cama.actualizacion_anterior || "";
+          camaEl.dataset.usuarioActualizacionAnterior = cama.usuario_actualizacion_anterior || "";
+          camaEl.dataset.origenActualizacionAnterior = cama.origen_actualizacion_anterior || "SIN_REGISTRO";
+          camaEl.dataset.estadoAnteriorActualizacionAnterior = cama.estado_anterior_actualizacion_anterior || "SIN_ESTADO";
+          camaEl.dataset.estadoNuevoActualizacionAnterior = cama.estado_nuevo_actualizacion_anterior || "SIN_ESTADO";
 
           var numero = document.createElement("span");
           numero.className = "mapa-cama-numero";
@@ -1548,19 +1707,39 @@ document.addEventListener("DOMContentLoaded", function () {
           var actualizacion = document.createElement("span");
           actualizacion.className = "mapa-cama-actualizacion";
           actualizacion.style.whiteSpace = "nowrap";
-          actualizacion.textContent = " " + formatearFechaHoraCorta(cama.ultima_actualizacion || "");
+          actualizacion.textContent = "Ult. act.: " + formatearFechaHoraCorta(cama.ultima_actualizacion || "");
+
+          var actualizacionUsuario = document.createElement("span");
+          actualizacionUsuario.className = "mapa-cama-actualizacion-usuario";
+          actualizacionUsuario.textContent = "Usuario: " + (cama.usuario_ultima_actualizacion || "Sin registro");
+
+          var actualizacionOrigen = document.createElement("span");
+          actualizacionOrigen.className = "mapa-cama-actualizacion-origen";
+          actualizacionOrigen.textContent = "Origen: " + (cama.origen_ultima_actualizacion || "SIN_REGISTRO");
 
           camaEl.appendChild(numero);
           camaEl.appendChild(estado);
           camaEl.appendChild(paciente);
           camaEl.appendChild(dni);
           camaEl.appendChild(actualizacion);
+          camaEl.appendChild(actualizacionUsuario);
+          camaEl.appendChild(actualizacionOrigen);
 
-          // [2026-06-26] Tooltip global: muestra usuario y fecha al hacer hover sobre la card
+          // [2026-07-01] Tooltip global: muestra la actualización inmediatamente anterior.
           camaEl.addEventListener("mouseenter", function () {
-            var usuario = camaEl.dataset.usuarioUltimaActualizacion || "—";
-            var fecha = formatearFechaHoraCorta(camaEl.dataset.ultimaActualizacion || "");
-            mapaTooltipGlobal.innerHTML = "<strong>\u00dalt. actualizaci\u00f3n</strong><br>" + usuario + "<br>" + fecha;
+            var fechaAnteriorRaw = camaEl.dataset.actualizacionAnterior || "";
+            if (!fechaAnteriorRaw) {
+              mapaTooltipGlobal.innerHTML = "<strong>Actualizacion anterior</strong><br>Sin actualizacion anterior.";
+            } else {
+              var usuarioAnterior = camaEl.dataset.usuarioActualizacionAnterior || "Sin registro";
+              var origenAnterior = camaEl.dataset.origenActualizacionAnterior || "SIN_REGISTRO";
+              var fechaHoraAnterior = formatearFechaHoraTooltip(fechaAnteriorRaw);
+              mapaTooltipGlobal.innerHTML = "<strong>Actualizacion anterior</strong><br>"
+                + "Usuario: " + escaparHtml(usuarioAnterior) + "<br>"
+                + "Fecha: " + escaparHtml(fechaHoraAnterior.fecha) + "<br>"
+                + "Hora: " + escaparHtml(fechaHoraAnterior.hora) + "<br>"
+                + "Origen: " + escaparHtml(origenAnterior);
+            }
             var rect = camaEl.getBoundingClientRect();
             mapaTooltipGlobal.style.left = (rect.left + rect.width / 2) + "px";
             mapaTooltipGlobal.style.top = (rect.top - 10) + "px";
@@ -1579,10 +1758,8 @@ document.addEventListener("DOMContentLoaded", function () {
           var _touchWasLong = false;
 
           camaEl.addEventListener("touchstart", function () {
-            // [2026-05-08] En modo solo lectura no activar acciones tactiles de edicion
-            // [2026-05-28] Avisar al usuario en lugar de fallar en silencio.
+            // [2026-07-01] En modo vista no activar long-press; el tap abre modal solo lectura.
             if (window.MAPA_SOLO_LECTURA) {
-              if (window.toastr) { toastr.info("Est\u00e1 en modo vista.", "Mapa"); }
               return;
             }
             _longTimer = setTimeout(function () {
@@ -1602,10 +1779,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
           camaEl.addEventListener("click", function () {
             if (_touchWasLong) { _touchWasLong = false; return; }
-            // [2026-05-08] En modo solo lectura no abrir modal de edicion
-            // [2026-05-28] Avisar al usuario en lugar de fallar en silencio.
+            // [2026-07-01] En modo vista se permite abrir modal solo lectura con datos del card.
             if (window.MAPA_SOLO_LECTURA) {
-              if (window.toastr) { toastr.info("Est\u00e1 en modo vista.", "Mapa"); }
+              abrirModalEdicionCama(camaEl, true);
               return;
             }
             if (_clickTimer) {
