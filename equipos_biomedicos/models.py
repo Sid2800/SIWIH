@@ -417,6 +417,186 @@ class Dispositivo(models.Model):
         return f"{self.codigo} - {self.nombre}"
 
 
+
+class TipoMantenimiento(models.IntegerChoices):
+    PREVENTIVO = 1, "Preventivo"
+    CORRECTIVO = 2, "Correctivo"
+    EMERGENCIA = 3, "Emergencia"
+
+
+class EstadoMantenimiento(models.IntegerChoices):
+    PROGRAMADO = 1, "Programado"
+    EN_PROCESO = 2, "En proceso"
+    COMPLETADO = 3, "Completado"
+    CANCELADO = 4, "Cancelado"
+
+
+class Repuesto(models.Model):
+    nombre = models.CharField(max_length=100, unique=True)
+    descripcion = models.CharField(max_length=250, blank=True)
+    activo = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        db_table = "equipo_repuesto"
+        ordering = ["nombre"]
+        verbose_name = "repuesto"
+        verbose_name_plural = "repuestos"
+
+    def __str__(self):
+        return self.nombre
+
+    def clean(self):
+        self.nombre = normalizar_nombre_catalogo(self.nombre)
+        self.descripcion = (self.descripcion or "").strip()
+        if not self.nombre:
+            raise ValidationError({"nombre": "El nombre del repuesto es obligatorio."})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+
+class MantenimientoEquipo(models.Model):
+    ESTADOS_FINALES_EQUIPO = (
+        (EstadoDispositivo.OPERATIVO, EstadoDispositivo.OPERATIVO.label),
+        (EstadoDispositivo.FUERA_DE_SERVICIO, EstadoDispositivo.FUERA_DE_SERVICIO.label),
+    )
+
+    dispositivo = models.ForeignKey(
+        Dispositivo,
+        on_delete=models.PROTECT,
+        related_name="mantenimientos",
+    )
+    tipo_mantenimiento = models.PositiveSmallIntegerField(
+        choices=TipoMantenimiento.choices,
+        db_index=True,
+    )
+    estado = models.PositiveSmallIntegerField(
+        choices=EstadoMantenimiento.choices,
+        default=EstadoMantenimiento.PROGRAMADO,
+        db_index=True,
+    )
+    tecnico_responsable = models.ForeignKey(
+        Empleado,
+        on_delete=models.PROTECT,
+        related_name="mantenimientos_equipos_responsable",
+    )
+    fecha_solicitud = models.DateField(default=timezone.localdate, db_index=True)
+    fecha_ingreso = models.DateField(null=True, blank=True)
+    fecha_inicio = models.DateField(null=True, blank=True)
+    fecha_salida = models.DateField(null=True, blank=True)
+    fecha_cierre = models.DateField(null=True, blank=True)
+    duracion_estimada_horas = models.DecimalField(
+        max_digits=7,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(0)],
+    )
+    duracion_real_horas = models.DecimalField(
+        max_digits=7,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(0)],
+    )
+    descripcion_solicitud = models.TextField()
+    trabajo_realizado = models.TextField(blank=True)
+    observaciones = models.TextField(blank=True)
+    estado_final_equipo = models.PositiveSmallIntegerField(
+        choices=ESTADOS_FINALES_EQUIPO,
+        null=True,
+        blank=True,
+    )
+    creado_por = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="mantenimientos_equipos_creados",
+    )
+    fecha_creado = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "equipo_mantenimiento"
+        ordering = ["-fecha_solicitud", "-fecha_creado"]
+        verbose_name = "mantenimiento de equipo"
+        verbose_name_plural = "mantenimientos de equipos"
+        indexes = [
+            models.Index(fields=["dispositivo", "estado"], name="equipo_mant_disp_estado_idx"),
+            models.Index(fields=["estado", "fecha_solicitud"], name="equipo_mant_estado_fecha_idx"),
+        ]
+
+    def __str__(self):
+        return f"{self.dispositivo.codigo} - {self.get_tipo_mantenimiento_display()}"
+
+    @property
+    def fecha_referencia(self):
+        return self.fecha_inicio or self.fecha_ingreso or self.fecha_solicitud
+
+    def clean(self):
+        errores = {}
+        self.descripcion_solicitud = (self.descripcion_solicitud or "").strip()
+        self.trabajo_realizado = (self.trabajo_realizado or "").strip()
+        self.observaciones = (self.observaciones or "").strip()
+
+        if not self.descripcion_solicitud:
+            errores["descripcion_solicitud"] = "Describe que mantenimiento se solicita o realiza."
+
+        if self.fecha_salida and self.fecha_ingreso and self.fecha_salida < self.fecha_ingreso:
+            errores["fecha_salida"] = "La fecha de salida no puede ser anterior a la fecha de ingreso."
+        if self.fecha_salida and self.fecha_inicio and self.fecha_salida < self.fecha_inicio:
+            errores["fecha_salida"] = "La fecha de salida no puede ser anterior al inicio del mantenimiento."
+        if self.fecha_cierre and self.fecha_inicio and self.fecha_cierre < self.fecha_inicio:
+            errores["fecha_cierre"] = "La fecha de cierre no puede ser anterior al inicio del mantenimiento."
+
+        if self.estado != EstadoMantenimiento.COMPLETADO:
+            self.estado_final_equipo = None
+        elif not self.estado_final_equipo:
+            errores["estado_final_equipo"] = "Indica como queda el equipo al completar el mantenimiento."
+
+        if errores:
+            raise ValidationError(errores)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+
+class RepuestoMantenimiento(models.Model):
+    mantenimiento = models.ForeignKey(
+        MantenimientoEquipo,
+        on_delete=models.PROTECT,
+        related_name="repuestos_usados",
+    )
+    repuesto = models.ForeignKey(
+        Repuesto,
+        on_delete=models.PROTECT,
+        related_name="usos_mantenimiento",
+    )
+    cantidad = models.PositiveIntegerField(default=1, validators=[MinValueValidator(1)])
+    observaciones = models.CharField(max_length=250, blank=True)
+
+    class Meta:
+        db_table = "equipo_repuesto_mantenimiento"
+        ordering = ["repuesto__nombre"]
+        verbose_name = "repuesto usado en mantenimiento"
+        verbose_name_plural = "repuestos usados en mantenimientos"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["mantenimiento", "repuesto"],
+                name="equipo_repuesto_unico_por_mantenimiento",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.repuesto} x{self.cantidad}"
+
+    def clean(self):
+        self.observaciones = (self.observaciones or "").strip()
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
 class BajaDispositivo(models.Model):
     # Registro administrativo de baja. Es OneToOne porque un equipo solo debe
     # tener una baja final, parecida a un cierre de expediente.

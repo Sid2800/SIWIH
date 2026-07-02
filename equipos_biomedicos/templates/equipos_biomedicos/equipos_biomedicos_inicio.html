@@ -63,10 +63,12 @@
             </header>
 
             <div class="biomedicos-submenu__opciones">
-                <span class="biomedicos-submenu__opcion controles_clic_desactivados texto_desactivados">
+                <a class="biomedicos-submenu__opcion"
+                   href="{% url 'registrar_mantenimiento_biomedicos' %}">
                     <i class="bi bi-plus-square"></i>
                     <span>Registrar mantenimiento</span>
-                </span>
+                    <i class="bi bi-chevron-right"></i>
+                </a>
                 <span class="biomedicos-submenu__opcion controles_clic_desactivados texto_desactivados">
                     <i class="bi bi-calendar3"></i>
                     <span>Programar mantenimiento</span>

@@ -6655,3 +6655,130 @@ table.dataTable tbody td.biomedicos-listado__vacio {
       max-width: 42rem;
    }
 }
+/* Equipos - demo de mantenimiento */
+.biomedicos-mantenimiento__selector {
+   align-items: end;
+   background-color: var(--blanco);
+   border: .1rem solid var(--colorLinea);
+   border-radius: 1.2rem;
+   display: grid;
+   gap: 1.5rem;
+   grid-template-columns: minmax(0, 1fr) minmax(28rem, .8fr);
+   margin-bottom: 1.8rem;
+   padding: 1.8rem;
+}
+
+.biomedicos-mantenimiento__selector h3,
+.biomedicos-mantenimiento__selector p {
+   margin: 0;
+}
+
+.biomedicos-mantenimiento__selector > div {
+   display: grid;
+   gap: .5rem;
+}
+
+.biomedicos-mantenimiento__busqueda {
+   display: grid;
+   gap: .7rem;
+}
+
+.biomedicos-mantenimiento__busqueda label {
+   color: var(--negro);
+   font-size: 1.4rem;
+   font-weight: 700;
+}
+
+.biomedicos-mantenimiento__resultados {
+   margin-top: 1.5rem;
+}
+
+.biomedicos-mantenimiento__seleccionar {
+   min-height: 3.4rem;
+   padding-inline: 1rem;
+   width: max-content;
+}
+
+.biomedicos-mantenimiento__equipo-resumen {
+   display: grid;
+   gap: 1rem;
+   grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.biomedicos-mantenimiento__equipo-resumen div {
+   background-color: var(--colorMenuHover);
+   border-radius: .8rem;
+   display: grid;
+   gap: .4rem;
+   padding: 1rem;
+}
+
+.biomedicos-mantenimiento__equipo-resumen span {
+   color: var(--colorTextoSecundario);
+   font-size: 1.2rem;
+   font-weight: 700;
+}
+
+.biomedicos-mantenimiento__equipo-resumen strong {
+   color: var(--negro);
+   font-size: 1.4rem;
+   min-width: 0;
+   overflow: hidden;
+   text-overflow: ellipsis;
+   white-space: nowrap;
+}
+
+.biomedicos-mantenimiento__repuestos {
+   grid-column: 1 / -1;
+}
+
+.biomedicos-mantenimiento__repuestos-lista {
+   display: grid;
+   gap: 1rem;
+}
+
+.biomedicos-mantenimiento__repuesto {
+   align-items: end;
+   border-bottom: .1rem solid var(--colorLinea);
+   display: grid;
+   gap: 1rem;
+   grid-template-columns: minmax(18rem, 1fr) 10rem minmax(18rem, 1fr) auto;
+   padding-bottom: 1rem;
+}
+
+.biomedicos-mantenimiento__eliminar {
+   align-items: center;
+   color: var(--negro);
+   display: flex;
+   font-size: 1.3rem;
+   font-weight: 700;
+   gap: .5rem;
+   min-height: 3.8rem;
+}
+
+.biomedicos-mantenimiento__nota {
+   color: var(--colorTextoSecundario);
+   font-size: 1.3rem;
+   margin: 1rem 0 0;
+}
+
+@media (max-width: 900px) {
+   .biomedicos-mantenimiento__selector,
+   .biomedicos-mantenimiento__equipo-resumen {
+      grid-template-columns: 1fr;
+   }
+
+   .biomedicos-mantenimiento__repuesto {
+      grid-template-columns: 1fr 10rem;
+   }
+
+   .biomedicos-mantenimiento__repuesto .biomedicos-registro__campo:nth-child(4) {
+      grid-column: 1 / -1;
+   }
+}
+
+@media (max-width: 600px) {
+   .biomedicos-mantenimiento__repuesto {
+      grid-template-columns: 1fr;
+   }
+}
