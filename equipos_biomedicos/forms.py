@@ -1,7 +1,6 @@
 from datetime import date
 
 from django import forms
-from django.forms import inlineformset_factory
 from django.db.models import Q
 
 from core.constants.choices_constants import EstadoRegistro, TipoUnidad
@@ -12,17 +11,12 @@ from .models import (
     AreaGestora,
     BajaDispositivo,
     ColorDispositivo,
-    EstadoMantenimiento,
     CriticidadDispositivo,
     Dispositivo,
     EstadoDispositivo,
-    MantenimientoEquipo,
     MarcaDispositivo,
     ModeloDispositivo,
-    Repuesto,
-    RepuestoMantenimiento,
     TipoDispositivo,
-    TipoMantenimiento,
     TipoTecnologiaDispositivo,
     normalizar_inventario_bienes_nacionales,
     normalizar_inventario_numero_ficha,
@@ -430,159 +424,3 @@ class DispositivoCreateForm(forms.ModelForm):
             cleaned_data["area_clinica"] = None
 
         return cleaned_data
-
-
-class MantenimientoEquipoForm(forms.ModelForm):
-    tecnico_responsable = EmpleadoChoiceField(
-        queryset=Empleado.objects.none(),
-        label="Tecnico responsable",
-        widget=forms.Select(
-            attrs={
-                "class": "formularioCampo-select js-empleado-select",
-                "id": "tecnico_responsable_mantenimiento",
-                "data-placeholder": "Buscar por ID, DNI o nombre",
-            }
-        ),
-    )
-
-    class Meta:
-        model = MantenimientoEquipo
-        fields = [
-            "tipo_mantenimiento",
-            "estado",
-            "tecnico_responsable",
-            "fecha_solicitud",
-            "fecha_ingreso",
-            "fecha_inicio",
-            "fecha_salida",
-            "fecha_cierre",
-            "duracion_estimada_horas",
-            "duracion_real_horas",
-            "descripcion_solicitud",
-            "trabajo_realizado",
-            "estado_final_equipo",
-            "observaciones",
-        ]
-        widgets = {
-            "tipo_mantenimiento": forms.Select(attrs={"class": "formularioCampo-select"}),
-            "estado": forms.Select(attrs={"class": "formularioCampo-select", "id": "estado_mantenimiento"}),
-            "fecha_solicitud": forms.DateInput(attrs={"class": "formularioCampo-text", "type": "date"}, format="%Y-%m-%d"),
-            "fecha_ingreso": forms.DateInput(attrs={"class": "formularioCampo-text", "type": "date"}, format="%Y-%m-%d"),
-            "fecha_inicio": forms.DateInput(attrs={"class": "formularioCampo-text", "type": "date"}, format="%Y-%m-%d"),
-            "fecha_salida": forms.DateInput(attrs={"class": "formularioCampo-text", "type": "date"}, format="%Y-%m-%d"),
-            "fecha_cierre": forms.DateInput(attrs={"class": "formularioCampo-text", "type": "date"}, format="%Y-%m-%d"),
-            "duracion_estimada_horas": forms.NumberInput(attrs={"class": "formularioCampo-text", "min": "0", "step": "0.25", "placeholder": "Ej. 2.5"}),
-            "duracion_real_horas": forms.NumberInput(attrs={"class": "formularioCampo-text", "min": "0", "step": "0.25", "placeholder": "Ej. 3"}),
-            "descripcion_solicitud": forms.Textarea(attrs={"class": "formularioCampo-text no-resize", "rows": 4, "placeholder": "Describe el mantenimiento solicitado o realizado"}),
-            "trabajo_realizado": forms.Textarea(attrs={"class": "formularioCampo-text no-resize", "rows": 4, "placeholder": "Trabajo realizado por el tecnico"}),
-            "estado_final_equipo": forms.Select(attrs={"class": "formularioCampo-select", "id": "estado_final_equipo"}),
-            "observaciones": forms.Textarea(attrs={"class": "formularioCampo-text no-resize", "rows": 3, "placeholder": "Observaciones adicionales"}),
-        }
-        labels = {
-            "tipo_mantenimiento": "Tipo de mantenimiento",
-            "estado": "Estado del mantenimiento",
-            "fecha_solicitud": "Fecha de solicitud",
-            "fecha_ingreso": "Fecha de ingreso",
-            "fecha_inicio": "Fecha de inicio",
-            "fecha_salida": "Fecha de salida",
-            "fecha_cierre": "Fecha de cierre",
-            "duracion_estimada_horas": "Duracion estimada (horas)",
-            "duracion_real_horas": "Duracion real (horas)",
-            "descripcion_solicitud": "Mantenimiento realizado o solicitado",
-            "trabajo_realizado": "Detalle del trabajo realizado",
-            "estado_final_equipo": "Estado final del equipo",
-            "observaciones": "Observaciones",
-        }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields["tipo_mantenimiento"].choices = [
-            ("", "Seleccione el tipo"),
-            *TipoMantenimiento.choices,
-        ]
-        self.fields["estado"].choices = [
-            ("", "Seleccione el estado"),
-            *EstadoMantenimiento.choices,
-        ]
-        self.fields["estado_final_equipo"].choices = [
-            ("", "Seleccione el estado final"),
-            *MantenimientoEquipo.ESTADOS_FINALES_EQUIPO,
-        ]
-        self.fields["fecha_solicitud"].input_formats = ["%Y-%m-%d"]
-        self.fields["fecha_ingreso"].input_formats = ["%Y-%m-%d"]
-        self.fields["fecha_inicio"].input_formats = ["%Y-%m-%d"]
-        self.fields["fecha_salida"].input_formats = ["%Y-%m-%d"]
-        self.fields["fecha_cierre"].input_formats = ["%Y-%m-%d"]
-
-        empleado_qs = Empleado.objects.filter(estado=EstadoRegistro.ACTIVO)
-        selected_id = (
-            self.data.get(self.add_prefix("tecnico_responsable"))
-            if self.is_bound
-            else self.initial.get("tecnico_responsable")
-        )
-        if selected_id and str(selected_id).isdigit():
-            filtro_tecnico = Q(pk=selected_id)
-            if self.is_bound:
-                filtro_tecnico &= Q(estado=EstadoRegistro.ACTIVO)
-            self.fields["tecnico_responsable"].queryset = Empleado.objects.filter(
-                filtro_tecnico
-            )
-        else:
-            self.fields["tecnico_responsable"].queryset = empleado_qs.none()
-
-    def clean(self):
-        cleaned_data = super().clean()
-        estado = cleaned_data.get("estado")
-        if estado != EstadoMantenimiento.COMPLETADO:
-            cleaned_data["estado_final_equipo"] = None
-        elif not cleaned_data.get("estado_final_equipo"):
-            self.add_error("estado_final_equipo", "Indica como queda el equipo al completar el mantenimiento.")
-        return cleaned_data
-
-
-class RepuestoMantenimientoForm(forms.ModelForm):
-    class Meta:
-        model = RepuestoMantenimiento
-        fields = ["repuesto", "cantidad", "observaciones"]
-        widgets = {
-            "repuesto": forms.Select(attrs={"class": "formularioCampo-select"}),
-            "cantidad": forms.NumberInput(attrs={"class": "formularioCampo-text", "min": "1"}),
-            "observaciones": forms.TextInput(attrs={"class": "formularioCampo-text", "placeholder": "Observacion opcional"}),
-        }
-        labels = {
-            "repuesto": "Repuesto",
-            "cantidad": "Cantidad",
-            "observaciones": "Observacion",
-        }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields["repuesto"].queryset = Repuesto.objects.filter(activo=True).order_by("nombre")
-        self.fields["repuesto"].empty_label = "Seleccione un repuesto"
-        self.fields["repuesto"].required = False
-        self.fields["cantidad"].required = False
-        self.fields["cantidad"].initial = None
-
-    def clean(self):
-        cleaned_data = super().clean()
-        repuesto = cleaned_data.get("repuesto")
-        cantidad = cleaned_data.get("cantidad")
-
-        if not repuesto:
-            cleaned_data["cantidad"] = None
-            cleaned_data["observaciones"] = ""
-            return cleaned_data
-
-        if not cantidad:
-            cleaned_data["cantidad"] = 1
-
-        return cleaned_data
-
-
-RepuestoMantenimientoFormSet = inlineformset_factory(
-    MantenimientoEquipo,
-    RepuestoMantenimiento,
-    form=RepuestoMantenimientoForm,
-    extra=5,
-    can_delete=True,
-)

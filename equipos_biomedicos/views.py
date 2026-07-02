@@ -18,19 +18,13 @@ from django.utils import timezone
 from core.constants.choices_constants import EstadoRegistro
 from rrhh.models import Empleado
 
-from .forms import (
-    BajaDispositivoForm,
-    DispositivoCreateForm,
-    MantenimientoEquipoForm,
-    RepuestoMantenimientoFormSet,
-)
+from .forms import BajaDispositivoForm, DispositivoCreateForm
 from .models import (
     AreaGestora,
     AsignacionDispositivo,
     BajaDispositivo,
     CriticidadDispositivo,
     Dispositivo,
-    EstadoMantenimiento,
     EstadoDispositivo,
     MarcaDispositivo,
     ModeloDispositivo,
@@ -335,38 +329,6 @@ def _preparar_dispositivos_para_tabla(dispositivos):
         )
 
 
-
-
-def _obtener_mantenimientos_recientes(dispositivo, limite=5):
-    return dispositivo.mantenimientos.select_related(
-        "tecnico_responsable",
-    ).prefetch_related(
-        "repuestos_usados__repuesto",
-    ).order_by(
-        "-fecha_solicitud",
-        "-fecha_creado",
-    )[:limite]
-
-
-def _sincronizar_estado_por_mantenimiento(dispositivo, mantenimiento, usuario):
-    if dispositivo.estado == EstadoDispositivo.DADO_DE_BAJA:
-        return
-
-    nuevo_estado = None
-    if mantenimiento.estado == EstadoMantenimiento.EN_PROCESO:
-        nuevo_estado = EstadoDispositivo.EN_MANTENIMIENTO
-    elif mantenimiento.estado == EstadoMantenimiento.COMPLETADO:
-        nuevo_estado = mantenimiento.estado_final_equipo
-
-    if nuevo_estado and dispositivo.estado != nuevo_estado:
-        Dispositivo.objects.filter(pk=dispositivo.pk).update(
-            estado=nuevo_estado,
-            modificado_por=usuario,
-            fecha_modificado=timezone.now(),
-        )
-        dispositivo.estado = nuevo_estado
-
-
 def _obtener_estado_garantia(dispositivo):
     # Calcula etiqueta visual de garantia sin guardarla en base de datos.
     if not dispositivo.fin_garantia:
@@ -506,27 +468,6 @@ def detalle_dispositivo(request, dispositivo_id):
     )
     asignacion_actual = _obtener_asignacion_actual(dispositivo)
     baja_dispositivo = _obtener_baja_dispositivo(dispositivo)
-    mantenimientos_recientes = _obtener_mantenimientos_recientes(dispositivo)
-    ultimo_mantenimiento = dispositivo.mantenimientos.filter(
-        estado=EstadoMantenimiento.COMPLETADO,
-    ).select_related(
-        "tecnico_responsable",
-    ).order_by(
-        "-fecha_cierre",
-        "-fecha_salida",
-        "-fecha_solicitud",
-        "-fecha_creado",
-    ).first()
-    mantenimiento_activo = dispositivo.mantenimientos.filter(
-        estado=EstadoMantenimiento.EN_PROCESO,
-    ).select_related(
-        "tecnico_responsable",
-    ).order_by(
-        "-fecha_inicio",
-        "-fecha_ingreso",
-        "-fecha_solicitud",
-        "-fecha_creado",
-    ).first()
 
     return render(
         request,
@@ -535,9 +476,6 @@ def detalle_dispositivo(request, dispositivo_id):
             "dispositivo": dispositivo,
             "asignacion_actual": asignacion_actual,
             "baja_dispositivo": baja_dispositivo,
-            "mantenimientos_recientes": mantenimientos_recientes,
-            "ultimo_mantenimiento": ultimo_mantenimiento,
-            "mantenimiento_activo": mantenimiento_activo,
         }
     )
 
@@ -669,99 +607,6 @@ def dar_baja_dispositivo(request, dispositivo_id):
                 "detalle_dispositivo_biomedicos",
                 kwargs={"dispositivo_id": dispositivo.id},
             ),
-        },
-    )
-
-
-
-@registrar_errores_vista("Error al registrar mantenimiento de equipo")
-def registrar_mantenimiento(request):
-    consulta = request.GET.get("q", "").strip()
-    dispositivo_id = _parametro_entero(
-        request.POST.get("dispositivo_id") or request.GET.get("dispositivo", "")
-    )
-    dispositivo = None
-    dispositivos_resultado = []
-
-    if dispositivo_id:
-        dispositivo = get_object_or_404(
-            Dispositivo.objects.select_related(
-                "tipo",
-                "marca",
-                "modelo",
-                "area_gestora",
-                "color",
-            ),
-            pk=dispositivo_id,
-        )
-        if dispositivo.estado == EstadoDispositivo.DADO_DE_BAJA:
-            messages.warning(
-                request,
-                "No se puede registrar mantenimiento a un equipo dado de baja.",
-            )
-            return redirect(
-                "detalle_dispositivo_biomedicos",
-                dispositivo_id=dispositivo.id,
-            )
-    elif consulta:
-        dispositivos = _aplicar_busqueda_dispositivos(
-            _obtener_dispositivos_base().exclude(
-                estado=EstadoDispositivo.DADO_DE_BAJA,
-            ),
-            consulta,
-        )
-        dispositivos_resultado = list(_ordenar_dispositivos(dispositivos)[:10])
-        _preparar_dispositivos_para_tabla(dispositivos_resultado)
-
-    form = MantenimientoEquipoForm(
-        request.POST or None,
-        initial={
-            "fecha_solicitud": timezone.localdate(),
-            "estado": EstadoMantenimiento.EN_PROCESO,
-        },
-    )
-    formset = RepuestoMantenimientoFormSet(
-        request.POST or None,
-        prefix="repuestos",
-    )
-
-    if request.method == "POST":
-        if not dispositivo:
-            messages.error(request, "Selecciona un equipo antes de registrar mantenimiento.")
-        elif form.is_valid() and formset.is_valid():
-            with transaction.atomic():
-                mantenimiento = form.save(commit=False)
-                mantenimiento.dispositivo = dispositivo
-                mantenimiento.creado_por = request.user
-                mantenimiento.save()
-
-                formset.instance = mantenimiento
-                formset.save()
-
-                _sincronizar_estado_por_mantenimiento(
-                    dispositivo,
-                    mantenimiento,
-                    request.user,
-                )
-
-            messages.success(
-                request,
-                f"Mantenimiento registrado para {dispositivo.codigo}.",
-            )
-            return redirect(
-                "detalle_dispositivo_biomedicos",
-                dispositivo_id=dispositivo.id,
-            )
-
-    return render(
-        request,
-        "equipos_biomedicos/registrar_mantenimiento_biomedicos.html",
-        {
-            "consulta": consulta,
-            "dispositivo": dispositivo,
-            "dispositivos_resultado": dispositivos_resultado,
-            "form": form,
-            "formset": formset,
         },
     )
 

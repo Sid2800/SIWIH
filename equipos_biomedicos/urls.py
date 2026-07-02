@@ -36,11 +36,6 @@ urlpatterns = [
         name='qr_dispositivo_biomedicos'
     ),
     path(
-        'mantenimientos/registrar/',
-        views.registrar_mantenimiento,
-        name='registrar_mantenimiento_biomedicos'
-    ),
-    path(
         'buscar-dispositivo/',
         views.buscar_dispositivo,
         name='buscar_dispositivo_biomedicos'

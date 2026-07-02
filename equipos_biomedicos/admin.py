@@ -8,10 +8,7 @@ from .models import (
     Dispositivo,
     MarcaDispositivo,
     ModeloDispositivo,
-    MantenimientoEquipo,
     TipoDispositivo,
-    Repuesto,
-    RepuestoMantenimiento,
 )
 
 
@@ -109,44 +106,6 @@ class DispositivoAdmin(admin.ModelAdmin):
         super().save_model(request, obj, form, change)
 
 
-
-@admin.register(Repuesto)
-class RepuestoAdmin(admin.ModelAdmin):
-    list_display = ("nombre", "activo")
-    list_filter = ("activo",)
-    search_fields = ("nombre", "descripcion")
-    ordering = ("nombre",)
-
-
-class RepuestoMantenimientoInline(admin.TabularInline):
-    model = RepuestoMantenimiento
-    extra = 1
-    autocomplete_fields = ("repuesto",)
-
-
-@admin.register(MantenimientoEquipo)
-class MantenimientoEquipoAdmin(admin.ModelAdmin):
-    list_display = (
-        "dispositivo",
-        "tipo_mantenimiento",
-        "estado",
-        "tecnico_responsable",
-        "fecha_solicitud",
-        "fecha_ingreso",
-        "fecha_salida",
-        "creado_por",
-    )
-    list_filter = ("tipo_mantenimiento", "estado", "fecha_solicitud")
-    search_fields = (
-        "dispositivo__codigo",
-        "dispositivo__numero_serie",
-        "tecnico_responsable__nombre",
-        "tecnico_responsable__apellido",
-        "tecnico_responsable__dni",
-    )
-    autocomplete_fields = ("dispositivo", "tecnico_responsable", "creado_por")
-    readonly_fields = ("fecha_creado",)
-    inlines = (RepuestoMantenimientoInline,)
 @admin.register(BajaDispositivo)
 class BajaDispositivoAdmin(admin.ModelAdmin):
     # Consulta administrativa de equipos dados de baja.
