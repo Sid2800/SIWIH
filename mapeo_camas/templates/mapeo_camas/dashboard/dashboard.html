@@ -8,7 +8,7 @@
   <!-- 2026-06-09: estáticos de mapeo centralizados en core/static/core/css -->
   <link rel="stylesheet" href="{% static 'core/css/mapeo/dashboard/dashboard.css' %}">
   <!-- 2026-06-16: capa local de accesibilidad visual para tipografía ampliada. -->
-  <link rel="stylesheet" href="{% static 'mapeo_camas/dashboard/dashboard-accessibilidad.css' %}">
+  <link rel="stylesheet" href="{% static 'core/css/mapeo/dashboard/dashboard-accessibilidad.css' %}">
 {% endblock extra_css %}
 
 {% block content %}
@@ -64,12 +64,12 @@
   <script src="{% static 'core/vendor/apexcharts/apexcharts.min.js' %}"></script>
 
   <script src="{% static 'core/scripts/mapeo/dashboard/api.js' %}"></script>
-  <script src="{% static 'mapeo_camas/dashboard/filters.js' %}?v=20260626a"></script>
-  <script src="{% static 'mapeo_camas/dashboard/kpis.js' %}"></script>
-  <script src="{% static 'mapeo_camas/dashboard/estados-resumen.js' %}"></script>
+  <script src="{% static 'core/scripts/mapeo/dashboard/filters.js' %}?v=20260626a"></script>
+  <script src="{% static 'core/scripts/mapeo/dashboard/kpis.js' %}"></script>
+  <script src="{% static 'core/scripts/mapeo/dashboard/charts/estados-resumen.js' %}"></script>
   <script src="{% static 'core/scripts/mapeo/dashboard/charts/ocupacion-hora.js' %}"></script>
-  <script src="{% static 'mapeo_camas/dashboard/tabla-ingresos.js' %}"></script>
+  <script src="{% static 'core/scripts/mapeo/dashboard/tabla-ingresos.js' %}"></script>
   <script src="{% static 'core/scripts/mapeo/dashboard/tabla-movimientos.js' %}"></script>
-  <script src="{% static 'mapeo_camas/dashboard/tabla-movimientos-local.js' %}"></script>
-  <script src="{% static 'mapeo_camas/dashboard/dashboard.js' %}"></script>
+  <script src="{% static 'core/scripts/mapeo/dashboard/tabla-movimientos-local.js' %}"></script>
+  <script src="{% static 'core/scripts/mapeo/dashboard/dashboard.js' %}"></script>
 {% endblock extra_js %}
