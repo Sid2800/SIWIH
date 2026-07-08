@@ -1,131 +1,89 @@
 /* =========================================================================
-   Dashboard Mapeo de Camas — filtro temporal
-   Fecha: 2026-05-28
-   Expone window.DashboardFilters con:
-     - init({ onChange })   Inicializa UI, dispara onChange al aplicar
-     - getParams()          Devuelve {desde, hasta} en formato ISO local
-     - getResumen()         Texto humano del rango activo
+   Dashboard Mapeo de Camas — filtro mensual fase 1
+   Fecha: 2026-06-16
    ========================================================================= */
 (function (global) {
   "use strict";
 
-  const STORAGE_KEY = "mapeoCamas.dashboard.filtro";
+  const STORAGE_KEY = "mapeoCamas.dashboard.filtro.mensual";
 
-  // --- Helpers de fecha (todo en hora local) ---------------------------------
-  function startOfDay(d) {
-    const x = new Date(d);
-    x.setHours(0, 0, 0, 0);
-    return x;
+  function pad(n) {
+    return String(n).padStart(2, "0");
   }
-  function endOfDay(d) {
-    const x = new Date(d);
-    x.setHours(23, 59, 59, 999);
-    return x;
+
+  function monthVal(d) {
+    return d.getFullYear() + "-" + pad(d.getMonth() + 1);
   }
-  function addDays(d, n) {
-    const x = new Date(d);
-    x.setDate(x.getDate() + n);
-    return x;
+
+  function parseMonth(v) {
+    if (!v) return null;
+    const parts = String(v).split("-");
+    if (parts.length !== 2) return null;
+    const y = Number(parts[0]);
+    const m = Number(parts[1]);
+    if (!Number.isInteger(y) || !Number.isInteger(m) || m < 1 || m > 12) return null;
+    return new Date(y, m - 1, 1);
   }
-  function startOfWeek(d) {
-    // Lunes como inicio (ISO).
-    const x = startOfDay(d);
-    const day = (x.getDay() + 6) % 7; // 0 = lunes
-    x.setDate(x.getDate() - day);
-    return x;
+
+  function monthStart(d) {
+    return new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0);
   }
-  function startOfMonth(d) {
-    const x = new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0);
-    return x;
+
+  function monthEnd(d) {
+    return new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59);
   }
-  function endOfMonth(d) {
-    const x = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
-    return x;
+
+  function resolveHasta(mesHasta) {
+    const finMes = monthEnd(mesHasta);
+    const now = new Date();
+    // [2026-06-26] Si el mes final es el mes actual, cortar al momento actual
+    // para evitar inflar horas/dias con proyeccion de dias futuros.
+    if (
+      mesHasta.getFullYear() === now.getFullYear() &&
+      mesHasta.getMonth() === now.getMonth()
+    ) {
+      return now;
+    }
+    return finMes;
   }
-  function pad(n) { return String(n).padStart(2, "0"); }
+
   function toLocalISO(d) {
     return (
       d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) +
       "T" + pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds())
     );
   }
-  function toInputValue(d) {
-    return (
-      d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) +
-      "T" + pad(d.getHours()) + ":" + pad(d.getMinutes())
-    );
-  }
-  function fromInputValue(v) {
-    if (!v) return null;
-    const d = new Date(v);
-    return isNaN(d.getTime()) ? null : d;
-  }
 
-  // --- Presets ---------------------------------------------------------------
-  function rangoPreset(preset) {
+  let state = {
+    mesDesde: null,
+    mesHasta: null,
+  };
+
+  let onChangeCb = null;
+  let inpMesDesde = null;
+  let inpMesHasta = null;
+  let resumenEl = null;
+
+  function ensureDefaults() {
     const now = new Date();
-    switch (preset) {
-      case "hoy":              return [startOfDay(now), now];
-      case "ayer": {
-        const a = addDays(startOfDay(now), -1);
-        return [a, endOfDay(a)];
-      }
-      case "ultimas-24h":      return [addDays(now, -1), now];
-      case "esta-semana":      return [startOfWeek(now), now];
-      case "semana-pasada": {
-        const inicio = addDays(startOfWeek(now), -7);
-        const fin = endOfDay(addDays(inicio, 6));
-        return [inicio, fin];
-      }
-      case "este-mes":         return [startOfMonth(now), now];
-      case "mes-pasado": {
-        const inicio = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        return [inicio, endOfMonth(inicio)];
-      }
-      case "ultimos-7":        return [startOfDay(addDays(now, -6)), now];
-      case "ultimos-30":       return [startOfDay(addDays(now, -29)), now];
-      default:                 return [startOfDay(now), now]; // fallback
+    if (!state.mesDesde) state.mesDesde = monthStart(now);
+    if (!state.mesHasta) state.mesHasta = monthStart(now);
+    if (state.mesHasta < state.mesDesde) {
+      const t = state.mesDesde;
+      state.mesDesde = state.mesHasta;
+      state.mesHasta = t;
     }
   }
-
-  function labelPreset(preset) {
-    const labels = {
-      "hoy": "Hoy",
-      "ayer": "Ayer",
-      "ultimas-24h": "Últimas 24h",
-      "esta-semana": "Esta semana",
-      "semana-pasada": "Semana pasada",
-      "este-mes": "Este mes",
-      "mes-pasado": "Mes pasado",
-      "ultimos-7": "Últimos 7 días",
-      "ultimos-30": "Últimos 30 días",
-      "personalizado": "Personalizado",
-    };
-    return labels[preset] || preset;
-  }
-
-  function fmtHuman(d) {
-    return d.toLocaleString([], {
-      year: "numeric", month: "2-digit", day: "2-digit",
-      hour: "2-digit", minute: "2-digit",
-    });
-  }
-
-  // --- Estado y persistencia -------------------------------------------------
-  let state = {
-    preset: "hoy",
-    desde: null,
-    hasta: null,
-  };
 
   function persist() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        preset: state.preset,
-        desde: state.desde ? toLocalISO(state.desde) : null,
-        hasta: state.hasta ? toLocalISO(state.hasta) : null,
+        mesDesde: state.mesDesde ? monthVal(state.mesDesde) : null,
+        mesHasta: state.mesHasta ? monthVal(state.mesHasta) : null,
       }));
-    } catch (e) { /* ignore */ }
+    } catch (e) {
+      // ignore
+    }
   }
 
   function loadPersisted() {
@@ -133,62 +91,31 @@
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return false;
       const parsed = JSON.parse(raw);
-      if (!parsed || !parsed.preset) return false;
-      state.preset = parsed.preset;
-      if (parsed.preset === "personalizado" && parsed.desde && parsed.hasta) {
-        state.desde = new Date(parsed.desde);
-        state.hasta = new Date(parsed.hasta);
-      } else {
-        const [d, h] = rangoPreset(parsed.preset);
-        state.desde = d; state.hasta = h;
-      }
+      if (!parsed) return false;
+      state.mesDesde = parseMonth(parsed.mesDesde);
+      state.mesHasta = parseMonth(parsed.mesHasta);
       return true;
-    } catch (e) { return false; }
+    } catch (e) {
+      return false;
+    }
   }
-
-  // --- DOM -------------------------------------------------------------------
-  let onChangeCb = null;
-  let chips = [];
-  let rangoWrap = null;
-  let inpDesde = null;
-  let inpHasta = null;
-  let btnAplicar = null;
-  let resumenEl = null;
 
   function refreshUI() {
-    chips.forEach((c) => {
-      c.classList.toggle("is-active", c.dataset.preset === state.preset);
-    });
-    if (rangoWrap) rangoWrap.hidden = state.preset !== "personalizado";
-    if (state.preset === "personalizado") {
-      if (inpDesde && state.desde) inpDesde.value = toInputValue(state.desde);
-      if (inpHasta && state.hasta) inpHasta.value = toInputValue(state.hasta);
-    }
+    ensureDefaults();
+    if (inpMesDesde) inpMesDesde.value = monthVal(state.mesDesde);
+    if (inpMesHasta) inpMesHasta.value = monthVal(state.mesHasta);
     if (resumenEl) {
-      const titulo = labelPreset(state.preset);
       resumenEl.textContent =
-        titulo + " · " + fmtHuman(state.desde) + " → " + fmtHuman(state.hasta);
+        "Meses: " + monthVal(state.mesDesde) + " -> " + monthVal(state.mesHasta);
     }
   }
 
-  function applyPreset(preset) {
-    state.preset = preset;
-    if (preset !== "personalizado") {
-      const [d, h] = rangoPreset(preset);
-      state.desde = d; state.hasta = h;
-    }
-    persist();
-    refreshUI();
-    if (preset !== "personalizado" && onChangeCb) onChangeCb();
-  }
-
-  function applyCustom() {
-    const d = fromInputValue(inpDesde && inpDesde.value);
-    const h = fromInputValue(inpHasta && inpHasta.value);
-    if (!d || !h) return;
-    state.preset = "personalizado";
-    state.desde = d <= h ? d : h;
-    state.hasta = d <= h ? h : d;
+  function applyFromUI() {
+    const m1 = parseMonth(inpMesDesde && inpMesDesde.value);
+    const m2 = parseMonth(inpMesHasta && inpMesHasta.value);
+    if (!m1 || !m2) return;
+    state.mesDesde = m1 <= m2 ? m1 : m2;
+    state.mesHasta = m1 <= m2 ? m2 : m1;
     persist();
     refreshUI();
     if (onChangeCb) onChangeCb();
@@ -196,42 +123,37 @@
 
   function init(opts) {
     onChangeCb = (opts && opts.onChange) || null;
+
     const root = document.querySelector(".dash-filtros");
     if (!root) {
-      // Sin UI: usar default hoy.
-      if (!loadPersisted()) applyPreset("hoy");
+      if (!loadPersisted()) ensureDefaults();
       return;
     }
-    chips = Array.from(root.querySelectorAll(".dash-chip"));
-    rangoWrap = document.getElementById("dash-filtros-rango");
-    inpDesde = document.getElementById("dash-filtro-desde");
-    inpHasta = document.getElementById("dash-filtro-hasta");
-    btnAplicar = document.getElementById("dash-filtro-aplicar");
+
+    inpMesDesde = document.getElementById("dash-filtro-mes-desde");
+    inpMesHasta = document.getElementById("dash-filtro-mes-hasta");
     resumenEl = document.getElementById("dash-filtros-resumen");
 
-    if (!loadPersisted()) {
-      const [d, h] = rangoPreset("hoy");
-      state.desde = d; state.hasta = h;
-    }
+    if (!loadPersisted()) ensureDefaults();
     refreshUI();
 
-    chips.forEach((c) => {
-      c.addEventListener("click", () => applyPreset(c.dataset.preset));
+    [inpMesDesde, inpMesHasta].forEach(function (el) {
+      if (el) el.addEventListener("change", applyFromUI);
     });
-    if (btnAplicar) btnAplicar.addEventListener("click", applyCustom);
   }
 
   function getParams() {
+    ensureDefaults();
     return {
-      desde: state.desde ? toLocalISO(state.desde) : null,
-      hasta: state.hasta ? toLocalISO(state.hasta) : null,
+      desde: toLocalISO(monthStart(state.mesDesde)),
+      hasta: toLocalISO(resolveHasta(state.mesHasta)),
+      agrupacion: "mensual",
     };
   }
 
   function getResumen() {
-    if (!state.desde || !state.hasta) return "";
-    return labelPreset(state.preset) + " · " +
-      fmtHuman(state.desde) + " → " + fmtHuman(state.hasta);
+    ensureDefaults();
+    return "Meses: " + monthVal(state.mesDesde) + " -> " + monthVal(state.mesHasta);
   }
 
   global.DashboardFilters = { init, getParams, getResumen };
