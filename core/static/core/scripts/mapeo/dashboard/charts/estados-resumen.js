@@ -1,127 +1,137 @@
 /* =========================================================================
-   Chart: Resumen de estados de camas (radialBar)
-   Fecha: 2026-05-28
-   Reutiliza datos del endpoint /kpis/ (sin llamadas extra).
-   Customizing DataLabels: nombre + valor en el centro, leyenda con colores
-   alineados a la paleta del sistema (mapa-cama--*).
+   Chart: Resumen de estados completo (todos los estados)
+   Fecha: 2026-06-15
    ========================================================================= */
 (function (global) {
   "use strict";
 
-  // Paleta de estados (alineada con /memories/repo/colores-estado-cama.md)
-  const SERIES = [
-    { key: "ocupadas",       label: "Ocupadas",        color: "#ef4444" },
-    { key: "disponibles",    label: "Disponibles",     color: "#22c55e" },
-    { key: "fuera_servicio", label: "Fuera servicio",  color: "#475569" },
+  let chart = null;
+
+  // 2026-06-15: orden fijo para visualizar siempre todo el catalogo de estados.
+  // [2026-07-02] CAMBIO: Excluidos ALTA, LIBRE y MANTENIMIENTO del gráfico de resumen
+  const ORDERED_CODES = [
+    "OCUPADA",
+    "PRE_ALTA",
+    "VACIA",
+    "FUERA_SERVICIO",
+    "CONSULTA_EXTERNA",
   ];
 
-  let chart = null;
-  let totalCamas = 0;
+  // [2026-07-02] Estados a excluir del gráfico de resumen
+  const EXCLUDED_CODES = ["ALTA", "LIBRE", "MANTENIMIENTO"];
 
-  function ensureApex() {
-    return typeof ApexCharts !== "undefined";
+  const CODE_ALIASES = {
+    PREALTA: "PRE_ALTA",
+    "PRE-ALTA": "PRE_ALTA",
+    "PRE ALTA": "PRE_ALTA",
+    FUERA_DE_SERVICIO: "FUERA_SERVICIO",
+    "FUERA-SERVICIO": "FUERA_SERVICIO",
+    "FUERA SERVICIO": "FUERA_SERVICIO",
+    CONSULTAEXTERNA: "CONSULTA_EXTERNA",
+    "CONSULTA-EXTERNA": "CONSULTA_EXTERNA",
+    "CONSULTA EXTERNA": "CONSULTA_EXTERNA",
+  };
+
+  const LABELS = {
+    OCUPADA: "Ocupada",
+    VACIA: "Vacia",
+    LIBRE: "Libre",
+    ALTA: "Alta",
+    PRE_ALTA: "Pre alta",
+    FUERA_SERVICIO: "Fuera servicio",
+    MANTENIMIENTO: "Mantenimiento",
+    CONSULTA_EXTERNA: "Consulta externa",
+  };
+
+  const COLORS = {
+    OCUPADA: "#ef4444",
+    VACIA: "#22c55e",
+    LIBRE: "#16a34a",
+    ALTA: "#facc15",
+    PRE_ALTA: "#eab308",
+    FUERA_SERVICIO: "#475569",
+    MANTENIMIENTO: "#64748b",
+    CONSULTA_EXTERNA: "#3b82f6",
+  };
+
+  function labelFor(code) {
+    return LABELS[code] || String(code || "SIN_ESTADO");
+  }
+
+  function colorFor(code) {
+    return COLORS[code] || "#94a3b8";
+  }
+
+  function normalizeCode(code) {
+    const raw = String(code || "").trim().toUpperCase();
+    if (!raw) return "SIN_ESTADO";
+    if (CODE_ALIASES[raw]) return CODE_ALIASES[raw];
+    return raw;
   }
 
   function init(elId) {
-    if (!ensureApex()) return;
+    if (typeof ApexCharts === "undefined") return;
     const el = document.getElementById(elId);
     if (!el) return;
 
     chart = new ApexCharts(el, {
-      chart: {
-        type: "radialBar",
-        height: 260,
-        sparkline: { enabled: false },
-        animations: { enabled: false },
-      },
-      series: SERIES.map(() => 0),
-      labels: SERIES.map((s) => s.label),
-      colors: SERIES.map((s) => s.color),
-      plotOptions: {
-        radialBar: {
-          startAngle: -135,
-          endAngle: 135,
-          hollow: {
-            margin: 5,
-            size: "42%",
-            background: "transparent",
-          },
-          track: {
-            background: "#e2e8f0",
-            strokeWidth: "100%",
-            margin: 4,
-          },
-          // Customizing the DataLabels appearance (estilo doc ApexCharts).
-          dataLabels: {
-            name: {
-              show: true,
-              fontSize: "13px",
-              fontWeight: 600,
-              color: "#0f172a",
-              offsetY: -4,
-            },
-            value: {
-              show: true,
-              fontSize: "16px",
-              fontWeight: 700,
-              color: "#0f172a",
-              formatter: function (val) {
-                // val es el % de la serie activa.
-                return parseFloat(val).toFixed(1) + "%";
-              },
-            },
-            total: {
-              show: true,
-              label: "Ocupación",
-              fontSize: "12px",
-              fontWeight: 600,
-              color: "#475569",
-              formatter: function (w) {
-                // Mostramos el % de la serie "Ocupadas" como referencia central.
-                const idx = 0; // OCUPADAS
-                const v = (w && w.globals && w.globals.series && w.globals.series[idx]) || 0;
-                return parseFloat(v).toFixed(1) + "%";
-              },
-            },
-          },
-        },
-      },
-      stroke: { lineCap: "round" },
-      legend: {
-        show: true,
-        position: "bottom",
-        fontSize: "12px",
-        labels: { colors: "#334155" },
-        markers: { radius: 4 },
-        itemMargin: { horizontal: 6, vertical: 2 },
-        formatter: function (seriesName, opts) {
-          const pct = opts.w.globals.series[opts.seriesIndex];
-          return seriesName + " · " + parseFloat(pct).toFixed(0) + "%";
-        },
-      },
+      chart: { type: "donut", height: 280, animations: { enabled: false } },
+      series: [],
+      labels: [],
+      colors: [],
+      legend: { position: "bottom", fontSize: "12px" },
+      dataLabels: { enabled: true },
+      noData: { text: "Sin datos" },
       tooltip: {
-        enabled: true,
         y: {
-          formatter: function (val, opts) {
-            const count = Math.round((val / 100) * (totalCamas || 1));
-            return parseFloat(val).toFixed(1) + "%  (" + count + " camas)";
-          },
-        },
-      },
+          formatter: function (val) {
+            return String(val) + " camas";
+          }
+        }
+      }
     });
     chart.render();
   }
 
-  // Recibe el payload del endpoint /kpis/
   function update(data) {
     if (!chart || !data) return;
-    totalCamas = data.total_camas || 0;
-    const pct = (n) => totalCamas ? Math.round((n / totalCamas) * 1000) / 10 : 0;
 
-    chart.updateSeries(SERIES.map((s) => pct(data[s.key] || 0)));
+    const estados = data.estados || {};
+    const merged = {};
 
+    Object.keys(estados).forEach(function (key) {
+      const norm = normalizeCode(key);
+      merged[norm] = (merged[norm] || 0) + (Number(estados[key]) || 0);
+    });
+
+    ORDERED_CODES.forEach(function (code) {
+      if (merged[code] === undefined) merged[code] = 0;
+    });
+
+    const orderedKnown = ORDERED_CODES.map(function (code) {
+      return { estado: code, cantidad: merged[code] || 0 };
+    });
+
+    const unknown = Object.keys(merged)
+      .filter(function (code) {
+        return ORDERED_CODES.indexOf(code) === -1;
+      })
+      .sort()
+      .map(function (code) {
+        return { estado: code, cantidad: merged[code] || 0 };
+      });
+
+    const entries = orderedKnown.concat(unknown);
+
+    chart.updateOptions({
+      labels: entries.map(function (i) { return labelFor(i.estado); }),
+      colors: entries.map(function (i) { return colorFor(i.estado); }),
+    });
+    chart.updateSeries(entries.map(function (i) { return i.cantidad; }));
+
+    const total = Number(data.total_camas) || 0;
     const pill = document.getElementById("estados-resumen-total");
-    if (pill) pill.textContent = totalCamas + " camas";
+    if (pill) pill.textContent = total + " camas";
   }
 
   global.DashboardChartEstadosResumen = { init, update };
