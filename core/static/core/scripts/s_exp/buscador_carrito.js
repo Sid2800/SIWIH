@@ -382,6 +382,10 @@ function agregarAlCarrito(item) {
     }
 
     toastr.success(`Expediente agregado: ${item.paciente_dni || ''} - ${item.paciente_nombre || ''}`);
+
+    document.getElementById('busqueda-input').inputmask.setValue('');
+    document.getElementById('busqueda-input').focus();
+
 }
 
 

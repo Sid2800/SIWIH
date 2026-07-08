@@ -41,6 +41,23 @@ def configurar_locale():
         pass
 
 
+def convertir_fecha(fecha):
+    """
+    Convierte una fecha a datetime aware.
+    """
+
+    if isinstance(fecha, str):
+        fecha = datetime.strptime(fecha, "%Y-%m-%d").date()
+
+    if isinstance(fecha, date) and not isinstance(fecha, datetime):
+        fecha = datetime.combine(fecha, time(12, 0))
+
+    if timezone.is_naive(fecha):
+        fecha = timezone.make_aware(fecha, timezone.get_current_timezone())
+
+    return fecha
+
+
 def calcular_edad_texto(fecha_nacimiento):
     hoy = datetime.now()
     # Si viene como date, convertir a datetime

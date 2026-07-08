@@ -42,20 +42,6 @@ def poblar(apps, schema_editor):
     if nuevas:
         ExpedienteUbicacion.objects.bulk_create(nuevas)
 
-    # ---- No clínicas (tipo=2) ----
-    ya_noclin = set(
-        ExpedienteUbicacion.objects
-        .filter(unidad_no_clinica__isnull=False)
-        .values_list('unidad_no_clinica_id', flat=True)
-    )
-    nuevas = [
-        ExpedienteUbicacion(unidad_no_clinica_id=uid, tipo=TIPO_NO_CLINICA, estado=True)
-        for uid in Unidad.objects.filter(estado=1).values_list('id', flat=True)
-        if uid not in ya_noclin
-    ]
-    if nuevas:
-        ExpedienteUbicacion.objects.bulk_create(nuevas)
-
 
 def _noop(apps, schema_editor):
     # No revertir: las ubicaciones pueden estar referenciadas por préstamos.

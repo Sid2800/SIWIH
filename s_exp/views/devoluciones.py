@@ -19,7 +19,7 @@ from s_exp.models import SolicitudPrestamo, SolicitudExpedienteDetalle, Prestamo
 from .comunes import (
     _es_exp_admin,
     _registrar_log,
-    _set_localizacion_admision,
+    _set_ubicacion_admision,
 )
 
 
@@ -194,8 +194,7 @@ def procesar_devolucion_api(request):
                 #  - NUEVO: expediente.ubicacion (FK catálogo) = ADMISION
                 #  - LEGACY: expediente.localizacion (texto) sincronizado
                 try:
-                    _set_localizacion_admision(ep.expediente, request.user,
-                                               ubicacion_obj=ubicacion_admision)
+                    _set_ubicacion_admision(ep.expediente, request.user, ubicacion_obj=ubicacion_admision)
                 except Exception as _e:
                     log_warning(f"No se pudo regresar a ADMISION al devolver: {_e}", app=LogApp.S_EXP)
 

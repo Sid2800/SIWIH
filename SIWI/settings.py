@@ -254,7 +254,7 @@ LOGGING = {
             "maxBytes": 1024 * 1024 * 20,  # 5MB
             "backupCount": 10,
             "formatter": "standard",
-            "level": "INFO",
+            "level": "WARNING",
         },
     },
 

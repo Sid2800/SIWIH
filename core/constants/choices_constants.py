@@ -13,7 +13,7 @@ class AlcanceUsuario(models.IntegerChoices):
 
 
 class TipoUnidad(models.IntegerChoices):
-    CLINICA = 1, "CLINICA"
+    # CLINICA = 1, "CLINICA"
     ADMINISTRATIVA = 2, "ADMINISTRATIVA"
     APOYO = 3, "APOYO"
 

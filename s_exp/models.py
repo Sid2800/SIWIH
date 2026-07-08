@@ -307,6 +307,7 @@ class SolicitudPrestamo(models.Model):
         related_name='solicitudes_prestamo',
         verbose_name='Solicitante'
     )
+    
     fecha_creacion = models.DateTimeField(
         auto_now_add=True,
         verbose_name='Fecha de Creación'

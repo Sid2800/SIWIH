@@ -4,19 +4,18 @@ from core.services.ingreso.ingreso_service import IngresoService
 from core.services.paciente_service import PacienteService
 from core.services.expediente_service import ExpedienteService
 from core.services.usuario_service import UsuarioService
-from core.utils.utilidades_textos import formatear_nombre_completo, formatear_ubicacion_completo
+from core.utils.utilidades_textos import formatear_nombre_completo, formatear_ubicacion_completo, formatear_expediente
 from core.utils.utilidades_fechas import formatear_fecha_simple, calcular_edad_texto
 from core.mixins import UnidadRolRequiredMixin
 from core.constants  import permisos
 from expediente import forms 
-
 from django.contrib import messages
 from django.urls import reverse_lazy
 from django.views.generic.edit import  CreateView
 from django.views.generic.detail import DetailView
 from django.views.generic import TemplateView
-from django.db.models import OuterRef, Subquery, When, Value, Case,Q
-from django.db.models.functions import Concat
+from django.db.models import OuterRef, Subquery, When, Value, Case,F
+from django.db.models.functions import Concat, Coalesce
 from django.http import JsonResponse
 from django.shortcuts import render
 
@@ -40,23 +39,31 @@ class ExpedienteAddView(UnidadRolRequiredMixin, CreateView):
         form = super(CreateView, self ).get_form()
         #form.fields['numero'].widget = forms.TextInput({'class':'formularioCampo-text', 'placeholder':'Numero'})
         form.fields['numero'].widget.attrs.update({'class': 'formularioCampo-text','placeholder':'Numero'})
-        form.fields['localizacion'].widget.attrs.update({'class': 'formularioCampo-select'})
         form.fields['estado'].widget.attrs.update({'class': 'formularioCampo-select'})
         return form
 
 class ExpedienteDetailView(DetailView):
-    model=Expediente
+    model = Expediente
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+
         usuario = self.request.user
-        
-        # Obtener tabs habilitadas para el usuario
+
         tabs, activo = UsuarioService.obtener_tabs_usuario(usuario)
         if tabs and activo:
-            context['tabs'] = tabs
-            context['tabActiva'] = activo
-            
+            context["tabs"] = tabs
+            context["tabActiva"] = activo
+
+        expediente = self.object
+
+        context["estado_expediente"] = {
+            "numero": formatear_expediente(expediente.numero),
+            "estado": ExpedienteService.obtener_ubicacion_estado_expediente(
+                expediente.numero
+            ),
+        }
+
         return context
 
 #Funcion que sirve la api para Frontend del expedietne libre econtrado
@@ -67,7 +74,7 @@ def traer_expediente_libre(request):
     if expediente:
         data = {
         "expediente_numero": expediente.numero if expediente.numero else None,
-        "localizacion": expediente.localizacion.descripcion_localizacion if expediente.localizacion and expediente.localizacion else "Desconocida",
+        "ubicacion": expediente.ubicacion.descripcion if expediente.ubicacion  else "Desconocida",
         "estado": expediente.estado if expediente.estado else "Desconocido"
         }
     return JsonResponse(data)
@@ -206,15 +213,27 @@ def listarExpedientesAPI(request):
         )
     ).values('apellidos')[:1]
 
+
+    def obtener_expresion_ubicacion():
+        return Coalesce(
+            F("ubicacion__unidad_clinica__area_atencion__nombre_area_atencion"),
+            F("ubicacion__unidad_clinica__sala__nombre_sala"),
+            F("ubicacion__unidad_clinica__servicio_aux__nombre_servicio_a"),
+            F("ubicacion__unidad_clinica__establecimiento_ext__nombre_institucion_salud"),
+            F("ubicacion__unidad_no_clinica__nombre_unidad"),
+        )
+
     # Consulta principal con subconsultas
     expediente_qs = Expediente.objects.annotate(
         asignacion_estado=Subquery(estado_subquery),
         propietario_dni=Subquery(dni_subquery),
         propietario_nombres=Subquery(nombres_subquery),
-        propietario_apellidos=Subquery(apellidos_subquery)
+        propietario_apellidos=Subquery(apellidos_subquery),
+        ubicacion_descripcion=obtener_expresion_ubicacion()
+
     ).values(
         "numero",
-        "localizacion__descripcion_localizacion",
+        "ubicacion_descripcion",
         "estado",
         "modificado_por__username",
         "fecha_modificado",
@@ -246,7 +265,7 @@ def listarExpedientesAPI(request):
     # Mapear las columnas en el mismo orden que aparecen en el DataTable
     columns = [
         "numero",#0
-        "localizacion__descripcion_localizacion",#1
+        "ubicacion",#1
         "estado",#2
         "propietario_dni",#3
         "propietario_nombres",#4

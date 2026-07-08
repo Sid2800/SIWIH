@@ -256,9 +256,9 @@ body.darkmode .sexp-exp-tag--pendiente {
 
 
 /* ============================================================
-   SWEETALERT2 & MODALES — Estilos del sistema (style.css)
-   Usa colores del sistema (colorBoton, colorContendor, etc.)
-   ============================================================ */
+SWEETALERT2 & MODALES — Estilos del sistema (style.css)
+Usa colores del sistema (colorBoton, colorContendor, etc.)
+============================================================ */
 
 /* Color del contenido HTML del modal */
 .swal2-html-container {
@@ -436,7 +436,7 @@ body.darkmode .sexp-exp-tag--pendiente {
 .sexp-modal-lista-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 0.6rem;
+    gap: 1rem 1.5rem;
     margin: 0.8rem 0;
     max-height: 280px;
     overflow-y: auto;
@@ -1824,11 +1824,11 @@ body.darkmode .sexp-entregar-faltantes-btn:hover {
     font-size: 1.8rem; /* Aumentar título de reporte */
     font-weight: 700;
 }
-    font-size: 1rem;
+    /* font-size: 1rem;
     display: flex;
     align-items: center;
     gap: 0.5rem;
-}
+} */
 
 .sexp-reporte-tabla {
     width: 100%;

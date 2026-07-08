@@ -735,9 +735,3 @@ def listarEvaluacionRxPacienteAPI(request):
     return JsonResponse({"data": evaluaciones})
 
 
-
-class DemoView(UnidadRolRequiredMixin,TemplateView):
-    template_name = 'imagenologia/demo.html'
-    required_roles = permisos.IMAGENOLOGIA_VISUALIZACION_ROLES
-    required_unidades = permisos.IMAGENOLOGIA_VISUALIZACION_UNIDADES
-

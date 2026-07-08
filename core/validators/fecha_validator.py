@@ -14,7 +14,8 @@ def validar_fecha(fecha, anio_minimo=2000, permitir_futuro=False):
     
     if fecha_dt.year < anio_minimo:
         raise ValidationError(f"La fecha no puede ser menor al año {anio_minimo}.")
-
+    
+    return fecha_dt
 
 def validar_anio(anio):
     anio_actual = date.today().year

@@ -2,6 +2,7 @@ from django.shortcuts import render
 import json
 from datetime import datetime
 from types import SimpleNamespace
+from django.core.exceptions import ValidationError
 
 from core.utils.utilidades_textos import formatear_nombre_completo
 from core.utils.utilidades_fechas import formatear_fecha_dd_mm_yyyy_hh_mm, formatear_fecha_dd_mm_yyyy
@@ -38,68 +39,41 @@ def guardarAtencion(request):
       return JsonResponse({'error': 'No tienes permisos para realizar esta acción'}, status=403)
 
 
-   if request.method == 'POST':
-      try:
-         data = json.loads(request.body)
+   if request.method != 'POST':
+      return JsonResponse({'error': 'Método no permitido'}, status=405)
+   
 
-         #validaciones      
+   try:
+      data = json.loads(request.body)
+   
 
-         #validacion de la fecha 
-         fecha_str = data.get('fecha')
-         try:
-               fecha_sola = datetime.strptime(fecha_str, '%Y-%m-%d').date()
-
-               # Combinar con hora al mediodía
-               fecha_naive = datetime.combine(fecha_sola, time(12, 0))
-
-               # Convertir a fecha con zona horaria
-               fecha_aware = timezone.make_aware(fecha_naive, timezone.get_current_timezone())
-
-               if fecha_aware.date() > timezone.now().date():
-                  return JsonResponse({'error': 'La fecha no puede ser futura'}, status=400)
-         except ValueError:
-               return JsonResponse({'error': 'Formato de fecha inválido. Se espera YYYY-MM-DD'}, status=400)
-         
-         #validacion del paciente 
-         pacienteId = data.get('idPaciente')
-         try:
-            paciente = Paciente.objects.get(id=pacienteId)
-
-            # Verificar si está fallecido
-            if PacienteService.comprobar_defuncion(paciente):
-               return JsonResponse({'error': 'No puedes registrar una atencion para un paciente fallecido.'}, status=400)    
-
-            # Verificar si está inactivo
-            if PacienteService.comprobar_inactivo(paciente.id):
-               return JsonResponse({'error': 'No puedes registrar una atencion para un paciente inactivo.'}, status=400)    
+      atencion_obj = {
+            "fecha": data.get('fecha'),
+            "area_atencion_id": data.get('area_atencion'),
+            "observaciones": data.get('observaciones'),
+            "paciente_id": data.get('idPaciente'),
+            "id": data.get('idAtencion'),
+            "usuario_id": request.user.id
+      }
 
 
 
+      atencion = SimpleNamespace(**atencion_obj)
+      resultado = AtencionService.procesar_atencion(atencion)
 
-         except Paciente.DoesNotExist:
-            return JsonResponse({'error': 'Paciente no registrado en la base de datos'}, status=400)
-
-
-         atencion_obj = {
-               "fecha": fecha_aware,
-               "area_atencion_id": data.get('area_atencion'),
-               "observaciones": data.get('observaciones'),
-               "paciente_id": pacienteId,
-               "id": data.get('idAtencion'),
-               "usuario_id": request.user.id
-         }
+      return JsonResponse({'guardo': resultado}, status=200)
+   
+   except ValidationError as e:
+      return JsonResponse({"error": e.messages[0]},status=400)
 
 
+   except ValueError as e:
+      return JsonResponse({'error': str(e)},status=400)
+   
+   except Exception as e:
+      return JsonResponse({'error': "No logramos procesar la atencion"}, status=500)
 
-         atencion = SimpleNamespace(**atencion_obj)
-         resultado = AtencionService.procesar_atencion(atencion)
 
-         return JsonResponse({'guardo': resultado}, status=200)
-
-      except json.JSONDecodeError:
-         return JsonResponse({'error': 'Error al procesar los datos JSON'}, status=400)
-
-   return JsonResponse({'error': 'Método no permitido'}, status=405)
 
 #verifica si un apciente tiene una atencion muy reciente
 def verificar_atencion_h(request):
@@ -142,6 +116,7 @@ class listarAtenciones(UnidadRolRequiredMixin,TemplateView):
    template_name = "atencion/atencion_list.html"
    required_roles = permisos.ATENCION_VISUALIZACION_ROLES
    required_unidades = permisos.ATENCION_VISUALIZACION_UNIDADES
+
 
 #sirve ak datatables que lista las atenciones
 def listarAtencionesAPI(request):

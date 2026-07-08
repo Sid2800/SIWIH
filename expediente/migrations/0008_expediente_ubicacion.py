@@ -5,28 +5,37 @@ from django.db import migrations, models
 
 
 def _backfill_ubicacion_admision(apps, schema_editor):
-    """
-    Inicializa la nueva columna Expediente.ubicacion en ADMISION para todos los
-    expedientes existentes (transición híbrida). Guarda el ID de la fila ADMISION
-    del catálogo expediente_ubicacion, NO el texto.
 
-    Si no existe la unidad ADMISION en servicio_unidad, deja la columna en NULL
-    (el flujo de préstamos la irá poblando).
-    """
-    Expediente = apps.get_model('expediente', 'Expediente')
-    ExpedienteUbicacion = apps.get_model('expediente', 'ExpedienteUbicacion')
-    Unidad = apps.get_model('servicio', 'Unidad')
+    Expediente = apps.get_model("expediente", "Expediente")
+    ExpedienteUbicacion = apps.get_model("expediente", "ExpedienteUbicacion")
+    Unidad = apps.get_model("servicio", "Unidad")
 
-    adm = (Unidad.objects.filter(nombre_unidad__iexact='ADMISION').first()
-           or Unidad.objects.filter(nombre_unidad__icontains='ADMIS').first())
-    if not adm:
-        return
+    TIPO_NO_CLINICA = 2
 
-    # TIPO_NO_CLINICA = 2 (ADMISION es unidad no clínica de servicio).
-    ubic, _ = ExpedienteUbicacion.objects.get_or_create(
-        unidad_no_clinica=adm, defaults={'tipo': 2})
+    # ----------------------------
+    # ADMISION
+    # ----------------------------
 
-    Expediente.objects.filter(ubicacion__isnull=True).update(ubicacion=ubic)
+    admision = (
+        Unidad.objects.filter(nombre_unidad__iexact="ADMISION").first()
+        or Unidad.objects.filter(nombre_unidad__icontains="ADMIS").first()
+    )
+
+    if admision:
+
+        ubicacion_admision, _ = ExpedienteUbicacion.objects.get_or_create(
+            unidad_no_clinica=admision,
+            defaults={
+                "tipo": TIPO_NO_CLINICA,
+                "estado": True,
+            }
+        )
+
+        Expediente.objects.filter(
+            ubicacion__isnull=True
+        ).update(
+            ubicacion=ubicacion_admision
+        )
 
 
 def _noop(apps, schema_editor):

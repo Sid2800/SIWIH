@@ -35,7 +35,9 @@ otros = [
     path('verificar-inactivo/', views.verificar_inactivo, name='verificar_paciente_inactivo'),
     path('verificar-similares/',views.verificar_duplicidad, name='verificar_paciente_similar'),
     path('historial/<int:pk>/<slug:slug>/',views.HistorialPaciente.as_view(), name='historial_paciente'),
-    path('consulta-reclasificar-rn/', views.EjecutarReclasificacion, name='consulta_reclasificar_rn')
+    path('consulta-reclasificar-rn/', views.EjecutarReclasificacion, name='consulta_reclasificar_rn'),
+    path("<int:paciente_id>/estado-expediente/",views.estado_expediente_partial,name="estado_expediente_partial",
+)
 
 
 

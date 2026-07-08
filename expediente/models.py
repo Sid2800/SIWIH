@@ -6,18 +6,6 @@ from django.core.validators import MaxValueValidator
 
 from datetime import datetime
 
-# Modelo de Ubicación
-class Localizacion(models.Model):
-    descripcion_localizacion = models.CharField(max_length=100, unique=True, verbose_name="Localizacion")
-    estado = models.BooleanField(default=True) 
-
-    class Meta:
-        verbose_name = "Localizacion"
-        verbose_name_plural = "Localizaciones"
-        ordering = ["descripcion_localizacion"]
-
-    def __str__(self):
-        return self.descripcion_localizacion
 
 
 
@@ -28,11 +16,6 @@ class Expediente(models.Model):
         help_text="Número de expediente único (máximo 199999)",
         validators=[MaxValueValidator(199999)],
         unique=True
-    )
-    localizacion = models.ForeignKey(
-        Localizacion,
-        on_delete=models.PROTECT,
-        default=1
     )
     # NUEVO (transición híbrida hacia el catálogo unificado):
     # Ubicación física ACTUAL del expediente referenciada por id a
@@ -204,9 +187,9 @@ class ExpedienteUbicacion(models.Model):
     def clean(self):
         """
         Valida a nivel de aplicación:
-          1. Exactamente una FK debe estar llena (clínica XOR no-clínica).
-          2. No debe existir otra fila con la misma unidad (evita duplicados).
-             Reemplaza al UniqueConstraint condicional que MySQL no soporta.
+        1. Exactamente una FK debe estar llena (clínica XOR no-clínica).
+        2. No debe existir otra fila con la misma unidad (evita duplicados).
+        Reemplaza al UniqueConstraint condicional que MySQL no soporta.
         """
         super().clean()
         tiene_clinica = self.unidad_clinica_id is not None

@@ -638,7 +638,7 @@ function rechazarSolicitud(id) {
         confirmButtonText: '<i class="bi bi-x-circle-fill"></i> Rechazar',
         cancelButtonText: '<i class="bi bi-arrow-left-circle-fill"></i> Cancelar',
         customClass: {
-            popup: 'contenedor-modal',
+            popup: 'contenedor-modal modal-rechazar-solicitud',
             title: 'contener-modal-titulo',
             confirmButton: 'contener-modal-boton-confirmar',
             cancelButton: 'contener-modal-boton-cancelar',

@@ -19,6 +19,10 @@ from django.db.models import Count, Q
 from s_exp.models import MotivoSolicitud, ExpedientePrestamo, SolicitudPrestamo, SolicitudExpedienteDetalle, Prestamo, ExpedienteEstadoLog
 from expediente.models import Expediente, PacienteAsignacion
 
+#sid
+from core.services.expediente_service import ExpedienteService
+from core.constants.domain_constants import EXP_UBICA_ADMISION_ID
+
 
 from .comunes import (
     _es_exp_admin,
@@ -676,6 +680,18 @@ def crear_solicitud_api(request):
                 return JsonResponse({
                     "error": f"El expediente #{exp.numero} ya no está disponible"
                 }, status=400)
+            
+            #sid 7.7.26 
+            # ID fijo de ExpedienteUbicacion correspondiente a ADMISION. = 1
+            if not exp.ubicacion or exp.ubicacion.id != EXP_UBICA_ADMISION_ID: # id ubicacionExpdiente // para Admision
+                return JsonResponse({
+                    "error": (
+                        f"El expediente #{exp.numero} no se encuentra en Admisión. "
+                        f"Ubicación actual: {exp.ubicacion.descripcion}"
+                    )
+                }, status=400)
+            
+
 
         apartado_id = EstadoExpedienteFisico.id_de('EXP_APARTADO')
 

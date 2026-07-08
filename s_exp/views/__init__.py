@@ -17,7 +17,7 @@ from .comunes import (
     _get_servicio_unidad_from_rrhh,
     _resolver_ubicacion_expediente,
     _set_localizacion_por_solicitud,
-    _set_localizacion_admision,
+    _set_ubicacion_admision,
     SExpAdminMixin,
     SExpUsuarioMixin,
 )
@@ -86,7 +86,7 @@ __all__ = [
     "_get_servicio_unidad_from_rrhh",
     "_resolver_ubicacion_expediente",
     "_set_localizacion_por_solicitud",
-    "_set_localizacion_admision",
+    "_set_ubicacion_admision",
     "SExpAdminMixin",
     "SExpUsuarioMixin",
     "DashboardAdminView",

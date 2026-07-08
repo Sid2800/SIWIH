@@ -267,7 +267,7 @@ def historial_prestamos_expediente_api(request, expediente_id):
         # con fallback legacy — ver _resolver_ubicacion_expediente.
         ubicacion_actual = ''
         try:
-            exp_obj = Expediente.objects.select_related('ubicacion', 'localizacion').filter(id=expediente_id).first()
+            exp_obj = Expediente.objects.select_related('ubicacion').filter(id=expediente_id).first()
             info_exp = ExpedientePrestamo.objects.select_related('ubicacion').filter(expediente_id=expediente_id).first()
             if exp_obj:
                 ubicacion_actual = _resolver_ubicacion_expediente(exp_obj, info_exp)

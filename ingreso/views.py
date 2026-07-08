@@ -9,6 +9,8 @@ from .models import Ingreso
 from paciente.models import Paciente
 from django.utils import timezone
 from django import forms
+from django.core.exceptions import ValidationError
+
 from django.db import transaction
 from django.utils.timezone import now 
 from django.http.response import JsonResponse, HttpResponseRedirect
@@ -83,8 +85,7 @@ class IngresoAddView(UnidadRolRequiredMixin, CreateView):
             form.instance.creado_por_id = usuario_id
             form.instance.modificado_por_id = usuario_id
         
-        
-
+    
 
         if pacienteId:
             form.instance.paciente_id = pacienteId
@@ -100,11 +101,11 @@ class IngresoAddView(UnidadRolRequiredMixin, CreateView):
                 #Cmabiar el eastdo de expediente
                 if pacienteId:
 
-                    cambio = ExpedienteService.cambiar_ubicacion(pacienteId, 2, usuario_id)
-                    if not cambio:
-                        raise Exception("No se logro cambiar la ubicacion del expediente")
+                    response = super().form_valid(form) # gurada l ingreo
+                    ubicacionExpediente = ExpedienteService.obtener_o_crear_ubicacion_sala(form.instance.sala)
+                    ExpedienteService.cambiar_ubicacion(form.instance.paciente.expediente_numero, ubicacionExpediente)
 
-                response = super().form_valid(form) # gurada l ingreo
+                
 
                 # [2026-05-07] Cambio relacionado con cama:
                 # si el ingreso se guarda con cama y paciente, sincroniza la tabla
@@ -241,6 +242,10 @@ class IngresoAddView(UnidadRolRequiredMixin, CreateView):
 
         return context
 
+
+
+
+
 class IngresoEditView(UnidadRolRequiredMixin, UpdateView):
     model = Ingreso
     required_roles = INGRESO_VISUALIZACION_ROLES
@@ -309,6 +314,10 @@ class IngresoEditView(UnidadRolRequiredMixin, UpdateView):
                 #Cmabiar el eastdo de expediente
 
                 response = super().form_valid(form) # gurada l ingreo
+
+                #cambio de ubicacion del expediente si se cambia la sala de ingreso
+                ubicacionExpediente = ExpedienteService.obtener_o_crear_ubicacion_sala(form.instance.sala)
+                ExpedienteService.cambiar_ubicacion(form.instance.paciente.expediente_numero, ubicacionExpediente)
 
                 # [2026-05-07] Cambio relacionado con cama:
                 # solo sincronizamos camas si el paciente sigue siendo el mismo.
@@ -481,6 +490,7 @@ def asignar_propiedades_campos_paciente(form):
                 'disabled': True
             })
 
+
 def llenar_datos_campos_paciente(form, paciente, numero_expediente=None):
     form.fields['dniPaciente'].initial = paciente.dni
     form.fields['numeroExpediente'].initial = str(numero_expediente).zfill(7) if numero_expediente else None
@@ -497,6 +507,7 @@ def llenar_datos_campos_paciente(form, paciente, numero_expediente=None):
         paciente.sector.aldea.municipio.nombre_municipio,
         paciente.sector.nombre_sector
     )
+
 
 def obtener_acompaniante(request):
     dni = request.GET.get('DNI')
@@ -525,6 +536,7 @@ def validar_ingreso_activo(request):
     ingreso_activo = IngresoService.tiene_ingreso_activo(id_paciente)
     # Retornar la respuesta con el estado del ingreso
     return JsonResponse({'ingresoActivo': ingreso_activo})
+
 
 class RecepcionIngresosSala(View):
     def dispatch(self, request, *args, **kwargs):
@@ -587,6 +599,11 @@ def registrarRecepcionIngresosSala(request):
             pdf_url = reverse("reporte_detalle_recepcion_ingresos_sala", kwargs={"recepcion_id":resultado['idRecepcion'] })
             return JsonResponse({"success": True, 'message': resultado['mensaje'],"pdf_url": pdf_url, "redirect_url": reverse_lazy('listar_ingresos') })
 
+        except ValidationError as e:
+            return JsonResponse(
+                {"error": e.messages[0]},
+                status=400
+            )
 
         except Exception as e:
             return JsonResponse(

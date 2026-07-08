@@ -1,0 +1,74 @@
+<div class="formulario__tarjeta  estadoExpedente__card">
+   <div class="formulario__tarjeta-titulo">
+      <i class="bi bi-file-medical"></i>
+      <span>EXP: #{{ info_expediente.numero }}</span>
+   </div>
+
+
+   <div class="estadoExpediente__contenido">
+
+      <div class="estadoExpediente__cabecera">
+
+         <div class="estadoExpediente__estado {{ info_expediente.estado.badge }}">
+               <i class="bi bi-circle-fill " title="Ocupado"></i>
+               <span class="estadoExpediente__estadoTexto">{{ info_expediente.estado.estado }}</span>
+         </div>
+
+      </div>
+
+      <div class="estadoExpediente__footer">
+
+
+         <div class="estadoExpediente__item">
+
+               <i class="bi bi-geo-alt"></i>
+               <div>
+                  <label>Ubicacion</label>
+                  <span>{{ info_expediente.estado.ubicacion|default:"-----" }}</span>
+               </div>
+
+         </div>
+
+         {% if info_expediente.estado.fecha %}
+
+               <div class="estadoExpediente__item">
+
+                  <i class="bi bi-calendar3"></i>
+                  <div>
+                     <label>Desde</label>
+                     <span>{{ info_expediente.estado.fecha|default:"-----" }}</span>
+                  </div>
+
+               </div>
+         {% endif %}
+
+         {% if info_expediente.estado.responsable %}
+               <div class="estadoExpediente__item">
+
+                  <i class="bi bi-person"></i>
+                  <div>
+                     <label>Responsable</label>
+                     <span>{{ info_expediente.estado.responsable }}</span>
+                  </div>
+
+               </div>
+         {% endif %}
+
+
+         {% if info_expediente.estado.motivo %}
+               <div class="estadoExpediente__item">
+
+                  <i class="bi bi-tag"></i>
+                  <div>
+                     <label>Motivo</label>
+                     <span>{{ info_expediente.estado.motivo }}</span>
+                  </div>
+
+               </div>
+         {% endif %}
+
+      </div>
+
+   </div>
+
+</div>

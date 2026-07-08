@@ -100,10 +100,12 @@ class CatalogoUbicaciones:
             qs = qs.filter(tipo=tipo)
         return qs
 
+
     @staticmethod
     def listar_dict(solo_activas: bool = True, tipo: Optional[int] = None) -> list:
         """Igual que listar() pero devuelve lista de dicts (para JSON/selects)."""
         return [DatosUbicacion.enriquecer(u) for u in CatalogoUbicaciones.listar(solo_activas, tipo)]
+
 
     @staticmethod
     def obtener_o_crear_por_unidad_clinica(unidad_clinica):
@@ -118,6 +120,7 @@ class CatalogoUbicaciones:
         )
         return obj
 
+
     @staticmethod
     def obtener_o_crear_por_unidad_no_clinica(unidad):
         """
@@ -130,6 +133,7 @@ class CatalogoUbicaciones:
             defaults={'tipo': ExpedienteUbicacion.TIPO_NO_CLINICA},
         )
         return obj
+
 
     @staticmethod
     def ubicacion_del_solicitante(solicitud):
@@ -147,6 +151,8 @@ class CatalogoUbicaciones:
         if not unidad:
             return None
         return CatalogoUbicaciones.obtener_o_crear_por_unidad_no_clinica(unidad)
+
+
 
     @staticmethod
     def ubicacion_admision():

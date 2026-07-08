@@ -5,6 +5,8 @@ from ubicacion.models import Departamento
 from paciente.models import Paciente
 from core.services.paciente_service import PacienteService
 from core.services.ingreso.ingreso_service import IngresoService
+from expediente.validator import ExpedienteValidator
+from django.core.exceptions import ValidationError
 from . import models
 from dal import autocomplete
 from datetime import date
@@ -102,10 +104,20 @@ class IngresoCreateForm(forms.ModelForm):
 
             if IngresoService.tiene_ingreso_activo(paciente.id):
                 self.add_error(None, 'El paciente seleccionado ya cuenta con un ingreso activo.')
-                
+
+            # validacion de expediente este disponible en admision
+            try:
+                ExpedienteValidator.validar_disponible(
+                    paciente.expediente_numero
+                )
+            except ValidationError as e:
+                self.add_error(None, e.message)
+
         else:
             self.add_error(None, 'El paciente es obligatorio para realizar un ingreso.')
 
+
+        
 
         #validacion de los campos relacionadoas al acompaniante
 

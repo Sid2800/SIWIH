@@ -382,7 +382,7 @@ def _set_localizacion_por_solicitud(expediente, solicitud, usuario_admin, ubicac
         return nombre_ubicacion
 
 
-def _set_localizacion_admision(expediente, usuario_admin, ubicacion_obj=None):
+def _set_ubicacion_admision(expediente, usuario_admin, ubicacion_obj=None):
     """
     Devuelve la ubicación del expediente a 'ADMISION' tras una DEVOLUCIÓN.
 
