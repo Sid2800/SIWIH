@@ -12,27 +12,89 @@
     <fieldset class="fieldsetExp">
         <legend>Detalles del expediente número: <b>{{ object.numero }}</b></legend>          
         
+        <div class="formulario__tarjeta detalleExpedienteCard">
 
-        <fieldset class="frmExpedienteCampos">
-            <legend>Expediente</legend>
-
-            <div class="formularioCampo">
-                <label for="numero">Número</label>
-                <input type="number" name="numero" value="{{ object.numero }}" readonly class="formularioCampo-text">
+            <div class="formulario__tarjeta-titulo">
+                <i class="bi bi-file-medical"></i>
+                <span>EXP #{{ estado_expediente.numero }}</span>
             </div>
 
-            <div class="formularioCampo">
-                <label for="ubicacion">Ubicación</label>
-                <input type="text" name="ubicacion" value="{{ object.localizacion }}" readonly class="formularioCampo-text">
+            <div class="estadoExpediente__contenido">
+
+                <div class="estadoExpediente__cabecera">
+
+                    <div class="estadoExpediente__estado {{ estado_expediente.estado.badge }}">
+                        <i class="bi bi-circle-fill"></i>
+
+                        <span class="estadoExpediente__estadoTexto">
+                            {{ estado_expediente.estado.estado }}
+                        </span>
+                    </div>
+
+                </div>
+
+                <div class="estadoExpediente__footer">
+
+                    <div class="estadoExpediente__item">
+
+                        <i class="bi bi-geo-alt"></i>
+
+                        <div>
+                            <label>Ubicación</label>
+                            <span>{{ estado_expediente.estado.ubicacion }}</span>
+                        </div>
+
+                    </div>
+
+                    {% if estado_expediente.estado.fecha %}
+                    <div class="estadoExpediente__item">
+
+                        <i class="bi bi-calendar3"></i>
+
+                        <div>
+                            <label>Desde</label>
+                            <span>{{ estado_expediente.estado.fecha }}</span>
+                        </div>
+
+                    </div>
+                    {% endif %}
+
+                    {% if estado_expediente.estado.responsable %}
+                    <div class="estadoExpediente__item">
+
+                        <i class="bi bi-person"></i>
+
+                        <div>
+                            <label>Responsable</label>
+                            <span>{{ estado_expediente.estado.responsable }}</span>
+                        </div>
+
+                    </div>
+                    {% endif %}
+
+                    {% if estado_expediente.estado.motivo %}
+                    <div class="estadoExpediente__item">
+
+                        <i class="bi bi-tag"></i>
+
+                        <div>
+                            <label>Motivo</label>
+                            <span>{{ estado_expediente.estado.motivo }}</span>
+                        </div>
+
+                    </div>
+                    {% endif %}
+
+                </div>
+
             </div>
 
-            <div class="formularioCampo">
-                <label for="estado">Estado</label>
-                <input type="text" name="estado" 
-                    value="{% if object.estado == 2 %}Libre{% else %}Ocupado{% endif %}" 
-                    readonly class="formularioCampo-text">
-            </div>
-        </fieldset>
+        </div>
+
+
+
+
+
 
         <fieldset class="detallesRegistro">
             <legend>Detalles del Registro</legend>
@@ -54,9 +116,21 @@
     
     </fieldset>
 
-    <div class="fieldsetExp">
-        <legend>Historial Propietarios</legend>
+    <div class="fieldsetExp exp-historial-tabs-wrapper">
+        <div class="exp-historial-tabs" role="tablist">
+            <button type="button" class="exp-historial-tab exp-historial-tab--active"
+                    data-target="exp-tab-propietarios" role="tab" aria-selected="true">
+                <i class="bi bi-people-fill"></i> Historial Propietarios
+            </button>
+            {% if tabs.prestamos %}
+            <button type="button" class="exp-historial-tab"
+                    data-target="exp-tab-prestamos" role="tab" aria-selected="false">
+                <i class="bi bi-clock-history"></i> Historial de Préstamos
+            </button>
+            {% endif %}
+        </div>
 
+        <div id="exp-tab-propietarios" class="exp-historial-panel exp-historial-panel--active" role="tabpanel">
             <table id="data_table_expediente_propietarios" class="dataTable stripe hover row-border">
                 <thead>
                     <tr>
@@ -71,6 +145,28 @@
                 </thead>
                 <tbody></tbody>
             </table>
+        </div>
+
+        {% if tabs.prestamos %}
+        <div id="exp-tab-prestamos" class="exp-historial-panel" role="tabpanel">
+            <div id="prestamos-estado-badge"
+                style="display:flex; justify-content:flex-end; margin-bottom:-1.4rem;">
+            </div>
+            <table id="historialTablaPrestamos" class="dataTable stripe hover row-border" style="width: 100%;">
+                <thead>
+                    <tr>
+                        <th>N° Exp</th>
+                        <th>Fecha Solicitud</th>
+                        <th>Motivo</th>
+                        <th>Solicitante</th>
+                        <th>Área donde se prestó</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+        {% endif %}
     </div>
 
     <div class="formularioBotones">

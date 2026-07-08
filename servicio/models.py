@@ -219,15 +219,13 @@ class ServiciosAux(models.Model):
 
 
 # lugares no clinicos
-
-
 class Unidad(models.Model):
     nombre_unidad = models.CharField(max_length=100, unique=True)
     nombre_corto_unidad = models.CharField(
         max_length=20, unique=True, blank=True, null=True
     )
     tipo = models.PositiveSmallIntegerField(
-        choices=TipoUnidad.choices, default=TipoUnidad.CLINICA
+        choices=TipoUnidad.choices, default=TipoUnidad.ADMINISTRATIVA
     )
     estado = models.SmallIntegerField(
         verbose_name="Estado",
@@ -461,6 +459,7 @@ class Unidad_clinica(models.Model):
         if self.establecimiento_ext:
             return ("EXTERNO", "Institución Externa")
         return ("NONE", "Sin tipo")
+
 
     def get_descripcion(self):
         if self.area_atencion:

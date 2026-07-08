@@ -101,7 +101,7 @@ function formatFecha(fechaISO) {
  * @param {string} fechaISO - Fecha en formato ISO (YYYY-MM-DDTHH:mm:ss.sssZ).
  * @returns {string} - Fecha formateada.
  */
-function formatoFecha_dd_mm_yy_hh_mm(fechaISO, hora=null) {
+function formatoFecha_dd_mm_yy_hh_mm(fechaISO, incluirHora=null) {
     if (!fechaISO) return "";
 
     const fecha = new Date(fechaISO);
@@ -109,7 +109,7 @@ function formatoFecha_dd_mm_yy_hh_mm(fechaISO, hora=null) {
     const dia = String(fecha.getDate()).padStart(2, '0');
     const mes = String(fecha.getMonth() + 1).padStart(2, '0'); // Mes de 0 a 11
     const año = String(fecha.getFullYear()).slice(-2); // Últimos dos dígitos del año
-    if (hora){
+    if (incluirHora){
         const horas = String(fecha.getHours()).padStart(2, '0');
         const minutos = String(fecha.getMinutes()).padStart(2, '0');
         return `${dia}/${mes}/${año} - ${horas}:${minutos}`

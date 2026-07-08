@@ -85,6 +85,7 @@ async function confirmarAccion(titulo, mensaje, botonAfirmativo = "Aceptar", bot
 
 
 function renderDatosPaciente(containerId, datos = {}) {
+
    const header = document.getElementById(containerId);
 
    if (!header) return;
@@ -1099,13 +1100,14 @@ async function AgregarAtencionModal(paciente=null, zona=null, atencionId=null) {
    let resultado = null;
 
    const modal = await Swal.fire({
-      title: `Definir una atencion `,
+      title: `<i class="bi-thermometer-half"></i> Definir una atencion `,
       html: `
+         <div class="tituloFormulario-subrallado"></div>
+         <div class="modal-contendor-data-encabezado" id="modalAgregarAtencionHeader" style="margin-bottom: 1rem;"></div>
+
          <form method="post" class="formulario" id="formulario-modal-atencion">
             <fieldset class="modalAtencionCampos">
-               <legend id="modal-atencion-leyenda">
-                  ${paciente ? `Paciente: <b>${paciente.nombre}</b>` : ''}
-               </legend>
+ 
    
 
                <div class="formularioCampoModal">
@@ -1212,6 +1214,18 @@ async function AgregarAtencionModal(paciente=null, zona=null, atencionId=null) {
          const idPaciente = document.getElementById("modal-atencion-paciente-id");
 
 
+         // mostrar contexto de paciente
+         if (paciente) {
+            const { id, ...pacienteSinId } = paciente;
+
+            renderDatosPaciente(
+               "modalAgregarAtencionHeader",
+               pacienteSinId
+            );
+
+         }
+         
+
          // Cargar especialidaes de backed
          async function cargarAreaAtencion(zona) {
             try {
@@ -1291,8 +1305,9 @@ async function AgregarAtencionModal(paciente=null, zona=null, atencionId=null) {
          }
 
          
-         function llenarAtencion(atencion) {
-            titleElement.textContent ="Actualizar atencion"
+         async function llenarAtencion(atencion) {
+
+            titleElement.innerHTML = '<i class="bi bi-thermometer-half"></i> Actualizar atención';
             observaciones.value = atencion.observaciones || "";
       
             fecha.value = formatearFechaISO(atencion.fecha) || "";
@@ -1301,7 +1316,7 @@ async function AgregarAtencionModal(paciente=null, zona=null, atencionId=null) {
             detallesModificado.value = concatenarLimpio(atencion.modificado_por," | ", formatFecha(atencion.fecha_modificado)) || "";
             fieldsetRegistro.style.display = 'block';
             servicio.value = atencion.idServicio;
-            cargarAreaAtencion(servicio.value);
+            await cargarAreaAtencion(servicio.value);
             areaAtencion.value = atencion.idAreaAtencion
 
             //manejar la fecha de recepcion
@@ -1318,7 +1333,6 @@ async function AgregarAtencionModal(paciente=null, zona=null, atencionId=null) {
             }
             
 
-            leyenda.innerHTML = `Paciente: <b> ${concatenarLimpio(atencion.pacienteNombre1,atencion.pacienteNombre2,atencion.pacienteApellido1,atencion.pacienteApellido2)}</b>`;
             idPaciente.value = atencion.pacienteId;
             
 
@@ -1366,7 +1380,7 @@ async function AgregarAtencionModal(paciente=null, zona=null, atencionId=null) {
 
             if (!response.ok) {
                // Aquí capturamos los errores que vienen del backend
-               toastr.error(data.error || "Error desconocido al guardar la atención");
+               toastr.error(data.error || "Error desconocido al guardar la atención","No se guardo la atencion");
                return;
             }
 
@@ -1473,13 +1487,13 @@ async function agregarAtencion(paciente,servicio,atencionID){
       // Verificar defunción
       const estaMuerto = await verificarDefuncion(paciente.id);
       if (estaMuerto) {
-         toastr.warning("No se puede brindar atencion a un paciente fallecido.");
+         toastr.warning("No se puede brindar atencion a un paciente fallecido.","No permitido");
          return;
       }
       // verificar Inactivo
       const inactivo = await verificarPacienteInactivo(paciente.id);
       if (inactivo) {
-         toastr.warning("No se puede brindar atencion a un paciente inactivo.");
+         toastr.warning("No se puede brindar atencion a un paciente inactivo.","No permitido");
          return;
       }
 

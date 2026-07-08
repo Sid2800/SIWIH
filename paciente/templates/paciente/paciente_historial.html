@@ -7,6 +7,7 @@
 
 
 <div class="contenedor2 pacienteHistorial"> 
+
         <div class="tituloFormulario">
             <div class="tituloFormulario-texto"> 
                 <i class="bi bi-journal-medical"></i>
@@ -15,81 +16,96 @@
             <div class="tituloFormulario-subrallado"></div>
         </div>
 
-        <fieldset class="HistorialPacienteCampos">
-            <legend>Datos paciente</legend>
-
-            <div class="formularioCampoHistorial">
-                <label>DNI </label>
-                <input type="text" class="formularioCampo-text" value="{{ info_paciente.dni }}" readonly>
-            </div>
-
-            
-            <div class="formularioCampoHistorial">    
-                <label>Expediente N</label>
-                <input type="text" class="formularioCampo-text"
-                    value="{% if info_expediente.numero %}{{ info_expediente.numero }} -|- {{ info_expediente.ubicacion }}{% else %}-------{% endif %}"
-                    readonly>
-            </div>
-
-
-            <div class="formularioCampoHistorial">
-                <label>Nombre</label>
-                <input type="text" id="historialNombrePaciente" class="formularioCampo-text" value="{{ info_paciente.nombreCompleto }}" readonly>                
-            </div>
-            
-            <div class="formularioCampoHistorial">
-                <label >Fecha de Nac:</label>
-                <input type="text" class="formularioCampo-text" value="{{ paciente.fecha_nacimiento }}" readonly>                
-            </div>
-
-            <div class="formularioCampoHistorial">
-                <label for="fecha_nacimiento">Edad</label>
-                <input type="text" class="formularioCampo-text" value="{{ info_paciente.edad }}" readonly>                
-            </div>
-            
-            <div class="formularioCampoHistorial">
-                <label>Sexo</label>
-                <input type="text" class="formularioCampo-text" value="{{ info_paciente.sexo }}" readonly>                
-            </div>
-
-            <div class="formularioCampoHistorial">
-                <label>Teléfono</label>
-                <input type="text" class="formularioCampo-text" value="{{ info_paciente.telefono }}" readonly>                
-            </div>
-
-            <div class="formularioCampoHistorial">
-                <label>Domicilio</label>
-                <input type="text" class="formularioCampo-text" value="{{ info_paciente.domicilio }}" readonly>                
-            </div>
-
-            <div class="formularioCampoHistorial">
-                <label>Madre</label>
-                <input type="text" class="formularioCampo-text" 
-                    value="{% if info_madre.nombre_completo %}{{ info_madre.nombre_completo }}{% else %}-------{% endif %}" 
-                    readonly>
-            </div>
-
-            <div class="formularioCampoHistorial">
-                <label>Ultima Visita</label>
-                <input type="text" class="formularioCampo-text" value="{{ ultima_atencion }}" readonly>                
-            </div>
-            
-            {% if  info_defuncion %}
-                <div class="formularioCampoHistorial">
-                    <label>Defuncion</label>
-                    <input type="text" class="formularioCampo-text" value="{{ info_defuncion.fecha }} -|- {{ info_defuncion.unidad_clinica }}" readonly>                
+        <div class="HistorialPacienteCampos">
+            <div class="formulario__tarjeta">
+                <div class="formulario__tarjeta-titulo">
+                    <i class="bi bi-person-vcard"></i>
+                    <span>Datos Generales</span>
                 </div>
-            {% endif %}
 
-            {% if  paciente.fecha_sai %}
-                <div class="formularioCampoHistorial">
-                    <label>SAI</label>
-                    <input type="text" class="formularioCampo-text" value="{{ paciente.fecha_sai }}" readonly>                
+
+                <div class="formulario__tarjeta-campos  historialPacienteCampos">
+
+                    <div class="formulario__tarjeta-campo">
+                        <label>DNI</label>
+                        <span class="formularioCampo-valor">{{ info_paciente.dni }}</span>
+                    </div>
+
+                    <div class="formulario__tarjeta-campo">
+                        <label>Nombre</label>
+                        <span class="formularioCampo-valor">{{ info_paciente.nombreCompleto }}</span>
+                    </div>
+
+                    <div class="formulario__tarjeta-campo">
+                        <label>Fecha de Nac.</label>
+                        <span class="formularioCampo-valor">{{ paciente.fecha_nacimiento }}</span>
+                    </div>
+
+                    <div class="formulario__tarjeta-campo">
+                        <label>Edad</label>
+                        <span class="formularioCampo-valor">{{ info_paciente.edad }}</span>
+                    </div>
+
+                    <div class="formulario__tarjeta-campo">
+                        <label>Sexo</label>
+                        <span class="formularioCampo-valor">{{ info_paciente.sexo }}</span>
+                    </div>
+
+                    <div class="formulario__tarjeta-campo">
+                        <label>Teléfono</label>
+                        <span class="formularioCampo-valor">{{ info_paciente.telefono }}</span>
+                    </div>
+
+                    <div class="formulario__tarjeta-campo">
+                        <label>Domicilio</label>
+                        <span class="formularioCampo-valor">{{ info_paciente.domicilio }}</span>
+                    </div>
+
+                    <div class="formulario__tarjeta-campo">
+                        <label>Madre</label>
+                        <span class="formularioCampo-valor">
+                            {% if info_madre.nombre_completo %}
+                                {{ info_madre.nombre_completo }}
+                            {% else %}
+                                -------
+                            {% endif %}
+                        </span>
+                    </div>
+
+                    <div class="formulario__tarjeta-campo">
+                        <label>Ult. Visita</label>
+                        <span class="formularioCampo-valor">{{ ultima_atencion }}</span>
+                    </div>
+
+                    {% if info_defuncion %}
+                    <div class="formulario__tarjeta-campo">
+                        <label>Defunción</label>
+                        <span class="formularioCampo-valor">
+                            {{ info_defuncion.fecha }} - {{ info_defuncion.unidad_clinica }}
+                        </span>
+                    </div>
+                    {% endif %}
+
+                    {% if paciente.fecha_sai %}
+                    <div class="formulario__tarjeta-campo">
+                        <label>SAI</label>
+                        <span class="formularioCampo-valor">{{ paciente.fecha_sai }}</span>
+                    </div>
+                    {% endif %}
+
+
+
                 </div>
-            {% endif %}
+            </div>
+
+            <div id="estadoExpediente">
+                {% include "paciente/partials/_estado_expediente.html" %}
+            </div>
+            
+        </div>
 
 
-        </fieldset>
+
 
         <div class="historialTabs">
 
@@ -221,8 +237,13 @@
 
 {% block media_js %}
     <script>
-        let idPaciente = "{{ paciente.id }}";
-        let nombrePaciente = "{{ info_paciente.nombreCompleto }}"
+        const idPaciente = "{{ paciente.id }}";
+        const nombrePaciente = "{{ info_paciente.nombreCompleto }}"
+        const numeroExpediente = "{{ info_expediente.numero }}"
+        const edadPaciente = "{{ info_paciente.edad }}".split(",")[0].trim();
+        const sexoPaciente = "{{ info_paciente.sexo }}";
+
+        const urlEstadoExpediente = "{% url 'estado_expediente_partial' paciente.id %}";
     </script>
 
 

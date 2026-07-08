@@ -3,6 +3,7 @@ from servicio.models import Servicio
 from expediente.models import PacienteAsignacion
 from core.services.servicio_service import ServicioService
 from core.services.expediente_service import ExpedienteService
+from atencion.validator import AtencionValidator
 from django.db import transaction
 from django.db.models import Func, F, Q, OuterRef, Subquery, DateField, Value, Count
 from django.db.models.functions import Concat
@@ -12,82 +13,122 @@ from core.utils.utilidades_logging import *
 import pytz
 from django.utils import timezone
 from datetime import timedelta
+
 class AtencionService:
 
       @staticmethod
       def procesar_atencion(atencion):
 
-            def actualizar_datos_si_necesario(atencionRegistro):
+            atencion = AtencionValidator.validar(atencion=atencion)
+
+            if atencion.id:
+                  return AtencionService._actualizar(atencion)
+
+            return AtencionService._crear(atencion)
+            
+
+      from django.db import transaction
+from atencion.models import Atencion
+from atencion.validator import AtencionValidator
+from core.constants.domain_constants import LogApp
+from core.utils.utilidades_logging import log_error, log_warning
+
+
+class AtencionService:
+
+      @staticmethod
+      def procesar_atencion(atencion):
+            """
+            Punto de entrada del módulo.
+
+            - Valida y normaliza la información recibida.
+            - Decide si crear o actualizar una atención.
+            """
+
+            atencion = AtencionValidator.validar(atencion)
+
+            if atencion.id:
+                  return AtencionService._actualizar(atencion)
+
+            return AtencionService._crear(atencion)
+
+
+
+      @staticmethod
+      def _crear(atencion):
+            """
+            Registra una nueva atención.
+            """
+
+            try:
+                  with transaction.atomic():
+
+                        atencion_registro = Atencion.objects.create(
+                              fecha_atencion=atencion.fecha,
+                              area_atencion=atencion.area_atencion,
+                              observaciones=atencion.observaciones,
+                              paciente=atencion.paciente,
+                              creado_por_id=atencion.usuario_id,
+                              modificado_por_id=atencion.usuario_id,
+                        )
+
+                        ExpedienteService.cambiar_ubicacion(atencion.paciente.expediente_numero, atencion.ubicacionExpediente)
+                        
+                        
+
+                  return True
+
+            except Exception as e:
+                  log_error(f"Error registrando atención: {e}", app=LogApp.ATENCION)
+
+                  return False
+            
+
+      @staticmethod
+      def _actualizar(atencion):
+            """
+            Actualiza una atención existente.
+            """
+
+            try:
+
+                  atencion_registro = atencion.atencion
+
                   cambios = False
-                  if atencionRegistro.fecha_atencion != atencion.fecha:
-                        atencionRegistro.fecha_atencion = atencion.fecha
+
+                  if atencion_registro.fecha_atencion != atencion.fecha:
+                        atencion_registro.fecha_atencion = atencion.fecha
                         cambios = True
 
-                  area_atencion_id_nuevo = int(atencion.area_atencion_id)
-                  if atencionRegistro.area_atencion.id != area_atencion_id_nuevo:
-                        nueva_area_atencion = ServicioService.obtener_area_atencion_id(area_atencion_id_nuevo)
-                        if nueva_area_atencion:
-                              atencionRegistro.area_atencion = nueva_area_atencion
-                              cambios = True
+                  if atencion_registro.area_atencion != atencion.area_atencion:
+                        atencion_registro.area_atencion = atencion.area_atencion
+                        cambios = True
+                        cambio_area = True
 
-                  if atencionRegistro.observaciones != atencion.observaciones:
-                        atencionRegistro.observaciones = atencion.observaciones
+
+                  if atencion_registro.observaciones != atencion.observaciones:
+                        atencion_registro.observaciones = atencion.observaciones
                         cambios = True
 
                   if cambios:
-                        atencionRegistro.save()
-                        return True
+                        atencion_registro.modificado_por_id = atencion.usuario_id
+                        atencion_registro.save()
+
+                  if cambio_area:
+                        ExpedienteService.cambiar_ubicacion(
+                        atencion.paciente.expediente_numero,
+                        atencion.ubicacionExpediente
+                  )
+
+                  return True
+
+            except Exception as e:
+
+                  log_error( f"Error actualizando atención {atencion.id}: {e}", app=LogApp.ATENCION)
+
                   return False
 
-            if atencion.id:
-                  try:
-                        atencionRegistro = Atencion.objects.get(id=atencion.id)
-                        return actualizar_datos_si_necesario(atencionRegistro)
-                  except Atencion.DoesNotExist:
-                        log_warning(
-                              f"Atención no encontrada id={atencion.id}",
-                              app=LogApp.ATENCION
-                        )
-                        return False
 
-            elif atencion.fecha and atencion.paciente_id and atencion.area_atencion_id:
-                  try:
-                        area_atencion_id = int(atencion.area_atencion_id)
-                        with transaction.atomic():
-                              atencionObjeto = Atencion.objects.create(
-                                    fecha_atencion=atencion.fecha,
-                                    area_atencion_id=area_atencion_id,
-                                    observaciones=atencion.observaciones,
-                                    paciente_id=atencion.paciente_id,
-                                    creado_por_id=atencion.usuario_id,
-                                    modificado_por_id=atencion.usuario_id
-                              )
-
-                        # Determinar ubicación del expediente
-                        mapa_ubicaciones = {
-                              1: 4,  # Emergencia general
-                              2: 5,  # Emergencia obstétrica
-                              3: 6   # Consulta externa
-                        }
-
-                        ubicacion = mapa_ubicaciones.get(area_atencion_id, 0)
-                        if ubicacion:
-                              ExpedienteService.cambiar_ubicacion(
-                                    atencionObjeto.paciente.id,
-                                    ubicacion,
-                                    atencion.usuario_id
-                              )
-                        return True
-
-                  except Exception:
-                        log_error(
-                              f"Error actualizando atención id={atencion.id}",
-                              app=LogApp.ATENCION
-                              )
-                        return False
-
-            return False
-            
 
       @staticmethod
       def obtener_atencion(id_atencion):
@@ -378,3 +419,29 @@ class AtencionService:
                         app=LogApp.REPORTE
                   )
                   return None
+            
+
+      @staticmethod
+      def obtener_estado_expediente(expediente_numero):
+            """
+            Determina si el expediente se encuentra en una atención ambulatoria activa.
+            """
+            atencion = (
+                  Atencion.objects.filter(
+                        paciente__expediente_numero=expediente_numero,
+                        fecha_recepcion__isnull=True
+                  )
+                  .only("fecha_creado")
+                  .first()
+            )
+
+            if not atencion:
+                  return None
+
+            return {
+                  "motivo": "ATENCION AMBULATORIA",
+                  "fecha": atencion.fecha_creado,
+            }
+      
+
+

@@ -5,12 +5,14 @@ from paciente.models import Paciente, Padre
 from expediente.models import PacienteAsignacion
 from servicio.models import Sala
 from core.services.paciente_service import PacienteService
+from core.services.expediente_service import ExpedienteService
 from core.services.mapeo_camas_service import MapeoCamasService  # [2026-05-07] Se agregó para liberar cama al inactivar ingreso
 from django.db.models import Func, F, Q, OuterRef, Subquery, DateField, Value, Count
 from django.db.models.functions import Concat
 from django.db import transaction
 from core.utils.utilidades_logging import *
-from core.constants.domain_constants import LogApp
+from core.constants.domain_constants import LogApp, EXP_UBICA_ADMISION_ID
+
 
 class IngresoService:
 
@@ -232,6 +234,7 @@ class IngresoService:
         )
 
         return ingresos
+    
     
     @staticmethod
     def listar_ingresos_por_paciente(id_paciente):
@@ -465,6 +468,8 @@ class IngresoService:
                 # Paso 1: marcar el ingreso como inactivo
                 ingreso.estado = 2
                 ingreso.save(update_fields=["estado"])
+                ubicacion_expediente = ExpedienteService.obtener_o_crear_ubicacion_unidad(EXP_UBICA_ADMISION_ID)
+                ExpedienteService.cambiar_ubicacion(ingreso.paciente.expediente_numero, ubicacion_expediente)
 
                 # Paso 2: liberar la cama - cierra la asignación activa del ingreso
                 # y registra OCUPADA → LIBRE en HistorialEstadoCama
@@ -479,3 +484,29 @@ class IngresoService:
             return True
 
         return False
+    
+    @staticmethod
+    def obtener_estado_expediente(expediente_numero):
+        """
+        Determina si el expediente se encuentra en un ingreso activo.
+
+        """
+
+        ingreso = (
+            Ingreso.objects.filter(
+                paciente__expediente_numero=expediente_numero,
+                estado=1,
+                fecha_recepcion_sdgi__isnull=True
+            )
+            .only("fecha_ingreso","fecha_egreso", "fecha_recepcion_sdgi")
+            .first()
+        )
+
+        if not ingreso:
+            return None
+
+        # Aún está en sala
+        if ingreso.fecha_egreso is None:
+            return {
+                "fecha": ingreso.fecha_ingreso,
+            }

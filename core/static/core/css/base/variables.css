@@ -1,0 +1,153 @@
+:root {
+   /*colore por defecto del proyecto*/
+   --blanco: rgb(255, 255, 255);
+   --negro: #000;
+   --colorTextoMenu: rgb(134, 136, 144);
+   --colorBoton: rgb(0, 0, 0);
+   --colorTextoBoton: rgb(255, 255, 255);
+   --colorMenuHover: rgb(230, 230, 230);
+   --colorMenuTextoHover: rgb(0, 0, 0);
+   --colorLinea: rgb(231, 231, 231);
+
+   --colorSwitchBase: rgb(201, 202, 206);
+   --colorSwitchBolita: rgb(241, 241, 241);
+   --colorSwitchEncendidoBase:  rgb(39, 205, 64);
+
+   --color-Scroll: rgb(192, 192, 192);
+   --color-Scroll-Hover: rgb(134, 134, 134);
+
+   --colorContendor: rgba(245, 245, 245, 0.90);
+
+   --colorTablaStriped: rgba(0, 0, 0, 0.035);
+   --colorTablaHover: rgba(0, 0, 0, 0.055);
+
+
+   --colorTablacelda: rgb(10, 10, 10);
+   --colorTablaceldaBorde: rgba(0, 0, 0, 0.15);
+
+   --colorTablaTituloBorde: rgba(0, 0, 0, 0.3);
+
+   --colorTablaExportacionHover: rgb(34, 34, 34);
+   --colorTablaExportacionTextoHover: rgb(255, 255, 255);
+   /*Colores que no cambian*/
+   --colorControlDeshabilitadoFondo: rgb(134, 136, 144);
+
+   
+   --colorTextoSololectura: rgb(60, 60, 60);
+
+   /*Colores controles desactivados*/
+   --colorTextoBloqueado: rgb(70,70,70);
+   --colorTextBLoqueadoFondo: rgb(242, 242, 222);
+
+
+   --fuenteMenu: 'Fredoka', sans-serif;
+   --fuenteTablaCuerpo: 'Roboto', sans-serif;
+   --fuenteTablaTitulo: 'Titillium Web', sans-serif;
+   --fuenteCuerpo: 'Poppins',sans-serif;
+
+   --sombra-card: 0 .2rem 1rem rgba(0, 0, 0, .05);
+
+   /*Para REsaltar*/
+   --verdeOscuro: rgb(15, 47, 44);
+
+   /* [2026-06-01] Tokens globales reutilizables para estados de cama. */
+   --estado-cama-vacia-bg-suave: #bbf7d0;
+   --estado-cama-vacia-bg: #dcfce7;
+   --estado-cama-vacia-texto: #166534;
+   --estado-cama-ocupada-bg-suave: #fecaca;
+   --estado-cama-ocupada-bg: #fee2e2;
+   --estado-cama-ocupada-texto: #991b1b;
+   --estado-cama-alta-bg-suave: #fde68a;
+   --estado-cama-alta-bg: #fef9c3;
+   --estado-cama-alta-texto: #854d0e;
+   --estado-cama-fuera-servicio-bg-suave: #334155;
+   --estado-cama-fuera-servicio-bg: #1e293b;
+   --estado-cama-fuera-servicio-texto: #f1f5f9;
+   --estado-cama-consulta-externa-bg-suave: #bfdbfe;
+   --estado-cama-consulta-externa-bg: #dbeafe;
+   --estado-cama-consulta-externa-texto: #1e40af;
+   --estado-cama-sin-asignacion-bg-suave: #cbd5e1;
+   --estado-cama-sin-asignacion-bg: #e2e8f0;
+   --estado-cama-sin-asignacion-texto: #334155;
+   --estado-cama-mapeada-borde: #f59e0b;
+   --estado-cama-mapeada-resalte: rgba(245, 158, 11, 0.12);
+   --estado-cama-mapeada-resalte-transparente: rgba(245, 158, 11, 0);
+
+   /* [2026-06-01] Tokens visuales adicionales reutilizables por el mapa de camas. */
+   --mapa-texto-principal: #0f172a;
+   --mapa-texto-secundario: #475569;
+   --mapa-panel-borde: #d9d9d9;
+   --mapa-panel-borde-suave: #e2e8f0;
+   --mapa-panel-borde-cubiculo: #d3deef;
+   --mapa-panel-fondo: #fff;
+   --mapa-panel-fondo-superior: #f3f6fb;
+   --mapa-panel-fondo-suave: #f8fafc;
+   --mapa-panel-texto-accion: #334155;
+   --mapa-acento-ambar: #f59e0b;
+   --mapa-texto-dni: #64748b;
+   --mapa-sombra-indicador: rgba(15, 23, 42, 0.08);
+   --mapa-sombra-indicador-hover: rgba(15, 23, 42, 0.14);
+   --mapa-sombra-indicador-activo: rgba(15, 23, 42, 0.85);
+   --mapa-sombra-indicador-activo-suave: rgba(15, 23, 42, 0.15);
+   --mapa-modal-texto: #0f172a;
+   --mapa-modal-texto-secundario: #475569;
+   --mapa-modal-fondo: #f8fafc;
+   --mapa-modal-fondo-bloqueado: #fee2e2;
+   --mapa-modal-fondo-bloqueado-base: #fecaca;
+   --mapa-modal-bolita-bloqueada: #b91c1c;
+
+   /*Radio Botton */
+   --colorRadioBotonActivo: rgb(73, 168, 88);
+   --colorEliminarRojo  : rgba(220, 53, 69, 0.9)
+   
+}
+
+.darkmode {
+   /*colore para uso del modo oscuro */
+   --blanco: rgb(30, 30, 30);
+   --negro: rgb(255, 255, 255);
+
+   --colorTextoMenu: rgb(120, 120, 127);
+
+   --colorBoton: rgb(255, 255, 255);
+   --colorTextoBoton: rgb(0, 0, 0);
+
+   --colorMenuHover: rgb(0, 0, 0);
+   --colorMenuTextoHover: rgb(238, 238, 238);
+
+   --colorLinea: rgb(71, 70, 78);
+
+   --colorSwitchBase: rgb(39, 205, 64);
+   --colorSwitchBolita: rgb(255, 255, 255);
+
+   --color-Scroll: rgb(68, 69, 74);
+   --color-Scroll-Hover: rgb(95, 95, 95);
+
+   --colorContendor: rgba(33, 37, 41, 1);
+
+   --colorTablaStriped: rgba(255, 255, 255, 0.025);
+   --colorTablaHover: rgba(255, 255, 255, 0.055);
+
+   --colorTablacelda: rgb(238, 238, 238);
+   --colorTablaceldaBorde: rgba(255, 255, 255, 0.30);
+
+   --colorTablaTituloBorde: rgba(255, 255, 255, 0.80);
+
+
+   --colorTablaExportacionHover: rgb(60, 60, 60);
+
+   --colorTextoSololectura: rgb(190, 190, 190);
+
+
+
+   /*Colores controles desactivados*/
+   --colorTextoBloqueado: rgb(70,70,70);
+   --colorTextBLoqueadoFondo: rgb(242, 242, 222);
+
+
+   --sombra-card: 0 .2rem 1rem rgba(255, 255, 255, .05);
+   
+}
+
+
+

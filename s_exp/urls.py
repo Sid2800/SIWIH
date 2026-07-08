@@ -1,0 +1,67 @@
+from django.urls import path
+from s_exp import views
+
+urlpatterns = [
+
+    # ==========================================
+    # VISTAS ADMIN (Template)
+    # ==========================================
+    path('dashboard/', views.DashboardAdminView.as_view(), name='s_exp_dashboard'),
+    path('solicitudes/', views.GestionSolicitudesView.as_view(), name='s_exp_solicitudes'),
+    path('monitoreo/', views.MonitoreoPrestamosView.as_view(), name='s_exp_monitoreo'),
+    path('devoluciones/', views.ControlDevolucionesView.as_view(), name='s_exp_devoluciones'),
+    path('historial/', views.HistorialSolicitudesView.as_view(), name='s_exp_historial'),
+    path('reportes/', views.ReportesView.as_view(), name='s_exp_reportes'),
+
+    # ==========================================
+    # VISTAS USUARIO (Template)
+    # ==========================================
+    path('buscador/', views.BuscadorExpedientesView.as_view(), name='s_exp_buscador'),
+    path('seguimiento/', views.SeguimientoView.as_view(), name='s_exp_seguimiento'),
+
+    # ==========================================
+    # APIs ADMIN
+    # ==========================================
+    path('api/dashboard-stats/', views.dashboard_stats_api, name='s_exp_dashboard_stats_api'),
+    path('api/listar-solicitudes/', views.listar_solicitudes_api, name='s_exp_listar_solicitudes_api'),
+    path('api/aprobar-solicitud/', views.aprobar_solicitud_api, name='s_exp_aprobar_solicitud_api'),
+    path('api/expedientes-solicitud/<int:solicitud_id>/', views.expedientes_solicitud_api, name='s_exp_expedientes_solicitud_api'),
+    path('api/expedientes-revision/<int:solicitud_id>/', views.expedientes_revision_api, name='s_exp_expedientes_revision_api'),
+    path('api/imprimir-solicitud/<int:solicitud_id>/', views.imprimir_solicitud_pdf, name='s_exp_imprimir_solicitud_pdf'),
+    path('api/revisar-entrega/', views.revisar_entrega_api, name='s_exp_revisar_entrega_api'),
+    path('api/marcar-listo/', views.marcar_listo_recojer_api, name='s_exp_marcar_listo_api'),
+    path('api/rechazar-solicitud/', views.rechazar_solicitud_api, name='s_exp_rechazar_solicitud_api'),
+    path('api/prestamos-activos/', views.prestamos_activos_api, name='s_exp_prestamos_activos_api'),
+    path('api/marcar-entregado/', views.marcar_entregado_api, name='s_exp_marcar_entregado_api'),
+    path('api/prestamos-devolucion/', views.prestamos_para_devolucion_api, name='s_exp_prestamos_devolucion_api'),
+    path('api/procesar-devolucion/', views.procesar_devolucion_api, name='s_exp_procesar_devolucion_api'),
+    path('api/reportes-data/', views.reportes_data_api, name='s_exp_reportes_data_api'),
+    path('api/exportar-excel/', views.exportar_reporte_excel, name='s_exp_exportar_excel'),
+    path('api/exportar-pdf/', views.exportar_reporte_pdf, name='s_exp_exportar_pdf'),
+    path('api/historial/', views.historial_solicitudes_api, name='s_exp_historial_api'),
+    path('api/historial/<int:solicitud_id>/', views.historial_solicitud_detalle_api, name='s_exp_historial_detalle_api'),
+
+    # ==========================================
+    # APIs USUARIO
+    # ==========================================
+    path('api/buscar-expedientes/', views.buscar_expedientes_api, name='s_exp_buscar_expedientes_api'),
+    path('api/crear-solicitud/', views.crear_solicitud_api, name='s_exp_crear_solicitud_api'),
+    path('api/mis-solicitudes/', views.mis_solicitudes_api, name='s_exp_mis_solicitudes_api'),
+    path('api/solicitar-devolucion/', views.solicitar_devolucion_api, name='s_exp_solicitar_devolucion_api'),
+
+    # ==========================================
+    # APIs COMUNES / CATÁLOGOS
+    # ==========================================
+    path('api/alertas/', views.alertas_usuario_api, name='s_exp_alertas_api'),
+    path('api/changes-check/', views.changes_check_api, name='s_exp_changes_check_api'),
+    path('api/motivos/', views.motivos_api, name='s_exp_motivos_api'),
+    path('api/info-usuario/', views.info_usuario_api, name='s_exp_info_usuario_api'),
+    path('api/historial-prestamos-paciente/<int:paciente_id>/',
+         views.historial_prestamos_paciente_api,
+         name='s_exp_historial_prestamos_paciente_api'),
+    path('api/historial-prestamos-expediente/<int:expediente_id>/',
+         views.historial_prestamos_expediente_api,
+         name='s_exp_historial_prestamos_expediente_api'),
+    path('api/notificado-listo/', views.marcar_notificacion_leida_api, name='s_exp_notificado_listo_api'),
+    path('api/vencimiento-leido/', views.marcar_vencimiento_leido_api, name='s_exp_vencimiento_leido_api'),
+]
