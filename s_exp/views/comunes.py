@@ -105,7 +105,7 @@ def _es_exp_admin(user):
     if not _es_usuario_valido_rrhh(user):
         return False
     # Permitir acceso a usuarios con roles: admin, digitador, directivo
-    return verificar_permisos_usuario(S_EXP_ADMIN_ROLES,S_EXP_ADMIN_UNIDADES)
+    return verificar_permisos_usuario(user,S_EXP_ADMIN_ROLES,S_EXP_ADMIN_UNIDADES)
 
 
 
