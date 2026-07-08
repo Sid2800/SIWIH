@@ -17,6 +17,7 @@ from mapeo_camas.models import MapeoSesionCama, MapeoSesionServicio  # [2026-05-
 from paciente.models import Paciente
 from servicio.models import Cama
 
+# [2026-06-26 LOG] Este servicio usa LogApp.MAPEO_CAMAS para separar trazas de mapeo.
 
 class MapeoCamasService:
     @staticmethod
@@ -156,7 +157,7 @@ class MapeoCamasService:
         except Exception as exc:
             log_error(
                 "Error al obtener ultimas asignaciones por cama",
-                app=LogApp.INGRESOS,
+                app=LogApp.MAPEO_CAMAS,
                 camas_filtradas=len(cama_ids) if cama_ids else 0,
                 error=str(exc),
             )
@@ -183,7 +184,7 @@ class MapeoCamasService:
         except Exception as exc:
             log_error(
                 "Error al obtener ultimos historiales por cama",
-                app=LogApp.INGRESOS,
+                app=LogApp.MAPEO_CAMAS,
                 camas_filtradas=len(cama_ids) if cama_ids else 0,
                 error=str(exc),
             )
@@ -226,7 +227,7 @@ class MapeoCamasService:
 
         log_warning(
             "Cama liberada por reasignacion sin origen",
-            app=LogApp.INGRESOS,
+            app=LogApp.MAPEO_CAMAS,
             cama_id=getattr(cama, "pk", None),
             usuario_id=getattr(usuario, "id", None),
             sesion_mapeo_id=getattr(sesion_mapeo, "id", None),
@@ -848,7 +849,7 @@ class MapeoCamasService:
             # [2026-06-01] Logging funcional para auditoría de validaciones de negocio.
             log_warning(
                 "Validacion de consistencia fallida en mapeo de camas",
-                app=LogApp.INGRESOS,
+                app=LogApp.MAPEO_CAMAS,
                 cama_id=cama_id,
                 ingreso_id=ingreso_id,
                 errores=errores,
@@ -866,7 +867,7 @@ class MapeoCamasService:
         if not cama_id or not ingreso_id or not usuario:
             log_warning(
                 "Sincronizacion cama-ingreso omitida por parametros incompletos",
-                app=LogApp.INGRESOS,
+                app=LogApp.MAPEO_CAMAS,
                 cama_id=cama_id,
                 ingreso_id=ingreso_id,
                 usuario_id=getattr(usuario, "id", None),
@@ -932,7 +933,7 @@ class MapeoCamasService:
         except IntegrityError as exc:
             log_error(
                 "Conflicto de concurrencia al sincronizar cama con ingreso",
-                app=LogApp.INGRESOS,
+                app=LogApp.MAPEO_CAMAS,
                 cama_id=cama_id,
                 ingreso_id=ingreso_id,
                 usuario_id=getattr(usuario, "id", None),
@@ -946,10 +947,11 @@ class MapeoCamasService:
         """
         [2026-05-26 AUDIT] Cierra la asignación activa por ingreso (compatibilidad de nombre).
         """
+        # [2026-06-30] Cerrar tambien PRE_ALTA para evitar camas colgadas al liberar ingreso.
         estado_ocupada = MapeoCamasService.get_estado_mapeo("OCUPADA", "ESTADO_CAMA")
         filtros = {
             "ingreso_id": ingreso_id,
-            "estado": estado_ocupada,
+            "estado__codigo__in": ESTADOS_OCUPADA_PREALTA,
         }
         if cama_id is not None:
             filtros["cama_id"] = cama_id
@@ -965,6 +967,7 @@ class MapeoCamasService:
 
         estado_vacia = MapeoCamasService.get_estado_mapeo("VACIA", "ESTADO_CAMA")
         ingreso_id_anterior = asignacion_activa.ingreso_id
+        estado_anterior = asignacion_activa.estado or estado_ocupada
         asignacion_activa.estado = estado_vacia
         asignacion_activa.ingreso = None
         asignacion_activa.save(update_fields=["estado", "ingreso"])
@@ -973,7 +976,7 @@ class MapeoCamasService:
         # Cierre: la cama pasa de Ocupada -> Vacia (libera la cama)
         MapeoCamasService.registrar_historial_estado_cama(
             cama_id=asignacion_activa.cama_id,
-            estado_anterior=estado_ocupada,
+            estado_anterior=estado_anterior,
             estado_nuevo=estado_vacia,
             ingreso_id=ingreso_id_anterior,
             usuario=usuario,
@@ -994,7 +997,7 @@ class MapeoCamasService:
         if not ingreso_id or not usuario:
             log_warning(
                 "Cambio de cama omitido por parametros incompletos",
-                app=LogApp.INGRESOS,
+                app=LogApp.MAPEO_CAMAS,
                 cama_anterior_id=cama_anterior_id,
                 cama_nueva_id=cama_nueva_id,
                 ingreso_id=ingreso_id,
@@ -1016,7 +1019,7 @@ class MapeoCamasService:
                 AsignacionCamaPaciente.objects.select_for_update()
                 .filter(
                     ingreso_id=ingreso_id,
-                    estado=estado_ocupada,
+                    estado__codigo__in=ESTADOS_OCUPADA_PREALTA,
                 )
                 .order_by("-fecha_inicio")
                 .first()
@@ -1050,7 +1053,7 @@ class MapeoCamasService:
             if cama_ocupada:
                 log_warning(
                     "Cambio de cama bloqueado: cama destino ocupada",
-                    app=LogApp.INGRESOS,
+                    app=LogApp.MAPEO_CAMAS,
                     cama_nueva_id=cama_nueva_id,
                     ingreso_id=ingreso_id,
                     asignacion_ocupada_id=cama_ocupada.id,
@@ -1060,9 +1063,12 @@ class MapeoCamasService:
                 )
 
             if cama_anterior_id is not None:
+                estado_anterior_cama = (
+                    asignacion_activa.estado if asignacion_activa and asignacion_activa.estado else estado_ocupada
+                )
                 MapeoCamasService.registrar_historial_estado_cama(
                     cama_id=cama_anterior_id,
-                    estado_anterior=estado_ocupada,
+                    estado_anterior=estado_anterior_cama,
                     estado_nuevo=estado_vacia,
                     ingreso_id=ingreso_id,
                     usuario=usuario,
@@ -1194,7 +1200,7 @@ class MapeoOperacionesMapaService:
         if not asig_origen or asig_origen.estado is None or asig_origen.estado.codigo not in {"OCUPADA", "PRE_ALTA"}:
             log_warning(
                 "Movimiento bloqueado: cama origen sin paciente operativo",
-                app=LogApp.INGRESOS,
+                app=LogApp.MAPEO_CAMAS,
                 cama_origen_id=getattr(cama_origen, "pk", None),
                 cama_destino_id=getattr(cama_destino, "pk", None),
             )
@@ -1204,7 +1210,7 @@ class MapeoOperacionesMapaService:
         if not ingreso_operativo:
             log_warning(
                 "Movimiento bloqueado: cama origen sin ingreso operativo",
-                app=LogApp.INGRESOS,
+                app=LogApp.MAPEO_CAMAS,
                 cama_origen_id=getattr(cama_origen, "pk", None),
             )
             raise ValidationError("La cama origen no tiene un ingreso activo valido. Datos incompletos.")
@@ -1212,7 +1218,7 @@ class MapeoOperacionesMapaService:
         if asig_destino and (asig_destino.estado is not None and asig_destino.estado.codigo != "VACIA"):
             log_warning(
                 "Movimiento bloqueado: cama destino no disponible",
-                app=LogApp.INGRESOS,
+                app=LogApp.MAPEO_CAMAS,
                 cama_destino_id=getattr(cama_destino, "pk", None),
                 estado_destino=getattr(getattr(asig_destino, "estado", None), "codigo", None),
             )
@@ -1428,7 +1434,7 @@ class MapeoOperacionesMapaService:
                 if not asig_actual:
                     log_warning(
                         "Confirmar alta bloqueado: no hay asignacion activa",
-                        app=LogApp.INGRESOS,
+                        app=LogApp.MAPEO_CAMAS,
                         cama_id=getattr(cama, "pk", None),
                         accion=accion,
                     )
@@ -1455,7 +1461,7 @@ class MapeoOperacionesMapaService:
                 if not asig_actual or not asig_actual.ingreso_id:
                     log_warning(
                         "Cancelar prealta bloqueado: ingreso actual no disponible",
-                        app=LogApp.INGRESOS,
+                        app=LogApp.MAPEO_CAMAS,
                         cama_id=getattr(cama, "pk", None),
                         accion=accion,
                     )
@@ -1482,7 +1488,7 @@ class MapeoOperacionesMapaService:
                 if not ingreso_observado:
                     log_warning(
                         "Cambio/traslado bloqueado: ingreso observado faltante",
-                        app=LogApp.INGRESOS,
+                        app=LogApp.MAPEO_CAMAS,
                         cama_id=getattr(cama, "pk", None),
                         accion=accion,
                     )
@@ -1532,7 +1538,7 @@ class MapeoOperacionesMapaService:
                 if not ingreso_observado:
                     log_warning(
                         "Asignacion bloqueada: ingreso observado faltante",
-                        app=LogApp.INGRESOS,
+                        app=LogApp.MAPEO_CAMAS,
                         cama_id=getattr(cama, "pk", None),
                         accion=accion,
                     )
@@ -1540,7 +1546,7 @@ class MapeoOperacionesMapaService:
                 if asig_actual and asig_actual.estado == estado_ocupada:
                     log_warning(
                         "Asignacion bloqueada: cama ya ocupada",
-                        app=LogApp.INGRESOS,
+                        app=LogApp.MAPEO_CAMAS,
                         cama_id=getattr(cama, "pk", None),
                         accion=accion,
                     )
@@ -1575,7 +1581,7 @@ class MapeoOperacionesMapaService:
                 if not asig_actual or asig_actual.estado != estado_ocupada:
                     log_warning(
                         "Alta forzada bloqueada: no existe ocupacion activa",
-                        app=LogApp.INGRESOS,
+                        app=LogApp.MAPEO_CAMAS,
                         cama_id=getattr(cama, "pk", None),
                         accion=accion,
                     )
@@ -1599,7 +1605,7 @@ class MapeoOperacionesMapaService:
 
         log_warning(
             "Accion de mapeo no procesada",
-            app=LogApp.INGRESOS,
+            app=LogApp.MAPEO_CAMAS,
             cama_id=getattr(cama, "pk", None),
             accion=accion,
         )

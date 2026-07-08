@@ -154,7 +154,7 @@
 
 {% block extra_css %}
 <!-- 2026-06-09: estáticos de mapeo centralizados en core/static/core/css -->
-<link rel="stylesheet" href="{% static 'core/css/mapeo/mapaCamas.css' %}?v=20260526c">
+<link rel="stylesheet" href="{% static 'core/css/mapeo/mapaCamas.css' %}?v=20260626b">
 <style>
   /* [2026-06-21 IMPROVEMENT] Reutiliza el boton textual del sistema para las acciones de sesión de mapeo. */
   .mapa-botones-acciones .formularioBotones-boton {
@@ -333,5 +333,5 @@
 </script>
 <!-- [2026-06-11] Cache-bust: fuerza recarga del JS con contador de intentos por servicio. -->
 <!-- [2026-06-11] Cache-bust: fix de modo solo lectura en inicio/cierre de sesión de mapeo. -->
-<script src="{% static 'core/scripts/mapeo/mapaCamasAsignacion.js' %}?v=20260622a"></script>
+<script src="{% static 'core/scripts/mapeo/mapaCamasAsignacion.js' %}?v=20260701b"></script>
 {% endblock %}
