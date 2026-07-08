@@ -487,3 +487,137 @@ class ExpedienteService:
             .filter(numero__in=numeros_expediente)
             .update(ubicacion_id=ubicacion)
         )
+    
+
+
+    # ejecion de una vez borrar 
+
+    @staticmethod
+    @transaction.atomic
+    def sincronizar_ubicaciones_desde_ingresos():
+        """
+            Sincroniza la ubicación física de los expedientes con el estado
+            actual de los ingresos.
+
+            Reglas:
+
+            - fecha_recepcion_sdgi != NULL
+                No hacer nada (ya fue recibido por SDGI).
+
+            - fecha_egreso == NULL
+                El expediente permanece en la sala.
+
+            - fecha_egreso != NULL
+            AND fecha_recepcion_sdgi == NULL
+                El expediente debe quedar en Estadística.
+
+            El proceso es idempotente; puede ejecutarse varias veces.
+        """
+
+        from core.constants.domain_constants import EXP_UBICA_ESTADISTICA_ID
+        from ingreso.models import Ingreso
+        #
+        # Mapa Sala -> Unidad Clínica
+        #
+        mapa_salas = {
+            unidad.sala_id: unidad
+            for unidad in (
+                Unidad_clinica.objects
+                .select_related("sala")
+                .exclude(sala=None)
+            )
+        }
+
+        #
+        # Ubicación Estadística
+        #
+        ubicacion_estadistica = ExpedienteUbicacion.objects.get(
+            pk=EXP_UBICA_ESTADISTICA_ID
+        )
+
+        #
+        # Todos los ingresos pendientes de recepción por SDGI
+        #
+        ingresos = (
+            Ingreso.objects
+            .filter(
+                estado=1,
+                fecha_recepcion_sdgi__isnull=True,
+            )
+            .select_related(
+                "paciente",
+                "sala",
+            )
+        )
+
+        #
+        # Mapa Paciente -> Expediente
+        #
+        asignaciones = {
+            asignacion.paciente_id: asignacion.expediente
+            for asignacion in (
+                PacienteAsignacion.objects
+                .filter(estado=1)
+                .select_related("expediente")
+            )
+        }
+
+        expedientes_actualizar = []
+
+        total_sala = 0
+        total_estadistica = 0
+        total_sin_expediente = 0
+        total_sin_unidad = 0
+
+        for ingreso in ingresos:
+
+            expediente = asignaciones.get(ingreso.paciente_id)
+
+            if expediente is None:
+                total_sin_expediente += 1
+                continue
+
+            #
+            # INGRESO ACTIVO
+            #
+            if ingreso.fecha_egreso is None:
+
+                unidad = mapa_salas.get(ingreso.sala_id)
+
+                if unidad is None:
+                    total_sin_unidad += 1
+                    continue
+
+                ubicacion = ExpedienteService._obtener_o_crear_ubicacion_clinica(
+                    unidad
+                )
+
+                if expediente.ubicacion_id != ubicacion.id:
+                    expediente.ubicacion = ubicacion
+                    expedientes_actualizar.append(expediente)
+                    total_sala += 1
+
+            #
+            # EGRESADO PENDIENTE SDGI
+            #
+            else:
+
+                if expediente.ubicacion_id != ubicacion_estadistica.id:
+                    expediente.ubicacion = ubicacion_estadistica
+                    expedientes_actualizar.append(expediente)
+                    total_estadistica += 1
+
+        if expedientes_actualizar:
+            Expediente.objects.bulk_update(
+                expedientes_actualizar,
+                ["ubicacion"],
+                batch_size=500,
+            )
+
+        return {
+            "actualizados": len(expedientes_actualizar),
+            "en_sala": total_sala,
+            "en_estadistica": total_estadistica,
+            "sin_expediente": total_sin_expediente,
+            "sin_unidad_clinica": total_sin_unidad,
+        }

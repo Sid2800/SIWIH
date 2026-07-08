@@ -1427,8 +1427,8 @@ class HistorialPaciente(DetailView):
 
 
 
-        # permisoDispensacion = verificar_permisos_dispensacion(self.request.user, PACIENTE_DISPENSACION_ROLES , PACIENTE_DISPENSACION_UNIDADES )
-        context['permiso_dispensacion'] = False #permisoDispensacion
+        permisoDispensacion = verificar_permisos_dispensacion(self.request.user, PACIENTE_DISPENSACION_ROLES , PACIENTE_DISPENSACION_UNIDADES )
+        context['permiso_dispensacion'] = permisoDispensacion
 
         tabs, activo = UsuarioService.obtener_tabs_usuario(usuario)
         if tabs and activo:

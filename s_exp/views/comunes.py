@@ -17,7 +17,8 @@ from usuario.models import PerfilUnidad
 
 from core.utils.utilidades_logging import log_info, log_warning, log_error
 from core.constants.domain_constants import LogApp
-
+from core.constants.permisos import S_EXP_ADMIN_ROLES, S_EXP_ADMIN_UNIDADES, S_EXP_SOLICITANTE_ROLES, S_EXP_SOLICITANTE_UNIDADES
+from usuario.permisos import verificar_permisos_usuario
 
 # ============================================
 # UTILIDAD: Formateo de fecha/hora en zona local
@@ -103,16 +104,9 @@ def _es_exp_admin(user):
     # Validación global: usuario debe estar en RRHH
     if not _es_usuario_valido_rrhh(user):
         return False
-
-    if user.is_superuser or user.is_staff:
-        return True
-    if user.groups.filter(name='administradores').exists():
-        return True
     # Permitir acceso a usuarios con roles: admin, digitador, directivo
-    return PerfilUnidad.objects.filter(
-        usuario=user,
-        rol__in=['admin', 'digitador', 'directivo']
-    ).exists()
+    return verificar_permisos_usuario(S_EXP_ADMIN_ROLES,S_EXP_ADMIN_UNIDADES)
+
 
 
 def _es_usuario_valido_rrhh(user):
@@ -171,12 +165,12 @@ def _es_exp_solicitante(user):
     - Debe tener rol 'exp_solicitante' o 'admin' en PerfilUnidad, o ser admin del módulo
     """
     # Validación global: usuario debe estar en RRHH
+
     if not _es_usuario_valido_rrhh(user):
         return False
-
-    if _es_exp_admin(user):
-        return True
-    return PerfilUnidad.objects.filter(usuario=user, rol='exp_solicitante').exists()
+    
+    return verificar_permisos_usuario(user, S_EXP_SOLICITANTE_ROLES, S_EXP_SOLICITANTE_UNIDADES)
+    
 
 
 def _get_unidad_usuario(user):
@@ -439,6 +433,8 @@ class SExpAdminMixin(LoginRequiredMixin):
 class SExpUsuarioMixin(LoginRequiredMixin):
     """Acceso para cualquier usuario con acceso al módulo (Solicitantes + Admin)."""
     def dispatch(self, request, *args, **kwargs):
-        if not _es_exp_solicitante(request.user):
-            return redirect('acceso_denegado')
-        return super().dispatch(request, *args, **kwargs)
+        if _es_exp_solicitante(request.user):
+            return super().dispatch(request, *args, **kwargs)
+
+        return redirect('acceso_denegado')
+        
