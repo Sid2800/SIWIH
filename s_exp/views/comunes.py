@@ -328,7 +328,6 @@ def _set_localizacion_por_solicitud(expediente, solicitud, usuario_admin, ubicac
     Returns:
         str: descripción de la nueva ubicación asignada
     """
-    from expediente.models import Localizacion
 
     nombre_ubicacion = None
 
@@ -358,13 +357,9 @@ def _set_localizacion_por_solicitud(expediente, solicitud, usuario_admin, ubicac
     nombre_ubicacion = nombre_ubicacion.upper()
 
     try:
-        loc_obj, _ = Localizacion.objects.get_or_create(
-            descripcion_localizacion=nombre_ubicacion,
-            defaults={'estado': True}
-        )
-        expediente.localizacion = loc_obj
+
         expediente.modificado_por = usuario_admin
-        campos = ['localizacion', 'modificado_por', 'fecha_modificado']
+        campos = [ 'modificado_por', 'fecha_modificado']
         # NUEVO: persistir también la FK al catálogo unificado en la tabla principal.
         if ubicacion_obj is not None:
             expediente.ubicacion = ubicacion_obj
@@ -372,7 +367,7 @@ def _set_localizacion_por_solicitud(expediente, solicitud, usuario_admin, ubicac
         expediente.save(update_fields=campos)
         return nombre_ubicacion
     except Exception as e:
-        log_warning(f"No se pudo actualizar localizacion del expediente #{expediente.numero}: {e}", app=LogApp.S_EXP)
+        log_warning(f"No se pudo actualizar ubicacion del expediente #{expediente.numero}: {e}", app=LogApp.S_EXP)
         return nombre_ubicacion
 
 
@@ -394,20 +389,10 @@ def _set_ubicacion_admision(expediente, usuario_admin, ubicacion_obj=None):
     Returns:
         str: "ADMISION"
     """
-    from expediente.models import Localizacion
-
     try:
-        loc_obj = Localizacion.objects.filter(
-            descripcion_localizacion__iexact='ADMISION'
-        ).first()
-        if not loc_obj:
-            loc_obj, _ = Localizacion.objects.get_or_create(
-                descripcion_localizacion='ADMISION',
-                defaults={'estado': True}
-            )
-        expediente.localizacion = loc_obj
+    
         expediente.modificado_por = usuario_admin
-        campos = ['localizacion', 'modificado_por', 'fecha_modificado']
+        campos = ['modificado_por', 'fecha_modificado']
         # NUEVO: persistir también la FK al catálogo unificado en la tabla principal.
         if ubicacion_obj is not None:
             expediente.ubicacion = ubicacion_obj
