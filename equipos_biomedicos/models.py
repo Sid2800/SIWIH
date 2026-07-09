@@ -5,7 +5,6 @@ from django.db import models
 from django.db.models import F, Q
 from django.utils import timezone
 
-from core.constants.choices_constants import TipoUnidad
 from rrhh.models import Empleado
 from servicio.models import Area_atencion, Unidad
 
@@ -564,14 +563,6 @@ class AsignacionDispositivo(models.Model):
         if tiene_area_clinica == tiene_unidad_no_clinica:
             errores["area_clinica"] = (
                 "Debe seleccionar exactamente una ubicación clínica o no clínica."
-            )
-
-        if (
-            tiene_unidad_no_clinica
-            and self.unidad_no_clinica.tipo == TipoUnidad.CLINICA
-        ):
-            errores["unidad_no_clinica"] = (
-                "La unidad seleccionada debe ser administrativa o de apoyo."
             )
 
         if self.fecha_inicio and self.fecha_fin and self.fecha_fin < self.fecha_inicio:

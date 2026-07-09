@@ -3,7 +3,7 @@ from datetime import date
 from django import forms
 from django.db.models import Q
 
-from core.constants.choices_constants import EstadoRegistro, TipoUnidad
+from core.constants.choices_constants import EstadoRegistro
 from rrhh.models import Empleado
 from servicio.models import Area_atencion, Unidad
 
@@ -362,7 +362,7 @@ class DispositivoCreateForm(forms.ModelForm):
         ).select_related("servicio")
         self.fields["unidad_no_clinica"].queryset = Unidad.objects.filter(
             filtro_unidad_no_clinica
-        ).exclude(tipo=TipoUnidad.CLINICA).order_by("nombre_unidad")
+        ).order_by("nombre_unidad")
 
         responsable_id = None
         if self.is_bound:
