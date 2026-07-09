@@ -12,7 +12,7 @@ from core.utils.utilidades_fechas import formatear_fecha_dd_mm_yyyy_hh_mm
 from s_exp.models import ExpedientePrestamo
 from expediente.models import ExpedienteUbicacion
 from servicio.models import Unidad_clinica, Unidad
-
+from core.constants.domain_constants import EXP_UBICA_ADMISION_ID
 
 class ExpedienteService:
 
@@ -47,6 +47,7 @@ class ExpedienteService:
             else:
                 expediente = ExpedienteService.asignar_expediente_paciente(expediente, paciente_id, usuario_id)
                 
+            ExpedienteService.cambiar_ubicacion(expediente.numero, EXP_UBICA_ADMISION_ID)
             return expediente
     
 
