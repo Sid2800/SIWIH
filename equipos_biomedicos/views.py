@@ -3,7 +3,6 @@ import logging
 from datetime import timedelta
 from functools import wraps
 from io import BytesIO
-
 import qrcode
 from django.conf import settings
 from django.contrib import messages
@@ -129,8 +128,6 @@ def _obtener_asignacion_actual(dispositivo):
         "unidad_no_clinica",
         "responsable",
     ).first()
-
-
 def _obtener_baja_dispositivo(dispositivo):
     # Evita repetir try/except cada vez que necesitamos saber si el equipo
     # ya tiene baja administrativa.
@@ -668,8 +665,6 @@ def qr_dispositivo(request, dispositivo_id):
             "qr_data_uri": _generar_qr_data_uri(detalle_url),
         },
     )
-
-
 @registrar_errores_vista("Error en busqueda de equipos")
 def buscar_dispositivo(request):
     # Busqueda rapida. Muestra resultados cuando hay texto o filtro de gestoria.
@@ -722,12 +717,10 @@ def buscar_dispositivo(request):
             ),
         },
     )
-
-
 @registrar_errores_vista("Error al buscar empleados para equipos")
 def buscar_empleados(request):
     # Endpoint AJAX usado por Select2 en el formulario de registro/edicion.
-    # Devuelve JSON con maximo 10 empleados activos.
+    # Devuelve JSON con maximo 10 empleados activos.        
     consulta = request.GET.get("q", "").strip()
     empleados = Empleado.objects.filter(estado=EstadoRegistro.ACTIVO)
 
@@ -741,6 +734,7 @@ def buscar_empleados(request):
             | Q(segundo_nombre__icontains=termino)
             | Q(primer_apellido__icontains=termino)
             | Q(segundo_apellido__icontains=termino)
+
         )
 
         if termino.isdigit():

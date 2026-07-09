@@ -5,15 +5,15 @@
 {% block content %}
 <div class="contenedor2 biomedicos-pagina biomedicos-pagina--detalle">
     <div class="biomedicos-detalle__encabezado">
-        <a class="biomedicos-detalle__regresar"
-           href="{% url 'listado_dispositivos_biomedicos' %}"
-           aria-label="Regresar al listado">
-            <i class="bi bi-arrow-left"></i>
-        </a>
         <div>
             <h2 class="sin-margen">Detalle del equipo</h2>
             <p>Consulta la información completa del equipo.</p>
         </div>
+        <a class="biomedicos-detalle__regresar"
+           href="{% url 'listado_dispositivos_biomedicos' %}">
+            <i class="bi bi-arrow-left"></i>
+            Listado de equipos
+        </a>
     </div>
 
     {# Resumen superior de la ficha. No muestra editar/baja; esas acciones viven en edicion. #}
@@ -55,7 +55,7 @@
             <a class="formularioBotones-boton biomedicos-detalle__boton biomedicos-detalle__boton--secundario"
                href="{% url 'listado_dispositivos_biomedicos' %}">
                 <i class="bi bi-arrow-left"></i>
-                Regresar
+                Listado de equipos
             </a>
         </div>
     </section>

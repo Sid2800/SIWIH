@@ -319,21 +319,20 @@ class DispositivoCreateForm(forms.ModelForm):
         self.fields["tipo"].queryset = TipoDispositivo.objects.filter(filtro_tipo)
         self.fields["tipo"].empty_label = "Seleccione el tipo de equipo"
         self.fields["marca"].queryset = MarcaDispositivo.objects.filter(filtro_marca)
-        self.fields["marca"].empty_label = "Seleccione la marca o deje INDEFINIDO"
+        self.fields["marca"].empty_label = "Marca / INDEFINIDO"
         self.fields["modelo"].queryset = ModeloDispositivo.objects.filter(filtro_modelo)
-        self.fields["modelo"].empty_label = "Seleccione el modelo o deje INDEFINIDO"
+        self.fields["modelo"].empty_label = "Modelo / INDEFINIDO"
         self.fields["area_gestora"].queryset = AreaGestora.objects.filter(
             filtro_area_gestora
         ).exclude(nombre="INDEFINIDO")
         self.fields["area_gestora"].empty_label = "Seleccione el area gestora"
         self.fields["color"].queryset = ColorDispositivo.objects.filter(filtro_color)
-        self.fields["color"].empty_label = "Seleccione el color o deje INDEFINIDO"
+        self.fields["color"].empty_label = "Color / INDEFINIDO"
         self.fields["tipo_tecnologia"].choices = [
             ("", "Seleccione el tipo de tecnología"),
             *TipoTecnologiaDispositivo.choices,
         ]
         self.fields["estado"].choices = [
-            ("", "Seleccione el estado inicial"),
             (EstadoDispositivo.OPERATIVO, EstadoDispositivo.OPERATIVO.label),
             (
                 EstadoDispositivo.EN_MANTENIMIENTO,
@@ -345,7 +344,6 @@ class DispositivoCreateForm(forms.ModelForm):
             ),
         ]
         self.fields["criticidad"].choices = [
-            ("", "Seleccione la criticidad"),
             *CriticidadDispositivo.choices,
         ]
         filtro_area_clinica = Q(estado=EstadoRegistro.ACTIVO)

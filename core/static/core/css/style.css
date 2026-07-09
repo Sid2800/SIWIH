@@ -5084,6 +5084,7 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
 
 .biomedicos-pagina {
    display: flex;
+   position: relative;
    flex-direction: column;
    gap: 2.5rem;
 }
@@ -5234,16 +5235,40 @@ a.biomedicos-submenu__opcion:hover {
 
 .biomedicos-volver {
    align-items: center;
-   color: var(--colorTextoMenu);
+   background-color: var(--blanco);
+   border: .1rem solid var(--colorTablaceldaBorde);
+   border-radius: .8rem;
+   color: var(--negro);
    display: flex;
+   font-size: 1.3rem;
    font-weight: 700;
-   gap: .8rem;
+   gap: .7rem;
+   min-height: 3.6rem;
+   justify-content: center;
+   margin-left: auto;
+   padding: .6rem 1rem;
    text-decoration: none;
    width: max-content;
 }
 
+.biomedicos-volver i {
+   font-size: 1.7rem;
+}
+
 .biomedicos-volver:hover {
+   background-color: var(--colorMenuHover);
    color: var(--negro);
+}
+
+.biomedicos-pagina > .biomedicos-volver {
+   position: absolute;
+   right: 1.2rem;
+   top: 1.2rem;
+   z-index: 3;
+}
+
+.biomedicos-pagina > .biomedicos-volver + .tituloFormulario {
+   padding-right: 15rem;
 }
 
 .biomedicos-etiqueta {
@@ -5307,6 +5332,7 @@ a.biomedicos-submenu__opcion:hover {
 .biomedicos-busqueda__boton {
    height: auto;
    justify-content: center;
+   margin-left: auto;
    padding: 1rem 1.8rem;
    width: auto;
 }
@@ -5352,8 +5378,19 @@ a.biomedicos-submenu__opcion:hover {
 }
 
 @media (max-width: 650px) {
+   .biomedicos-pagina > .biomedicos-volver {
+      align-self: flex-end;
+      margin-bottom: -1.2rem;
+      position: static;
+   }
+
+   .biomedicos-pagina > .biomedicos-volver + .tituloFormulario {
+      padding-right: 0;
+   }
+}
+@media (max-width: 650px) {
    .biomedicos-busqueda__campo {
-      grid-template-columns: auto 1fr;
+      grid-template-columns: 1fr;
    }
 
    .biomedicos-busqueda__gestoria {
@@ -5371,7 +5408,7 @@ a.biomedicos-submenu__opcion:hover {
 
 .biomedicos-registro {
    display: grid;
-   gap: 1.5rem;
+   gap: 1.1rem;
    grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
@@ -5394,26 +5431,26 @@ a.biomedicos-submenu__opcion:hover {
    background-color: var(--blanco);
    border: .1rem solid var(--colorLinea);
    border-radius: 1.2rem;
-   padding: 1.8rem;
+   padding: 1.3rem 1.4rem;
 }
 
 .biomedicos-registro__titulo {
    align-items: center;
    color: var(--negro);
    display: flex;
-   font-size: 1.7rem;
-   gap: 1rem;
-   margin: 0 0 1.8rem;
+   font-size: 1.45rem;
+   gap: .8rem;
+   margin: 0 0 1.2rem;
 }
 
 .biomedicos-registro__titulo i {
    color: var(--negro);
-   font-size: 2.2rem;
+   font-size: 1.9rem;
 }
 
 .biomedicos-registro__campos {
    display: grid;
-   gap: 1.5rem;
+   gap: 1rem;
 }
 
 .biomedicos-registro__campos--dos {
@@ -5423,7 +5460,7 @@ a.biomedicos-submenu__opcion:hover {
 .biomedicos-registro__campo {
    display: flex;
    flex-direction: column;
-   gap: .6rem;
+   gap: .35rem;
    min-width: 0;
 }
 
@@ -5437,20 +5474,45 @@ a.biomedicos-submenu__opcion:hover {
 
 .biomedicos-registro__campo label {
    color: var(--negro);
-   font-size: 1.4rem;
+   font-size: 1.25rem;
    font-weight: 700;
 }
 
 .biomedicos-registro__campo .formularioCampo-text,
 .biomedicos-registro__campo .formularioCampo-select,
 .biomedicos-registro__campo .formularioCampo-date {
-   min-height: 3.8rem;
+   font-size: 1.35rem;
+   line-height: 1.2;
+   min-height: 3.2rem;
+   padding: .35rem .55rem;
    text-transform: none;
 }
 
+.biomedicos-registro__campo .formularioCampo-text::placeholder {
+   font-size: 1.35rem;
+}
+
 .biomedicos-registro__campo textarea.formularioCampo-text {
-   min-height: 9rem;
-   padding: 1rem;
+   min-height: 7.5rem;
+   padding: .7rem;
+}
+
+.biomedicos-registro .select2-container--default {
+   min-height: 3.2rem;
+}
+
+.biomedicos-registro .select2-selection {
+   min-height: 3.2rem !important;
+}
+
+.biomedicos-registro .select2-selection__rendered {
+   font-size: 1.35rem;
+   line-height: 3.2rem !important;
+   padding-left: .55rem !important;
+}
+
+.biomedicos-registro .select2-selection__arrow {
+   height: 3.2rem !important;
 }
 
 .biomedicos-registro__costo {
@@ -5466,7 +5528,8 @@ a.biomedicos-submenu__opcion:hover {
    border-radius: .5rem 0 0 .5rem;
    color: var(--negro);
    display: flex;
-   padding: 0 1rem;
+   font-size: 1.3rem;
+   padding: 0 .8rem;
 }
 
 .biomedicos-registro__costo .formularioCampo-text {
@@ -5480,15 +5543,15 @@ a.biomedicos-submenu__opcion:hover {
    display: flex;
    flex-direction: column;
    justify-content: center;
-   min-height: 13rem;
-   padding: 1.5rem;
+   min-height: 10.5rem;
+   padding: 1rem;
    text-align: center;
 }
 
 .biomedicos-registro__foto i {
    color: var(--negro);
-   font-size: 3.5rem;
-   margin-bottom: .5rem;
+   font-size: 2.8rem;
+   margin-bottom: .3rem;
 }
 
 .biomedicos-registro__foto small {
@@ -5499,7 +5562,7 @@ a.biomedicos-submenu__opcion:hover {
 .biomedicos-registro__acciones {
    align-items: center;
    display: flex;
-   gap: 1.5rem;
+   gap: 1rem;
    grid-column: 1 / -1;
    justify-content: space-between;
    width: 100%;
@@ -5507,7 +5570,7 @@ a.biomedicos-submenu__opcion:hover {
 
 .biomedicos-registro__acciones-principales {
    display: flex;
-   gap: 1.5rem;
+   gap: 1rem;
    justify-content: flex-end;
    margin-left: auto;
 }
@@ -5515,10 +5578,10 @@ a.biomedicos-submenu__opcion:hover {
 .biomedicos-registro__boton {
    height: auto;
    justify-content: center;
-   min-height: 4.8rem;
-   padding: 1rem 2rem;
+   min-height: 4.2rem;
+   padding: .8rem 1.6rem;
    text-transform: none;
-   width: 23rem;
+   width: 20rem;
 }
 
 .biomedicos-registro__boton--secundario {
@@ -5569,13 +5632,24 @@ a.biomedicos-submenu__opcion:hover {
    justify-content: space-between;
 }
 
-.biomedicos-listado__encabezado > div {
+.biomedicos-listado__titulo {
    display: flex;
    flex: 1;
    flex-direction: column;
    gap: 1.5rem;
 }
 
+.biomedicos-listado__acciones-encabezado {
+   align-items: center;
+   display: flex;
+   gap: 1rem;
+   justify-content: flex-end;
+}
+
+.biomedicos-volver--inline {
+   margin-left: 0;
+   position: static;
+}
 .biomedicos-listado__subtitulo {
    color: var(--colorTextoMenu);
    font-size: 1.3rem;
@@ -5956,6 +6030,14 @@ table.dataTable tbody td.biomedicos-listado__vacio {
       flex-direction: column;
    }
 
+   .biomedicos-listado__acciones-encabezado {
+      align-items: stretch;
+      flex-direction: column;
+   }
+
+   .biomedicos-listado__acciones-encabezado .biomedicos-volver {
+      width: 100%;
+   }
    .biomedicos-listado__registrar {
       width: 100%;
    }
@@ -5997,7 +6079,7 @@ table.dataTable tbody td.biomedicos-listado__vacio {
    align-items: center;
    display: grid;
    gap: 1.5rem;
-   grid-template-columns: auto 1fr auto;
+   grid-template-columns: minmax(0, 1fr) auto;
 }
 
 .biomedicos-detalle__encabezado p {
@@ -6012,13 +6094,20 @@ table.dataTable tbody td.biomedicos-listado__vacio {
    border-radius: .8rem;
    color: var(--negro);
    display: flex;
-   font-size: 2rem;
-   height: 4.2rem;
+   font-size: 1.3rem;
+   font-weight: 700;
+   gap: .7rem;
    justify-content: center;
+   margin-left: auto;
+   min-height: 3.6rem;
+   padding: .6rem 1rem;
    text-decoration: none;
-   width: 4.2rem;
+   width: max-content;
 }
 
+.biomedicos-detalle__regresar i {
+   font-size: 1.7rem;
+}
 .biomedicos-detalle__demo {
    background-color: var(--colorMenuHover);
    border-radius: 5rem;
@@ -6380,7 +6469,7 @@ table.dataTable tbody td.biomedicos-listado__vacio {
    .biomedicos-detalle__encabezado {
       align-items: start;
       gap: 1rem;
-      grid-template-columns: auto 1fr;
+      grid-template-columns: 1fr;
    }
 
    .biomedicos-detalle__encabezado h2 {
@@ -6393,9 +6482,10 @@ table.dataTable tbody td.biomedicos-listado__vacio {
    }
 
    .biomedicos-detalle__regresar {
-      font-size: 1.8rem;
-      height: 3.8rem;
-      width: 3.8rem;
+      font-size: 1.25rem;
+      margin-left: auto;
+      min-height: 3.6rem;
+      width: max-content;
    }
 
    .biomedicos-detalle__demo {
@@ -6467,16 +6557,16 @@ table.dataTable tbody td.biomedicos-listado__vacio {
 }
 
 
-/* Detalle de equipos fijo dentro del area principal. */
+/* Detalle de equipos con scroll general de la pagina. */
 .contenedor:has(> .biomedicos-pagina--detalle) {
-   height: 100%;
-   overflow: hidden;
+   height: auto;
+   overflow: visible;
 }
 
 .contenedor2.biomedicos-pagina--detalle {
-   height: calc(100% - 2rem);
+   height: auto;
    margin: 1rem 0;
-   overflow: hidden;
+   overflow: visible;
 }
 
 .biomedicos-pagina--detalle .biomedicos-detalle__encabezado,
@@ -6485,17 +6575,15 @@ table.dataTable tbody td.biomedicos-listado__vacio {
 }
 
 .biomedicos-pagina--detalle .biomedicos-detalle__contenido {
-   flex: 1 1 auto;
-   min-height: 0;
-   overflow-x: hidden;
-   overflow-y: auto;
-   padding-right: .4rem;
+   flex: 0 1 auto;
+   min-height: auto;
+   overflow: visible;
+   padding-right: 0;
 }
 
 .biomedicos-pagina--detalle .biomedicos-detalle__secciones {
-   min-height: 0;
+   min-height: auto;
 }
-
 .biomedicos-pagina--detalle .biomedicos-detalle__tabla {
    min-width: 0;
    table-layout: fixed;
