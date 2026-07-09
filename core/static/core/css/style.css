@@ -5211,6 +5211,7 @@ a.biomedicos-submenu__opcion:hover {
    justify-content: space-between;
 }
 
+.biomedicos-listado__encabezado > div,
 .biomedicos-listado__titulo {
    display: flex;
    flex: 1;
