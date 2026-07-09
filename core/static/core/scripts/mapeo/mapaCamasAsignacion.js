@@ -857,6 +857,32 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 
+  // [2026-07-09] Valida apertura del modal SOLO para rol con intentos restringidos.
+  async function validarAperturaModalEdicion() {
+    if (!window.MAPA_ROL_INTENTOS_RESTRINGIDO) {
+      return true;
+    }
+    if (!API_URLS.validarAperturaModal) {
+      return true;
+    }
+
+    try {
+      var response = await fetch(API_URLS.validarAperturaModal, {
+        method: "GET",
+        headers: { "X-Requested-With": "XMLHttpRequest" }
+      });
+      var data = await response.json();
+      if (!response.ok || !data.ok) {
+        toastr.warning((data && data.error) || "No se puede abrir el modal en este momento.", "Aviso");
+        return false;
+      }
+      return true;
+    } catch (error) {
+      toastr.error("No se pudo validar permisos para abrir el modal.", "Error");
+      return false;
+    }
+  }
+
   // Modal principal para operar una cama: cambio de estado o movimiento de paciente.
   async function abrirModalEdicionCama(camaEl, soloVista) {
     // Datos base tomados de la card seleccionada.
@@ -1020,11 +1046,14 @@ document.addEventListener("DOMContentLoaded", function () {
     if (estadosDisponibles.indexOf("OCUPADA") === -1) {
       estadosDisponibles.push("OCUPADA");
     }
+    // [2026-07-08] Restaurar FUERA_SERVICIO como estado destino del modal
+    if (estadosDisponibles.indexOf("FUERA_SERVICIO") === -1) estadosDisponibles.push("FUERA_SERVICIO");
     if (estadoActual && estadosDisponibles.indexOf(estadoActual) === -1) {
       estadosDisponibles.unshift(estadoActual);
     }
     if (window.MAPA_ROL_INTENTOS_RESTRINGIDO && esOcupada) {
-      estadosDisponibles = ["VACIA", "PRE_ALTA"];
+      // [2026-07-08] FUERA_SERVICIO permitido para rol restringido
+      estadosDisponibles = ["VACIA", "PRE_ALTA", "FUERA_SERVICIO"];
     }
     var opcionesEstado = estadosDisponibles.map(function (e) {
       var sel = e === estadoActual ? ' selected="selected"' : "";
@@ -1175,8 +1204,9 @@ document.addEventListener("DOMContentLoaded", function () {
               Swal.showValidationMessage("Debe seleccionar el nuevo estado.");
               return false;
             }
-            if (window.MAPA_ROL_INTENTOS_RESTRINGIDO && ["VACIA", "PRE_ALTA"].indexOf(estadoEl.value) === -1) {
-              Swal.showValidationMessage("Este rol solo puede pasar la cama a PRE_ALTA o VACIA desde esta pantalla.");
+            if (window.MAPA_ROL_INTENTOS_RESTRINGIDO && ["VACIA", "PRE_ALTA", "FUERA_SERVICIO"].indexOf(estadoEl.value) === -1) {
+              // [2026-07-08] FUERA_SERVICIO permitido para rol restringido
+              Swal.showValidationMessage("Este rol solo puede pasar la cama a PRE_ALTA, VACIA o FUERA_SERVICIO desde esta pantalla.");
               return false;
             }
             // Si se mantiene OCUPADA, re-enviar el ingreso actual para no romper validacion del backend.
@@ -1789,8 +1819,12 @@ document.addEventListener("DOMContentLoaded", function () {
               _clickTimer = null;
               if (sesionMapeoActivaId) { confirmarCamaSinCambios(camaEl); }
             } else {
-              _clickTimer = setTimeout(function () {
+              _clickTimer = setTimeout(async function () {
                 _clickTimer = null;
+                var puedeAbrirModal = await validarAperturaModalEdicion();
+                if (!puedeAbrirModal) {
+                  return;
+                }
                 abrirModalEdicionCama(camaEl);
               }, CLICK_DELAY_MS);
             }

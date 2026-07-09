@@ -29,7 +29,7 @@ from core.constants.permisos import (
 from core.services.usuario_service import UsuarioService
 from usuario.permisos import verificar_permisos_usuario
 
-from mapeo_camas.models import HistorialEstadoCama
+from mapeo_camas.models import HistorialEstadoCama, MapeoSesionCama
 from servicio.models import Sala
 
 from core.constants.mapeo_camas_constants import (
@@ -161,12 +161,21 @@ def _inicio_ventana_limite_sala():
 
 
 def _filtro_observaciones_movimiento_limite():
-    """Filtro común para contar movimientos que consumen límite por sala.
-    Los movimientos de superadmin quedan fuera porque usan otra observación."""
+    """Filtro para contar SOLO MOVIMIENTOS que consumen límite por sala.
+    
+    [2026-07-09] DIAGNÓSTICO BD COMPLETADO:
+    - MOV_PAC: Movimiento inter-servicio (diferentes salas) → CUENTA ✓
+    - MOV_PAC_DETALLE: Movimiento intra-servicio (misma sala) → NO CUENTA ✗
+    - CAMBIO_TRASLADO_MAPEO: Movimiento en sesión mapeo → CUENTA ✓
+    - MOV_PAC_SUPERADMIN: Movimiento admin → NO CUENTA ✗
+    
+    Se excluyen intra-servicio (MOV_PAC_DETALLE) y cambios de estado sin movimiento.
+    Datos BD: Servicio 200 tiene 12 MOV_PAC + 6 MOV_PAC_DETALLE.
+    Solo los 12 MOV_PAC deberían contar en el límite.
+    """
     return Q(observacion__codigo__in=[
-        OBSERVACION_MOVIMIENTO_PACIENTE_MAPA,
-        OBSERVACION_MOVIMIENTO_PACIENTE_MAPA_DETALLE,
-        OBSERVACION_CAMBIO_TRASLADO_MAPEO,
+        OBSERVACION_MOVIMIENTO_PACIENTE_MAPA,          # MOV_PAC: inter-servicio
+        OBSERVACION_CAMBIO_TRASLADO_MAPEO,             # Cambio traslado en mapeo
     ])
 
 
@@ -278,4 +287,46 @@ def _validar_limite_intentos_salas(usuario, sala_ids):
                 status=400,
             )
 
+    return None
+
+
+# [2026-07-09] Validación para bloquear cambios mientras hay mapeo en proceso
+def _validar_mapeo_no_iniciado(usuario):
+    """Valida que NO haya una sesión de mapeo en proceso (EN_PROGRESO).
+    
+    IMPORTANTE: Esta validación SOLO aplica a usuarios con rol/unidad MAPEO_CAMAS_INTENTOS_CAMBIO
+    (digitador en ADMI/SALA). Los demás usuarios pueden hacer cambios libremente.
+    
+    Retorna JsonResponse 400 si existe una sesión activa y el usuario es restringido; 
+    en caso contrario None.
+    """
+    # [2026-07-09] Validar explícitamente por permisos de intentos de cambio.
+    if not usuario or getattr(usuario, "is_superuser", False):
+        return None
+    if not verificar_permisos_usuario(
+        usuario,
+        MAPEO_CAMAS_INTENTO_CAMBIO_ROLES,
+        MAPEO_CAMAS_INTENTO_CAMBIO_UNIDADES,
+    ):
+        return None
+    
+    sesion_activa = MapeoSesionCama.objects.filter(
+        estado__codigo="EN_PROGRESO",
+        fecha_fin__isnull=True,
+    ).first()
+    
+    if sesion_activa:
+        return JsonResponse(
+            {
+                "ok": False,
+                "error": (
+                    f"No se pueden realizar cambios mientras hay un mapeo en proceso. "
+                    f"Iniciado por {sesion_activa.usuario.get_full_name()} "
+                    f"a las {sesion_activa.fecha_inicio:%H:%M}."
+                ),
+                "sesion_id": sesion_activa.id,
+            },
+            status=400,
+        )
+    
     return None

@@ -438,8 +438,7 @@ def dashboard_kpis(request):
         pct = round((ocupadas / total_camas) * 100, 1) if total_camas else 0
 
         # [2026-07-02] CAMBIO: Reemplazadas métricas de sesión mapeo por estados operativos
-        # Extraer conteos de estados específicos del conteo general
-        mantenimiento = conteo_por_estado.get("MANTENIMIENTO", 0)
+        # [2026-07-09] Removida métrica separada de mantenimiento (consolidada en fuera_servicio)
         consulta_externa = conteo_por_estado.get("CONSULTA_EXTERNA", 0)
         pre_altas = conteo_por_estado.get("PRE_ALTA", 0)
 
@@ -450,7 +449,6 @@ def dashboard_kpis(request):
             "disponibles": disponibles,
             "fuera_servicio": fuera_servicio,
             "porcentaje_ocupacion": pct,
-            "mantenimiento": mantenimiento,
             "consulta_externa": consulta_externa,
             "pre_altas": pre_altas,
         }, meta=_rango_meta(desde, hasta))

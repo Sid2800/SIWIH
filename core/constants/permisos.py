@@ -100,16 +100,16 @@ MAPEO_CAMAS_VISUALIZACION_ROLES = ["admin", "digitador", "visitante", "directivo
 MAPEO_CAMAS_VISUALIZACION_UNIDADES = ["ADMI", 'SALA']
 
 # [2026-05-18] Acceso para entrar y ejecutar flujo de mapeo.
-MAPEO_CAMAS_MAPEAR_ROLES = ["admin", "digitador",]
+MAPEO_CAMAS_MAPEAR_ROLES = ["admin",]
 MAPEO_CAMAS_MAPEAR_UNIDADES = ["ADMI",'SALA']
 
 # [2026-05-18] Acceso para cambios manuales en el mapa (edición directa).
-MAPEO_CAMAS_CAMBIOS_ROLES = []
-MAPEO_CAMAS_CAMBIOS_UNIDADES = ["ADMI"]
+MAPEO_CAMAS_CAMBIOS_ROLES = ["digitador" ]
+MAPEO_CAMAS_CAMBIOS_UNIDADES = ["ADMI","SALA"]
 
 # [2026-06-11] Ajuste operativo: el limite de intentos aplica.
-MAPEO_CAMAS_INTENTOS_CAMBIO_ROLES = []
-MAPEO_CAMAS_INTENTOS_CAMBIO_UNIDADES = ["ADMI"]
+MAPEO_CAMAS_INTENTOS_CAMBIO_ROLES = ["digitador"]
+MAPEO_CAMAS_INTENTOS_CAMBIO_UNIDADES = ["ADMI","SALA"]
 
 # Acceso de auditoría (historiales, detalle de historial)
 # [2026-05-11] Visitante habilitado para visualizar templates de historial.

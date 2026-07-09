@@ -12,7 +12,6 @@
     disponibles: "kpi-disponibles",
     fuera_servicio: "kpi-fuera-servicio",
     porcentaje_ocupacion: "kpi-porcentaje-ocupacion",
-    mantenimiento: "kpi-mantenimiento",
     consulta_externa: "kpi-consulta-externa",
     pre_altas: "kpi-pre-altas",
   };
