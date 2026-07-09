@@ -357,7 +357,7 @@ class PacienteEditView(UpdateView):
             info_expediente = {
                 'numero': expediente.numero,
                 'estado': expediente.estado,  # AsegÃºrate de que 'estado' sea en minÃºsculas
-                'ubicacion': expediente.localizacion.descripcion_localizacion  # AsegÃºrate de que 'ubicacion' estÃ© en minÃºsculas
+
             }
             context['info_expediente'] = json.dumps(info_expediente)
 
@@ -1421,48 +1421,13 @@ class HistorialPaciente(DetailView):
     def get_context_data(self,**kwargs):
         context = super().get_context_data(**kwargs)
         usuario = self.request.user
-        paciente = self.object
 
-        info_paciente = {#adicional requiere formateo
-            'dni': formatear_dni(paciente.dni) if paciente.dni else "--------",
-            'telefono': paciente.telefono if paciente.telefono else "--------",
-            'nombreCompleto': formatear_nombre_completo(paciente.primer_nombre,paciente.segundo_nombre, paciente.primer_apellido, paciente.segundo_apellido),
-            'fechaNacimiento': paciente.fecha_nacimiento,
-            'edad': calcular_edad_texto(str(paciente.fecha_nacimiento)),
-            'sexo': paciente.get_sexo_display(),
-            'domicilio': UbicacionService.obtener_cadena_ubicacion_completa(paciente)
-        }
-        context['info_paciente'] = info_paciente
+        datos = PacienteService.obtener_datos_paciente(self.object)
+        context.update(vars(datos))
 
-        expediente = ExpedienteService.obtener_expediente_activo_paciente(paciente.id)
-        if expediente:
-            info_expediente = {
-                'numero': formatear_expediente(expediente.numero),
-                'ubicacion': expediente.localizacion.descripcion_localizacion 
-            }
-            context['info_expediente'] = info_expediente
 
-        def obtener_info_padre(padre_id):
-            return PadreService.obtener_detalles_padre(padre_id) if padre_id else None
 
-        context['info_madre'] = obtener_info_padre(paciente.madre_id)
-        context['ultima_atencion'] = paciente.get_ultima_visita()
-
-        #comprueba informacino si es SAI o DEFUNCION
-        defuncion = PacienteService.obtener_defuncion(paciente.id)
-        if defuncion:
-
-            lugar = defuncion.unidad_clinica if defuncion.tipo_defuncion == TipoDefuncion.INTRAHOSPITALARIA  else "EXTRAHOSPITALARIA"
-            info_defuncion = {
-                'id': defuncion.id,
-                'fecha': defuncion.fecha_defuncion,
-                'motivo': defuncion.motivo,
-                'fecha_registro':defuncion.fecha_registro,
-                'unidad_clinica': lugar
-            }
-            context['info_defuncion'] = info_defuncion
-
-        permisoDispensacion = verificar_permisos_dispensacion(self.request.user,PACIENTE_DISPENSACION_ROLES , PACIENTE_DISPENSACION_UNIDADES )
+        permisoDispensacion = verificar_permisos_dispensacion(self.request.user, PACIENTE_DISPENSACION_ROLES , PACIENTE_DISPENSACION_UNIDADES )
         context['permiso_dispensacion'] = permisoDispensacion
 
         tabs, activo = UsuarioService.obtener_tabs_usuario(usuario)
@@ -1470,8 +1435,25 @@ class HistorialPaciente(DetailView):
             context['tabs'] = tabs
             context['tabActiva'] = activo
 
+    
 
         return context
+    
+
+def estado_expediente_partial(request, paciente_id):
+
+    paciente = get_object_or_404(
+        Paciente,
+        id=paciente_id
+    )
+
+    datos = PacienteService.obtener_datos_paciente(paciente)
+
+    return render(
+        request,
+        "paciente/partials/_estado_expediente.html",
+        vars(datos)
+    )
 
 
 def EjecutarReclasificacion(request):

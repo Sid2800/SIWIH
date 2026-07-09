@@ -5,6 +5,7 @@ from datetime import timedelta
 from collections import defaultdict
 
 from django.contrib.auth.decorators import login_required
+from django.db.models import OuterRef, Subquery
 from django.http import HttpResponse
 from django.shortcuts import redirect
 from django.utils import timezone
@@ -40,7 +41,6 @@ from ._helpers import (
     _paciente_payload,
     _rango_meta,
     _snapshot_estado_camas,
-    _snapshot_estado_por_cama,
 )
 from ._permisos import _tiene_permiso_dashboard
 from ._sesion import _obtener_sesion_mapeo_activa
@@ -56,23 +56,45 @@ __all__ = [
 ]
 
 
-ESTADOS_OCUPADOS_REPORTE = {"OCUPADA", "PRE_ALTA"}
+# [2026-06-26] En el reporte Excel de ocupacion se contabiliza solo estado OCUPADA
+# para alinear con lectura operativa del historial por cama.
+ESTADOS_OCUPADOS_REPORTE = {"OCUPADA"}
 
 
 def _iterar_dias_intervalo(inicio, fin):
     """2026-06-16: Devuelve días tocados por el intervalo [inicio, fin)."""
     if not inicio or not fin or fin <= inicio:
         return
-    cursor = inicio.date()
-    ultimo = (fin - timedelta(seconds=1)).date()
+    # [2026-06-26] Normaliza a hora local para evitar desfases de día por UTC en el conteo.
+    inicio_local = timezone.localtime(inicio)
+    fin_local = timezone.localtime(fin)
+    cursor = inicio_local.date()
+    ultimo = (fin_local - timedelta(seconds=1)).date()
     while cursor <= ultimo:
         yield cursor
         cursor = cursor + timedelta(days=1)
 
 
+def _snapshot_estado_por_cama_desde_historial(corte):
+    """2026-06-26: Snapshot historico estricto por cama usando solo HistorialEstadoCama."""
+    return {
+        r["cama_id"]: (r["estado_nuevo__codigo"] or "VACIA")
+        for r in HistorialEstadoCama.objects
+        .filter(id=Subquery(
+            HistorialEstadoCama.objects
+            .filter(cama_id=OuterRef("cama_id"), fecha_hora__lte=corte)
+            .order_by("-fecha_hora", "-id")
+            .values("id")[:1]
+        ))
+        .values("cama_id", "estado_nuevo__codigo")
+    }
+
+
 def _calcular_metricas_ocupacion_por_cama(desde, hasta):
     """2026-06-16: Calcula horas/días ocupados e ingresos por cama para el rango."""
-    snapshot_desde = _snapshot_estado_por_cama(desde)
+    # [2026-06-26] Para reporte historico de ocupacion, usar solo historial evita arrastre
+    # de estado actual desde AsignacionCamaPaciente y reduce inflado de horas/dias.
+    snapshot_desde = _snapshot_estado_por_cama_desde_historial(desde)
 
     eventos = list(
         HistorialEstadoCama.objects
@@ -81,12 +103,15 @@ def _calcular_metricas_ocupacion_por_cama(desde, hasta):
         .order_by("cama_id", "fecha_hora", "id")
     )
 
+    # [2026-06-26] Para mantener coherencia con horas/dias del reporte, ingresos/pacientes
+    # también se calculan desde historial (evento de ocupación) en lugar de asignaciones.
     ingresos_rows = list(
-        AsignacionCamaPaciente.objects
+        HistorialEstadoCama.objects
         .filter(
-            fecha_inicio__gte=desde,
-            fecha_inicio__lte=hasta,
+            fecha_hora__gte=desde,
+            fecha_hora__lte=hasta,
             ingreso_id__isnull=False,
+            estado_nuevo__codigo="OCUPADA",
         )
         .values("cama_id", "ingreso_id")
     )
@@ -403,7 +428,8 @@ def dashboard_kpis(request):
         # 2026-06-16: KPIs del dashboard alimentados solo con tablas de mapeo_camas.
         conteo_por_estado = _snapshot_estado_camas(hasta)
         total_camas = sum(conteo_por_estado.values())
-        ocupadas = conteo_por_estado.get("OCUPADA", 0)
+        # [2026-06-26] Alinea KPI con el resto del dashboard: PRE_ALTA también cuenta como ocupada.
+        ocupadas = conteo_por_estado.get("OCUPADA", 0) + conteo_por_estado.get("PRE_ALTA", 0)
         disponibles = conteo_por_estado.get("VACIA", 0) + conteo_por_estado.get("LIBRE", 0)
         fuera_servicio = (
             conteo_por_estado.get("FUERA_SERVICIO", 0) + conteo_por_estado.get("MANTENIMIENTO", 0)
@@ -411,24 +437,11 @@ def dashboard_kpis(request):
 
         pct = round((ocupadas / total_camas) * 100, 1) if total_camas else 0
 
-        # 2026-06-16: KPI "Altas del dia" retirado; dashboard evita este dato en fase actual.
-        # 2026-06-16: En dashboard se presenta actividad como movimientos del rango.
-        movimientos = MovimientoCama.objects.filter(
-            fecha_hora__gte=desde,
-            fecha_hora__lte=hasta,
-        ).count()
-
-        sesion = _obtener_sesion_mapeo_activa(request.user)
-        cambios_mapeo = 0
-        camas_validadas = 0
-        if sesion:
-            cambios_mapeo = DetalleMapeoCama.objects.filter(
-                sesion_mapeo=sesion, hubo_cambio=True
-            ).count()
-            camas_validadas = (
-                DetalleMapeoCama.objects.filter(sesion_mapeo=sesion, fue_validada=True)
-                .values("cama_id").distinct().count()
-            )
+        # [2026-07-02] CAMBIO: Reemplazadas métricas de sesión mapeo por estados operativos
+        # Extraer conteos de estados específicos del conteo general
+        mantenimiento = conteo_por_estado.get("MANTENIMIENTO", 0)
+        consulta_externa = conteo_por_estado.get("CONSULTA_EXTERNA", 0)
+        pre_altas = conteo_por_estado.get("PRE_ALTA", 0)
 
         return _dashboard_response({
             "estados": conteo_por_estado,
@@ -437,9 +450,9 @@ def dashboard_kpis(request):
             "disponibles": disponibles,
             "fuera_servicio": fuera_servicio,
             "porcentaje_ocupacion": pct,
-            "movimientos": movimientos,
-            "cambios_mapeo": cambios_mapeo,
-            "camas_validadas": camas_validadas,
+            "mantenimiento": mantenimiento,
+            "consulta_externa": consulta_externa,
+            "pre_altas": pre_altas,
         }, meta=_rango_meta(desde, hasta))
     except Exception as exc:
         return _dashboard_error(exc)
@@ -451,18 +464,15 @@ def dashboard_ocupacion_hora(request):
     try:
         desde, hasta = _dashboard_parse_range(request)
         granularidad = _dashboard_granularidad(desde, hasta)
-        # 2026-06-16: denominador tomado de snapshot de mapeo (sin dependencia de servicio.Cama).
-        total_camas = max(len(_snapshot_estado_por_cama(hasta)), 1)
+        # [2026-07-02] Fase 2: serie temporal por cama con estado efectivo usando solo historial.
+        # Regla de negocio: solo OCUPADA cuenta como ocupación para esta métrica.
+        estado_inicial_por_cama = _snapshot_estado_por_cama_desde_historial(desde)
 
-        conteo_inicio = _snapshot_estado_camas(desde)
-        ocupadas_inicio = conteo_inicio.get("OCUPADA", 0)
-
-        # 2026-06-16: usa transición anterior->nuevo para delta real de ocupación y evitar caídas artificiales.
-        estados_ocupados = {"OCUPADA", "PRE_ALTA"}
-        eventos = (
+        eventos = list(
             HistorialEstadoCama.objects
             .filter(fecha_hora__gte=desde, fecha_hora__lte=hasta)
-            .values("fecha_hora", "estado_anterior__codigo", "estado_nuevo__codigo")
+            .values("cama_id", "fecha_hora", "estado_nuevo__codigo", "id")
+            .order_by("fecha_hora", "id")
         )
 
         def _bin_key(dt):
@@ -495,28 +505,42 @@ def dashboard_ocupacion_hora(request):
         while cursor <= fin:
             bins.append(cursor)
             cursor = _bin_next(cursor)
+        bins_set = set(bins)
 
-        delta = {b: 0 for b in bins}
+        eventos_por_bin = defaultdict(list)
+        camas_ids = set(estado_inicial_por_cama.keys())
         for ev in eventos:
+            camas_ids.add(ev["cama_id"])
             b = _bin_key(ev["fecha_hora"])
-            if b not in delta:
-                continue
-            estado_anterior = ev.get("estado_anterior__codigo")
-            estado_nuevo = ev.get("estado_nuevo__codigo")
-            antes_ocupada = estado_anterior in estados_ocupados
-            ahora_ocupada = estado_nuevo in estados_ocupados
-            if (not antes_ocupada) and ahora_ocupada:
-                delta[b] += 1
-            elif antes_ocupada and (not ahora_ocupada):
-                delta[b] -= 1
+            if b in bins_set:
+                eventos_por_bin[b].append(ev)
+
+        total_camas = len(camas_ids)
+        estado_ocupada_por_cama = {
+            cama_id: (estado_codigo == "OCUPADA")
+            for cama_id, estado_codigo in estado_inicial_por_cama.items()
+        }
 
         items = []
-        ocupadas = ocupadas_inicio
         for b in bins:
-            ocupadas = max(0, ocupadas + delta[b])
+            # [2026-07-02] Aplica todos los cambios del bin y toma estado final por cama (0/1).
+            for ev in eventos_por_bin.get(b, []):
+                estado_ocupada_por_cama[ev["cama_id"]] = (ev.get("estado_nuevo__codigo") == "OCUPADA")
+
+            ocupadas = sum(
+                1
+                for cama_id in camas_ids
+                if estado_ocupada_por_cama.get(cama_id, False)
+            )
+            ocupadas = max(0, min(ocupadas, total_camas))
+            porcentaje = 0.0
+            if total_camas > 0:
+                porcentaje = (ocupadas / total_camas) * 100.0
+            porcentaje = round(max(0.0, min(porcentaje, 100.0)), 1)
+
             items.append({
                 "hora": _bin_label(b),
-                "porcentaje": round((ocupadas / total_camas) * 100, 1),
+                "porcentaje": porcentaje,
             })
         return _dashboard_response(
             {"items": items, "granularidad": granularidad},

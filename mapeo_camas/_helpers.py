@@ -123,11 +123,44 @@ def _meta_ultima_actualizacion(historial):
         return {
             "ultima_actualizacion": "",
             "usuario_ultima_actualizacion": "",
+            "origen_ultima_actualizacion": "SIN_REGISTRO",
+            "estado_anterior_ultima_actualizacion": "SIN_ESTADO",
+            "estado_nuevo_ultima_actualizacion": "SIN_ESTADO",
+            "actualizacion_anterior": "",
+            "usuario_actualizacion_anterior": "",
+            "origen_actualizacion_anterior": "SIN_REGISTRO",
+            "estado_anterior_actualizacion_anterior": "SIN_ESTADO",
+            "estado_nuevo_actualizacion_anterior": "SIN_ESTADO",
         }
+
+    def _clasificar_origen(observacion_codigo, ingreso_id=None):
+        codigo = (observacion_codigo or "").strip().upper()
+        if "SALA" in codigo or "TRASLADO" in codigo:
+            return "CAMBIO_SALA"
+        if "MAPEO" in codigo or "MAPA" in codigo:
+            return "MAPEO"
+        if (
+            "INGRESO" in codigo
+            or "ASIGNACION" in codigo
+            or "CAMBIO DE CAMA" in codigo
+            or "CIERRE" in codigo
+        ):
+            return "INGRESO"
+        return "INGRESO" if ingreso_id else "MAPEO"
+
+    observacion_codigo = getattr(getattr(historial, "observacion", None), "codigo", "")
     # 2026-06-09: usa helper general de core para formato de fecha local.
     return {
         "ultima_actualizacion": hora_local_iso(historial.fecha_hora),
         "usuario_ultima_actualizacion": _nombre_usuario(historial.usuario),
+        "origen_ultima_actualizacion": _clasificar_origen(observacion_codigo, getattr(historial, "ingreso_id", None)),
+        "estado_anterior_ultima_actualizacion": getattr(getattr(historial, "estado_anterior", None), "codigo", "SIN_ESTADO") or "SIN_ESTADO",
+        "estado_nuevo_ultima_actualizacion": getattr(getattr(historial, "estado_nuevo", None), "codigo", "SIN_ESTADO") or "SIN_ESTADO",
+        "actualizacion_anterior": "",
+        "usuario_actualizacion_anterior": "",
+        "origen_actualizacion_anterior": "SIN_REGISTRO",
+        "estado_anterior_actualizacion_anterior": "SIN_ESTADO",
+        "estado_nuevo_actualizacion_anterior": "SIN_ESTADO",
     }
 
 

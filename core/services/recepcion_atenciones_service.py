@@ -9,6 +9,7 @@ from django.utils import timezone
 from datetime import timedelta
 from core.constants.domain_constants import LogApp
 from core.utils.utilidades_logging import *
+from core.constants.domain_constants import EXP_UBICA_ADMISION_ID
 
 class RecepcionAtencionService:
     def __init__(self, RecepcionAtencion=None):
@@ -29,67 +30,81 @@ class RecepcionAtencionService:
         
     @staticmethod
     def procesar_recepcion_atencion(observaciones, atenciones, usuario):
-        
+
         try:
             with transaction.atomic():
+
                 recepcion = RecepcionAtencion.objects.create(
                     recibido_por=usuario,
                     modificado_por=usuario,
                     observaciones=observaciones
                 )
 
-                for atencion in atenciones:
-                    id_atencion = atencion.get('id')
-                    id_servicio = atencion.get('idServicio')
-                    id_paciente = atencion.get('idPaciente')
-                    
-                    RecepcionAtencionService.procesar_recepcion_atencion_detalle(
-                        id_atencion, id_servicio, id_paciente, recepcion, usuario
+                detalles = []
+                atenciones_actualizar = []
+                expedientes = set()
+
+                fecha_recepcion = timezone.now()
+
+                for item in atenciones:
+
+                    id_atencion = item.get("id")
+                    id_servicio = item.get("idServicio")
+                    id_paciente = item.get("idPaciente")
+
+                    atencion = Atencion.objects.select_related(
+                        "paciente"
+                    ).get(
+                        id=id_atencion,
+                        paciente_id=id_paciente,
+                        area_atencion__servicio_id=id_servicio
                     )
 
+                    atencion.fecha_recepcion = fecha_recepcion
+                    atencion.modificado_por = usuario
+
+                    atenciones_actualizar.append(atencion)
+
+                    detalles.append(
+                        RecepcionAtencionDetalle(
+                            recepcion=recepcion,
+                            atencion=atencion
+                        )
+                    )
+
+                    expedientes.add(
+                        atencion.paciente.expediente_numero
+                    )
+
+
+                Atencion.objects.bulk_update(
+                    atenciones_actualizar,
+                    ["fecha_recepcion", "modificado_por"]
+                )
+
+                RecepcionAtencionDetalle.objects.bulk_create(
+                    detalles
+                )
+
+                ExpedienteService.cambiar_ubicacion_lotes(
+                    expedientes,
+                    EXP_UBICA_ADMISION_ID
+                )
+
             return {
-                'mensaje': "El proceso se realizó correctamente",
-                'idRecepcion': recepcion.id
+                "mensaje": "El proceso se realizó correctamente",
+                "idRecepcion": recepcion.id
             }
 
-
         except Exception as e:
+
             log_error(
                 f"[FALLO_RECEPCION_ATENCION] usuario={usuario.id} total_atenciones={len(atenciones)} detalle={str(e)}",
                 app=LogApp.ATENCION
             )
+
             raise
 
-
-    @staticmethod
-    def procesar_recepcion_atencion_detalle(idAtencion, idServicio, idPaciente, recepcion, usuario):
-        
-        try:
-            atencion = Atencion.objects.only("fecha_recepcion").get(
-                id=idAtencion,
-                paciente_id=idPaciente,
-                area_atencion__servicio_id=idServicio
-            )
-            atencion.fecha_recepcion = timezone.now()
-            atencion.modificado_por = usuario
-            atencion.save()
-
-            RecepcionAtencionDetalle.objects.create(
-                recepcion=recepcion,
-                atencion=atencion
-            )
-            #en neceario cmabiar la ubicacion del expedienteasi 
-            cambio = ExpedienteService.cambiar_ubicacion(idPaciente,1, usuario.id) #1 el id de Archivo
-
-            if not cambio:
-                raise Exception("No se logro cambiar la ubicacion del expediente")
-
-
-        except Ingreso.DoesNotExist:
-            raise Exception("La atención indicada no existe")
-
-        except Exception as e:
-            raise
 
 
     def obtener_detalles(self): # lo usa reporte

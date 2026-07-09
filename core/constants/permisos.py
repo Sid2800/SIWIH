@@ -86,9 +86,28 @@ REFERENCIA_VISUALIZACION_UNIDADES = ["UAU"]
 
 
 
-# los usauro de alcance gglbal pueden ser 
+# los usauro de alcance gglbal pueden ser
 
 ROLES_GLOBALES = ['directivo', 'admin']
+
+
+# -----------------------------
+# PERMISOS APP S_EXP    solo estan declarados no se usan
+# -----------------------------
+
+# Acceso de administración (aprobar, rechazar, monitorear, devoluciones, reportes)
+S_EXP_ADMIN_ROLES = ['admin']
+S_EXP_ADMIN_UNIDADES = ['Admision']
+
+# Acceso de usuario solicitante (buscar, solicitar, seguimiento)
+S_EXP_SOLICITANTE_ROLES = ['admin', 'digitador', 'directivos']
+S_EXP_SOLICITANTE_UNIDADES = ['RX', 'UAU', ] #OJOOOO  AGREGAR LOS NOMBRES CORTOS DE LAS UNIDADES
+
+# remapeir todo los usaurios visitante admision a sus repectivos unidades 
+# por ejemplo los usaurios de estadistica
+# correjir SAla a enfermeria  los uaurios de unidad sala serian unioda enfermeria 
+# correjir el texto de usaurio en menu para todos los usauiros no depender user si no de empleado. 
+# incluso hacer un bloqueo mexin para los usuriuos sin empleado  y personal no clinico
 
 
 # -----------------------------
@@ -119,4 +138,3 @@ MAPEO_CAMAS_HISTORIALES_UNIDADES = ["ADMI"]
 # [2026-05-28] Acceso al dashboard operativo de KPIs/gráficas en tiempo real.
 MAPEO_CAMAS_DASHBOARD_ROLES = []
 MAPEO_CAMAS_DASHBOARD_UNIDADES = ["ADMI"]
-

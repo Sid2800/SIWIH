@@ -1,0 +1,71 @@
+{% extends 'core/base.html' %}
+{% load static %}
+{% load permisos_unidad %}
+
+{% block title %}Monitoreo de Préstamos{% endblock title %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'core/css/s_exp.css' %}">
+{% endblock extra_css %}
+
+{% block content %}
+<div class="contenedor2 dataTables_wrapper">
+    <div class="tituloFormulario sexp-margin-bottom-15">
+        <div class="tituloFormulario-texto">
+            <i class="bi bi-binoculars"></i>
+            <h2 class="sin-margen">Monitoreo de Préstamos Activos</h2>
+        </div>
+        <div class="tituloFormulario-subrallado"></div>
+    </div>
+
+    <div class="sexp-nav-modulos">
+        <a href="{% url 's_exp_buscador' %}" class="sexp-nav-link">
+            <i class="bi bi-search"></i> Solicitar Expedientes
+        </a>
+        <a href="{% url 's_exp_seguimiento' %}" class="sexp-nav-link">
+            <i class="bi bi-clock-history"></i> Mis Solicitudes
+        </a>
+        
+        <a href="{% url 's_exp_solicitudes' %}" class="sexp-nav-link">
+            <i class="bi bi-list-check"></i> Gestión Solicitudes
+        </a>
+        <a href="{% url 's_exp_monitoreo' %}" class="sexp-nav-link sexp-nav-link--active">
+            <i class="bi bi-binoculars"></i> Monitoreo
+        </a>
+        <a href="{% url 's_exp_devoluciones' %}" class="sexp-nav-link">
+            <i class="bi bi-arrow-return-left"></i> Devoluciones
+        </a>
+        <a href="{% url 's_exp_reportes' %}" class="sexp-nav-link">
+            <i class="bi bi-bar-chart-line"></i> Reportes
+        </a>
+    </div>
+
+    <div class="sexp-filtros sexp-flex-between">
+        <div class="sexp-flex-gap-1">
+            <button class="sexp-filtro-btn active" data-estado="">Todos</button>
+            <button class="sexp-filtro-btn" data-estado="Activo">Aprobados (sin entregar)</button>
+            <button class="sexp-filtro-btn" data-estado="Entregado">Entregados</button>
+            <button class="sexp-filtro-btn" data-estado="DevolucionParcial">Devolución Parcial</button>
+        </div>
+    </div>
+
+    <table id="tabla_prestamos" class="dataTable stripe hover row-border" style="width:100%">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Usuario</th>
+                <th>Área</th>
+                <th>Expedientes</th>
+                <th>Estado</th>
+                <th>Tiempo</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script src="{% static 'core/scripts/s_exp/prestamos.js' %}"></script>
+{% endblock extra_js %}

@@ -1,0 +1,2817 @@
+/* ============================================================
+   S_EXP — Módulo Préstamo de Expedientes
+   Estilos unificados para todas las plantillas del módulo.
+   Compatible con modo claro y oscuro (variables de style.css).
+   ============================================================ */
+
+
+/* ======= Navegación sub-módulos (compartido) ======= */
+
+.sexp-nav-modulos {
+    display: flex;
+    gap: 1.4rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.sexp-nav-link {
+    padding: 0.8rem 1.5rem;
+    border-radius: 1rem;
+    background-color: var(--blanco);
+    border: 1px solid var(--colorLinea);
+    text-decoration: none;
+    color: var(--colorTablacelda);
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 1.7rem;
+    font-weight: 600;
+    font-family: var(--fuenteCuerpo);
+    transition: background-color .2s, transform .2s, border-color .2s;
+}
+
+.sexp-nav-link i {
+    font-size: 1.8rem;
+}
+
+.sexp-nav-link:hover {
+    background-color: var(--colorMenuHover);
+    color: var(--colorMenuTextoHover);
+    border-color: var(--colorMenuTextoHover);
+    transform: translateY(-1px);
+}
+
+.sexp-nav-link--active {
+    background-color: var(--colorBoton);
+    color: var(--colorTextoBoton);
+    border-color: var(--colorBoton);
+}
+
+
+/* ======= DataTable base ======= */
+
+.dataTable { font-size: 1.4rem; }
+
+
+/* ======= Badges y Tags compartidos ======= */
+
+.sexp-badge {
+    display: inline-block;
+    padding: 0.2rem 0.6rem;
+    border-radius: 2rem;
+    font-size: 1.2rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.sexp-badge--disponible {
+    background: rgba(34, 197, 94, 0.15);
+    color: #22c55e;
+    border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.sexp-badge--prestado {
+    background: rgba(220, 53, 69, 0.15);
+    color: var(--colorEliminarRojo);
+    border: 1px solid rgba(220, 53, 69, 0.3);
+}
+
+.sexp-badge--en-carrito {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.3rem 0.6rem;
+    border-radius: 0.6rem;
+    background: rgba(99, 102, 241, 0.15);
+    color: #6366f1;
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.sexp-badge--vencido { background: rgba(239,68,68,0.15); color: #ef4444; }
+.sexp-badge--normal  { background: rgba(99,102,241,0.15); color: #6366f1; }
+
+.sexp-exp-tag {
+    background: rgba(99, 102, 241, 0.15);
+    color: #6366f1;
+    padding: 0.2rem 0.5rem;
+    border-radius: 0.4rem;
+    font-size: 1.2rem;
+    font-weight: 600;
+    display: inline-block;
+}
+
+.sexp-exp-tag--late {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.sexp-exp-tag--rechazado {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    font-weight: 700;
+}
+
+/* AMARILLO: expediente aprobado pero pendiente de devolver */
+.sexp-exp-tag--pendiente {
+    background: rgba(234, 179, 8, 0.18);
+    color: #b45309;
+    border: 1px solid rgba(234, 179, 8, 0.5);
+    font-weight: 700;
+}
+
+body.darkmode .sexp-exp-tag--pendiente {
+    color: #fbbf24;
+    background: rgba(234, 179, 8, 0.22);
+    border-color: rgba(234, 179, 8, 0.55);
+}
+
+
+/* ======= Estado Badges para DataTable (Gestión Solicitudes) =======
+   Colores que funcionan correctamente en modo claro Y oscuro.
+   Usan el color semántico como texto, no var(--negro). */
+
+.sexp-estado-badge {
+    padding: 0.25rem 0.6rem;
+    border-radius: 20px;
+    font-size: 1.2rem;
+    font-weight: 600;
+    display: inline-block;
+    white-space: nowrap;
+}
+
+.sexp-estado-badge--pendiente {
+    background: rgba(99, 102, 241, 0.2);
+    color: #818cf8;
+}
+.sexp-estado-badge--aprobada_organizando {
+    background: rgba(34, 197, 94, 0.2);
+    color: #22c55e;
+}
+.sexp-estado-badge--rechazada {
+    background: rgba(239, 68, 68, 0.2);
+    color: #f87171;
+}
+.sexp-estado-badge--listo_recoger {
+    background: rgba(16, 185, 129, 0.2);
+    color: #34d399;
+}
+.sexp-estado-badge--en_prestamo {
+    background: rgba(245, 158, 11, 0.2);
+    color: #fbbf24;
+}
+.sexp-estado-badge--en_devolucion {
+    background: rgba(139, 92, 246, 0.2);
+    color: #a78bfa;
+}
+.sexp-estado-badge--incompleta {
+    background: rgba(249, 115, 22, 0.2);
+    color: #fb923c;
+}
+.sexp-estado-badge--finalizada {
+    background: rgba(100, 116, 139, 0.2);
+    color: #94a3b8;
+}
+.sexp-estado-badge--anulada {
+    background: rgba(100, 116, 139, 0.15);
+    color: #64748b;
+}
+
+
+/* ======= Botones de Acción en DataTable ======= */
+
+.sexp-action-group {
+    display: flex;
+    gap: 0.3rem;
+    flex-wrap: wrap;
+}
+
+.sexp-action-btn {
+    border: none;
+    padding: 0.3rem 0.6rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 1.3rem;
+    font-weight: 600;
+    font-family: var(--fuenteCuerpo);
+    transition: opacity .2s, transform .1s;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    white-space: nowrap;
+}
+
+.sexp-action-btn:hover {
+    opacity: 0.85;
+    transform: translateY(-1px);
+}
+
+/* Botón deshabilitado (esperando un paso previo en el flujo) */
+.sexp-action-btn:disabled,
+.sexp-action-btn[disabled] {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+    filter: grayscale(0.5);
+}
+
+.sexp-action-btn--aprobar {
+    background: rgba(34, 197, 94, 0.2);
+    color: #16a34a;
+    border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.sexp-action-btn--rechazar {
+    background: rgba(239, 68, 68, 0.2);
+    color: #dc2626;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.sexp-action-btn--listo {
+    background: rgba(16, 185, 129, 0.2);
+    color: #059669;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.sexp-action-btn--imprimir {
+    background: rgba(0, 139, 139, 0.2);
+    color: #008b8b;
+    border: 1px solid rgba(0, 139, 139, 0.4);
+}
+
+.sexp-action-btn--revisar {
+    background: rgba(99, 102, 241, 0.2);
+    color: #4f46e5;
+    border: 1px solid rgba(99, 102, 241, 0.4);
+}
+
+.sexp-action-btn--entregar {
+    background: rgba(13, 148, 136, 0.2);
+    color: #0d9488;
+    border: 1px solid rgba(13, 148, 136, 0.4);
+}
+
+
+/* ============================================================
+SWEETALERT2 & MODALES — Estilos del sistema (style.css)
+Usa colores del sistema (colorBoton, colorContendor, etc.)
+============================================================ */
+
+/* Color del contenido HTML del modal */
+.swal2-html-container {
+    color: var(--colorTablacelda) !important;
+}
+
+/* Validaciones y errores en modales */
+.swal2-validation-message {
+    color: var(--negro);
+    font-size: 1.5rem;
+    font-weight: bold;
+    background-color: transparent;
+    font-family: var(--fuenteTablaCuerpo);
+    text-decoration: underline;
+}
+
+/* Contenedor de botones de acción: layout y ancho */
+.contener-modal-contenedor-botones {
+    flex-direction: row;
+    row-gap: 1rem;
+    width: 90% !important;
+}
+
+/* Estilos base de botones (confirmar y cancelar): colores, tamaño, fuente */
+.contener-modal-boton-confirmar,
+.contener-modal-boton-cancelar {
+    background-color: var(--colorBoton) !important;
+    color: var(--colorTextoBoton) !important;
+    transition: background-color 0.3s ease;
+    border-radius: 1rem !important;
+    font-size: 1.5rem !important;
+    font-family: var(--fuenteTablaTitulo);
+    font-weight: bold;
+    text-transform: uppercase;
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    column-gap: 0.8rem;
+    min-width: 18rem;
+    width: auto;
+    height: 4rem;
+    padding: 0 1.5rem;
+    white-space: nowrap;
+}
+
+/* Hover de botones: cambio de color */
+.contener-modal-boton-confirmar:hover,
+.contener-modal-boton-cancelar:hover {
+    background-color: var(--colorMenuHover) !important;
+    color: var(--colorBoton) !important;
+}
+
+/* Tamaño de los íconos dentro de los botones */
+.contener-modal-boton-confirmar i,
+.contener-modal-boton-cancelar i {
+    font-size: 2.5rem;
+}
+
+
+/* ============================================================
+   MODALES S_EXP — Layout y distribución
+   Mantiene estructura de grid/tarjetas con colores del sistema
+   ============================================================ */
+
+/* Campos dentro de modales: label y estructura */
+.sexp-modal-campo {
+    margin-bottom: 1rem;
+}
+
+.sexp-modal-campo label {
+    display: block;
+    margin-bottom: 0.3rem;
+    font-weight: 600;
+    font-size: 1.4rem;
+    color: var(--colorTablacelda);
+}
+
+/* Inputs y selects dentro de modales */
+.sexp-modal-input,
+.sexp-modal-select {
+    width: 100%;
+    padding: 0.6rem;
+    border-radius: 0.6rem;
+    border: 1px solid var(--colorLinea);
+    background-color: var(--blanco);
+    color: var(--colorTablacelda);
+    font-size: 1.6rem;
+    font-family: var(--fuenteCuerpo);
+    box-sizing: border-box;
+}
+
+.sexp-modal-input:focus,
+.sexp-modal-select:focus {
+    outline: none;
+    border-color: var(--colorBoton);
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
+}
+
+/* Fila de inputs de tiempo: stepper (− N +) + select unidad */
+.sexp-modal-tiempo-row {
+    display: grid;
+    grid-template-columns: 16rem 1fr;
+    gap: 0.8rem;
+    align-items: center;
+}
+
+.sexp-tiempo-stepper {
+    display: grid;
+    grid-template-columns: 4rem 1fr 4rem;
+    align-items: stretch;
+    border: 1px solid var(--colorLinea);
+    border-radius: 0.6rem;
+    overflow: hidden;
+    background-color: var(--blanco);
+}
+
+.sexp-stepper-btn {
+    background-color: var(--colorBoton);
+    color: var(--colorTextoBoton);
+    border: none;
+    font-size: 2rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: filter 0.2s;
+    padding: 0;
+    line-height: 1;
+}
+
+.sexp-stepper-btn:hover {
+    filter: brightness(1.1);
+}
+
+.sexp-stepper-btn:active {
+    filter: brightness(0.9);
+}
+
+.sexp-tiempo-stepper input[type="number"] {
+    width: 100%;
+    border: none;
+    background-color: transparent;
+    text-align: center;
+    font-weight: 700;
+    font-size: 1.8rem;
+    color: var(--colorTablacelda);
+    padding: 0.5rem 0.2rem;
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+/* Ocultar spinners nativos (usamos los nuestros) */
+.sexp-tiempo-stepper input[type="number"]::-webkit-outer-spin-button,
+.sexp-tiempo-stepper input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.sexp-tiempo-stepper input[type="number"]:focus {
+    outline: none;
+    background-color: rgba(99, 102, 241, 0.05);
+}
+
+.sexp-modal-tiempo-row select {
+    width: 100%;
+}
+
+/* Hint/ayuda en modales */
+.sexp-modal-hint {
+    opacity: 0.6;
+    display: block;
+    margin-top: 0.3rem;
+    font-size: 1.2rem;
+}
+
+/* Lista de expedientes en grid responsivo dentro del modal */
+.sexp-modal-lista-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem 1.5rem;
+    margin: 0.8rem 0;
+    max-height: 280px;
+    overflow-y: auto;
+    padding: 0.4rem;
+}
+
+/* Tarjetas con datos en el modal — extendidas y con mejor tipografía */
+.sexp-modal-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 1rem 1.2rem;
+    border: 1px solid var(--colorLinea);
+    border-radius: 0.6rem;
+    background-color: var(--blanco);
+    min-height: 9rem;
+    justify-content: center;
+}
+
+.sexp-modal-item .sexp-modal-item-id,
+.sexp-modal-item .sexp-modal-item-nombre,
+.sexp-modal-item .sexp-modal-item-exp {
+    font-size: 1.6rem;
+    line-height: 1.4;
+    color: var(--colorTablacelda);
+    word-break: break-word;
+}
+
+.sexp-modal-item .sexp-modal-item-id {
+    font-weight: 700;
+    color: var(--colorBoton);
+}
+
+.sexp-modal-item .sexp-modal-item-nombre {
+    font-weight: 600;
+}
+
+.sexp-modal-item .sexp-modal-item-exp {
+    opacity: 0.85;
+    font-size: 1.4rem;
+}
+
+/* Modal grande: aumenta tamaño general de texto */
+.sexp-modal-grande .swal2-html-container,
+.sexp-modal-grande .swal2-html-container p,
+.sexp-modal-grande .swal2-html-container span,
+.sexp-modal-grande .swal2-html-container strong,
+.sexp-modal-grande .swal2-html-container label {
+    font-size: 1.65rem !important;
+    line-height: 1.5 !important;
+}
+
+.sexp-modal-grande .sexp-modal-resumen {
+    font-size: 1.7rem !important;
+    margin: 0.8rem 0 !important;
+}
+
+.sexp-modal-grande .sexp-modal-item .sexp-modal-item-id,
+.sexp-modal-grande .sexp-modal-item .sexp-modal-item-nombre {
+    font-size: 1.7rem !important;
+}
+
+.sexp-modal-grande .sexp-modal-item .sexp-modal-item-exp {
+    font-size: 1.5rem !important;
+}
+
+/* Botones más grandes en modal-grande */
+.sexp-modal-grande .contener-modal-boton-confirmar,
+.sexp-modal-grande .contener-modal-boton-cancelar {
+    font-size: 1.7rem !important;
+    min-width: 22rem;
+    height: 5rem;
+}
+
+.sexp-modal-grande .contener-modal-boton-confirmar i,
+.sexp-modal-grande .contener-modal-boton-cancelar i {
+    font-size: 2.3rem;
+}
+
+/* Resumen y lista de aprobación con botón de colapsar/expandir */
+.sexp-modal-aprob-resumen {
+    margin: 0 0 0.8rem 0 !important;
+    padding: 0.8rem 1rem;
+    background: var(--colorContendor);
+    border-radius: 0.6rem;
+    color: var(--colorTablacelda);
+    font-size: 1.55rem !important;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    border: 1px solid var(--colorLinea);
+}
+
+.sexp-modal-aprob-resumen-info {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex: 1;
+}
+
+.sexp-modal-aprob-toggle {
+    background: transparent;
+    border: 1px solid var(--colorLinea);
+    color: var(--colorTablacelda);
+    border-radius: 0.5rem;
+    padding: 0.3rem 0.7rem;
+    cursor: pointer;
+    font-size: 1.3rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    transition: all 0.2s;
+}
+
+.sexp-modal-aprob-toggle:hover {
+    background: var(--colorBoton);
+    color: var(--colorTextoBoton);
+    border-color: var(--colorBoton);
+}
+
+.sexp-modal-aprob-toggle i {
+    transition: transform 0.2s;
+}
+
+.sexp-modal-aprob-lista--collapsed .sexp-modal-aprob-toggle i,
+.sexp-modal-aprob-resumen.is-collapsed + .sexp-modal-aprob-lista {
+    display: none;
+}
+
+/* Lista en grid de 3 columnas (PC), 2 (tablet), 1 (móvil) */
+.sexp-modal-aprob-lista {
+    max-height: 360px;
+    overflow-y: auto;
+    margin-bottom: 1rem;
+    background: var(--blanco);
+    border-radius: 0.6rem;
+    border: 1px solid var(--colorLinea);
+    padding: 0.6rem;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+    transition: max-height 0.3s ease, padding 0.3s ease;
+}
+
+.sexp-modal-aprob-lista.is-collapsed {
+    max-height: 0;
+    padding: 0;
+    margin: 0;
+    overflow: hidden;
+    border-width: 0;
+}
+
+.sexp-modal-aprob-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.6rem 0.8rem;
+    border: 1px solid var(--colorLinea);
+    border-radius: 0.5rem;
+    color: var(--colorTablacelda);
+    background-color: var(--colorContendor);
+    word-break: break-word;
+}
+
+.sexp-modal-aprob-id {
+    font-weight: 700;
+    color: var(--colorBoton);
+    font-size: 1.35rem;
+    line-height: 1.2;
+}
+
+.sexp-modal-aprob-item-top {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.7rem;
+}
+
+.sexp-modal-aprob-num {
+    font-size: 1.25rem;
+    font-weight: 600;
+    background: rgba(99, 102, 241, 0.18);
+    color: var(--colorTablacelda);
+    padding: 0.1rem 0.5rem;
+    border-radius: 8px;
+    line-height: 1.4;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.sexp-modal-aprob-nombre {
+    font-size: 1.35rem;
+    line-height: 1.3;
+    word-break: break-word;
+}
+
+/* Sugerencia de tiempo en modal */
+.sexp-modal-sugerido {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    padding: 0.7rem 0.9rem;
+    margin-bottom: 1rem;
+    background-color: rgba(245, 158, 11, 0.15);
+    border: 1px solid var(--colorLinea);
+    border-radius: 0.6rem;
+    color: var(--colorTablacelda);
+    font-size: 1.4rem !important;
+    line-height: 1.4;
+}
+
+.sexp-modal-sugerido i {
+    font-size: 1.7rem;
+    color: #f59e0b;
+    flex: 0 0 auto;
+    margin-top: 0.1rem;
+}
+
+
+/* ============================================================
+   MODAL REVISIÓN DE ENTREGA — Grid 4 columnas
+   Columnas: checkbox | expediente | nombre | comentario
+   ============================================================ */
+
+.sexp-revision-modal {
+    text-align: left;
+}
+
+.sexp-revision-help {
+    margin: 0 0 1rem 0;
+    padding: 0.7rem 0.9rem;
+    background: var(--colorContendor);
+    border: 1px solid var(--colorLinea);
+    border-radius: 0.6rem;
+    font-size: 1.4rem !important;
+    color: var(--colorTablacelda);
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+}
+
+.sexp-revision-help i {
+    color: var(--colorBoton);
+    font-size: 1.5rem;
+    margin-top: 0.1rem;
+    flex: 0 0 auto;
+}
+
+/* Grid 3 cols (PC), 2 cols (tablet), 1 col (móvil) */
+.sexp-revision-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.8rem;
+    max-height: 520px;
+    overflow-y: auto;
+    padding: 0.3rem;
+}
+
+/* Buscador local dentro del modal */
+.sexp-modal-buscador-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin: 0 0 0.8rem 0;
+    flex-wrap: wrap;
+}
+
+.sexp-modal-buscador-input {
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex: 1;
+    min-width: 280px;
+}
+
+.sexp-modal-buscador-input i.bi-search {
+    position: absolute;
+    left: 1rem;
+    color: var(--colorTablacelda);
+    opacity: 0.6;
+    font-size: 1.6rem;
+    pointer-events: none;
+}
+
+.sexp-modal-buscador-input input {
+    padding-left: 3.5rem !important;
+    padding-right: 3.5rem !important;
+}
+
+.sexp-modal-buscador-clear {
+    position: absolute;
+    right: 0.5rem;
+    background: transparent;
+    border: none;
+    color: var(--colorTablacelda);
+    opacity: 0.7;
+    cursor: pointer;
+    padding: 0.4rem 0.6rem;
+    border-radius: 0.4rem;
+    transition: all 0.15s;
+    font-size: 1.4rem;
+    display: none;
+}
+
+.sexp-modal-buscador-clear:hover {
+    opacity: 1;
+    background: rgba(239, 68, 68, 0.15);
+    color: #dc2626;
+}
+
+.sexp-modal-buscador-info {
+    font-size: 1.3rem;
+    color: var(--colorTablacelda);
+    opacity: 0.8;
+    white-space: nowrap;
+}
+
+/* Cada tarjeta de expediente */
+.sexp-revision-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    padding: 0.9rem 1rem;
+    background-color: var(--blanco);
+    border: 1px solid var(--colorLinea);
+    border-radius: 0.7rem;
+    transition: background 0.2s, border-color 0.2s;
+    color: var(--colorTablacelda);
+}
+
+.sexp-revision-card-header {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+}
+
+.sexp-revision-paciente {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    flex: 1;
+    min-width: 0;
+}
+
+.sexp-revision-card-comentario {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.sexp-revision-card-label {
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: var(--colorTablacelda);
+    opacity: 0.85;
+}
+
+/* Estado: NO encontrado (rojo) */
+.sexp-revision-card--rechazado {
+    background-color: rgba(239, 68, 68, 0.12);
+    border-color: #ef4444;
+}
+
+.sexp-revision-card--rechazado .sexp-revision-id,
+.sexp-revision-card--rechazado .sexp-revision-nombre,
+.sexp-revision-card--rechazado .sexp-revision-card-label {
+    color: #b91c1c;
+}
+
+.sexp-revision-card--rechazado .sexp-exp-tag {
+    background: rgba(239, 68, 68, 0.18) !important;
+    color: #b91c1c !important;
+    border: 1px solid rgba(239, 68, 68, 0.5) !important;
+    font-weight: 700 !important;
+}
+
+.sexp-revision-card--rechazado .sexp-revision-comentario {
+    border-color: #ef4444 !important;
+    background-color: var(--blanco) !important;
+}
+
+/* Mantener compatibilidad con clases antiguas */
+.sexp-revision-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    padding: 0.9rem 1rem;
+    background-color: var(--blanco);
+    border: 1px solid var(--colorLinea);
+    border-radius: 0.7rem;
+}
+
+.sexp-revision-row--rechazado {
+    background-color: rgba(239, 68, 68, 0.12);
+    border-color: #ef4444;
+}
+
+/* Checkbox personalizado para revisión */
+.sexp-revision-card .sexp-exp-dec-check,
+.sexp-revision-row .sexp-exp-dec-check {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+    flex-shrink: 0;
+}
+
+.sexp-revision-card .sexp-exp-dec-check input[type="checkbox"],
+.sexp-revision-row .sexp-exp-dec-check input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+    height: 0;
+    width: 0;
+}
+
+.sexp-revision-card .sexp-exp-dec-checkmark,
+.sexp-revision-row .sexp-exp-dec-checkmark {
+    height: 2.4rem;
+    width: 2.4rem;
+    background-color: var(--blanco);
+    border: 2px solid var(--colorLinea);
+    border-radius: 0.4rem;
+    display: inline-block;
+    position: relative;
+    transition: all 0.15s;
+}
+
+.sexp-revision-card .sexp-exp-dec-check:hover .sexp-exp-dec-checkmark,
+.sexp-revision-row .sexp-exp-dec-check:hover .sexp-exp-dec-checkmark {
+    border-color: var(--colorBoton);
+}
+
+.sexp-revision-card .sexp-exp-dec-check input:checked ~ .sexp-exp-dec-checkmark,
+.sexp-revision-row .sexp-exp-dec-check input:checked ~ .sexp-exp-dec-checkmark {
+    background-color: var(--colorBoton);
+    border-color: var(--colorBoton);
+}
+
+.sexp-revision-card .sexp-exp-dec-check input:checked ~ .sexp-exp-dec-checkmark::after,
+.sexp-revision-row .sexp-exp-dec-check input:checked ~ .sexp-exp-dec-checkmark::after {
+    content: "";
+    position: absolute;
+    left: 0.7rem;
+    top: 0.25rem;
+    width: 0.5rem;
+    height: 1rem;
+    border: solid var(--colorTextoBoton);
+    border-width: 0 0.3rem 0.3rem 0;
+    transform: rotate(45deg);
+}
+
+/* Etiqueta del expediente */
+.sexp-revision-card .sexp-exp-tag,
+.sexp-revision-row .sexp-exp-tag {
+    background: rgba(99, 102, 241, 0.15);
+    color: var(--colorTablacelda);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    padding: 0.35rem 0.7rem;
+    border-radius: 0.4rem;
+    font-size: 1.3rem;
+    font-weight: 600;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.sexp-revision-id {
+    font-weight: 700;
+    color: var(--colorBoton);
+    font-size: 1.4rem;
+    line-height: 1.25;
+}
+
+.sexp-revision-nombre {
+    color: var(--colorTablacelda);
+    font-size: 1.45rem;
+    font-weight: 600;
+    word-break: break-word;
+    line-height: 1.3;
+}
+
+.sexp-revision-comentario {
+    width: 100%;
+    padding: 0.55rem 0.75rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--colorLinea);
+    background: var(--blanco);
+    color: var(--colorTablacelda);
+    font-size: 1.35rem;
+    font-family: var(--fuenteCuerpo);
+    box-sizing: border-box;
+}
+
+.sexp-revision-comentario:focus {
+    outline: none;
+    border-color: var(--colorBoton);
+}
+
+
+/* ============================================================
+   POPUP INFO EXPEDIENTE (tap en móvil/tablet)
+   ============================================================ */
+.sexp-exp-info-popup {
+    text-align: left;
+    font-size: 1.5rem;
+    line-height: 1.5;
+    color: var(--colorTablacelda);
+}
+
+.sexp-exp-info-popup .sexp-exp-info-fila {
+    display: flex;
+    gap: 0.6rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px dashed var(--colorLinea);
+}
+
+.sexp-exp-info-popup .sexp-exp-info-fila:last-child {
+    border-bottom: none;
+}
+
+.sexp-exp-info-popup .sexp-exp-info-label {
+    font-weight: 700;
+    min-width: 9rem;
+    color: var(--colorBoton);
+}
+
+.sexp-exp-info-popup .sexp-exp-info-valor {
+    flex: 1;
+    word-break: break-word;
+}
+
+.sexp-exp-info-popup .sexp-exp-info-estado--ok {
+    color: #16a34a;
+    font-weight: 700;
+}
+
+.sexp-exp-info-popup .sexp-exp-info-estado--rec {
+    color: #dc2626;
+    font-weight: 700;
+}
+
+.sexp-exp-info-popup .sexp-exp-info-estado--pend {
+    color: #d97706;
+    font-weight: 700;
+}
+
+.sexp-exp-info-popup .sexp-exp-info-estado--late {
+    color: #d97706;
+    font-weight: 700;
+}
+
+/* Tag clickeable: cursor pointer en touch */
+.sexp-exp-tag {
+    cursor: pointer;
+    user-select: none;
+}
+
+
+/* ============================================================
+   MODAL AUDITORÍA DE DEVOLUCIÓN — Tarjetas en grid responsive
+   ============================================================ */
+
+.sexp-auditoria-help {
+    margin: 0 0 1rem 0;
+    padding: 0.8rem 1rem;
+    background: var(--colorContendor);
+    border: 1px solid var(--colorLinea);
+    border-radius: 0.6rem;
+    font-size: 1.5rem !important;
+    color: var(--colorTablacelda);
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+}
+
+.sexp-auditoria-help i {
+    color: var(--colorBoton);
+    font-size: 1.7rem;
+    flex: 0 0 auto;
+}
+
+/* Grid responsive: 3 cols (PC), 2 (tablet), 1 (móvil) */
+.sexp-auditoria-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.8rem;
+    max-height: 520px;
+    overflow-y: auto;
+    margin-bottom: 1rem;
+    padding: 0.3rem;
+}
+
+/* Tarjeta de cada expediente en auditoría */
+.sexp-auditoria-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+    padding: 0.9rem 1rem;
+    background-color: var(--blanco);
+    border: 1px solid var(--colorLinea);
+    border-radius: 0.7rem;
+    transition: background 0.2s, border-color 0.2s;
+    color: var(--colorTablacelda);
+}
+
+.sexp-auditoria-card-header {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+}
+
+.sexp-auditoria-card .sexp-exp-tag {
+    background: rgba(99, 102, 241, 0.15);
+    color: var(--colorTablacelda);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    padding: 0.4rem 0.8rem;
+    border-radius: 0.4rem;
+    font-size: 1.4rem;
+    font-weight: 700;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.sexp-auditoria-paciente {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    flex: 1;
+    min-width: 0;
+}
+
+.sexp-auditoria-id {
+    font-weight: 700;
+    color: var(--colorBoton);
+    font-size: 1.4rem;
+    line-height: 1.25;
+}
+
+.sexp-auditoria-nombre {
+    color: var(--colorTablacelda);
+    font-size: 1.45rem;
+    font-weight: 600;
+    line-height: 1.3;
+    word-break: break-word;
+}
+
+.sexp-auditoria-radios {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.8rem 1.2rem;
+    justify-content: flex-start;
+    padding: 0.4rem 0;
+    border-top: 1px dashed var(--colorLinea);
+    border-bottom: 1px dashed var(--colorLinea);
+}
+
+.sexp-auditoria-radio {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    cursor: pointer;
+    font-size: 1.4rem;
+    color: var(--colorTablacelda);
+    user-select: none;
+}
+
+.sexp-auditoria-radio input[type="radio"] {
+    width: 1.7rem;
+    height: 1.7rem;
+    cursor: pointer;
+    accent-color: var(--colorBoton);
+}
+
+.sexp-auditoria-radio--ok { color: #16a34a; font-weight: 600; }
+.sexp-auditoria-radio--no { color: #d97706; font-weight: 600; }
+.sexp-auditoria-radio--lost { color: #dc2626; font-weight: 600; }
+
+.sexp-auditoria-coment-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.sexp-auditoria-coment {
+    font-size: 1.4rem !important;
+}
+
+/* Resaltado de tarjetas según estado seleccionado */
+.sexp-auditoria-card--no {
+    background-color: rgba(234, 179, 8, 0.16);
+    border-color: #d97706;
+}
+
+.sexp-auditoria-card--no .sexp-auditoria-id,
+.sexp-auditoria-card--no .sexp-auditoria-nombre {
+    color: #b45309;
+}
+
+.sexp-auditoria-card--lost {
+    background-color: rgba(239, 68, 68, 0.12);
+    border-color: #dc2626;
+}
+
+.sexp-auditoria-card--lost .sexp-auditoria-id,
+.sexp-auditoria-card--lost .sexp-auditoria-nombre {
+    color: #b91c1c;
+}
+
+/* Tarjeta de un expediente YA DEVUELTO en una auditoría previa */
+.sexp-auditoria-card--done {
+    background-color: rgba(34, 197, 94, 0.10);
+    border-color: #16a34a;
+}
+
+.sexp-auditoria-card--done .sexp-auditoria-id,
+.sexp-auditoria-card--done .sexp-auditoria-nombre {
+    color: #166534;
+}
+
+/* Badge de bloqueo cuando un expediente ya fue procesado en una auditoría previa */
+.sexp-auditoria-lock {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.25rem 0.6rem;
+    border-radius: 1rem;
+    background-color: rgba(100, 116, 139, 0.18);
+    color: var(--colorTablacelda);
+    font-size: 1.15rem;
+    font-weight: 700;
+}
+
+.sexp-auditoria-card .sexp-auditoria-radio input:disabled,
+.sexp-auditoria-card .sexp-auditoria-coment:disabled {
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+/* Leyenda de colores en la lista de devoluciones */
+.sexp-dev-leyenda {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: center;
+    margin-bottom: 0.6rem;
+    font-size: 1.3rem;
+    color: var(--colorTablacelda);
+    opacity: 0.9;
+}
+
+.sexp-dev-leyenda > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.sexp-dev-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+
+/* Responsive modales */
+@media (max-width: 1024px) {
+    .sexp-modal-lista-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .sexp-modal-aprob-lista {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .sexp-revision-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .sexp-auditoria-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .contener-modal-boton-confirmar,
+    .contener-modal-boton-cancelar {
+        min-width: 15rem;
+        font-size: 1.4rem !important;
+    }
+}
+
+@media (max-width: 768px) {
+    .contener-modal-contenedor-botones {
+        column-gap: 1rem;
+    }
+
+    .sexp-modal-lista-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .sexp-modal-aprob-lista {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    /* En tablet y móvil: revisión en 1 columna */
+    .sexp-revision-grid {
+        grid-template-columns: 1fr;
+    }
+
+    /* Auditoría: 2 cols en tablet pequeña */
+    .sexp-auditoria-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .contener-modal-boton-confirmar,
+    .contener-modal-boton-cancelar {
+        min-width: 13rem;
+        height: 3.6rem;
+    }
+}
+
+@media (max-width: 600px) {
+    .sexp-auditoria-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 480px) {
+    .sexp-modal-tiempo-row {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+    }
+
+    .sexp-modal-select {
+        width: 100%;
+    }
+
+    .sexp-modal-aprob-lista {
+        grid-template-columns: 1fr;
+    }
+
+    .sexp-auditoria-radios {
+        flex-direction: column;
+        gap: 0.5rem;
+        align-items: flex-start;
+    }
+
+    .contener-modal-boton-confirmar,
+    .contener-modal-boton-cancelar {
+        min-width: 11rem;
+        font-size: 1.2rem !important;
+    }
+}
+
+
+/* ======= Filtros compartidos ======= */
+
+.sexp-filtros {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.sexp-filtro-btn {
+    padding: 0.5rem 1rem;
+    border-radius: 1rem;
+    border: 1px solid var(--colorLinea);
+    background-color: transparent;
+    color: var(--colorTablacelda);
+    cursor: pointer;
+    font-size: 1.4rem;
+    transition: all .2s;
+    font-family: var(--fuenteCuerpo);
+}
+
+.sexp-filtro-btn:hover,
+.sexp-filtro-btn.active {
+    background-color: var(--colorBoton);
+    color: var(--colorTextoBoton);
+    border-color: var(--colorBoton);
+}
+
+
+/* ============================================================
+   BUSCADOR — Búsqueda y Carrito
+   ============================================================ */
+
+.sexp-buscador-layout {
+    display: grid;
+    grid-template-columns: 1fr 370px;
+    gap: 1.5rem;
+}
+
+/* Barra de búsqueda */
+.sexp-search-box {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.sexp-search-input {
+    flex: 1;
+    min-width: 200px;
+    padding: 0.6rem 1rem;
+    border-radius: 1rem;
+    border: 1px solid var(--colorLinea);
+    background-color: var(--blanco);
+    color: var(--colorTablacelda);
+    font-size: 1.6rem;
+    font-family: var(--fuenteCuerpo);
+}
+
+.sexp-search-select {
+    padding: 0.6rem;
+    border-radius: 1rem;
+    border: 1px solid var(--colorLinea);
+    background-color: var(--blanco);
+    color: var(--colorTablacelda);
+    font-size: 1.6rem;
+    font-family: var(--fuenteCuerpo);
+}
+
+.sexp-search-btn {
+    padding: 0.6rem 1.2rem;
+    border-radius: 1rem;
+    border: none;
+    background-color: var(--colorBoton);
+    color: var(--colorTextoBoton);
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 1.6rem;
+    font-family: var(--fuenteCuerpo);
+    transition: background-color .2s;
+}
+
+.sexp-search-btn:hover { opacity: 0.85; }
+
+/* Resultados */
+.sexp-resultado {
+    background-color: var(--blanco);
+    border-radius: 1rem;
+    padding: 2rem 1.5rem;
+    margin-bottom: 0.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all .2s;
+    border: 1px solid var(--colorLinea);
+    color: var(--colorTablacelda);
+}
+
+.sexp-resultado:hover { border-color: var(--colorBoton); }
+
+.sexp-resultado__info h4 {
+    margin: 0 0 0.2rem;
+    font-size: 1.8rem;
+    font-weight: 600;
+}
+
+.sexp-resultado__info p {
+    margin: 0;
+    font-size: 1.4rem;
+    opacity: 0.7;
+}
+
+.sexp-add-btn {
+    padding: 0.4rem 1.4rem;
+    border-radius: 0.6rem;
+    border: none;
+    background-color: var(--colorRadioBotonActivo);
+    color: #fff;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 1.4rem;
+    transition: all .2s;
+    white-space: nowrap;
+}
+
+.sexp-add-btn:hover { opacity: 0.85; }
+
+.sexp-add-btn:disabled {
+    background-color: var(--colorControlDeshabilitadoFondo);
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+/* Carrito */
+.sexp-carrito {
+    background-color: var(--blanco);
+    border-radius: 1.5rem;
+    padding: 1.2rem;
+    position: sticky;
+    top: 1rem;
+    border: 1px solid var(--colorLinea);
+    transition: background-color 0.3s ease;
+}
+
+.sexp-carrito h3 {
+    margin: 0 0 1rem;
+    font-size: 1.6rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--colorTablacelda);
+}
+
+.sexp-carrito-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.6rem 0.5rem;
+    border-bottom: 1px solid var(--colorLinea);
+    font-size: 1.4rem;
+    color: var(--colorTablacelda);
+}
+
+.sexp-carrito-item:last-child { border-bottom: none; }
+
+.sexp-remove-btn {
+    background: none;
+    border: none;
+    color: var(--colorEliminarRojo);
+    cursor: pointer;
+    font-size: 1.6rem;
+    padding: 0.2rem;
+    transition: opacity .2s;
+}
+
+.sexp-remove-btn:hover { opacity: 0.7; }
+
+.sexp-carrito-empty {
+    text-align: center;
+    opacity: 0.5;
+    padding: 1.5rem;
+    font-size: 1.4rem;
+    color: var(--colorTablacelda);
+}
+
+.sexp-carrito-form {
+    margin-top: 1rem;
+    border-top: 1px solid var(--colorLinea);
+    padding-top: 1rem;
+}
+
+.sexp-carrito-form label {
+    display: block;
+    margin-bottom: 0.3rem;
+    font-weight: 600;
+    font-size: 1.4rem;
+    color: var(--colorTablacelda);
+}
+
+.sexp-carrito-form textarea,
+.sexp-carrito-form input,
+.sexp-carrito-form select {
+    width: 100%;
+    padding: 0.5rem;
+    border-radius: 0.6rem;
+    border: 1px solid var(--colorLinea);
+    background-color: var(--blanco);
+    color: var(--colorTablacelda);
+    font-size: 1.4rem;
+    margin-bottom: 1.4rem;
+    font-family: var(--fuenteCuerpo);
+}
+
+.sexp-submit-btn {
+    width: 100%;
+    padding: 1.2rem;
+    border-radius: 1rem;
+    border: none;
+    background-color: var(--colorBoton);
+    color: var(--colorTextoBoton);
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 1.8rem;
+    transition: all .2s;
+    font-family: var(--fuenteCuerpo);
+}
+
+.sexp-submit-btn:hover { opacity: 0.85; }
+
+.sexp-submit-btn:disabled {
+    background-color: var(--colorControlDeshabilitadoFondo);
+    cursor: not-allowed;
+}
+
+.sexp-carrito-count {
+    background-color: var(--colorBoton);
+    color: var(--colorTextoBoton);
+    border-radius: 50%;
+    width: 22px;
+    height: 22px;
+    display: inline-flex;
+    justify-content: center;
+    font-size: 1.2rem;
+    font-weight: 700;
+}
+
+
+/* ============================================================
+   SEGUIMIENTO — Timeline de solicitudes del usuario
+   ============================================================ */
+
+.sexp-timeline { display: flex; flex-direction: column; gap: 1rem; }
+
+.sexp-sol-card {
+    background-color: var(--blanco);
+    border-radius: 1.2rem;
+    padding: 1.8rem;
+    border-left: 5px solid var(--colorBoton);
+    transition: all .3s;
+    color: var(--colorTablacelda);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    font-size: 1.5rem;
+}
+.sexp-sol-card--pendiente   { border-left-color: #6366f1; }
+.sexp-sol-card--aprobado    { border-left-color: #22c55e; }
+.sexp-sol-card--rechazado   { border-left-color: var(--colorEliminarRojo); }
+.sexp-sol-card--enprestamo  { border-left-color: #f59e0b; }
+.sexp-sol-card--devuelto    { border-left-color: var(--colorControlDeshabilitadoFondo); }
+.sexp-sol-card--parcial     { border-left-color: #f97316; }
+.sexp-sol-card--anulado     { border-left-color: #64748b; }
+
+.sexp-sol-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.4rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+.sexp-sol-header h3 { margin: 0; font-size: 2rem; font-weight: 700; }
+
+.sexp-sol-badge {
+    padding: 0.25rem 1.4rem;
+    border-radius: 2rem;
+    font-size: 1.2rem;
+    font-weight: 700;
+}
+.sexp-sol-badge--pendiente         { background: rgba(99,102,241,0.15);  color: #818cf8; }
+.sexp-sol-badge--aprobado          { background: rgba(34,197,94,0.15);   color: #22c55e; }
+.sexp-sol-badge--rechazado         { background: rgba(220,53,69,0.15);   color: var(--colorEliminarRojo); }
+.sexp-sol-badge--enprestamo        { background: rgba(245,158,11,0.15);  color: #fbbf24; }
+.sexp-sol-badge--devuelto          { background: rgba(100,116,139,0.15); color: #94a3b8; }
+.sexp-sol-badge--devolucionparcial { background: rgba(249,115,22,0.15);  color: #fb923c; }
+.sexp-sol-badge--anulado           { background: rgba(100,116,139,0.15); color: #64748b; }
+
+.sexp-sol-info {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    font-size: 1.5rem;
+}
+.sexp-sol-info label { opacity: 0.6; font-size: 1.4rem; display: block; margin-bottom: 0.2rem; }
+
+.sexp-sol-exps { display: flex; gap: 0.3rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+
+.sexp-sol-timer {
+    font-family: 'Courier New', monospace;
+    font-weight: 700;
+    font-size: 1.4rem;
+    margin-top: 0.8rem;
+}
+.sexp-sol-rechazo {
+    background: rgba(220,53,69,0.1);
+    border-radius: 0.8rem;
+    padding: 1rem 1.4rem;
+    margin-top: 0.8rem;
+    font-size: 1.4rem;
+}
+.sexp-devolver-btn {
+    padding: 0.8rem 1.5rem;
+    border-radius: 1rem;
+    border: none;
+    background-color: #f59e0b;
+    color: #000;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 1.4rem;
+    transition: all .2s;
+    margin-top: 1rem;
+}
+.sexp-devolver-btn:hover { opacity: 0.85; transform: translateY(-2px); }
+
+/* Botón específico para entregar faltantes — naranja más vivo que el de devolución */
+.sexp-entregar-faltantes-btn {
+    background-color: #f97316 !important;
+    color: #fff !important;
+    box-shadow: 0 2px 6px rgba(249,115,22,0.35);
+}
+.sexp-entregar-faltantes-btn:hover {
+    background-color: #ea6a0d !important;
+    opacity: 1;
+}
+body.darkmode .sexp-entregar-faltantes-btn {
+    background-color: #fb923c !important;
+    color: #1a1a1a !important;
+}
+body.darkmode .sexp-entregar-faltantes-btn:hover {
+    background-color: #fdba74 !important;
+}
+
+
+/* ============================================================
+   GESTIÓN DE SOLICITUDES
+   ============================================================ */
+
+.sexp-exp-tags { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+
+
+/* ============================================================
+   MONITOREO — Timers y barras de progreso
+   ============================================================ */
+
+.sexp-timer {
+    font-family: 'Courier New', monospace;
+    font-size: 1.4rem;
+    font-weight: 700;
+    padding: 0.3rem 0.6rem;
+    border-radius: 0.6rem;
+}
+.sexp-timer--ok      { background: rgba(34,197,94,0.15);  color: #22c55e; }
+.sexp-timer--warn    { background: rgba(234,179,8,0.15);  color: #eab308; }
+.sexp-timer--danger  { background: rgba(239,68,68,0.15);  color: #ef4444; }
+.sexp-timer--expired { background: rgba(239,68,68,0.25);  color: #ef4444; animation: sexp-blink 1s infinite; }
+
+@keyframes sexp-blink {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.5; }
+}
+
+.sexp-progress-bar {
+    width: 100%;
+    height: 6px;
+    background-color: var(--colorLinea);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 0.3rem;
+}
+
+.sexp-progress-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 1s linear;
+}
+.sexp-progress-fill--ok     { background: #22c55e; }
+.sexp-progress-fill--warn   { background: #eab308; }
+.sexp-progress-fill--danger { background: #ef4444; }
+
+
+/* ============================================================
+   DEVOLUCIONES
+   ============================================================ */
+
+.sexp-dev-card {
+    background-color: var(--blanco);
+    border-radius: 1rem;
+    padding: 1.5rem; /* Aumentar padding */
+    margin-bottom: 1.2rem;
+    border-left: 5px solid #6366f1;
+    color: var(--colorTablacelda);
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+.sexp-dev-card--vencido { border-left-color: #ef4444; }
+.sexp-dev-card--parcial { border-left-color: #f97316; }
+
+.sexp-dev-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.4rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+.sexp-dev-header h3 { 
+    margin: 0; 
+    font-size: 1.6rem; /* Aumentar tamaño de título */
+    font-weight: 700;
+}
+
+/* Icono de colapso - visible siempre en tarjetas marcadas como colapsables */
+.sexp-card-toggle {
+    display: inline-block;
+    font-size: 1.8rem;
+    transition: transform 0.3s;
+    cursor: pointer;
+    opacity: 0.7;
+}
+.sexp-card-collapsible .sexp-card-toggle { display: inline-block; }
+.sexp-collapsed .sexp-card-toggle { transform: rotate(-180deg); }
+.sexp-card-collapsible .sexp-sol-header,
+.sexp-card-collapsible .sexp-dev-header {
+    cursor: pointer;
+}
+.sexp-card-collapsible.sexp-collapsed .sexp-card-body {
+    display: none !important;
+}
+
+.sexp-dev-info {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    font-size: 1.4rem; /* Aumentar tamaño de info */
+}
+.sexp-dev-info span { font-weight: 700; opacity: 0.9; margin-right: 0.5rem; }
+
+.sexp-dev-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+
+.sexp-dev-btn {
+    padding: 0.8rem 1.4rem;
+    border-radius: 0.8rem;
+    border: none;
+    cursor: pointer;
+    font-size: 1.4rem; /* Aumentar tamaño de botones */
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all .2s;
+    font-family: var(--fuenteCuerpo);
+}
+.sexp-dev-btn--completa       { background: #22c55e; color: #fff; }
+.sexp-dev-btn--completa:hover { opacity: 0.85; transform: translateY(-1px); }
+.sexp-dev-btn--parcial        { background: #f59e0b; color: #000; }
+.sexp-dev-btn--parcial:hover  { opacity: 0.85; transform: translateY(-1px); }
+
+
+/* ============================================================
+   REPORTES
+   ============================================================ */
+
+.sexp-reportes-filtros {
+    background-color: var(--blanco);
+    border-radius: 1rem;
+    padding: 1.2rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    border: 1px solid var(--colorLinea);
+    color: var(--colorTablacelda);
+}
+
+.sexp-filtro-grupo { display: flex; flex-direction: column; gap: 0.3rem; }
+.sexp-filtro-grupo label { font-size: 1.4rem; font-weight: 600; opacity: 0.7; }
+.sexp-filtro-grupo input,
+.sexp-filtro-grupo select {
+    padding: 0.8rem;
+    border-radius: 0.6rem;
+    border: 1px solid var(--colorLinea);
+    background-color: var(--blanco);
+    color: var(--colorTablacelda);
+    font-size: 1.3rem; /* Aumentar tamaño de inputs de reporte */
+    font-family: var(--fuenteCuerpo);
+}
+
+.sexp-filtro-btn--export       { background: #22c55e; color: #fff; }
+.sexp-filtro-btn--export:hover { opacity: 0.85; }
+
+.sexp-reportes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+}
+
+.sexp-reporte-card {
+    background-color: var(--blanco);
+    border-radius: 1.2rem;
+    padding: 1.5rem;
+    border: 1px solid var(--colorLinea);
+    color: var(--colorTablacelda);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+}
+.sexp-reporte-card h3 {
+    margin: 0 0 1.2rem;
+    font-size: 1.8rem; /* Aumentar título de reporte */
+    font-weight: 700;
+}
+    /* font-size: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+} */
+
+.sexp-reporte-tabla {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 1.4rem; /* Aumentar tamaño de tabla de reporte */
+    color: var(--colorTablacelda);
+}
+.sexp-reporte-tabla th {
+    text-align: left;
+    padding: 1rem 0.8rem; /* Más padding */
+    opacity: 0.9;
+    border-bottom: 2px solid var(--colorLinea);
+    font-weight: 700;
+}
+.sexp-reporte-tabla td {
+    padding: 1rem 0.8rem;
+    border-bottom: 1px solid var(--colorLinea);
+}
+
+.sexp-tabs { display: flex; gap: 0; margin-bottom: 1.5rem; flex-wrap: wrap; }
+.sexp-tab {
+    padding: 0.6rem 1.2rem;
+    border: none;
+    cursor: pointer;
+    background: transparent;
+    color: var(--colorTablacelda);
+    font-size: 1.4rem;
+    font-family: var(--fuenteCuerpo);
+    border-bottom: 2px solid transparent;
+    transition: all .2s;
+}
+.sexp-tab:hover  { border-bottom-color: var(--colorLinea); }
+.sexp-tab.active { border-bottom-color: var(--colorBoton); font-weight: 600; }
+
+.sexp-tab-content        { display: none; }
+.sexp-tab-content.active { display: block; }
+
+/* ======= Dashboard / KPIs ======= */
+
+.sexp-dashboard {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.sexp-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+}
+
+.sexp-kpi-card {
+    background-color: var(--blanco);
+    border-radius: 1rem;
+    padding: 1.2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    border-left: 4px solid var(--kpi-color, #6366f1);
+    transition: transform 0.2s;
+    color: var(--colorTablacelda);
+}
+
+.sexp-kpi-card:hover {
+    transform: translateY(-2px);
+}
+
+.sexp-kpi-card__valor {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--kpi-color, #6366f1);
+}
+
+.sexp-kpi-card__titulo {
+    font-size: 1.2rem; /* Aumentar título KPI */
+    opacity: 0.85;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Colores de KPIs */
+.sexp-kpi-card--disponible { --kpi-color: #22c55e; }
+.sexp-kpi-card--prestado { --kpi-color: #f59e0b; }
+.sexp-kpi-card--pendiente { --kpi-color: #6366f1; }
+.sexp-kpi-card--vencido { --kpi-color: #ef4444; }
+.sexp-kpi-card--parcial { --kpi-color: #f97316; }
+.sexp-kpi-card--proximo { --kpi-color: #eab308; }
+.sexp-kpi-card--total { --kpi-color: #8b5cf6; }
+.sexp-kpi-card--baja { --kpi-color: #64748b; }
+
+.sexp-section-title {
+    font-size: 1.4rem;
+    font-weight: 600;
+    margin-bottom: 1.4rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--colorTablacelda);
+}
+
+.sexp-alerta-tabla {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    color: var(--colorTablacelda);
+}
+
+.sexp-alerta-tabla th {
+    text-align: left;
+    padding: 0.6rem;
+    opacity: 0.7;
+    border-bottom: 1px solid var(--colorLinea);
+}
+
+.sexp-alerta-tabla td {
+    padding: 0.6rem;
+    border-bottom: 1px solid var(--colorLinea);
+}
+
+/* Modificadores de Badges */
+.sexp-badge--proximo { background: rgba(234, 179, 8, 0.15); color: #eab308; }
+.sexp-badge--parcial { background: rgba(249, 115, 22, 0.15); color: #fb923c; }
+
+/* ======= Utilidades para Limpieza de HTML ======= */
+
+.sexp-margin-bottom-15 { margin-bottom: 1.5rem; }
+.sexp-flex-between { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.sexp-flex-end { display: flex; justify-content: flex-end; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.sexp-flex-gap-1 { display: flex; gap: 1rem; flex-wrap: wrap; }
+.sexp-flex-gap-1 .sexp-filtro-btn {
+    font-size: 1.5rem;
+    padding: 0.7rem 1.4rem;
+    font-weight: 600;
+}
+
+.sexp-btn-refresh {
+    background: var(--colorBoton) !important;
+    color: var(--colorTextoBoton) !important;
+    border: none !important;
+}
+
+.sexp-full-width { width: 100% !important; }
+.sexp-text-center { text-align: center; }
+.sexp-opacity-5 { opacity: 0.5; }
+.sexp-opacity-6 { opacity: 0.6; }
+.sexp-padding-1 { padding: 1rem; }
+
+
+/* ============================================================
+   RESPONSIVE — Adaptación para Tablets y Móviles
+   ============================================================ */
+
+/* --- Tablets (≤ 1024px) --- */
+@media (max-width: 1024px) {
+    .sexp-buscador-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .sexp-carrito {
+        position: static;
+    }
+
+    .sexp-kpi-grid {
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    }
+
+    .sexp-reportes-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* --- Móviles grandes / Tablets pequeñas (≤ 768px) --- */
+@media (max-width: 768px) {
+    .sexp-nav-modulos {
+        gap: 0.6rem;
+    }
+
+    .sexp-nav-link {
+        padding: 0.6rem 1rem;
+        font-size: 1.4rem;
+    }
+
+    .sexp-nav-link i {
+        font-size: 1.6rem;
+    }
+
+    /* Ocultar texto largo en nav, solo iconos */
+    .sexp-nav-link span {
+        display: none;
+    }
+
+    .sexp-filtros {
+        gap: 0.5rem;
+    }
+
+    .sexp-filtro-btn {
+        padding: 0.4rem 0.7rem;
+        font-size: 1.2rem;
+    }
+
+    .sexp-kpi-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .sexp-kpi-card__valor {
+        font-size: 1.6rem;
+    }
+
+    .sexp-sol-info {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .sexp-dev-info {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .sexp-resultado {
+        padding: 1rem;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.8rem;
+    }
+
+    .sexp-resultado__info h4 {
+        font-size: 1.5rem;
+    }
+
+    .sexp-action-group {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .sexp-action-btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    /* DataTable horizontal scroll en pantallas chicas */
+    .dataTables_wrapper {
+        overflow-x: auto;
+    }
+
+    .sexp-dev-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
+
+/* --- Celulares pequeños (≤ 480px) --- */
+@media (max-width: 480px) {
+    .sexp-nav-modulos {
+        gap: 0.4rem;
+    }
+
+    .sexp-nav-link {
+        padding: 0.5rem 0.8rem;
+        font-size: 1.3rem;
+        gap: 0.3rem;
+    }
+
+    .sexp-kpi-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 0.6rem;
+    }
+
+    .sexp-kpi-card {
+        padding: 0.8rem;
+    }
+
+    .sexp-kpi-card__valor {
+        font-size: 1.4rem;
+    }
+
+    .sexp-kpi-card__titulo {
+        font-size: 0.75rem;
+    }
+
+    .sexp-search-box {
+        flex-direction: column;
+    }
+
+    .sexp-search-input {
+        min-width: unset;
+        width: 100%;
+    }
+
+    .sexp-search-select {
+        width: 100%;
+    }
+
+    .sexp-search-btn {
+        width: 100%;
+    }
+
+    .sexp-carrito {
+        border-radius: 1rem;
+        padding: 0.8rem;
+    }
+
+    .sexp-submit-btn {
+        font-size: 1.5rem;
+        padding: 1rem;
+    }
+
+    .sexp-sol-card {
+        padding: 0.8rem;
+    }
+
+    .sexp-sol-info {
+        grid-template-columns: 1fr;
+    }
+
+    .sexp-dev-info {
+        grid-template-columns: 1fr;
+    }
+
+    .sexp-dev-card {
+        padding: 0.8rem;
+    }
+
+    .sexp-tabs {
+        overflow-x: auto;
+    }
+
+    .sexp-tab {
+        white-space: nowrap;
+        font-size: 1.2rem;
+        padding: 0.5rem 0.8rem;
+    }
+
+    .sexp-reportes-filtros {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .sexp-filtro-grupo {
+        width: 100%;
+    }
+
+    .sexp-filtro-grupo input,
+    .sexp-filtro-grupo select {
+        width: 100%;
+    }
+
+}
+
+
+/* ============================================================
+   PERSONALIZACIONES SOLICITADAS POR EL USUARIO 
+   ============================================================ */
+
+/* En modo oscuro, hacer que las tarjetitas y el carrito resalten más del fondo padre */
+body.darkmode .sexp-resultado,
+body.darkmode .sexp-carrito {
+    background-color: #3f4247; /* Gris un poco más claro que el contendor principal */
+    border-color: #5a5f66;
+}
+
+/* ============================================================
+   FILTROS DE FECHA — Barra de Mis Solicitudes
+   ============================================================ */
+
+.sexp-filtros-fecha {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding: 1rem 1.2rem;
+    background-color: var(--blanco);
+    border-radius: 1rem;
+    border: 1px solid var(--colorLinea);
+}
+
+.sexp-filtro-btn {
+    padding: 0.5rem 1.2rem;
+    border-radius: 2rem;
+    border: 1px solid var(--colorLinea);
+    background-color: transparent;
+    color: var(--colorTablacelda);
+    cursor: pointer;
+    font-size: 1.3rem;
+    font-family: var(--fuenteCuerpo);
+    font-weight: 500;
+    transition: all .2s;
+}
+
+.sexp-filtro-btn:hover {
+    background-color: var(--colorBoton);
+    color: var(--colorTextoBoton);
+    border-color: var(--colorBoton);
+}
+
+.sexp-filtro-btn--active {
+    background-color: var(--colorBoton) !important;
+    color: var(--colorTextoBoton) !important;
+    border-color: var(--colorBoton) !important;
+    font-weight: 700;
+}
+
+.sexp-rango-fechas {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    color: var(--colorTablacelda);
+    font-size: 1.3rem;
+}
+
+.sexp-fecha-input,
+body.darkmode .sexp-fecha-input {
+    padding: 0.4rem 0.8rem;
+    border-radius: 0.6rem;
+    border: 1px solid #AAAAAA !important;
+    background-color: #FFFFFF !important;  /* Siempre blanco para que el icono sea visible */
+    color: #000000 !important;             /* Texto siempre negro */
+    font-size: 1.3rem;
+    font-family: var(--fuenteCuerpo);
+    cursor: pointer;
+    min-width: 140px;
+}
+
+/* Ícono del calendario siempre visible (sobre fondo blanco siempre es negro) */
+.sexp-fecha-input::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 0.8;
+    filter: none !important; /* Nunca invertir: fondo siempre es blanco */
+}
+
+/* Estilo para las etiquetas de expedientes en el seguimiento */
+.sexp-exp-tag {
+    background: rgba(99,102,241,0.1);
+    color: var(--colorTablacelda);
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+    font-size: 1.3rem; 
+    font-weight: 600;
+    border: 1px solid rgba(99,102,241,0.2);
+}
+
+body.darkmode .sexp-exp-tag {
+    background: rgba(255,255,255,0.05);
+    color: #ffffff;
+    border-color: rgba(255,255,255,0.1);
+}
+
+/* ============================================================
+   COLORES POR ESTADO (sobrescriben las reglas base anteriores)
+   - ROJO: rechazados / no encontrados (no se prestaron)
+   - AMARILLO: aprobados pendientes de devolver
+   - LATE: entregados fuera de tiempo
+   ============================================================ */
+.sexp-exp-tag.sexp-exp-tag--rechazado,
+body.darkmode .sexp-exp-tag.sexp-exp-tag--rechazado {
+    background: rgba(239, 68, 68, 0.18) !important;
+    color: #dc2626 !important;
+    border: 1px solid rgba(239, 68, 68, 0.5) !important;
+    font-weight: 700 !important;
+}
+body.darkmode .sexp-exp-tag.sexp-exp-tag--rechazado {
+    color: #fca5a5 !important;
+    background: rgba(239, 68, 68, 0.22) !important;
+    border-color: rgba(239, 68, 68, 0.55) !important;
+}
+
+.sexp-exp-tag.sexp-exp-tag--pendiente {
+    background: rgba(234, 179, 8, 0.22) !important;
+    color: #92400e !important;
+    border: 1px solid rgba(234, 179, 8, 0.6) !important;
+    font-weight: 700 !important;
+}
+body.darkmode .sexp-exp-tag.sexp-exp-tag--pendiente {
+    color: #fbbf24 !important;
+    background: rgba(234, 179, 8, 0.25) !important;
+    border-color: rgba(234, 179, 8, 0.6) !important;
+}
+
+.sexp-exp-tag.sexp-exp-tag--late {
+    background: rgba(239, 68, 68, 0.15) !important;
+    color: #ef4444 !important;
+    border: 1px solid rgba(239, 68, 68, 0.3) !important;
+}
+
+/* Forzar colores de modo claro para Combobox y Textbox dentro del Carrito */
+.sexp-carrito-form select,
+.sexp-carrito-form textarea,
+.sexp-carrito-form input,
+body.darkmode .sexp-carrito-form select,
+body.darkmode .sexp-carrito-form textarea,
+body.darkmode .sexp-carrito-form input {
+    background-color: #FFFFFF !important;
+    color: #000000 !important;
+    border: 1px solid #CCCCCC !important;
+}
+
+body.darkmode .sexp-carrito-form select:focus,
+body.darkmode .sexp-carrito-form textarea:focus,
+body.darkmode .sexp-carrito-form input:focus {
+    border-color: #333333 !important;
+}
+
+/* Darle estilo de "tarjetitas" pequeñas a los items agregados en modo oscuro */
+body.darkmode .sexp-carrito-item {
+    background-color: #4f5359; /* Más claro que el fondo del carrito (#3f4247) */
+    border: 1px solid #636870;
+    border-radius: 0.6rem;
+    padding: 0.8rem;
+    margin-bottom: 0.6rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+body.darkmode .sexp-carrito-item:last-child {
+    margin-bottom: 0;
+    border-bottom: 1px solid #636870; /* Prevenir que se quite el borde del ultimo item */
+}
+
+/* Hacer que el texto de los items sea muy visible y claro */
+.sexp-carrito-item .big_skin_checked span {
+    color: #888888; /* Gris en modo claro */
+}
+
+body.darkmode .sexp-carrito-item .big_skin_checked span,
+body.darkmode .sexp-carrito-item span,
+body.darkmode .sexp-carrito-item {
+    color: #FFFFFF !important; /* Blanco puro como fue solicitado */
+}
+
+/* Hacer que el ícono de eliminar resalte más claro en el fondo oscuro */
+body.darkmode .sexp-remove-btn {
+    color: #ff6b6b !important; /* Un rojo mucho más brillante/claro */
+    opacity: 0.9;
+}
+
+body.darkmode .sexp-remove-btn:hover {
+    color: #ff4d4d !important;
+    opacity: 1;
+}
+
+/* Resaltar el botón principal del carrito para que no sea oscuro/aburrido */
+body.darkmode .sexp-submit-btn {
+    background-color: #6366f1 !important; /* Azul/Indigo vibrante */
+    color: #ffffff !important;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+    border: none;
+}
+
+body.darkmode .sexp-submit-btn:hover {
+    background-color: #4f46e5 !important;
+}
+/* ============================================================
+   RESPONSIVE - TARJETAS COLAPSABLES
+   ============================================================ */
+
+/* En móviles, habilitar el comportamiento colapsable */
+@media (max-width: 768px) {
+    .sexp-card-collapsible .sexp-card-toggle {
+        display: block; /* Mostrar la flecha solo en móvil */
+    }
+
+    /* Ocultar el cuerpo cuando está colapsado */
+    .sexp-collapsed .sexp-card-body {
+        display: none !important;
+    }
+
+    /* Estilo del header cuando es colapsable para que parezca botón */
+    .sexp-card-collapsible .sexp-dev-header,
+    .sexp-card-collapsible .sexp-sol-header {
+        cursor: pointer;
+        padding: 0.5rem 0;
+        margin-bottom: 0; /* Quitar margen si está cerrado */
+    }
+
+    .sexp-card-collapsible:not(.sexp-collapsed) .sexp-dev-header,
+    .sexp-card-collapsible:not(.sexp-collapsed) .sexp-sol-header {
+        margin-bottom: 1.2rem; /* Recuperar margen si está abierto */
+        border-bottom: 1px solid rgba(0,0,0,0.05);
+        padding-bottom: 1rem;
+    }
+
+    /* Reducir padding de tarjetas en móvil */
+    .sexp-sol-card, .sexp-dev-card {
+        padding: 1rem;
+    }
+
+    /* Botones de acción: ancho completo y tap-target cómodo */
+    .sexp-devolver-btn,
+    .sexp-entregar-faltantes-btn {
+        width: 100%;
+        padding: 1rem 1.2rem;
+        font-size: 1.5rem;
+    }
+}
+
+/* Tablet — breakpoint intermedio */
+@media (max-width: 1024px) and (min-width: 769px) {
+    .sexp-sol-info {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .sexp-kpi-grid {
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    }
+}
+
+/* ============================================================
+   DARK MODE — Tarjetas (Mis Solicitudes / Reportes / KPIs)
+   Color más claro que el fondo para evitar confusión visual
+   ============================================================ */
+body.darkmode .sexp-sol-card,
+body.darkmode .sexp-dev-card,
+body.darkmode .sexp-reporte-card,
+body.darkmode .sexp-kpi-card {
+    background-color: #3f4247;
+}
+
+/* ============================================================
+   BUSCADOR — Layout vertical con grid responsivo de 3 columnas
+   ============================================================ */
+.sexp-buscador-vertical {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+/* Caja de búsqueda en la parte superior */
+.sexp-search-box--top {
+    background-color: var(--blanco);
+    padding: 1rem 1.5rem;
+    border-radius: 1rem;
+    border: 1px solid var(--colorLinea);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+    margin-bottom: 0;
+}
+
+.sexp-buscador-resultados-wrap {
+    background-color: var(--blanco);
+    padding: 1.5rem;
+    border-radius: 1rem;
+    border: 1px solid var(--colorLinea);
+    color: var(--colorTablacelda);
+}
+
+.sexp-buscador-resultados-titulo {
+    margin: 0 0 1rem 0;
+    font-size: 1.7rem;
+    font-weight: 700;
+    color: var(--colorTablacelda);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Grid responsivo: 3 columnas en pantallas grandes */
+.sexp-resultados-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+}
+
+.sexp-grid-empty {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 2rem;
+    opacity: 0.6;
+    font-size: 1.5rem;
+}
+
+/* Tarjeta de resultado en grid */
+.sexp-resultado--card {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.6rem;
+    padding: 1.2rem 1.4rem;
+    margin-bottom: 0;
+    min-height: 130px;
+}
+
+.sexp-resultado-id-nombre {
+    margin: 0 0 0.3rem 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1.3;
+    word-break: break-word;
+}
+
+.sexp-resultado-id-nombre .sexp-id {
+    color: var(--colorBoton);
+    font-weight: 700;
+}
+
+.sexp-resultado-id-nombre .sexp-sep {
+    margin: 0 0.3rem;
+    opacity: 0.5;
+}
+
+.sexp-resultado-id-nombre .sexp-nombre {
+    font-weight: 600;
+}
+
+.sexp-resultado-exp,
+.sexp-resultado-ubic {
+    margin: 0 !important;
+    font-size: 1.3rem;
+    opacity: 0.8;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.sexp-resultado-acciones {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    padding-top: 0.6rem;
+    border-top: 1px dashed var(--colorLinea);
+}
+
+/* Carrito en parte inferior — tipografía y espaciado equivalente a resultados-busqueda */
+.sexp-carrito--bottom {
+    width: 100%;
+    box-sizing: border-box;
+    position: static;     /* anula el sticky heredado */
+    padding: 1.5rem 1.8rem;
+    border-radius: 1rem;
+}
+
+.sexp-carrito--bottom h3 {
+    font-size: 1.9rem;
+    margin: 0 0 1rem 0;
+    font-weight: 700;
+}
+
+.sexp-carrito--bottom .sexp-carrito-empty {
+    font-size: 1.6rem;
+    padding: 1.8rem;
+}
+
+.sexp-carrito--bottom .sexp-carrito-form {
+    margin-top: 1.2rem;
+    padding-top: 1.2rem;
+}
+
+.sexp-carrito--bottom .sexp-carrito-form label {
+    font-size: 1.6rem;
+    margin-bottom: 0.5rem;
+}
+
+.sexp-carrito--bottom .sexp-carrito-form select,
+.sexp-carrito--bottom .sexp-carrito-form textarea,
+.sexp-carrito--bottom .sexp-carrito-form input {
+    font-size: 1.6rem;
+    padding: 0.8rem 1rem;
+    border-radius: 0.8rem;
+}
+
+.sexp-carrito-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 1.2rem;
+    margin-bottom: 0.5rem;
+}
+
+.sexp-info-unidad {
+    font-size: 1.5rem;
+    opacity: 0.75;
+    margin: 0.4rem 0 0.8rem 0;
+}
+
+/* ============================================================
+   CARRITO — Grid responsivo de 3 columnas
+   ============================================================ */
+.sexp-carrito-grid {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin-top: 0.5rem;
+}
+
+.sexp-carrito-grid .sexp-carrito-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.6rem;
+    padding: 1rem 1.2rem;
+    border: 1px solid var(--colorLinea);
+    border-radius: 0.8rem;
+    border-bottom: 1px solid var(--colorLinea); /* anula la regla del border-bottom-only */
+}
+
+.sexp-carrito-item-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    flex: 1;
+    min-width: 0;
+}
+
+.sexp-carrito-item-id {
+    font-size: 1.7rem;
+    font-weight: 700;
+}
+
+.sexp-carrito-item-nombre {
+    font-size: 1.55rem;
+    word-break: break-word;
+}
+
+.sexp-carrito-item-exp {
+    font-size: 1.4rem;
+    opacity: 0.8;
+}
+
+.sexp-carrito-grid .sexp-remove-btn {
+    font-size: 1.9rem;
+}
+
+@media (max-width: 1024px) {
+    .sexp-carrito-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 640px) {
+    .sexp-carrito-grid { grid-template-columns: 1fr; }
+}
+
+/* ============================================================
+   BUSCADOR — Responsive
+   ============================================================ */
+
+/* Tablet: 2 columnas */
+@media (max-width: 1024px) {
+    .sexp-resultados-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .sexp-carrito-form-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Móvil: 1 columna */
+@media (max-width: 640px) {
+    .sexp-resultados-grid {
+        grid-template-columns: 1fr;
+        gap: 0.8rem;
+    }
+    .sexp-search-box--top {
+        flex-direction: column;
+        padding: 0.8rem 1rem;
+    }
+    .sexp-search-box--top .sexp-search-select,
+    .sexp-search-box--top .sexp-search-input,
+    .sexp-search-box--top .sexp-search-btn {
+        width: 100%;
+    }
+    .sexp-resultado-id-nombre {
+        font-size: 1.4rem;
+    }
+}
+
+/* Dark mode para el nuevo layout */
+body.darkmode .sexp-search-box--top,
+body.darkmode .sexp-buscador-resultados-wrap {
+    background-color: #3f4247;
+}
+
+
+/* ============================================================
+   SUGERIR TIEMPO DE ENTREGA — Panel opcional en el carrito
+   ============================================================ */
+.sexp-sugerir-tiempo {
+    margin: 0.4rem 0 1.1rem 0;
+    padding: 0.8rem 1rem;
+    border: 1px dashed var(--colorLinea);
+    border-radius: 0.8rem;
+    background-color: rgba(99, 102, 241, 0.04);
+}
+
+.sexp-sugerir-tiempo-check {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    cursor: pointer;
+    font-size: 1.55rem;
+    font-weight: 600;
+    color: var(--colorTablacelda);
+    user-select: none;
+    margin: 0 !important;
+}
+
+.sexp-sugerir-tiempo-check input[type="checkbox"] {
+    width: 1.8rem;
+    height: 1.8rem;
+    cursor: pointer;
+    accent-color: var(--colorBoton);
+    margin: 0 !important;
+}
+
+.sexp-sugerir-tiempo-check i {
+    font-size: 1.7rem;
+    color: var(--colorBoton);
+}
+
+.sexp-sugerir-tiempo-panel {
+    margin-top: 0.9rem;
+    padding-top: 0.9rem;
+    border-top: 1px solid var(--colorLinea);
+}
+
+.sexp-sugerir-tiempo-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 0.6rem;
+}
+
+.sexp-sugerir-tiempo-grid label {
+    font-size: 1.5rem !important;
+    font-weight: 600;
+    margin-bottom: 0.4rem !important;
+    color: var(--colorTablacelda);
+    display: block;
+}
+
+.sexp-sugerir-tiempo-row {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.sexp-sugerir-tiempo-row input[type="number"] {
+    flex: 1;
+    min-width: 0;
+}
+
+.sexp-sugerir-tiempo-row select {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 9rem;
+}
+
+.sexp-sugerir-tiempo-hint {
+    margin: 0.4rem 0 0 0 !important;
+    font-size: 1.35rem !important;
+    line-height: 1.45;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    color: var(--colorTablacelda);
+    opacity: 0.85;
+}
+
+.sexp-sugerir-tiempo-hint i {
+    flex: 0 0 auto;
+    margin-top: 0.2rem;
+    color: var(--colorBoton);
+    font-size: 1.5rem;
+}
+
+body.darkmode .sexp-sugerir-tiempo {
+    background-color: rgba(255, 255, 255, 0.04);
+    border-color: #5a5f66;
+}
+
+@media (max-width: 640px) {
+    .sexp-sugerir-tiempo-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Botón del modal sticky (Listo para recoger / Vencimiento)
+   Texto en una sola línea, padding adecuado, no se rompe */
+.sexp-sticky-btn {
+    white-space: nowrap !important;
+    padding: 0.6rem 1.4rem !important;
+    font-size: 1.4rem !important;
+    line-height: 1.2 !important;
+    min-width: auto !important;
+    max-width: 90% !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 0.5rem !important;
+}
+
+.sexp-sticky-btn i {
+    font-size: 1.5rem !important;
+}

@@ -1,6 +1,8 @@
 # 2026-05-29: extraído de mapeo_camas/views.py en refactor E (split)
 """Helpers de sesión de mapeo y persistencia de auditoría (historial/detalle)."""
 
+import json
+
 from django.contrib.sessions.models import Session
 from django.db import transaction
 from django.utils import timezone
@@ -14,6 +16,9 @@ from mapeo_camas.models import (
 )
 
 from ._helpers import get_estado_mapeo, _resolver_ingreso_operativo
+
+# [2026-06-26 SCOPE] Prefijo técnico para serializar alcance de sesión sin migración adicional.
+_SCOPE_PREFIX = "__MAPEO_SCOPE__="
 
 def _cancelar_sesion_mapeo_sin_sesion_django(sesion):
     """[2026-06-22] Cancela una sesion de mapeo cuyo usuario ya no tiene sesion Django activa."""
@@ -105,6 +110,49 @@ def _obtener_servicios_ids_sesion(sesion):
     return list(
         sesion.servicios_incluidos.order_by("servicio_id").values_list("servicio_id", flat=True)
     )
+
+
+def _obtener_salas_ids_sesion(sesion):
+    """Retorna ids de sala restringidos en la sesion (si aplica)."""
+    if not sesion:
+        return []
+
+    # [2026-06-26 SCOPE] Reusa observacion_texto como metadato estructurado de alcance.
+    texto = (getattr(sesion, "observacion_texto", "") or "").strip()
+    if not texto.startswith(_SCOPE_PREFIX):
+        return []
+
+    payload_raw = texto[len(_SCOPE_PREFIX):]
+    try:
+        payload = json.loads(payload_raw)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return []
+
+    sala_ids = payload.get("sala_ids") or []
+    if not isinstance(sala_ids, list):
+        return []
+
+    resultado = []
+    for sala_id in sala_ids:
+        try:
+            sala_id_int = int(sala_id)
+        except (TypeError, ValueError):
+            continue
+        if sala_id_int > 0:
+            resultado.append(sala_id_int)
+    return sorted(set(resultado))
+
+
+def _guardar_scope_sesion(sesion, *, sala_ids=None):
+    """Guarda alcance técnico de sala en la sesión activa de mapeo."""
+    sala_ids = sorted(set(int(s) for s in (sala_ids or []) if int(s) > 0))
+    if not sala_ids:
+        return
+
+    # [2026-06-26 SCOPE] JSON compacto para minimizar escritura y facilitar parseo.
+    scope = json.dumps({"sala_ids": sala_ids}, separators=(",", ":"))
+    sesion.observacion_texto = f"{_SCOPE_PREFIX}{scope}"
+    sesion.save(update_fields=["observacion_texto"])
 
 
 # [2026-05-07] Helper para registrar detalle de mapeo (auditoría)

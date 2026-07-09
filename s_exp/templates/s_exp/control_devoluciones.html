@@ -1,0 +1,421 @@
+{% extends 'core/base.html' %}
+{% load static %}
+{% load permisos_unidad %}
+
+{% block title %}Control de Devoluciones{% endblock title %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'core/css/s_exp.css' %}">
+{% endblock extra_css %}
+
+{% block content %}
+<div class="contenedor2">
+    <div class="tituloFormulario sexp-margin-bottom-15">
+        <div class="tituloFormulario-texto">
+            <i class="bi bi-arrow-return-left"></i>
+            <h2 class="sin-margen">Control de Devoluciones</h2>
+        </div>
+        <div class="tituloFormulario-subrallado"></div>
+    </div>
+
+    <div class="sexp-nav-modulos">
+        <a href="{% url 's_exp_buscador' %}" class="sexp-nav-link">
+            <i class="bi bi-search"></i> Solicitar Expedientes
+        </a>
+        <a href="{% url 's_exp_seguimiento' %}" class="sexp-nav-link">
+            <i class="bi bi-clock-history"></i> Mis Solicitudes
+        </a>
+        
+        <a href="{% url 's_exp_solicitudes' %}" class="sexp-nav-link">
+            <i class="bi bi-list-check"></i> Gestión Solicitudes
+        </a>
+        <a href="{% url 's_exp_monitoreo' %}" class="sexp-nav-link">
+            <i class="bi bi-binoculars"></i> Monitoreo
+        </a>
+        <a href="{% url 's_exp_devoluciones' %}" class="sexp-nav-link sexp-nav-link--active">
+            <i class="bi bi-arrow-return-left"></i> Devoluciones
+        </a>
+        <a href="{% url 's_exp_reportes' %}" class="sexp-nav-link">
+            <i class="bi bi-bar-chart-line"></i> Reportes
+        </a>
+    </div>
+
+
+    <div id="lista-devoluciones">
+        <p class="sexp-opacity-5 sexp-text-center">Cargando préstamos pendientes de devolución...</p>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    cargarDevoluciones(false);
+
+    // ===== Auto-refresh inteligente con BANNER (botón "Actualizar") =====
+    //
+    // ORIGEN DEL FLUJO:
+    //   Cuando un usuario marca una solicitud para devolver, el backend
+    //   (solicitar_devolucion_api) registra el log 'SOLICITUD_DEVOLUCION_INICIADA'.
+    //   El endpoint ligero changes_check_api expone MAX(timestamp) de ese log
+    //   bajo la sección 'devoluciones'.
+    //
+    // QUÉ HACE:
+    //   registrarConTrigger consulta changes_check_api cada 5s (polling con
+    //   header X-Polling-Request, por lo que NO renueva la sesión de 30 min).
+    //   Si el timestamp de 'devoluciones' cambió respecto al último visto,
+    //   acumula las novedades en un BANNER flotante con un botón "Actualizar",
+    //   en lugar de recargar solo. Así el admin no pierde el contexto si está
+    //   auditando una devolución en curso, y ve un contador cuando llegan
+    //   varias devoluciones seguidas (2, 3, ...). Mismo comportamiento que
+    //   Gestión de Solicitudes (consistencia de UX).
+    //
+    // IMPACTO EN RENDIMIENTO:
+    //   El polling solo pega a un endpoint que hace agregaciones MAX(timestamp)
+    //   (muy barato). La recarga real (cargarDevoluciones) solo se ejecuta
+    //   cuando el admin pulsa "Actualizar", no en cada tick.
+    if (window.RealtimeSExp) {
+        RealtimeSExp.registrarConTrigger('control-devoluciones', 'devoluciones', function () {
+            cargarDevoluciones(true);
+        }, 5, { etiqueta: 'devoluciones' });
+    }
+});
+
+function cargarDevoluciones(esPolling = false) {
+    const headers = {};
+    if (esPolling) headers['X-Polling-Request'] = 'true';
+
+    $.ajax({
+        url: window.urls.s_exp_prestamos_devolucion_api,
+        method: 'GET',
+        headers: headers,
+        // cache:false evita que el navegador sirva una respuesta vieja al
+        // pulsar "Actualizar" (jQuery agrega un parámetro anti-caché, igual
+        // que hace DataTables en Gestión de Solicitudes). Sin esto, la nueva
+        // devolución podía no aparecer al recargar.
+        cache: false,
+        success: function(resp) {
+            renderDevoluciones(resp.data);
+        },
+        error: function(xhr) {
+            // En recarga manual (no polling) avisamos del error para no dejar
+            // al admin sin pistas de por qué no se actualizó.
+            if (!esPolling) {
+                toastr.error("Error al cargar las devoluciones");
+            } else {
+                console.error('[Devoluciones] Error al recargar:', xhr && xhr.status);
+            }
+        }
+    });
+}
+
+function renderDevoluciones(data) {
+    const container = $('#lista-devoluciones');
+    if (!data.length) {
+        container.html('<p style="opacity:0.5; text-align:center;">No hay préstamos pendientes de devolución.</p>');
+        return;
+    }
+
+    let html = '';
+    data.forEach(function(p) {
+        const claseExtra = p.esta_vencido ? 'sexp-dev-card--vencido' : (p.estado === 'DevolucionParcial' ? 'sexp-dev-card--parcial' : '');
+        const badgeEstilo = p.esta_vencido 
+            ? 'background:rgba(239,68,68,0.2);color:var(--negro);' 
+            : (p.estado === 'DevolucionParcial' ? 'background:rgba(249,115,22,0.2);color:var(--negro);' : 'background:rgba(34,197,94,0.2);color:var(--negro);');
+        
+        const detallesJSON = encodeURIComponent(JSON.stringify(p.detalles_expedientes));
+
+        // Render de tags coloreados según estado de devolución de cada expediente
+        const tagsHtml = p.detalles_expedientes.map(d => {
+            const est = d.estado_devolucion || 'pendiente';
+            const cls = est === 'perdido'
+                ? 'sexp-exp-tag sexp-exp-tag--rechazado'
+                : est === 'pendiente'
+                    ? 'sexp-exp-tag sexp-exp-tag--pendiente'
+                    : 'sexp-exp-tag';
+            const tip = est === 'perdido' ? 'Marcado como perdido'
+                : est === 'pendiente' ? 'Pendiente de devolver'
+                : 'Devuelto correctamente';
+            return `<span class="${cls}" title="${tip}">#${d.numero}</span>`;
+        }).join(' ');
+
+        html += `
+        <div class="sexp-dev-card sexp-card-collapsible sexp-collapsed ${claseExtra}">
+            <div class="sexp-dev-header" onclick="toggleCard(this)">
+                <h3><i class="bi bi-box-seam"></i> Préstamo #${p.id}</h3>
+                <div style="display:flex; align-items:center; gap:0.8rem;">
+                    <span class="sexp-estado-badge" style="${badgeEstilo}">${p.estado}</span>
+                    <i class="bi bi-chevron-down sexp-card-toggle"></i>
+                </div>
+            </div>
+            <div class="sexp-card-body">
+                <div class="sexp-dev-info">
+                    <div><span>Usuario:</span> ${p.usuario_nombre}</div>
+                    <div><span>Total Solic.:</span> ${p.cant_expedientes}</div>
+                    <div><span>Devueltos:</span> ${p.cant_devueltos}</div>
+                </div>
+                <div style="margin-bottom:1rem;">
+                    <div class="sexp-dev-leyenda">
+                        <span><span class="sexp-exp-tag">#</span> Devuelto</span>
+                        <span><span class="sexp-exp-tag sexp-exp-tag--pendiente">#</span> Pendiente</span>
+                        <span><span class="sexp-exp-tag sexp-exp-tag--rechazado">#</span> Perdido</span>
+                    </div>
+                    <div class="sexp-dev-tags">${tagsHtml}</div>
+                </div>
+                <div class="sexp-dev-actions">
+                    <button class="sexp-dev-btn sexp-dev-btn--completa" onclick="abrirModalAuditoria(${p.id}, '${detallesJSON}')">
+                        <i class="bi bi-clipboard-check"></i> Revisar y Auditar Devolución
+                    </button>
+                </div>
+            </div>
+        </div>`;
+    });
+    container.html(html);
+}
+
+function toggleCard(headerEl) {
+    $(headerEl).closest('.sexp-card-collapsible').toggleClass('sexp-collapsed');
+}
+
+function abrirModalAuditoria(prestamoId, detallesEncoded) {
+    const detalles = JSON.parse(decodeURIComponent(detallesEncoded));
+
+    // Ordenar: pendientes primero (para que el admin se enfoque en lo que falta), procesados después
+    detalles.sort((a, b) => {
+        const aPend = (a.estado_devolucion || 'pendiente') === 'pendiente' ? 0 : 1;
+        const bPend = (b.estado_devolucion || 'pendiente') === 'pendiente' ? 0 : 1;
+        return aPend - bPend;
+    });
+
+    const tarjetasHtml = detalles.map(d => {
+        const ident = d.paciente_identidad || 'S/ID';
+        const nom = d.paciente_nombre || 'N/A';
+        const estado = d.estado_devolucion || 'pendiente';
+        const yaProcesado = (estado === 'devuelto' || estado === 'perdido');
+        const comentarioPrev = (d.comentario_devolucion || '').replace(/"/g, '&quot;');
+
+        // Estado pre-seleccionado y clase de la tarjeta
+        let valorInicial, clase = '';
+        if (estado === 'devuelto') { valorInicial = 'recibido'; clase = ' sexp-auditoria-card--done'; }
+        else if (estado === 'perdido') { valorInicial = 'perdido'; clase = ' sexp-auditoria-card--lost'; }
+        else { valorInicial = 'recibido'; }  // pendiente: por defecto recibido
+
+        const disabledAttr = yaProcesado ? ' disabled' : '';
+
+        // Badge superior según estado
+        let lockBadge = '';
+        if (estado === 'devuelto') {
+            lockBadge = `<span class="sexp-auditoria-lock" style="background:rgba(34,197,94,0.25);color:var(--negro);" title="Ya devuelto en auditoría previa">
+                            <i class="bi bi-check-circle-fill"></i> Ya devuelto
+                         </span>`;
+        } else if (estado === 'perdido') {
+            lockBadge = `<span class="sexp-auditoria-lock" style="background:rgba(239,68,68,0.25);color:var(--negro);" title="Marcado como perdido en auditoría previa">
+                            <i class="bi bi-x-circle-fill"></i> Perdido
+                         </span>`;
+        } else {
+            // Pendiente — visible que se puede interactuar
+            lockBadge = `<span class="sexp-auditoria-lock" style="background:rgba(245,158,11,0.25);color:var(--negro);" title="Pendiente de devolver — se puede auditar">
+                            <i class="bi bi-hourglass-split"></i> Pendiente
+                         </span>`;
+        }
+
+        return `
+            <div class="sexp-auditoria-card${clase}" id="aud-card-${d.id}" data-estado-prev="${estado}"
+                 ${yaProcesado ? 'style="opacity:0.7;"' : ''}>
+                <div class="sexp-auditoria-card-header">
+                    <span class="sexp-exp-tag">#${d.numero}</span>
+                    <div class="sexp-auditoria-paciente">
+                        <span class="sexp-auditoria-id">${ident}</span>
+                        <span class="sexp-auditoria-nombre">${nom}</span>
+                    </div>
+                    ${lockBadge}
+                </div>
+                <div class="sexp-auditoria-radios">
+                    <label class="sexp-auditoria-radio sexp-auditoria-radio--ok"${yaProcesado ? ' style="cursor:not-allowed;opacity:0.6;"' : ''}>
+                        <input type="radio" name="estado_exp_${d.id}" value="recibido" data-detalle="${d.id}"${valorInicial==='recibido'?' checked':''}${disabledAttr}>
+                        <i class="bi bi-check-circle"></i> Recibido
+                    </label>
+                    <label class="sexp-auditoria-radio sexp-auditoria-radio--no"${yaProcesado ? ' style="cursor:not-allowed;opacity:0.6;"' : ''}>
+                        <input type="radio" name="estado_exp_${d.id}" value="no_recibido" data-detalle="${d.id}"${disabledAttr}>
+                        <i class="bi bi-hourglass-split"></i> No Recibido
+                    </label>
+                    <label class="sexp-auditoria-radio sexp-auditoria-radio--lost"${yaProcesado ? ' style="cursor:not-allowed;opacity:0.6;"' : ''}>
+                        <input type="radio" name="estado_exp_${d.id}" value="perdido" data-detalle="${d.id}"${valorInicial==='perdido'?' checked':''}${disabledAttr}>
+                        <i class="bi bi-exclamation-triangle"></i> Perdido
+                    </label>
+                </div>
+                <div class="sexp-auditoria-coment-row">
+                    <label class="sexp-revision-card-label" for="coment-${d.id}">
+                        Comentario (obligatorio si NO se recibió)
+                    </label>
+                    <input type="text" id="coment-${d.id}" class="sexp-modal-input sexp-auditoria-coment"
+                           data-detalle="${d.id}" maxlength="200"
+                           value="${comentarioPrev}"
+                           placeholder="Ingrese comentario (irá al PDF en Observaciones devolución)"${disabledAttr}>
+                </div>
+            </div>`;
+    }).join('');
+
+    Swal.fire({
+        title: 'Auditoría de Devolución — Préstamo #' + prestamoId,
+        width: '95%',
+        html: `
+            <div class="sexp-revision-modal">
+                <p class="sexp-auditoria-help">
+                    <i class="bi bi-info-circle"></i>
+                    Marque el estado físico de cada expediente. El comentario es obligatorio si NO se recibió y quedará en el PDF.
+                </p>
+                <div class="sexp-modal-buscador-row">
+                    <div class="sexp-modal-buscador-input">
+                        <i class="bi bi-search"></i>
+                        <input type="search" id="sexp-aud-buscar" class="sexp-modal-input"
+                               placeholder="Filtrar por identidad, nombre o número de expediente..."
+                               autocomplete="off">
+                        <button type="button" class="sexp-modal-buscador-clear" id="sexp-aud-buscar-clear"
+                                title="Limpiar filtro" aria-label="Limpiar filtro">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    </div>
+                    <span class="sexp-modal-buscador-info" id="sexp-aud-buscar-info"></span>
+                </div>
+                <div class="sexp-auditoria-grid">${tarjetasHtml}</div>
+            </div>`,
+        showCancelButton: true,
+        confirmButtonText: '<i class="bi bi-check-circle-fill"></i> Finalizar Auditoría',
+        cancelButtonText: '<i class="bi bi-x-circle-fill"></i> Cancelar',
+        customClass: {
+            popup: 'contenedor-modal sexp-modal-grande',
+            title: 'contener-modal-titulo',
+            confirmButton: 'contener-modal-boton-confirmar',
+            cancelButton: 'contener-modal-boton-cancelar',
+        },
+        didOpen: () => {
+            const actionsContainer = document.querySelector('.swal2-actions');
+            if (actionsContainer) actionsContainer.classList.add('contener-modal-contenedor-botones');
+
+            // Aplicar clase visual inicial según pre-selección
+            document.querySelectorAll('.sexp-auditoria-card').forEach(card => {
+                const sel = card.querySelector('input[type="radio"]:checked');
+                if (sel && sel.value === 'no_recibido') card.classList.add('sexp-auditoria-card--no');
+                else if (sel && sel.value === 'perdido') card.classList.add('sexp-auditoria-card--lost');
+            });
+
+            // Resaltar tarjeta cuando se elija "no recibido" o "perdido"
+            document.querySelectorAll('.sexp-auditoria-card input[type="radio"]').forEach(rad => {
+                rad.addEventListener('change', function () {
+                    const det = this.dataset.detalle;
+                    const card = document.getElementById('aud-card-' + det);
+                    if (!card) return;
+                    card.classList.remove('sexp-auditoria-card--no', 'sexp-auditoria-card--lost');
+                    if (this.value === 'no_recibido') card.classList.add('sexp-auditoria-card--no');
+                    else if (this.value === 'perdido') card.classList.add('sexp-auditoria-card--lost');
+                });
+            });
+
+            // Buscador local
+            const inpBuscar = document.getElementById('sexp-aud-buscar');
+            const btnClear = document.getElementById('sexp-aud-buscar-clear');
+            const info = document.getElementById('sexp-aud-buscar-info');
+            const cards = document.querySelectorAll('.sexp-auditoria-card');
+
+            function filtrar() {
+                const q = (inpBuscar.value || '').trim().toLowerCase();
+                let visibles = 0;
+                cards.forEach(card => {
+                    const text = card.textContent.toLowerCase();
+                    const match = !q || text.indexOf(q) >= 0;
+                    card.style.display = match ? '' : 'none';
+                    if (match) visibles++;
+                });
+                if (info) {
+                    info.textContent = q
+                        ? `${visibles} de ${cards.length} expediente(s)`
+                        : `${cards.length} expediente(s)`;
+                }
+                btnClear.style.display = q ? '' : 'none';
+            }
+            inpBuscar.addEventListener('input', filtrar);
+            btnClear.addEventListener('click', function () {
+                inpBuscar.value = '';
+                filtrar();
+                inpBuscar.focus();
+            });
+            filtrar();
+        },
+        preConfirm: () => {
+            const recibidos = [];
+            const perdidos = [];
+            const no_recibidos = [];
+            const comentarios_por_detalle = {};
+            const sinComentario = [];
+
+            detalles.forEach(d => {
+                // Si ya estaba procesado (devuelto/perdido), no se vuelve a enviar
+                const card = document.getElementById('aud-card-' + d.id);
+                const estadoPrev = card ? card.getAttribute('data-estado-prev') : 'pendiente';
+                if (estadoPrev === 'devuelto' || estadoPrev === 'perdido') return;
+
+                const val = document.querySelector(`input[name="estado_exp_${d.id}"]:checked`).value;
+                const com = (document.getElementById('coment-' + d.id).value || '').trim();
+                if (val === 'recibido') recibidos.push(d.id);
+                else if (val === 'perdido') perdidos.push(d.id);
+                else {
+                    no_recibidos.push(d.id);
+                    if (!com) sinComentario.push(d.numero);
+                }
+                if (com) comentarios_por_detalle[d.id] = com;
+            });
+
+            if (sinComentario.length) {
+                Swal.showValidationMessage(
+                    `Comentario obligatorio para los expedientes NO recibidos: ${sinComentario.map(n => '#' + n).join(', ')}`
+                );
+                return false;
+            }
+
+            return {
+                recibidos: recibidos,
+                perdidos: perdidos,
+                no_recibidos: no_recibidos,
+                comentarios_por_detalle: comentarios_por_detalle,
+                notas: ''
+            };
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            enviarAuditoria(prestamoId, result.value);
+        }
+    });
+}
+
+function enviarAuditoria(prestamoId, data) {
+    $.ajax({
+        url: window.urls.s_exp_procesar_devolucion_api,
+        method: 'POST',
+        headers: { 'X-CSRFToken': window.CSRF_TOKEN },
+        contentType: 'application/json',
+        data: JSON.stringify({
+            prestamo_id: prestamoId,
+            detalles_recibidos: data.recibidos,
+            detalles_perdidos: data.perdidos,
+            detalles_no_recibidos: data.no_recibidos,
+            comentarios_por_detalle: data.comentarios_por_detalle || {},
+            notas: data.notas
+        }),
+        success: function(resp) {
+            if (resp.success) {
+                const msg = resp.estado === 'SOL_FINALIZADA' 
+                    ? 'Auditoría completa. Todos los expedientes regresaron correctamente.' 
+                    : 'Auditoría parcial guardada. Existen expedientes pendientes o perdidos.';
+                toastr.success(msg);
+                cargarDevoluciones();
+            }
+        },
+        error: function(xhr) {
+            const err = xhr.responseJSON ? xhr.responseJSON.error : 'Error desconocido';
+            toastr.error(err);
+        }
+    });
+}
+</script>
+{% endblock extra_js %}

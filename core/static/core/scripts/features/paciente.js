@@ -1629,9 +1629,9 @@ agregarSector.addEventListener("click",() =>{
 
         const paciente = {
             id: idPaciente,
-            dni: $dni.val(),
-            nombre: concatenarLimpio($nombre1.val(), $nombre2.val(), $apellido1.val(), $apellido2.val()),
-            numero: dicContexto.infoExpediente.numero
+            DNI: $dni.val(),
+            Paciente: concatenarLimpio($nombre1.val(), $nombre2.val(), $apellido1.val(), $apellido2.val()),
+            Expediente: dicContexto.infoExpediente.numero
         };
 
         // Hacemos la llamada al backend

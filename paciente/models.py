@@ -290,33 +290,33 @@ class Paciente(models.Model):
     modificado_por = models.ForeignKey(User, on_delete=models.PROTECT, related_name='pacientes_modificados')
     expediente_numero = models.CharField(max_length=20, blank=True, null=True, db_index=True)
 
-    def get_ultima_visita(self, fecha=False ):
+    def get_ultima_visita(self, fecha=False):
         ultima_atencion = self.atenciones.order_by('-fecha_atencion').first()
-        ultimo_ingreso = self.pacientes_ingresados.filter(estado=1).order_by('-fecha_ingreso').first()
+        ultimo_ingreso = self.pacientes_ingresados.filter(
+            estado=1
+        ).order_by('-fecha_ingreso').first()
 
         fecha_ultima = None
 
         if ultima_atencion and ultimo_ingreso:
-            # Compara las dos fechas
-            if ultima_atencion.fecha_atencion > ultimo_ingreso.fecha_ingreso:
-                fecha_ultima = ultima_atencion.fecha_atencion
-            else:
-                fecha_ultima = ultimo_ingreso.fecha_ingreso
-
+            fecha_ultima = max(
+                ultima_atencion.fecha_atencion,
+                ultimo_ingreso.fecha_ingreso
+            )
         elif ultima_atencion:
             fecha_ultima = ultima_atencion.fecha_atencion
         elif ultimo_ingreso:
             fecha_ultima = ultimo_ingreso.fecha_ingreso
 
-        if fecha_ultima:
-            #convertir a hora local
-            fecha_local = localtime(fecha_ultima)
+        if not fecha_ultima:
+            return None if fecha else "SIN REGISTRO"
 
-            if fecha == True:
-                return fecha_local
-            else:
-                return formatear_fecha_simple(fecha_local)
-        return None
+        fecha_local = localtime(fecha_ultima)
+
+        if fecha:
+            return fecha_local
+
+        return formatear_fecha_simple(fecha_local)
 
     def get_extranjeroPasaporte(self):
         tipo = self.tipo_id

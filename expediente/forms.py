@@ -6,7 +6,7 @@ class ExpedienteCreateForm(forms.ModelForm):
 
     class Meta:
         model = models.Expediente    
-        fields = ["numero","localizacion","estado"]
+        fields = ["numero","estado"]
         
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
