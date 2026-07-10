@@ -311,8 +311,21 @@ document.addEventListener("DOMContentLoaded", () => {
             toastr.error("No hay ninguna fila seleccionada.");
             return;
         }
+
+        const paciente = {
+            dni: selectedRow.paciente__dni,
+            nombre: concatenarLimpio(
+                    selectedRow.paciente__primer_nombre,
+                    selectedRow.paciente__segundo_nombre,
+                    selectedRow.paciente__primer_apellido,
+                    selectedRow.paciente__segundo_apellido
+                ),
+            numero: selectedRow.paciente__expediente_numero
+        };
+
+
         
-        let resultado = await AgregarAtencionModal(null,null,selectedRow.id);
+        let resultado = await AgregarAtencionModal(paciente,null,selectedRow.id);
 
         if (resultado?.guardo === true) {
             toastr.info(`Atencion procesada correctamente`, "Cambios realizados");

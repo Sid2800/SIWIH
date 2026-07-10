@@ -58,6 +58,7 @@ class UsuarioService:
             "ingresos": False,
             "atenciones": False,
             "radiologia": False,
+            "prestamos": False,
         }
 
         activo = None
@@ -72,6 +73,7 @@ class UsuarioService:
         if UsuarioService.pertenece_unidad(usuario, UnidadID.ADMI):  # ADMISION
             tabs["ingresos"] = True
             tabs["atenciones"] = True
+            tabs["prestamos"] = True
             if not activo:
                 activo = "ingresos"
 

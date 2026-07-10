@@ -112,6 +112,7 @@ const ModalGaleria = (function () {
 
             const data = await resp.json();
 
+
             
             if (!data.success) {
                 toastr.error(data.error || "Error obteniendo imágenes", "Galería");

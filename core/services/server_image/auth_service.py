@@ -77,10 +77,10 @@ def traer_server_token(timeout=5):
     # Pedir uno nuevo
     token = _request_new_token(timeout=timeout)
 
-    log_warning(
-        "Se generó nuevo token para servidor de imágenes",
-        app=LogApp.TOKEN
-    )
+    # log_warning(
+    #     "Se generó nuevo token para servidor de imágenes",
+    #     app=LogApp.TOKEN
+    # )
 
     _IMAGE_TOKEN = token
 

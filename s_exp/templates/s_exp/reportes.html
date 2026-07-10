@@ -1,0 +1,185 @@
+{% extends 'core/base.html' %}
+{% load static %}
+{% load permisos_unidad %}
+
+{% block title %}Reportes S_EXP{% endblock title %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'core/css/s_exp.css' %}">
+{% endblock extra_css %}
+
+{% block content %}
+<div class="contenedor2">
+    <div class="tituloFormulario sexp-margin-bottom-15">
+        <div class="tituloFormulario-texto">
+            <i class="bi bi-bar-chart-line"></i>
+            <h2 class="sin-margen">Reportes — Préstamo de Expedientes</h2>
+        </div>
+        <div class="tituloFormulario-subrallado"></div>
+    </div>
+
+    <div class="sexp-nav-modulos">
+        <a href="{% url 's_exp_buscador' %}" class="sexp-nav-link">
+            <i class="bi bi-search"></i> Solicitar Expedientes
+        </a>
+        <a href="{% url 's_exp_seguimiento' %}" class="sexp-nav-link">
+            <i class="bi bi-clock-history"></i> Mis Solicitudes
+        </a>
+        
+        <a href="{% url 's_exp_solicitudes' %}" class="sexp-nav-link">
+            <i class="bi bi-list-check"></i> Gestión Solicitudes
+        </a>
+        <a href="{% url 's_exp_monitoreo' %}" class="sexp-nav-link">
+            <i class="bi bi-binoculars"></i> Monitoreo
+        </a>
+        <a href="{% url 's_exp_devoluciones' %}" class="sexp-nav-link">
+            <i class="bi bi-arrow-return-left"></i> Devoluciones
+        </a>
+        <a href="{% url 's_exp_reportes' %}" class="sexp-nav-link sexp-nav-link--active">
+            <i class="bi bi-bar-chart-line"></i> Reportes
+        </a>
+    </div>
+
+    <!-- Filtros -->
+    <div class="sexp-reportes-filtros">
+        <div class="sexp-filtro-grupo">
+            <label>Fecha Inicio</label>
+            <input type="date" id="filtro-fecha-inicio">
+        </div>
+        <div class="sexp-filtro-grupo">
+            <label>Fecha Fin</label>
+            <input type="date" id="filtro-fecha-fin">
+        </div>
+        <div class="sexp-filtro-grupo">
+            <label>Rango Rápido</label>
+            <select id="filtro-rango">
+                <option value="">Personalizado</option>
+                <option value="diario">Hoy</option>
+                <option value="semanal">Esta Semana</option>
+                <option value="mensual" selected>Este Mes</option>
+                <option value="trimestral">Este Trimestre</option>
+                <option value="semestral">Este Semestre</option>
+                <option value="anual">Este Año</option>
+            </select>
+        </div>
+        <button class="sexp-filtro-btn" id="btn-generar-reporte">
+            <i class="bi bi-funnel"></i> Generar
+        </button>
+        <button class="sexp-filtro-btn sexp-filtro-btn--export" id="btn-exportar-excel">
+            <i class="bi bi-file-earmark-spreadsheet"></i> Excel
+        </button>
+        <button class="sexp-filtro-btn" id="btn-exportar-pdf" style="background:#ef4444;color:#fff;">
+            <i class="bi bi-file-earmark-pdf"></i> PDF
+        </button>
+    </div>
+
+    <!-- Tabs -->
+    <div class="sexp-tabs">
+        <button class="sexp-tab active" data-tab="resumen">
+            <i class="bi bi-speedometer2"></i> Resumen
+        </button>
+        <button class="sexp-tab" data-tab="detalle">
+            <i class="bi bi-table"></i> Detalle por Ranking
+        </button>
+        <button class="sexp-tab" data-tab="incidencias">
+            <i class="bi bi-exclamation-triangle"></i> Incidencias
+        </button>
+    </div>
+
+    <!-- Tab: Resumen General -->
+    <div class="sexp-tab-content active" id="tab-resumen">
+        <!-- KPIs -->
+        <div class="sexp-kpi-grid" style="margin-bottom:2rem;">
+            <div class="sexp-kpi-card" style="--kpi-color:#6366f1;">
+                <span class="sexp-kpi-card__valor" id="kpi-total-solicitudes">0</span>
+                <span class="sexp-kpi-card__titulo">Solicitudes</span>
+            </div>
+            <div class="sexp-kpi-card" style="--kpi-color:#f59e0b;">
+                <span class="sexp-kpi-card__valor" id="kpi-total-expedientes">0</span>
+                <span class="sexp-kpi-card__titulo">Expedientes Solicitados</span>
+            </div>
+            <div class="sexp-kpi-card" style="--kpi-color:#22c55e;">
+                <span class="sexp-kpi-card__valor" id="kpi-aprobadas">0</span>
+                <span class="sexp-kpi-card__titulo">Aprobadas</span>
+            </div>
+            <div class="sexp-kpi-card" style="--kpi-color:#ef4444;">
+                <span class="sexp-kpi-card__valor" id="kpi-rechazadas">0</span>
+                <span class="sexp-kpi-card__titulo">Rechazadas</span>
+            </div>
+            <div class="sexp-kpi-card" style="--kpi-color:#8b5cf6;">
+                <span class="sexp-kpi-card__valor" id="kpi-pendientes">0</span>
+                <span class="sexp-kpi-card__titulo">Pendientes</span>
+            </div>
+        </div>
+
+        <!-- Tablas resumen -->
+        <div class="sexp-reportes-grid">
+            <div class="sexp-reporte-card">
+                <h3><i class="bi bi-building"></i> Demanda por Área</h3>
+                <table class="sexp-reporte-tabla">
+                    <thead><tr><th>Área</th><th>Solicitudes</th></tr></thead>
+                    <tbody id="tbody-areas"></tbody>
+                </table>
+            </div>
+            <div class="sexp-reporte-card">
+                <h3><i class="bi bi-pie-chart"></i> Motivos de Uso</h3>
+                <table class="sexp-reporte-tabla">
+                    <thead><tr><th>Motivo</th><th>Cantidad</th></tr></thead>
+                    <tbody id="tbody-motivos"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab: Detalle por Ranking -->
+    <div class="sexp-tab-content" id="tab-detalle">
+        <div class="sexp-reportes-grid">
+            <div class="sexp-reporte-card">
+                <h3><i class="bi bi-file-text"></i> Expedientes Más Solicitados</h3>
+                <table class="sexp-reporte-tabla">
+                    <thead><tr><th># Expediente</th><th>Veces Solicitado</th></tr></thead>
+                    <tbody id="tbody-expedientes-top"></tbody>
+                </table>
+            </div>
+            <div class="sexp-reporte-card">
+                <h3><i class="bi bi-person-badge"></i> Usuarios con Más Solicitudes</h3>
+                <table class="sexp-reporte-tabla">
+                    <thead><tr><th>Usuario</th><th>Solicitudes</th></tr></thead>
+                    <tbody id="tbody-usuarios-top"></tbody>
+                </table>
+            </div>
+            <div class="sexp-reporte-card">
+                <h3><i class="bi bi-x-circle" style="color:#ef4444;"></i> Trazabilidad de Rechazos</h3>
+                <table class="sexp-reporte-tabla">
+                    <thead><tr><th>Solicitud</th><th>Usuario</th><th>Fecha</th><th>Motivo</th></tr></thead>
+                    <tbody id="tbody-rechazos"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab: Incidencias -->
+    <div class="sexp-tab-content" id="tab-incidencias">
+        <div class="sexp-reportes-grid">
+            <div class="sexp-reporte-card">
+                <h3><i class="bi bi-alarm" style="color:var(--colorEliminarRojo);"></i> Morosidad</h3>
+                <table class="sexp-reporte-tabla">
+                    <thead><tr><th>Préstamo</th><th>Usuario</th><th>Área</th><th>Días Vencido</th></tr></thead>
+                    <tbody id="tbody-morosidad"></tbody>
+                </table>
+            </div>
+            <div class="sexp-reporte-card">
+                <h3><i class="bi bi-exclamation-circle" style="color:#f97316;"></i> Inconsistencias</h3>
+                <table class="sexp-reporte-tabla">
+                    <thead><tr><th>Préstamo</th><th>Usuario</th><th>Total</th><th>Devueltos</th><th>Faltantes</th></tr></thead>
+                    <tbody id="tbody-inconsistencias"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script src="{% static 'core/scripts/s_exp/reportes.js' %}"></script>
+{% endblock extra_js %}

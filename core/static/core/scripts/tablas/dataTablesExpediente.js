@@ -95,7 +95,7 @@ document.addEventListener("DOMContentLoaded", () => {
             },
         },
         { 
-            data: "localizacion__descripcion_localizacion",
+            data: "ubicacion_descripcion",
             responsivePriority: 2
         },
     

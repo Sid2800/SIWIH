@@ -157,6 +157,114 @@ $(document).ready(function () {
        // Inicializar tabla de pacientes
     initDataTable("data_table_expediente_propietarios", API_URLS.listar_expedientes_propietarios_API, propietariosColumnas);
 
+    // Lógica de préstamos (Nueva)
+    let tablePrestamos;
+    function inicializarTablaHistorialPrestamos() {
+        const tableId = "historialTablaPrestamos";
+        const ajaxUrl = `/s_exp/api/historial-prestamos-expediente/${idExpediente}/`;
+
+        if (document.getElementById(tableId)) {
+            $.get(ajaxUrl, function (response) {
+                const prestamos = response.data || [];
+
+                // Mostrar badge de estado actual + UBICACIÓN ACTUAL del expediente.
+                // 'ubicacion_actual' viene de la API (dónde está el expediente AHORA),
+                // mientras que la columna "Área donde se prestó" de la tabla es el
+                // destino histórico de cada préstamo (snapshot, no cambia).
+                const badgeContainer = document.getElementById('prestamos-estado-badge');
+                if (badgeContainer) {
+                    let badges = '';
+                    if (response.en_prestamo) {
+                        badges += '<span style="background:rgba(245,158,11,0.2);color:var(--negro);padding:0.3rem 0.8rem;border-radius:20px;font-size:1.3rem;font-weight:600;"><i class="bi bi-exclamation-triangle"></i> Expediente actualmente en préstamo</span>';
+                    } else if (prestamos.length > 0) {
+                        badges += '<span style="background:rgba(34,197,94,0.2);color:var(--negro);padding:0.3rem 0.8rem;border-radius:20px;font-size:1.3rem;font-weight:600;"><i class="bi bi-check-circle"></i> Sin préstamos activos</span>';
+                    }
+                    if (response.ubicacion_actual) {
+                        badges += ' <span style="background:rgba(59,130,246,0.18);color:var(--negro);padding:0.3rem 0.8rem;border-radius:20px;font-size:1.3rem;font-weight:600;margin-left:0.4rem;"><i class="bi bi-geo-alt"></i> Ubicación actual: ' + response.ubicacion_actual + '</span>';
+                    }
+                    badgeContainer.innerHTML = badges;
+                }
+
+                tablePrestamos = $(`#${tableId}`).DataTable({
+                    responsive: true,
+                    processing: true,
+                    serverSide: false,
+                    lengthMenu: [5, 10],
+                    data: prestamos,
+                    columns: [
+                        { data: 'numero_expediente' },
+                        { data: 'fecha_solicitud' },
+                        { data: 'motivo' },
+                        { data: 'solicitante' },
+                        { data: 'area_destino' },
+                        {
+                            data: 'estado',
+                            render: function (data) {
+                                const colores = {
+                                    'Pendiente': 'background:rgba(99,102,241,0.2);color:var(--negro);',
+                                    'Aprobado': 'background:rgba(34,197,94,0.2);color:var(--negro);',
+                                    'Rechazado': 'background:rgba(239,68,68,0.2);color:var(--negro);',
+                                    'EnPrestamo': 'background:rgba(245,158,11,0.2);color:var(--negro);',
+                                    'Devuelto': 'background:rgba(100,116,139,0.2);color:var(--negro);',
+                                    'DevolucionParcial': 'background:rgba(249,115,22,0.2);color:var(--negro);',
+                                    'Anulado': 'background:rgba(107,114,128,0.2);color:var(--negro);'
+                                };
+                                const estilo = colores[data] || '';
+                                return `<span style="padding:0.2rem 0.5rem;border-radius:12px;font-size:1.2rem;font-weight:600;${estilo}">${data}</span>`;
+                            }
+                        }
+                    ],
+                    language: {
+                        lengthMenu: "Mostrar _MENU_ por página",
+                        zeroRecords: "No se encontraron préstamos",
+                        info: "_START_ a _END_ de _TOTAL_ registros",
+                        infoEmpty: "0 a 0 de 0 registros",
+                        infoFiltered: "(filtrado de _MAX_)",
+                        search: "Buscar:",
+                        paginate: { first: "<<", last: ">>", next: ">", previous: "<" },
+                        loadingRecords: "Cargando...",
+                        processing: "Procesando...",
+                        emptyTable: "No hay préstamos registrados"
+                    },
+                    dom: '<"superior"f>t<"inferior"lip><"clear">',
+                    order: [[1, "desc"]],
+                });
+
+                // Ajustar columnas al cargar
+                setTimeout(() => {
+                    if(tablePrestamos) tablePrestamos.columns.adjust().draw();
+                }, 200);
+
+            }).fail(function() {
+                console.log('No se pudo cargar historial de préstamos (API no disponible)');
+            });
+        }
+    }
+
+    inicializarTablaHistorialPrestamos();
+
+    // Tabs: alternar entre "Historial Propietarios" e "Historial de Préstamos"
+    $('.exp-historial-tab').on('click', function () {
+        const targetId = $(this).data('target');
+
+        $('.exp-historial-tab')
+            .removeClass('exp-historial-tab--active')
+            .attr('aria-selected', 'false');
+        $(this)
+            .addClass('exp-historial-tab--active')
+            .attr('aria-selected', 'true');
+
+        $('.exp-historial-panel').removeClass('exp-historial-panel--active');
+        $('#' + targetId).addClass('exp-historial-panel--active');
+
+        // Reajustar columnas de DataTables al mostrar (evita que se vean colapsadas)
+        if (targetId === 'exp-tab-propietarios' && table) {
+            setTimeout(() => table.columns.adjust().draw(false), 50);
+        } else if (targetId === 'exp-tab-prestamos' && tablePrestamos) {
+            setTimeout(() => tablePrestamos.columns.adjust().draw(false), 50);
+        }
+    });
+
 });
 
 
