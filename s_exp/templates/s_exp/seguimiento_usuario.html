@@ -25,7 +25,7 @@
         <a href="{% url 's_exp_seguimiento' %}" class="sexp-nav-link sexp-nav-link--active">
             <i class="bi bi-clock-history"></i> Mis Solicitudes
         </a>
-        {% if request.user|tiene_rol:"ADMIN:Admision" %}
+        {% if request.user|tiene_rol:"admin:ADMI" %}
         <a href="{% url 's_exp_solicitudes' %}" class="sexp-nav-link">
             <i class="bi bi-list-check"></i> Gestión Solicitudes
         </a>

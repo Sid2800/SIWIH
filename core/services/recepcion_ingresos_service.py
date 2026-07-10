@@ -202,7 +202,7 @@ class RecepcionIngresoServiceSDGI:
                 # Actualizar ingresos
                 Ingreso.objects.bulk_update(
                     ingresos_actualizar,
-                    ["fecha_egreso", "modificado_por"]
+                    ["fecha_recepcion_sdgi", "modificado_por"]
                 )
 
                 # Crear detalles de recepción
@@ -211,6 +211,7 @@ class RecepcionIngresoServiceSDGI:
                 )
 
                 # Cambiar ubicación de los expedientes a Admisión
+                log_info(expedientes)
                 ExpedienteService.cambiar_ubicacion_lotes(
                     expedientes,
                     EXP_UBICA_ADMISION_ID
