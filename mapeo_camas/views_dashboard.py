@@ -61,6 +61,15 @@ __all__ = [
 ESTADOS_OCUPADOS_REPORTE = {"OCUPADA"}
 
 
+ESTADOS_KPI_DASHBOARD = {
+    "ocupadas": ("OCUPADA", "PRE_ALTA"),
+    "disponibles": ("VACIA", "LIBRE"),
+    "fuera_servicio": ("FUERA_SERVICIO", "MANTENIMIENTO"),
+    "consulta_externa": ("CONSULTA_EXTERNA",),
+    "pre_altas": ("PRE_ALTA",),
+}
+
+
 def _iterar_dias_intervalo(inicio, fin):
     """2026-06-16: Devuelve días tocados por el intervalo [inicio, fin)."""
     if not inicio or not fin or fin <= inicio:
@@ -160,11 +169,102 @@ def _calcular_metricas_ocupacion_por_cama(desde, hasta):
     return metricas
 
 
+def _formatear_kpi_horas_porcentaje(horas_activas, porcentaje):
+    return f"{horas_activas:.1f} h · {porcentaje:.1f}%"
+
+
+def _calcular_horas_por_estado_dashboard(desde, hasta):
+    """2026-07-10: Calcula horas activas por estado para las cards KPI del dashboard."""
+    total_horas_ventana = max((hasta - desde).total_seconds() / 3600.0, 0.0)
+    snapshot_desde = _snapshot_estado_por_cama_desde_historial(desde)
+
+    eventos = list(
+        HistorialEstadoCama.objects
+        .filter(fecha_hora__gte=desde, fecha_hora__lte=hasta)
+        .values("cama_id", "fecha_hora", "estado_nuevo__codigo")
+        .order_by("cama_id", "fecha_hora", "id")
+    )
+
+    camas_ids = set(snapshot_desde.keys())
+    camas_ids.update(ev["cama_id"] for ev in eventos)
+    total_camas_periodo = len(camas_ids)
+    total_horas_ventana_camas = total_horas_ventana * total_camas_periodo
+
+    eventos_por_cama = defaultdict(list)
+    for ev in eventos:
+        eventos_por_cama[ev["cama_id"]].append(ev)
+
+    segundos_por_estado = defaultdict(float)
+    detalle_por_cama = {}
+
+    for cama_id in camas_ids:
+        # [2026-07-10] Si no existe estado previo en historial, se asume VACIA para no inflar horas.
+        estado_actual = snapshot_desde.get(cama_id) or "VACIA"
+        ultimo_punto = desde
+        segundos_por_estado_cama = defaultdict(float)
+
+        for ev in eventos_por_cama.get(cama_id, []):
+            fecha_evento = ev["fecha_hora"]
+            if fecha_evento > ultimo_punto:
+                duracion = (fecha_evento - ultimo_punto).total_seconds()
+                segundos_por_estado[estado_actual] += duracion
+                segundos_por_estado_cama[estado_actual] += duracion
+
+            estado_actual = ev.get("estado_nuevo__codigo") or "VACIA"
+            ultimo_punto = fecha_evento
+
+        if hasta > ultimo_punto:
+            duracion = (hasta - ultimo_punto).total_seconds()
+            segundos_por_estado[estado_actual] += duracion
+            segundos_por_estado_cama[estado_actual] += duracion
+
+        detalle_por_cama[cama_id] = {
+            codigo: round(segundos / 3600.0, 2)
+            for codigo, segundos in segundos_por_estado_cama.items()
+        }
+
+    horas_por_estado = {
+        codigo: round(segundos / 3600.0, 2)
+        for codigo, segundos in segundos_por_estado.items()
+    }
+
+    porcentajes_por_kpi = {}
+    horas_por_kpi = {}
+    textos_por_kpi = {}
+    for campo, codigos in ESTADOS_KPI_DASHBOARD.items():
+        horas_activas = round(sum(horas_por_estado.get(codigo, 0.0) for codigo in codigos), 2)
+        porcentaje = 0.0
+        if total_horas_ventana_camas > 0:
+            porcentaje = round((horas_activas / total_horas_ventana_camas) * 100.0, 1)
+        porcentaje = max(0.0, min(porcentaje, 100.0))
+        horas_por_kpi[campo] = horas_activas
+        porcentajes_por_kpi[campo] = porcentaje
+        textos_por_kpi[campo] = _formatear_kpi_horas_porcentaje(horas_activas, porcentaje)
+
+    return {
+        "horas_ventana": round(total_horas_ventana, 2),
+        "total_camas_periodo": total_camas_periodo,
+        "horas_ventana_camas": round(total_horas_ventana_camas, 2),
+        "horas_por_estado": horas_por_estado,
+        "horas_por_kpi": horas_por_kpi,
+        "porcentajes_por_kpi": porcentajes_por_kpi,
+        "textos_por_kpi": textos_por_kpi,
+        "detalle_por_cama": detalle_por_cama,
+    }
+
+
 def _construir_filas_reporte_ocupacion(desde, hasta):
     """2026-06-16: Agrupa métricas por servicio/sala/cama para exportación Excel."""
     metricas_por_cama = _calcular_metricas_ocupacion_por_cama(desde, hasta)
     if not metricas_por_cama:
         return []
+
+    # [2026-07-10] Reutiliza el detalle por cama del KPI para alinear estados del Excel.
+    detalle_horas_estado_por_cama = _calcular_horas_por_estado_dashboard(desde, hasta).get("detalle_por_cama", {})
+    codigos_pre_alta = ESTADOS_KPI_DASHBOARD.get("pre_altas", ("PRE_ALTA",))
+    codigos_vacia = ESTADOS_KPI_DASHBOARD.get("disponibles", ("VACIA",))
+    codigos_fuera_servicio = ESTADOS_KPI_DASHBOARD.get("fuera_servicio", ("FUERA_SERVICIO",))
+    codigos_consulta_externa = ESTADOS_KPI_DASHBOARD.get("consulta_externa", ("CONSULTA_EXTERNA",))
 
     total_dias_ventana = len(list(_iterar_dias_intervalo(desde, hasta)))
     total_dias_ventana = max(total_dias_ventana, 1)
@@ -186,6 +286,10 @@ def _construir_filas_reporte_ocupacion(desde, hasta):
     filas = []
     for servicio_nombre in sorted(agrupado.keys()):
         servicio_horas = 0.0
+        servicio_horas_pre_alta = 0.0
+        servicio_horas_vacia = 0.0
+        servicio_horas_fuera_servicio = 0.0
+        servicio_horas_consulta_externa = 0.0
         servicio_dias = 0
         servicio_ingresos = 0
         servicio_camas = 0
@@ -193,12 +297,21 @@ def _construir_filas_reporte_ocupacion(desde, hasta):
         for sala_nombre in sorted(agrupado[servicio_nombre].keys()):
             camas_sala = agrupado[servicio_nombre][sala_nombre]
             sala_horas = 0.0
+            sala_horas_pre_alta = 0.0
+            sala_horas_vacia = 0.0
+            sala_horas_fuera_servicio = 0.0
+            sala_horas_consulta_externa = 0.0
             sala_dias = 0
             sala_ingresos = 0
 
             for cama in camas_sala:
                 met = metricas_por_cama.get(cama.pk, {})
+                detalle_estado = detalle_horas_estado_por_cama.get(cama.pk, {})
                 horas = float(met.get("horas_ocupada") or 0.0)
+                horas_pre_alta = round(sum(float(detalle_estado.get(codigo) or 0.0) for codigo in codigos_pre_alta), 2)
+                horas_vacia = round(sum(float(detalle_estado.get(codigo) or 0.0) for codigo in codigos_vacia), 2)
+                horas_fuera_servicio = round(sum(float(detalle_estado.get(codigo) or 0.0) for codigo in codigos_fuera_servicio), 2)
+                horas_consulta_externa = round(sum(float(detalle_estado.get(codigo) or 0.0) for codigo in codigos_consulta_externa), 2)
                 dias = int(met.get("dias_ocupada") or 0)
                 ingresos = int(met.get("ingresos_total") or 0)
                 pct = round((horas / total_horas_ventana) * 100, 2) if total_horas_ventana else 0.0
@@ -210,6 +323,10 @@ def _construir_filas_reporte_ocupacion(desde, hasta):
                     "cama": str(cama.numero_cama),
                     "n_camas": 1,
                     "horas_ocupada": horas,
+                    "horas_pre_alta": horas_pre_alta,
+                    "horas_vacia": horas_vacia,
+                    "horas_fuera_servicio": horas_fuera_servicio,
+                    "horas_consulta_externa": horas_consulta_externa,
                     "horas_ventana": round(total_horas_ventana, 2),
                     "ocupacion_pct": pct,
                     "dias_ocupada": dias,
@@ -219,6 +336,10 @@ def _construir_filas_reporte_ocupacion(desde, hasta):
                 })
 
                 sala_horas += horas
+                sala_horas_pre_alta += horas_pre_alta
+                sala_horas_vacia += horas_vacia
+                sala_horas_fuera_servicio += horas_fuera_servicio
+                sala_horas_consulta_externa += horas_consulta_externa
                 sala_dias += dias
                 sala_ingresos += ingresos
 
@@ -232,6 +353,10 @@ def _construir_filas_reporte_ocupacion(desde, hasta):
                 "cama": "TOTAL SALA",
                 "n_camas": sala_camas,
                 "horas_ocupada": round(sala_horas, 2),
+                "horas_pre_alta": round(sala_horas_pre_alta, 2),
+                "horas_vacia": round(sala_horas_vacia, 2),
+                "horas_fuera_servicio": round(sala_horas_fuera_servicio, 2),
+                "horas_consulta_externa": round(sala_horas_consulta_externa, 2),
                 "horas_ventana": round(sala_horas_teoricas, 2),
                 "ocupacion_pct": sala_pct,
                 "dias_ocupada": sala_dias,
@@ -241,6 +366,10 @@ def _construir_filas_reporte_ocupacion(desde, hasta):
             })
 
             servicio_horas += sala_horas
+            servicio_horas_pre_alta += sala_horas_pre_alta
+            servicio_horas_vacia += sala_horas_vacia
+            servicio_horas_fuera_servicio += sala_horas_fuera_servicio
+            servicio_horas_consulta_externa += sala_horas_consulta_externa
             servicio_dias += sala_dias
             servicio_ingresos += sala_ingresos
             servicio_camas += sala_camas
@@ -254,6 +383,10 @@ def _construir_filas_reporte_ocupacion(desde, hasta):
             "cama": "TOTAL SERVICIO",
             "n_camas": servicio_camas,
             "horas_ocupada": round(servicio_horas, 2),
+            "horas_pre_alta": round(servicio_horas_pre_alta, 2),
+            "horas_vacia": round(servicio_horas_vacia, 2),
+            "horas_fuera_servicio": round(servicio_horas_fuera_servicio, 2),
+            "horas_consulta_externa": round(servicio_horas_consulta_externa, 2),
             "horas_ventana": round(servicio_horas_teoricas, 2),
             "ocupacion_pct": servicio_pct,
             "dias_ocupada": servicio_dias,
@@ -264,6 +397,10 @@ def _construir_filas_reporte_ocupacion(desde, hasta):
 
     if filas:
         total_horas = round(sum(float(f.get("horas_ocupada") or 0.0) for f in filas if f.get("nivel") == "TOTAL_SERVICIO"), 2)
+        total_horas_pre_alta = round(sum(float(f.get("horas_pre_alta") or 0.0) for f in filas if f.get("nivel") == "TOTAL_SERVICIO"), 2)
+        total_horas_vacia = round(sum(float(f.get("horas_vacia") or 0.0) for f in filas if f.get("nivel") == "TOTAL_SERVICIO"), 2)
+        total_horas_fuera_servicio = round(sum(float(f.get("horas_fuera_servicio") or 0.0) for f in filas if f.get("nivel") == "TOTAL_SERVICIO"), 2)
+        total_horas_consulta_externa = round(sum(float(f.get("horas_consulta_externa") or 0.0) for f in filas if f.get("nivel") == "TOTAL_SERVICIO"), 2)
         total_camas = int(sum(int(f.get("n_camas") or 0) for f in filas if f.get("nivel") == "TOTAL_SERVICIO"))
         total_ingresos = int(sum(int(f.get("ingresos_total") or 0) for f in filas if f.get("nivel") == "TOTAL_SERVICIO"))
         total_dias = int(sum(int(f.get("dias_ocupada") or 0) for f in filas if f.get("nivel") == "TOTAL_SERVICIO"))
@@ -275,6 +412,10 @@ def _construir_filas_reporte_ocupacion(desde, hasta):
             "cama": "SUPER TOTAL",
             "n_camas": total_camas,
             "horas_ocupada": total_horas,
+            "horas_pre_alta": total_horas_pre_alta,
+            "horas_vacia": total_horas_vacia,
+            "horas_fuera_servicio": total_horas_fuera_servicio,
+            "horas_consulta_externa": total_horas_consulta_externa,
             "horas_ventana": round(horas_ventana_total, 2),
             "ocupacion_pct": round((total_horas / horas_ventana_total) * 100, 2) if horas_ventana_total else 0.0,
             "dias_ocupada": total_dias,
@@ -302,6 +443,10 @@ def _generar_excel_ocupacion(desde, hasta, filas, username):
         "Cama",
         "N camas",
         "Horas ocupada",
+        "Horas pre-alta",
+        "Horas vacia",
+        "Horas fuera servicio",
+        "Horas consulta externa",
         "Horas ventana",
         "% ocupacion",
         "Dias ocupada",
@@ -309,7 +454,7 @@ def _generar_excel_ocupacion(desde, hasta, filas, username):
         "% dia ocupacion",
         "Ingresos total",
     ]
-    anchos = [16, 30, 26, 18, 12, 16, 16, 14, 14, 14, 14, 16]
+    anchos = [16, 30, 26, 18, 12, 16, 16, 16, 20, 20, 16, 14, 14, 14, 14, 16]
     for idx, ancho in enumerate(anchos, start=1):
         ws.column_dimensions[get_column_letter(idx)].width = ancho
 
@@ -317,14 +462,14 @@ def _generar_excel_ocupacion(desde, hasta, filas, username):
     ServiceExcel.dibujar_encabezado_excel(ws, col_fin=col_fin)
     ws.append([])
     ws.append([])
-    ws.merge_cells(f"A{ws.max_row}:I{ws.max_row}")
+    ws.merge_cells(f"A{ws.max_row}:{col_fin}{ws.max_row}")
     titulo = ws.cell(row=ws.max_row, column=1)
     titulo.value = "Dashboard Mapeo de Camas - Ocupacion por servicio/sala/cama"
     titulo.font = Font(name="Helvetica", bold=True, size=12)
     titulo.alignment = Alignment(horizontal="center", vertical="center")
 
     ws.append([])
-    ws.merge_cells(f"A{ws.max_row}:I{ws.max_row}")
+    ws.merge_cells(f"A{ws.max_row}:{col_fin}{ws.max_row}")
     subtitulo = ws.cell(row=ws.max_row, column=1)
     subtitulo.value = f"Rango: {hora_local_iso(desde)} -> {hora_local_iso(hasta)}"
     subtitulo.font = Font(name="Helvetica", size=10, bold=True)
@@ -347,6 +492,10 @@ def _generar_excel_ocupacion(desde, hasta, filas, username):
             item["cama"],
             item.get("n_camas", 0),
             item["horas_ocupada"],
+            item.get("horas_pre_alta", 0.0),
+            item.get("horas_vacia", 0.0),
+            item.get("horas_fuera_servicio", 0.0),
+            item.get("horas_consulta_externa", 0.0),
             item["horas_ventana"],
             item["ocupacion_pct"] / 100.0,
             item["dias_ocupada"],
@@ -373,9 +522,9 @@ def _generar_excel_ocupacion(desde, hasta, filas, username):
                 c.font = ServiceExcel.FONT_GENERAL
 
         for i in range(1, len(columnas) + 1):
-            if i == 8:
+            if i == 12:
                 ws.cell(row=f, column=i).number_format = "0.00%"
-            if i == 11:
+            if i == 15:
                 ws.cell(row=f, column=i).number_format = "0.00%"
 
     ServiceExcel.dibujar_pie_excel(ws, hora_local_iso(timezone.now()), username or "", username or "")
@@ -428,29 +577,28 @@ def dashboard_kpis(request):
         # 2026-06-16: KPIs del dashboard alimentados solo con tablas de mapeo_camas.
         conteo_por_estado = _snapshot_estado_camas(hasta)
         total_camas = sum(conteo_por_estado.values())
-        # [2026-06-26] Alinea KPI con el resto del dashboard: PRE_ALTA también cuenta como ocupada.
-        ocupadas = conteo_por_estado.get("OCUPADA", 0) + conteo_por_estado.get("PRE_ALTA", 0)
-        disponibles = conteo_por_estado.get("VACIA", 0) + conteo_por_estado.get("LIBRE", 0)
-        fuera_servicio = (
-            conteo_por_estado.get("FUERA_SERVICIO", 0) + conteo_por_estado.get("MANTENIMIENTO", 0)
-        )
-
-        pct = round((ocupadas / total_camas) * 100, 1) if total_camas else 0
-
-        # [2026-07-02] CAMBIO: Reemplazadas métricas de sesión mapeo por estados operativos
-        # [2026-07-09] Removida métrica separada de mantenimiento (consolidada en fuera_servicio)
-        consulta_externa = conteo_por_estado.get("CONSULTA_EXTERNA", 0)
-        pre_altas = conteo_por_estado.get("PRE_ALTA", 0)
+        # [2026-07-10] Las cards de estados pasan a lectura por horas activas dentro del rango.
+        metricas_horas = _calcular_horas_por_estado_dashboard(desde, hasta)
+        pct = metricas_horas["porcentajes_por_kpi"].get("ocupadas", 0.0)
 
         return _dashboard_response({
             "estados": conteo_por_estado,
             "total_camas": total_camas,
-            "ocupadas": ocupadas,
-            "disponibles": disponibles,
-            "fuera_servicio": fuera_servicio,
+            "ocupadas": metricas_horas["textos_por_kpi"].get("ocupadas", "0.0 h · 0.0%"),
+            "disponibles": metricas_horas["textos_por_kpi"].get("disponibles", "0.0 h · 0.0%"),
+            "fuera_servicio": metricas_horas["textos_por_kpi"].get("fuera_servicio", "0.0 h · 0.0%"),
             "porcentaje_ocupacion": pct,
-            "consulta_externa": consulta_externa,
-            "pre_altas": pre_altas,
+            "consulta_externa": metricas_horas["textos_por_kpi"].get("consulta_externa", "0.0 h · 0.0%"),
+            "pre_altas": metricas_horas["textos_por_kpi"].get("pre_altas", "0.0 h · 0.0%"),
+            "horas_ventana": metricas_horas["horas_ventana"],
+            "horas_ventana_camas": metricas_horas["horas_ventana_camas"],
+            "kpis_detalle": {
+                campo: {
+                    "horas_activas": metricas_horas["horas_por_kpi"].get(campo, 0.0),
+                    "porcentaje": metricas_horas["porcentajes_por_kpi"].get(campo, 0.0),
+                }
+                for campo in ESTADOS_KPI_DASHBOARD.keys()
+            },
         }, meta=_rango_meta(desde, hasta))
     except Exception as exc:
         return _dashboard_error(exc)
