@@ -114,6 +114,7 @@ def registrar_dispositivo(request):
             "icono_formulario": "bi bi-clipboard2-plus",
             "texto_boton_guardar": "Guardar equipo",
             "url_regresar": reverse("inicio_biomedicos"),
+            "texto_regresar": "Equipos",
             "estado_label": "Estado inicial *",
         },
     )
@@ -296,6 +297,7 @@ def _preparar_dispositivos_para_tabla(dispositivos):
         EstadoDispositivo.EN_MANTENIMIENTO: "biomedicos-estado--media",
         EstadoDispositivo.FUERA_DE_SERVICIO: "biomedicos-estado--alta",
         EstadoDispositivo.DADO_DE_BAJA: "biomedicos-estado--inactivo",
+        EstadoDispositivo.REPUESTO_PENDIENTE: "biomedicos-estado--repuesto",
     }
     criticidad_css = {
         CriticidadDispositivo.BAJA: "biomedicos-estado--operativo",
@@ -308,6 +310,7 @@ def _preparar_dispositivos_para_tabla(dispositivos):
         EstadoDispositivo.EN_MANTENIMIENTO: "Mant.",
         EstadoDispositivo.FUERA_DE_SERVICIO: "F. serv.",
         EstadoDispositivo.DADO_DE_BAJA: "Baja",
+        EstadoDispositivo.REPUESTO_PENDIENTE: "Rep.",
     }
     for dispositivo in dispositivos:
         dispositivo.asignacion_actual = (
@@ -465,6 +468,18 @@ def detalle_dispositivo(request, dispositivo_id):
     )
     asignacion_actual = _obtener_asignacion_actual(dispositivo)
     baja_dispositivo = _obtener_baja_dispositivo(dispositivo)
+    estado_css = {
+        EstadoDispositivo.OPERATIVO: "biomedicos-estado--operativo",
+        EstadoDispositivo.EN_MANTENIMIENTO: "biomedicos-estado--media",
+        EstadoDispositivo.FUERA_DE_SERVICIO: "biomedicos-estado--alta",
+        EstadoDispositivo.DADO_DE_BAJA: "biomedicos-estado--inactivo",
+        EstadoDispositivo.REPUESTO_PENDIENTE: "biomedicos-estado--repuesto",
+    }
+    criticidad_css = {
+        CriticidadDispositivo.BAJA: "biomedicos-estado--operativo",
+        CriticidadDispositivo.MEDIA: "biomedicos-estado--media",
+        CriticidadDispositivo.ALTA: "biomedicos-estado--alta",
+    }
 
     return render(
         request,
@@ -473,9 +488,10 @@ def detalle_dispositivo(request, dispositivo_id):
             "dispositivo": dispositivo,
             "asignacion_actual": asignacion_actual,
             "baja_dispositivo": baja_dispositivo,
+            "estado_css": estado_css.get(dispositivo.estado, ""),
+            "criticidad_css": criticidad_css.get(dispositivo.criticidad, ""),
         }
     )
-
 
 @registrar_errores_vista("Error al editar equipo")
 def editar_dispositivo(request, dispositivo_id):
@@ -547,6 +563,7 @@ def editar_dispositivo(request, dispositivo_id):
                 kwargs={"dispositivo_id": dispositivo.id},
             ),
             "estado_label": "Estado *",
+            "texto_regresar": "Detalle del equipo",
         },
     )
 

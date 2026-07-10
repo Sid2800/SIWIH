@@ -1,22 +1,24 @@
 {% extends 'core/base.html' %}
 {% load static %}
 
-    {% block title %}Buscar equipo{% endblock title %}
+{% block title %}Buscar equipo{% endblock title %}
 
 {% block content %}
 <div class="contenedor2 biomedicos-pagina biomedicos-pagina--ancha">
-    <a class="biomedicos-volver" href="{% url 'inicio_biomedicos' %}">
-        <i class="bi bi-arrow-left"></i> Equipos
-    </a>
-
     <div class="tituloFormulario">
-        <div class="tituloFormulario-texto">
-            <i class="bi bi-search"></i>
-            <h2 class="sin-margen">Buscar equipo</h2>
+        <div class="biomedicos-encabezado-superior">
+            <div class="tituloFormulario-texto">
+                <i class="bi bi-search"></i>
+                <h2 class="sin-margen">Buscar equipo</h2>
+            </div>
+            <a class="biomedicos-volver biomedicos-volver--inline biomedicos-encabezado-volver"
+               href="{% url 'inicio_biomedicos' %}">
+                <i class="bi bi-arrow-left"></i>
+                Equipos
+            </a>
         </div>
         <div class="tituloFormulario-subrallado"></div>
     </div>
-
     <section class="biomedicos-busqueda">
         <div>
             <p class="biomedicos-etiqueta">Consulta rápida</p>

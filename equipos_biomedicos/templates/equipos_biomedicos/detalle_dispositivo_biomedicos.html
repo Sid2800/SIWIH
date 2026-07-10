@@ -4,22 +4,24 @@
 
 {% block content %}
 <div class="contenedor2 biomedicos-pagina biomedicos-pagina--detalle">
-    <div class="biomedicos-detalle__encabezado">
-        <div>
-            <h2 class="sin-margen">Detalle del equipo</h2>
-            <p>Consulta la información completa del equipo.</p>
+    <div class="tituloFormulario">
+        <div class="biomedicos-encabezado-superior">
+            <div class="tituloFormulario-texto">
+                <i class="bi bi-device-hdd"></i>
+                <h2 class="sin-margen">Detalle del equipo</h2>
+            </div>
+            <a class="biomedicos-volver biomedicos-volver--inline biomedicos-encabezado-volver"
+               href="{% url 'listado_dispositivos_biomedicos' %}">
+                <i class="bi bi-arrow-left"></i>
+                Listado de equipos
+            </a>
         </div>
-        <a class="biomedicos-detalle__regresar"
-           href="{% url 'listado_dispositivos_biomedicos' %}">
-            <i class="bi bi-arrow-left"></i>
-            Listado de equipos
-        </a>
+        <div class="tituloFormulario-subrallado"></div>
     </div>
-
     {# Resumen superior de la ficha. No muestra editar/baja; esas acciones viven en edicion. #}
     <section class="biomedicos-detalle__resumen">
         <div class="biomedicos-detalle__imagen">
-                    <i class="bi bi-device-hdd"></i>
+            <i class="bi bi-device-hdd"></i>
             <span>Sin fotografía</span>
         </div>
 
@@ -32,11 +34,11 @@
                 </div>
                 <div>
                     <dt>Estado:</dt>
-                    <dd><span class="biomedicos-estado">{{ dispositivo.get_estado_display }}</span></dd>
+                    <dd><span class="biomedicos-estado {{ estado_css }}">{{ dispositivo.get_estado_display }}</span></dd>
                 </div>
                 <div>
                     <dt>Criticidad:</dt>
-                    <dd><span class="biomedicos-estado">{{ dispositivo.get_criticidad_display }}</span></dd>
+                    <dd><span class="biomedicos-estado {{ criticidad_css }}">{{ dispositivo.get_criticidad_display }}</span></dd>
                 </div>
             </dl>
         </div>

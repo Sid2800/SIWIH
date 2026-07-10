@@ -342,6 +342,10 @@ class DispositivoCreateForm(forms.ModelForm):
                 EstadoDispositivo.FUERA_DE_SERVICIO,
                 EstadoDispositivo.FUERA_DE_SERVICIO.label,
             ),
+            (
+                EstadoDispositivo.REPUESTO_PENDIENTE,
+                EstadoDispositivo.REPUESTO_PENDIENTE.label,
+            ),
         ]
         self.fields["criticidad"].choices = [
             *CriticidadDispositivo.choices,

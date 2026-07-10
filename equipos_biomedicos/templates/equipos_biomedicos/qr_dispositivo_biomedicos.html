@@ -4,14 +4,17 @@
 
 {% block content %}
 <div class="contenedor2 biomedicos-pagina">
-    <a class="biomedicos-volver" href="{% url 'detalle_dispositivo_biomedicos' dispositivo.id %}">
-        <i class="bi bi-arrow-left"></i> Detalle del equipo
-    </a>
-
     <div class="tituloFormulario">
-        <div class="tituloFormulario-texto">
-            <i class="bi bi-qr-code"></i>
-            <h2 class="sin-margen">QR del equipo</h2>
+        <div class="biomedicos-encabezado-superior">
+            <div class="tituloFormulario-texto">
+                <i class="bi bi-qr-code"></i>
+                <h2 class="sin-margen">QR del equipo</h2>
+            </div>
+            <a class="biomedicos-volver biomedicos-volver--inline biomedicos-encabezado-volver"
+               href="{% url 'detalle_dispositivo_biomedicos' dispositivo.id %}">
+                <i class="bi bi-arrow-left"></i>
+                Detalle del equipo
+            </a>
         </div>
         <div class="tituloFormulario-subrallado"></div>
     </div>

@@ -4,23 +4,25 @@
 
 {% block content %}
 <div class="contenedor2 biomedicos-pagina biomedicos-pagina--detalle">
-    <a class="biomedicos-volver" href="{{ url_regresar }}">
-        <i class="bi bi-arrow-left"></i> Detalle del equipo
-    </a>
-
     <div class="tituloFormulario">
-        <div class="tituloFormulario-texto">
-            <i class="bi bi-exclamation-octagon"></i>
-            <div>
-                <h2 class="sin-margen">Dar de baja equipo</h2>
-                <p class="biomedicos-listado__subtitulo">
-                    Registrar la baja administrativa del equipo {{ dispositivo.codigo }}.
-                </p>
+        <div class="biomedicos-encabezado-superior">
+            <div class="tituloFormulario-texto">
+                <i class="bi bi-exclamation-octagon"></i>
+                <div>
+                    <h2 class="sin-margen">Dar de baja equipo</h2>
+                    <p class="biomedicos-baja__subtitulo">
+                        Registrar la baja administrativa del equipo {{ dispositivo.codigo }}.
+                    </p>
+                </div>
             </div>
+            <a class="biomedicos-volver biomedicos-volver--inline biomedicos-encabezado-volver"
+               href="{{ url_regresar }}">
+                <i class="bi bi-arrow-left"></i>
+                Detalle del equipo
+            </a>
         </div>
         <div class="tituloFormulario-subrallado"></div>
     </div>
-
     {# Advertencia visual: la baja no borra el equipo, solo cambia su estado y crea historial. #}
     <section class="biomedicos-baja__advertencia" role="alert">
         <i class="bi bi-exclamation-triangle"></i>

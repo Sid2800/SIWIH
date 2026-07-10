@@ -4,18 +4,20 @@
 
 {% block content %}
 <div class="contenedor2 biomedicos-pagina">
-    <a class="biomedicos-volver" href="{{ url_regresar }}">
-        <i class="bi bi-arrow-left"></i> Equipos
-    </a>
-
     <div class="tituloFormulario">
-        <div class="tituloFormulario-texto">
-            <i class="{{ icono_formulario|default:'bi bi-clipboard2-plus' }}"></i>
-            <h2 class="sin-margen">{{ titulo_formulario|default:"Registrar equipo" }}</h2>
+        <div class="biomedicos-encabezado-superior">
+            <div class="tituloFormulario-texto">
+                <i class="{{ icono_formulario|default:'bi bi-clipboard2-plus' }}"></i>
+                <h2 class="sin-margen">{{ titulo_formulario|default:"Registrar equipo" }}</h2>
+            </div>
+            <a class="biomedicos-volver biomedicos-volver--inline biomedicos-encabezado-volver"
+               href="{{ url_regresar }}">
+                <i class="bi bi-arrow-left"></i>
+                {{ texto_regresar|default:"Equipos" }}
+            </a>
         </div>
         <div class="tituloFormulario-subrallado"></div>
     </div>
-
     {# Este template se reutiliza para registrar y editar. Los textos/URLs vienen desde views.py. #}
     <form class="biomedicos-registro" method="post" autocomplete="off">
         {% csrf_token %}
@@ -27,7 +29,7 @@
         {% endif %}
 
         {# Datos propios del equipo. Los selects de tipo/marca/modelo vienen filtrados desde forms.py. #}
-        <section class="biomedicos-registro__seccion biomedicos-registro__seccion--informacion">
+        <section class="biomedicos-registro__seccion">
             <h3 class="biomedicos-registro__titulo">
                 <i class="bi bi-info-circle"></i>
                 Información del equipo
@@ -83,7 +85,7 @@
         </section>
 
         {# Ubicacion inicial o actual: clinica y no clinica son campos distintos en la base. #}
-        <section class="biomedicos-registro__seccion biomedicos-registro__seccion--ubicacion">
+        <section class="biomedicos-registro__seccion">
             <h3 class="biomedicos-registro__titulo">
                 <i class="bi bi-geo-alt"></i>
                 Ubicación y responsable
@@ -121,7 +123,7 @@
         </section>
 
         {# Estado, criticidad y frecuencia controlan inventario y futura logica de mantenimiento. #}
-        <section class="biomedicos-registro__seccion biomedicos-registro__seccion--control">
+        <section class="biomedicos-registro__seccion">
             <h3 class="biomedicos-registro__titulo">
                 <i class="bi bi-shield"></i>
                 Control del equipo
@@ -147,7 +149,7 @@
         </section>
 
         {# Datos opcionales de compra/garantia. La regla fuerte de garantia vive en models.py. #}
-        <section class="biomedicos-registro__seccion biomedicos-registro__seccion--administrativa">
+        <section class="biomedicos-registro__seccion">
             <h3 class="biomedicos-registro__titulo">
                 <i class="bi bi-briefcase"></i>
                 Información administrativa
@@ -181,7 +183,7 @@
         </section>
 
         {# Fotos queda reservado para una etapa futura; aun no guarda archivos. #}
-        <section class="biomedicos-registro__seccion biomedicos-registro__seccion--fotos">
+        <section class="biomedicos-registro__seccion">
             <h3 class="biomedicos-registro__titulo">
                 <i class="bi bi-camera"></i>
                 Fotos del equipo

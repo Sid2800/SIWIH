@@ -55,6 +55,7 @@ class EstadoDispositivo(models.IntegerChoices):
     EN_MANTENIMIENTO = 2, "En mantenimiento"
     FUERA_DE_SERVICIO = 3, "Fuera de servicio"
     DADO_DE_BAJA = 4, "Dado de baja"
+    REPUESTO_PENDIENTE = 5, "Repuesto pendiente"
 
 
 class CriticidadDispositivo(models.IntegerChoices):

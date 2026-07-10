@@ -5,35 +5,36 @@
 {% block content %}
 <div class="contenedor2 biomedicos-pagina biomedicos-pagina--ancha">
     <div class="biomedicos-listado__encabezado">
-        <div>
-            <a class="biomedicos-volver" href="{% url 'inicio_biomedicos' %}">
-                <i class="bi bi-arrow-left"></i> Equipos
-            </a>
+        <div class="biomedicos-listado__titulo">
             <div class="tituloFormulario">
-                <div class="tituloFormulario-texto">
-            <i class="bi bi-device-hdd"></i>
-                    <div>
+                <div class="biomedicos-encabezado-superior">
+                    <div class="tituloFormulario-texto">
+                        <i class="bi bi-device-hdd"></i>
                         <h2 class="sin-margen">Listado de equipos</h2>
-                        <p class="biomedicos-listado__subtitulo">
-                            Consulta y gestión de los equipos del hospital.
-                        </p>
                     </div>
+                    <a class="biomedicos-volver biomedicos-volver--inline biomedicos-encabezado-volver"
+                       href="{% url 'inicio_biomedicos' %}">
+                        <i class="bi bi-arrow-left"></i>
+                        Equipos
+                    </a>
                 </div>
                 <div class="tituloFormulario-subrallado"></div>
             </div>
         </div>
 
-        <a class="formularioBotones-boton biomedicos-listado__registrar"
-           href="{% url 'registrar_dispositivo_biomedicos' %}">
-            <i class="bi bi-plus-lg"></i>
-            Registrar equipo
-        </a>
+        <div class="biomedicos-listado__acciones-superior">
+            <a class="formularioBotones-boton biomedicos-listado__registrar"
+               href="{% url 'registrar_dispositivo_biomedicos' %}">
+                <i class="bi bi-plus-lg"></i>
+                Registrar equipo
+            </a>
+        </div>
     </div>
 
     {# Filtros GET: views.py lee estos parametros y devuelve la tabla paginada. #}
     <form class="biomedicos-listado__controles" method="get">
         <div class="biomedicos-listado__busqueda">
-            <div class="biomedicos-listado__campo-icono biomedicos-listado__busqueda-campo">
+            <div class="biomedicos-listado__campo-icono">
                 <i class="bi bi-search"></i>
                 <input class="formularioCampo-text"
                        id="buscar_listado_dispositivo"

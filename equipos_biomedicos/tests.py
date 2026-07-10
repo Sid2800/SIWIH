@@ -298,6 +298,30 @@ class EquiposBiomedicosViewsTests(TestCase):
         self.assertEqual(asignacion_actual.unidad_no_clinica, self.unidad_no_clinica)
         self.assertEqual(asignacion_actual.responsable, self.responsable_nuevo)
 
+    def test_estado_repuesto_pendiente_se_guarda_y_sigue_activo(self):
+        respuesta = self.client.post(
+            reverse('editar_dispositivo_biomedicos', args=[self.dispositivo.id]),
+            self._datos_formulario_dispositivo(
+                estado=EstadoDispositivo.REPUESTO_PENDIENTE,
+                numero_serie="SERIE-REPUESTO",
+            ),
+        )
+
+        self.assertRedirects(
+            respuesta,
+            reverse('detalle_dispositivo_biomedicos', args=[self.dispositivo.id]),
+        )
+
+        self.dispositivo.refresh_from_db()
+        self.assertEqual(
+            self.dispositivo.estado,
+            EstadoDispositivo.REPUESTO_PENDIENTE,
+        )
+
+        respuesta_listado = self.client.get(reverse('listado_dispositivos_biomedicos'))
+        self.assertContains(respuesta_listado, self.dispositivo.codigo)
+        self.assertContains(respuesta_listado, "Rep.")
+        self.assertContains(respuesta_listado, "Repuesto pendiente")
     def test_edicion_sin_cambio_de_ubicacion_no_duplica_asignacion(self):
         # Editar datos administrativos no debe duplicar historial de asignacion.
         respuesta = self.client.post(
