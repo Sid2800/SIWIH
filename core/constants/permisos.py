@@ -310,7 +310,7 @@ S_EXP_ADMIN_ROLES = ['admin']
 S_EXP_ADMIN_UNIDADES = ['ADMI']
 
 # Acceso de usuario solicitante (buscar, solicitar, seguimiento)
-S_EXP_SOLICITANTE_ROLES = ['admin', 'digitador', 'directivos']
+S_EXP_SOLICITANTE_ROLES = ['admin', 'digitador', 'directivo']
 S_EXP_SOLICITANTE_UNIDADES = [
    "ADMI",  # Admisión
    "DIR",   # Dirección
