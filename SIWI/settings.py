@@ -35,7 +35,7 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True if os.getenv("DEBUG", "0") == "1" else False
 
-ALLOWED_HOSTS = ['SIWIH','127.0.0.1','192.168.88.28','192.168.88.173']
+ALLOWED_HOSTS = ['SIWIH', '127.0.0.1', '192.168.88.8', '192.168.88.28', '192.168.88.173', '100.84.35.113']
 
 # Application definition
 
@@ -60,8 +60,10 @@ INSTALLED_APPS = [
     'referencia',
     'clinico',
     'usuario',
-    'rrhh',
     'agenda_medica'
+    's_exp',
+    'mapeo_camas',
+    'rrhh'
 ]
 
 MIDDLEWARE = [
@@ -73,6 +75,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'core.middleware.LoginRequiredMiddleware',  #se requiere login para servir cualquier json o pagina
+    'core.middleware.NoSessionRefreshOnPollingMiddleware',  # Polling no renueva sesión
 ]
 
 ROOT_URLCONF = 'SIWI.urls'
@@ -192,6 +195,7 @@ SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 SESSION_COOKIE_AGE = 1800  # 30 minutos
 
 # Reinicia el tiempo de expiraci�n con cada solicitud activa
+
 SESSION_SAVE_EVERY_REQUEST = True
 
 
@@ -199,6 +203,24 @@ SESSION_SAVE_EVERY_REQUEST = True
 BASE_DIR = Path(__file__).resolve().parent.parent
 LOG_DIR = BASE_DIR / "logs"
 LOG_DIR.mkdir(exist_ok=True)
+
+def _silenciar_polling_filter(record):
+    """
+    Filtro para django.server: descarta las líneas de access log que
+    correspondan a endpoints de polling (changes-check, alertas).
+    Estos endpoints se consultan cada pocos segundos y solo generan ruido
+    en la consola. No se descartan errores 4xx/5xx aunque sean polling.
+    """
+    msg = record.getMessage()
+    # Solo silenciar respuestas exitosas (200, 304) a endpoints de polling
+    rutas_polling = ['/s_exp/api/changes-check/', '/s_exp/api/alertas/']
+    for ruta in rutas_polling:
+        if ruta in msg:
+            # No silenciar si hay error (4xx, 5xx)
+            if ' 200 ' in msg or ' 304 ' in msg:
+                return False  # descartar este log
+    return True  # mantener todo lo demás
+
 
 LOGGING = {
     "version": 1,
@@ -208,6 +230,15 @@ LOGGING = {
         "standard": {
             "format": "[{asctime}] {levelname} [{name}] [{app}] {message}",
             "style": "{",
+            # Valor por defecto cuando un log no pasa 'app' via extra={'app': ...}
+            "defaults": {"app": "general"},
+        },
+    },
+
+    "filters": {
+        "silenciar_polling": {
+            "()": "django.utils.log.CallbackFilter",
+            "callback": _silenciar_polling_filter,
         },
     },
 
@@ -224,15 +255,29 @@ LOGGING = {
             "maxBytes": 1024 * 1024 * 20,  # 5MB
             "backupCount": 10,
             "formatter": "standard",
-            "level": "INFO",
+            "level": "WARNING",
         },
     },
 
     "loggers": {
+        # Logger central del sistema. Todas las apps registran aquí vía
+        # core.utils.utilidades_logging (log_info/log_warning/log_error),
+        # identificándose con el campo 'app' (ej. app="s_exp"). El formato
+        # incluye [{app}], así que un solo archivo centraliza todo y se puede
+        # filtrar por módulo. (s_exp dejó de usar su logger dedicado.)
         "siwi": {
             "handlers": ["console", "siwi_file"],
             "level": "INFO",
             "propagate": False,
         },
+        # django.server emite los logs de acceso del runserver/gunicorn.
+        # Aplicamos el filtro para silenciar los polling con respuesta 200.
+        "django.server": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "filters": ["silenciar_polling"],
+            "propagate": False,
+        },
     },
 }
+

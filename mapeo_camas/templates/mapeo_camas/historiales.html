@@ -1,0 +1,86 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}{{ titulo }}{% endblock %}
+
+{% block content %}
+<div class="contenedor2 dataTables_wrapper">
+  <div class="tituloFormulario" style="margin-bottom: 1.5rem;">
+    <div class="tituloFormulario-texto">
+      <i class="bi bi-clock-history"></i>
+      <h2 class="sin-margen">{{ titulo }}</h2>
+    </div>
+    <div class="tituloFormulario-subrallado"></div>
+  </div>
+
+    <table id="tabla-historiales" class="dataTable stripe hover row-border">
+      <thead>
+        <tr>
+          <th>Referencia</th>
+          <th>Tipo</th>
+          <th>Estado</th>
+          <th>Servicios</th>
+          <th>Fecha</th>
+          <th>Usuario</th>
+        </tr>
+      </thead>
+      <tbody id="tabla-historiales-body"></tbody>
+      <tfoot>
+        <tr>
+          <th>Referencia</th>
+          <th>Tipo</th>
+          <th>Estado</th>
+          <th>Servicios</th>
+          <th>Fecha</th>
+          <th>Usuario</th>
+        </tr>
+      </tfoot>
+    </table>
+
+  <p style="margin-top: 0.75rem; color: #555; font-weight: 600;">Doble clic o doble toque en una línea para abrir el detalle.</p>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  #tabla-historiales {
+    width: 100%;
+  }
+
+  #tabla-historiales tbody tr {
+    cursor: pointer;
+  }
+
+  .hist-servicio-chip {
+    display: inline-block;
+    font-size: 1.05rem;
+    font-weight: 600;
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    background: #dbeafe;
+    color: #1e40af;
+    white-space: nowrap;
+    margin: 0.1rem 0.15rem 0.1rem 0;
+  }
+
+  .hist-sin-servicios {
+    color: #94a3b8;
+  }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+{# [2026-06-01] URLs de la API inyectadas desde el template para evitar hardcodeo en JS. #}
+<script>
+  window.MAPA_CFG = {
+    urls: {
+      camas:  "{% url 'mapeo_camas_historiales_camas' %}",
+      data:   "{% url 'mapeo_camas_historiales_data' %}",
+      detalle:"{% url 'mapeo_camas_historiales_detalle' %}",
+      mapa:   "{% url 'mapeo_camas_mapa' %}"
+    }
+  };
+</script>
+<!-- 2026-06-09: estáticos de mapeo centralizados en core/static/core/scripts -->
+<script src="{% static 'core/scripts/mapeo/historialesCamas.js' %}?v=20260601a"></script>
+{% endblock %}

@@ -1,0 +1,337 @@
+{% extends 'core/base.html' %}
+{% load static %}
+{% load permisos_unidad %}
+
+{% block title %}{{ titulo }}{% endblock %}
+
+{% block content %}
+<div class="contenedor2">
+  <div class="tituloFormulario" style="margin-bottom: 1.5rem;">
+    <div class="tituloFormulario-texto">
+      <i class="bi bi-hospital"></i>
+      <h2 class="sin-margen" id="mapa-titulo-principal">{{ titulo }}</h2>
+    </div>
+    <div class="tituloFormulario-subrallado"></div>
+  </div>
+
+  <div class="mapa-acciones-superior">
+    <div class="dt-buttons mapa-botones-acciones">
+      {# [2026-05-18] Botones de mapeo según permiso de mapear. #}
+      {% if puede_mapear %}
+      <button type="button" class="formularioBotones-boton" id="btn-iniciar-mapeo" title="Iniciar mapeo de camas">
+        <span>Iniciar mapeo</span>
+      </button>
+      {% endif %}
+      {% if puede_ver_historiales %}
+      <a href="{% url 'mapeo_camas_historiales' %}" class="dt-button" id="btn-historiales-camas" title="Ver historiales de camas">
+        <i class="bi bi-clock-history boton-exportacion"></i>
+      </a>
+      {% endif %}
+      {% if puede_ver_dashboard %}
+      {# [2026-06-11] Dashboard usa permiso propio MAPEO_CAMAS_DASHBOARD_*. #}
+      <a href="{% url 'mapeo_camas_dashboard' %}" class="dt-button" id="btn-dashboard-camas" title="Dashboard de mapeo de camas">
+        <i class="bi bi-bar-chart-line boton-exportacion"></i>
+      </a>
+      {% endif %}
+      {% if es_superusuario %}
+      {# [2026-05-25] Sincronización masiva inicial de ingresos->camas, solo para superusuario. #}
+      <button type="button" class="dt-button" id="btn-sincronizar-camas" title="Sincronizar camas de ingresos activos">
+        <i class="bi bi-arrow-repeat boton-exportacion"></i>
+      </button>
+      {% endif %}
+      {# [2026-05-18] Botones de control de sesión para usuarios con permiso de mapear. #}
+      {% if puede_mapear %}
+      <button type="button" class="formularioBotones-boton mapa-control-mapeo--oculto" data-action="terminar-mapeo" title="Finalizar mapeo">
+        <span>Finalizar mapeo</span>
+      </button>
+      {% endif %}
+      {% if puede_cancelar_mapeo %}
+      <button type="button" class="formularioBotones-boton mapa-control-mapeo--oculto" id="btn-cancelar-mapeo" title="Cancelar mapeo">
+        <span>Cancelar mapeo</span>
+      </button>
+      {% endif %}
+    </div>
+
+    <div class="mapa-buscador">
+      <label for="mapa-busqueda" class="mapa-buscador-label">Buscar:</label>
+      <select id="mapa-tipo-busqueda" class="formularioCampo-select">
+        <option value="dni" selected>DNI</option>
+        <option value="todo">Todos</option>
+        <option value="cama">Numero cama</option>
+        <option value="paciente">Paciente</option>
+        <option value="estado">Estado</option>
+        <option value="sala">Sala</option>
+      </select>
+      <input
+        type="text"
+        id="mapa-busqueda"
+        class="formularioCampo-text"
+        placeholder="Buscar..."
+        autocomplete="off"
+      >
+      <button type="button" class="dt-button" id="btn-limpiar-busqueda" title="Limpiar busqueda">
+        <i class="bi bi-x-circle boton-exportacion"></i>
+      </button>
+    </div>
+  </div>
+
+  {% comment %}
+  [2026-05-04 FEATURE] Banner de advertencia para otros usuarios.
+  Muestra si otro usuario tiene un mapeo activo (EN_PROGRESO).
+  {% endcomment %}
+  {% if sesiones_ajenas %}
+  <div class="mapa-banner-advertencia">
+    <i class="bi bi-exclamation-triangle-fill mapa-banner-advertencia__icono"></i>
+    <div class="mapa-banner-advertencia__contenido">
+      <span class="mapa-banner-advertencia__texto">
+        Mapeos en progreso detectados. Evita modificar camas de estos servicios:
+      </span>
+      <ul class="mapa-banner-advertencia__lista">
+        {% for sesion in sesiones_ajenas %}
+        <li class="mapa-banner-advertencia__item">
+          <div class="mapa-banner-advertencia__detalle">
+            <strong>{{ sesion.usuario }}</strong>
+            {% if sesion.servicios %}
+              &mdash; {{ sesion.servicios|join:", " }}
+            {% else %}
+              &mdash; Sin servicios asociados
+            {% endif %}
+            {% if sesion.hora_inicio %}
+              <span>&middot; Inicio: {{ sesion.hora_inicio }}</span>
+            {% endif %}
+          </div>
+          {% if puede_cancelar_mapeo_banner %}
+          <form method="post" action="{% url 'mapeo_camas_cancelar_mapeo' %}" class="mapa-banner-advertencia__accion-form">
+            {% csrf_token %}
+            <input type="hidden" name="sesion_mapeo_id" value="{{ sesion.sesion_id }}">
+            <input type="hidden" name="next" value="{{ request.path }}">
+            <button type="submit" class="formularioBotones-boton mapa-banner-advertencia__accion" title="Cancelar este mapeo">
+              <span>Cancelar</span>
+            </button>
+          </form>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+  {% endif %}
+
+  {% comment %}[2026-05-04 FEATURE] Banner pegajoso de mapeo activo (propio). Se muestra/oculta con JS.{% endcomment %}
+  <div id="mapa-banner-mapeo" class="mapa-banner-mapeo mapa-control-mapeo--oculto">
+    <i class="bi bi-record-circle-fill mapa-banner-mapeo__icono"></i>
+    <span class="mapa-banner-mapeo__texto">Mapeo en progreso &mdash; revisa cada cama y confirma o corrige su estado</span>
+    {% if sesion_activa %}
+    <span class="mapa-banner-mapeo__texto">Inicio: {{ sesion_activa.fecha_inicio|date:"d/m/Y H:i" }}</span>
+    {% endif %}
+  </div>
+
+  <section class="mapa-indicadores" aria-label="Indicadores de estado y sala de camas">
+    <div class="mapa-indicadores__encabezado">
+      <h3 class="mapa-indicadores__titulo">Indicadores por estado y sala</h3>
+      <p class="mapa-indicadores__ayuda">Puedes combinar filtros de estado y sala al mismo tiempo.</p>
+    </div>
+    <div id="mapa-indicadores" class="mapa-indicadores__grid"></div>
+    <div id="mapa-indicadores-sala" class="mapa-indicadores__grid" style="margin-top:0.55rem;"></div>
+  </section>
+
+  <section class="mapa-filtros-movil" aria-label="Filtros moviles por estado y sala">
+    <div class="mapa-filtros-movil__campo">
+      <label for="mapa-filtro-estado-movil" class="mapa-buscador-label">Estado</label>
+      <select id="mapa-filtro-estado-movil" class="formularioCampo-select"></select>
+    </div>
+    <div class="mapa-filtros-movil__campo">
+      <label for="mapa-filtro-sala-movil" class="mapa-buscador-label">Sala</label>
+      <select id="mapa-filtro-sala-movil" class="formularioCampo-select"></select>
+    </div>
+  </section>
+
+  <div id="mapa-servicios" class="mapa-grid-servicios"></div>
+
+
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<!-- 2026-06-09: estáticos de mapeo centralizados en core/static/core/css -->
+<link rel="stylesheet" href="{% static 'core/css/mapeo/mapaCamas.css' %}?v=20260626b">
+<style>
+  /* [2026-06-21 IMPROVEMENT] Reutiliza el boton textual del sistema para las acciones de sesión de mapeo. */
+  .mapa-botones-acciones .formularioBotones-boton {
+    width: auto;
+    min-width: 16rem;
+    margin: 0;
+  }
+
+  /* [2026-06-21 IMPROVEMENT] Aumenta visibilidad de alertas de sesion para lectura comoda. */
+  .mapeo-alerta-sesion {
+    width: min(92vw, 62rem) !important;
+    max-width: 62rem !important;
+    padding: 1.5rem !important;
+  }
+
+  .mapeo-alerta-sesion .swal2-title,
+  .mapeo-alerta-sesion .contener-modal-titulo {
+    font-size: 2.7rem !important;
+    line-height: 1.18 !important;
+    margin-bottom: 0.85rem !important;
+  }
+
+  .mapeo-alerta-sesion .swal2-html-container,
+  .mapeo-alerta-sesion .swal2-text,
+  .mapeo-alerta-sesion .swal2-input-label,
+  .mapeo-alerta-sesion .swal2-validation-message,
+  .mapeo-alerta-sesion .modal-mapeo-servicios__texto,
+  .mapeo-alerta-sesion .modalAtencionCampos legend {
+    font-size: 1.75rem !important;
+    line-height: 1.6 !important;
+  }
+
+  .mapeo-alerta-sesion .swal2-input-label,
+  .mapeo-alerta-sesion .modalAtencionCampos label,
+  .mapeo-alerta-sesion .modalAtencionCampos strong,
+  .mapeo-alerta-sesion .modalAtencionCampos p {
+    font-size: 1.65rem !important;
+    line-height: 1.55 !important;
+  }
+
+  .mapeo-alerta-sesion .modal-mapeo-servicios__resumen,
+  .mapeo-alerta-sesion .modal-mapeo-servicios__texto-item,
+  .mapeo-alerta-sesion .modal-mapeo-servicios__nombre,
+  .mapeo-alerta-sesion .ck-formulario__label {
+    font-size: 1.55rem !important;
+    line-height: 1.45 !important;
+  }
+
+  .mapeo-alerta-sesion .modal-mapeo-servicios__lista {
+    row-gap: 0.8rem !important;
+  }
+
+  .mapeo-alerta-sesion .modal-mapeo-servicios__item {
+    min-height: 3.4rem !important;
+  }
+
+  .mapeo-alerta-sesion .swal2-html-container .tabla-general {
+    font-size: 1.55rem !important;
+  }
+
+  .mapeo-alerta-sesion .swal2-textarea {
+    min-height: 12rem !important;
+    font-size: 1.55rem !important;
+    padding: 1rem !important;
+  }
+
+  .mapeo-alerta-sesion .swal2-confirm,
+  .mapeo-alerta-sesion .swal2-cancel,
+  .mapeo-alerta-sesion .contener-modal-boton-confirmar,
+  .mapeo-alerta-sesion .contener-modal-boton-cancelar {
+    font-size: 1.5rem !important;
+    min-height: 3.45rem !important;
+    padding: 0.95rem 1.5rem !important;
+  }
+
+  .mapeo-alerta-sesion .tabla-general th,
+  .mapeo-alerta-sesion .tabla-general td {
+    font-size: 1.5rem !important;
+    padding: 0.8rem 0.7rem !important;
+  }
+
+  .mapeo-alerta-sesion .modalAtencionCampos {
+    margin-top: 1rem !important;
+  }
+
+  .mapeo-alerta-sesion .swal2-actions {
+    gap: 0.8rem !important;
+    margin-top: 1.25rem !important;
+  }
+
+  /* [2026-06-22] Accion compacta para cancelar mapeos ajenos desde el aviso superior. */
+  .mapa-banner-advertencia__lista {
+    width: 100%;
+  }
+
+  .mapa-banner-advertencia__accion-form {
+    display: inline-flex;
+    margin-left: auto;
+    flex-shrink: 0;
+    align-self: center;
+    justify-self: end;
+  }
+
+  .mapa-banner-advertencia__accion {
+    min-width: auto !important;
+    width: auto !important;
+    padding: 0.45rem 0.85rem !important;
+    line-height: 1.2 !important;
+  }
+
+  .mapa-banner-advertencia__item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.85rem;
+    width: 100%;
+  }
+
+  .mapa-banner-advertencia__detalle {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+{# [2026-05-08] Indica al JS si el usuario puede editar el mapa o es solo lectura #}
+{# [2026-06-01] URLs de la API inyectadas desde el template para evitar hardcodeo en JS. #}
+<script>
+  window.MAPA_SOLO_LECTURA = {% if es_editor %}false{% else %}true{% endif %};
+  window.MAPA_ROL_INTENTOS_RESTRINGIDO = {% if es_rol_intentos_restringido %}true{% else %}false{% endif %};
+  window.MAPA_CFG = {
+    sesionMaxHoras: {{ sesion_max_horas|default:24 }},
+    urls: {
+      estadoMapeo:      "{% url 'mapeo_camas_estado_mapeo' %}",
+      iniciarMapeo:     "{% url 'mapeo_camas_iniciar_mapeo' %}",
+      terminarMapeo:    "{% url 'mapeo_camas_terminar_mapeo' %}",
+      cancelarMapeo:    "{% url 'mapeo_camas_cancelar_mapeo' %}",
+      sincronizarCamas: "{% url 'sincronizar-camas-superadmin' %}",
+      mapa:             "{% url 'mapeo_camas_data' %}",
+      buscarPacientes:  "{% url 'mapeo_camas_buscar_pacientes' %}",
+      actualizarCama:   "{% url 'mapeo_camas_actualizar_cama' %}",
+      camasDisponibles: "{% url 'mapeo_camas_camas_disponibles' %}",
+      moverPaciente:    "{% url 'mapeo_camas_mover_paciente' %}",
+      procesarCamaMapeo:"{% url 'mapeo_camas_procesar_cama_mapeo' %}"
+    }
+  };
+
+  document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll(".mapa-banner-advertencia__accion-form").forEach(function (formulario) {
+      formulario.addEventListener("submit", function (event) {
+        event.preventDefault();
+
+        Swal.fire({
+          title: "Cancelar mapeo",
+          text: "La sesión de mapeo seleccionada se cancelará y no podrá retomarse. ¿Desea continuar?",
+          icon: "warning",
+          showCancelButton: true,
+          confirmButtonText: "Sí, cancelar",
+          cancelButtonText: "Volver",
+          customClass: {
+            popup: "contener-modal-defuncion mapeo-alerta-sesion",
+            title: "contener-modal-titulo",
+            content: "contener-modal-contenido",
+            confirmButton: "contener-modal-boton-confirmar",
+            cancelButton: "contener-modal-boton-cancelar"
+          }
+        }).then(function (resultado) {
+          if (resultado.isConfirmed) {
+            formulario.submit();
+          }
+        });
+      });
+    });
+  });
+</script>
+<!-- [2026-06-11] Cache-bust: fuerza recarga del JS con contador de intentos por servicio. -->
+<!-- [2026-06-11] Cache-bust: fix de modo solo lectura en inicio/cierre de sesión de mapeo. -->
+<script src="{% static 'core/scripts/mapeo/mapaCamasAsignacion.js' %}?v=20260701b"></script>
+{% endblock %}

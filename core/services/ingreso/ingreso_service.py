@@ -5,11 +5,14 @@ from paciente.models import Paciente, Padre
 from expediente.models import PacienteAsignacion
 from servicio.models import Sala
 from core.services.paciente_service import PacienteService
+from core.services.expediente_service import ExpedienteService
+from core.services.mapeo_camas_service import MapeoCamasService  # [2026-05-07] Se agregó para liberar cama al inactivar ingreso
 from django.db.models import Func, F, Q, OuterRef, Subquery, DateField, Value, Count
 from django.db.models.functions import Concat
 from django.db import transaction
 from core.utils.utilidades_logging import *
-from core.constants.domain_constants import LogApp
+from core.constants.domain_constants import LogApp, EXP_UBICA_ADMISION_ID
+
 
 class IngresoService:
 
@@ -232,6 +235,7 @@ class IngresoService:
 
         return ingresos
     
+    
     @staticmethod
     def listar_ingresos_por_paciente(id_paciente):
         ingresos_qs = Ingreso.objects.filter(
@@ -419,11 +423,97 @@ class IngresoService:
         
 
     @staticmethod
-    def inactivar_ingreso(ingresoId):
-        updated = Ingreso.objects.filter(
+
+    def inactivar_ingreso(ingresoId, usuario):  # [2026-05-07] Se agregó parámetro 'usuario' para registrar quién libera la cama
+        """
+        Inactiva un ingreso y libera la cama asignada de forma atómica.
+
+        Solo puede inactivarse un ingreso que:
+          - Exista con el id proporcionado.
+          - No haya sido recibido por SDGI (fecha_recepcion_sdgi es None).
+          - Esté en estado Activo (estado=1).
+
+        Pasos dentro de transaction.atomic():
+          1. Cambia el estado del ingreso a Inactivo (estado=2).
+          2. Cierra la AsignacionCamaPaciente activa del paciente y registra
+             la transición OCUPADA → LIBRE en HistorialEstadoCama.
+
+        Usar atomic() garantiza que el ingreso no quede inactivo con la cama
+        aún marcada como ocupada, ni la cama liberada sin que el ingreso cambie.
+
+        Parámetros:
+          ingresoId (int): PK del ingreso a inactivar.
+          usuario (User):  usuario que ejecuta la acción (se registra en historial).
+
+        Retorna:
+          True  si se inactivó correctamente.
+          False si no se encontró un ingreso que cumpla las condiciones.
+        """
+        ingreso = Ingreso.objects.filter(
             id=ingresoId,
             fecha_recepcion_sdgi__isnull=True,
             estado=1
-        ).update(estado=2)
+        ).first()
 
-        return updated > 0
+        if ingreso:
+            # [2026-05-29] Defensa en profundidad: si hay una sesion de mapeo de camas
+            # EN_PROGRESO sobre el servicio del ingreso, no se permite inactivar.
+            mensaje_bloqueo = MapeoCamasService.validar_ingreso_no_bloqueado_por_mapeo(
+                ingreso_id=ingreso.id,
+            )
+            if mensaje_bloqueo:
+                return False
+
+            with transaction.atomic():  # [2026-05-07] Antes: ingreso.save() simple sin atomic ni liberación de cama
+                # Paso 1: marcar el ingreso como inactivo
+                ingreso.estado = 2
+                ingreso.save(update_fields=["estado"])
+                ubicacion_expediente = ExpedienteService.obtener_o_crear_ubicacion_unidad(EXP_UBICA_ADMISION_ID)
+                ExpedienteService.cambiar_ubicacion(ingreso.paciente.expediente_numero, ubicacion_expediente)
+
+                # Paso 2: liberar la cama - cierra la asignación activa del ingreso
+                # y registra OCUPADA → LIBRE en HistorialEstadoCama
+                if ingreso.id:  # [2026-05-07] Bloque nuevo: liberación atómica de cama al inactivar
+                    # [2026-05-26 AUDIT] Liberación por ingreso_id para evitar pivote paciente_id.
+                    MapeoCamasService.cerrar_asignacion_activa_paciente(
+                        ingreso_id=ingreso.id,
+                        usuario=usuario,
+                        cama_id=ingreso.cama_id,
+                    )
+
+            return True
+
+        return False
+    
+    @staticmethod
+    def obtener_estado_expediente(expediente_numero):
+        """
+        Determina si el expediente se encuentra en un ingreso activo.
+
+        """
+
+        ingreso = (
+            Ingreso.objects.filter(
+                paciente__expediente_numero=expediente_numero,
+                estado=1,
+                fecha_recepcion_sdgi__isnull=True
+            )
+            .only("fecha_ingreso","fecha_egreso", "fecha_recepcion_sdgi")
+            .order_by("-fecha_ingreso", "-id")
+            .first()
+        )
+
+
+        if not ingreso:
+            return None
+
+        # Aún está en sala
+        if ingreso.fecha_egreso is None:
+            return {
+                "fecha": ingreso.fecha_ingreso,
+            }
+        
+        if ingreso.fecha_recepcion_sdgi is None:
+            return {
+                "fecha": ingreso.fecha_egreso,
+            }

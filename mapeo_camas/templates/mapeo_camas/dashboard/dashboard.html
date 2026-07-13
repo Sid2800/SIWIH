@@ -1,0 +1,75 @@
+
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}{{ titulo }}{% endblock %}
+
+{% block extra_css %}
+  <!-- 2026-06-09: estáticos de mapeo centralizados en core/static/core/css -->
+  <link rel="stylesheet" href="{% static 'core/css/mapeo/dashboard/dashboard.css' %}">
+  <!-- 2026-06-16: capa local de accesibilidad visual para tipografía ampliada. -->
+  <link rel="stylesheet" href="{% static 'core/css/mapeo/dashboard/dashboard-accessibilidad.css' %}">
+{% endblock extra_css %}
+
+{% block content %}
+<div class="contenedor2">
+  <div class="tituloFormulario" style="margin-bottom: 1.5rem;">
+    <div class="tituloFormulario-texto">
+      <i class="bi bi-bar-chart-line"></i>
+      <h2 class="sin-margen">{{ titulo }}</h2>
+    </div>
+    <div class="tituloFormulario-subrallado"></div>
+  </div>
+
+  <div class="dash-wrap" data-component="dashboard-mapeo-camas">
+    <div class="dash-header__meta" style="justify-content: flex-end;">
+      <span class="dash-pill dash-pill--ok">Tiempo real · 30s</span>
+      <span class="dash-muted">{{ subtitulo }}</span>
+      <span id="dash-updated-at" class="dash-muted">—</span>
+      <button id="dash-refresh-btn" type="button" class="dash-refresh-btn" aria-label="Refrescar ahora">
+        Refrescar
+      </button>
+      <button id="dash-export-excel-btn" type="button" class="dash-refresh-btn" aria-label="Descargar reporte Excel">
+        Descargar Excel
+      </button>
+      {# [2026-06-16] Se retira la guía del dashboard a solicitud de usuario. #}
+    </div>
+
+    {# [2026-06-15] Fase 1: filtros arriba; resumen y KPIs comparten la fila superior. #}
+    {% include 'mapeo_camas/dashboard/_filtros.html' %}
+    <div class="dash-top">
+      {% include 'mapeo_camas/dashboard/_kpi_cards.html' %}
+      {% include 'mapeo_camas/dashboard/_estados_resumen.html' %}
+    </div>
+    {% include 'mapeo_camas/dashboard/_charts.html' %}
+  </div>
+</div>
+
+<script>
+  {# [2026-06-01] URLs de la API inyectadas desde el template — no hardcodear en JS. #}
+  window.DASHBOARD_CFG = {
+    urls: {
+      kpis:               "{% url 'mapeo_camas_dashboard_kpis' %}",
+      ocupacionHora:      "{% url 'mapeo_camas_dashboard_ocupacion_hora' %}",
+      exportOcupacionExcel:"{% url 'mapeo_camas_dashboard_export_ocupacion_excel' %}",
+      ultimosIngresos:    "{% url 'mapeo_camas_dashboard_ultimos_ingresos' %}",
+      ultimosMovimientos: "{% url 'mapeo_camas_dashboard_ultimos_movimientos' %}"
+    }
+  };
+</script>
+{% endblock content %}
+
+{% block extra_js %}
+  {# [2026-05-28] ApexCharts local — única dependencia de terceros del dashboard. #}
+  <script src="{% static 'core/vendor/apexcharts/apexcharts.min.js' %}"></script>
+
+  <script src="{% static 'core/scripts/mapeo/dashboard/api.js' %}"></script>
+  <script src="{% static 'core/scripts/mapeo/dashboard/filters.js' %}?v=20260626a"></script>
+  <script src="{% static 'core/scripts/mapeo/dashboard/kpis.js' %}"></script>
+  <script src="{% static 'core/scripts/mapeo/dashboard/charts/estados-resumen.js' %}"></script>
+  <script src="{% static 'core/scripts/mapeo/dashboard/charts/ocupacion-hora.js' %}"></script>
+  <script src="{% static 'core/scripts/mapeo/dashboard/tabla-ingresos.js' %}"></script>
+  <script src="{% static 'core/scripts/mapeo/dashboard/tabla-movimientos.js' %}"></script>
+  <script src="{% static 'core/scripts/mapeo/dashboard/tabla-movimientos-local.js' %}"></script>
+  <script src="{% static 'core/scripts/mapeo/dashboard/dashboard.js' %}"></script>
+{% endblock extra_js %}

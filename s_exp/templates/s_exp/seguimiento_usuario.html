@@ -1,0 +1,70 @@
+{% extends 'core/base.html' %}
+{% load static %}
+{% load permisos_unidad %}
+
+{% block title %}Mis Solicitudes{% endblock title %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'core/css/s_exp.css' %}">
+{% endblock extra_css %}
+
+{% block content %}
+<div class="contenedor2">
+    <div class="tituloFormulario sexp-margin-bottom-15">
+        <div class="tituloFormulario-texto">
+            <i class="bi bi-clock-history"></i>
+            <h2 class="sin-margen">Seguimiento de Mis Solicitudes</h2>
+        </div>
+        <div class="tituloFormulario-subrallado"></div>
+    </div>
+
+    <div class="sexp-nav-modulos">
+        <a href="{% url 's_exp_buscador' %}" class="sexp-nav-link">
+            <i class="bi bi-search"></i> Solicitar Expedientes
+        </a>
+        <a href="{% url 's_exp_seguimiento' %}" class="sexp-nav-link sexp-nav-link--active">
+            <i class="bi bi-clock-history"></i> Mis Solicitudes
+        </a>
+        {% if request.user|tiene_rol:"admin:ADMI" %}
+        <a href="{% url 's_exp_solicitudes' %}" class="sexp-nav-link">
+            <i class="bi bi-list-check"></i> Gestión Solicitudes
+        </a>
+        <a href="{% url 's_exp_monitoreo' %}" class="sexp-nav-link">
+            <i class="bi bi-binoculars"></i> Monitoreo
+        </a>
+        <a href="{% url 's_exp_devoluciones' %}" class="sexp-nav-link">
+            <i class="bi bi-arrow-return-left"></i> Devoluciones
+        </a>
+        <a href="{% url 's_exp_reportes' %}" class="sexp-nav-link">
+            <i class="bi bi-bar-chart-line"></i> Reportes
+        </a>
+        {% endif %}
+    </div>
+
+    <!-- Barra de filtros de fecha -->
+    <div class="sexp-filtros-fecha">
+        <button class="sexp-filtro-btn sexp-filtro-btn--active" data-filtro="">Todos</button>
+        <button class="sexp-filtro-btn" data-filtro="hoy">Hoy</button>
+        <button class="sexp-filtro-btn" data-filtro="semana">Esta semana</button>
+        <button class="sexp-filtro-btn" data-filtro="mes">Este mes</button>
+        <button class="sexp-filtro-btn" data-filtro="rango">
+            <i class="bi bi-calendar-range"></i> Rango
+        </button>
+        <!-- Rango de fechas (oculto por defecto) -->
+        <div class="sexp-rango-fechas" id="rango-fechas" style="display:none;">
+            <input type="date" id="fecha-inicio" class="sexp-fecha-input" placeholder="Fecha inicio">
+            <span>—</span>
+            <input type="date" id="fecha-fin" class="sexp-fecha-input" placeholder="Fecha fin">
+            <button class="sexp-filtro-btn" id="btn-aplicar-rango">Aplicar</button>
+        </div>
+    </div>
+
+    <div class="sexp-timeline" id="timeline-solicitudes">
+        <p class="sexp-opacity-5 sexp-text-center">Cargando solicitudes...</p>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script src="{% static 'core/scripts/s_exp/seguimiento.js' %}"></script>
+{% endblock extra_js %}

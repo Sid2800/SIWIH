@@ -6,16 +6,26 @@ from core.constants.domain_constants import UsoUnidadC
 from django.db.models import Q
 from django.views.decorators.csrf import csrf_exempt
 from django.views import View
+from mapeo_camas.models import AsignacionCamaPaciente
 import json
 
 # Create your views here.
 class CamaAutocomplete(autocomplete.Select2QuerySetView):
     
     def get_queryset(self):
-        return ServicioService.obtener_camas_activas()
+        # [2026-06-22] Filtro de ingreso: incluir camas en VACIA, CONSULTA_EXTERNA y PRE_ALTA.
+        return ServicioService.obtener_camas_activas(
+            codigos_estado_permitidos=["VACIA", "CONSULTA_EXTERNA", "PRE_ALTA"]
+        )
     
     def get_result_label(self, result):
         return f"{result.numero_cama} {result.sala}"
+
+    @staticmethod
+    def _estado_cama_texto(codigo_estado):
+        if not codigo_estado:
+            return "SIN_ESTADO"
+        return codigo_estado.replace("_", " ")
 
     def get(self, request, *args, **kwargs):
         query = request.GET.get('q', '')
@@ -27,12 +37,30 @@ class CamaAutocomplete(autocomplete.Select2QuerySetView):
                 Q(numero_cama__icontains=query) |
                 Q(sala__nombre_sala__icontains=query)
             )
+
+        camas = list(camas)
+        camas_ids = [cama.pk for cama in camas]
+
+        # [2026-06-22] Mostrar estado actual de cama en el autocomplete de ingreso.
+        asignaciones = (
+            AsignacionCamaPaciente.objects
+            .filter(cama_id__in=camas_ids)
+            .select_related("estado")
+            .order_by("cama_id", "-fecha_inicio", "-id")
+        )
+        estado_por_cama = {}
+        for asignacion in asignaciones:
+            if asignacion.cama_id not in estado_por_cama:
+                estado_por_cama[asignacion.cama_id] = getattr(asignacion.estado, "codigo", None)
                     
         # Creamos la respuesta en formato JSON
         results = [
             {
                 'id': cama.numero_cama,
-                'text': f"{cama.numero_cama} {cama.sala}",
+                'text': (
+                    f"{cama.numero_cama} {cama.sala} | "
+                    f"Estado: {self._estado_cama_texto(estado_por_cama.get(cama.pk))}"
+                ),
                 'id_sala': cama.sala.id,
             }
             for cama in camas

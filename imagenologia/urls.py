@@ -16,6 +16,4 @@ urlpatterns = [
     path('inactivar-evalucion-rx/', views.inactivarEvalucionRX, name='inactivar_evalucion_rx'),
 
 
-    path('demo/', views.DemoView.as_view(), name='demo')
-
 ]

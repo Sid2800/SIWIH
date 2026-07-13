@@ -27,7 +27,21 @@ from core.services.paciente_service import PacienteService
 from core.services.reporte.PDF.reporte_generador_service import ReporteGeneradorService
 from core.services.reporte.EXCEL.reporte_service_excel import ServiceExcel
 from core.constants.stored_procedures import SP_CATALOGO_REFERENCIAS_RECIBIDAS, SP_CATALOGO_REFERENCIAS_ENVIADAS
-from core.constants.permisos import ROLES_GLOBALES, ATENCION_EDITOR_ROLES, ATENCION_VISUALIZACION_UNIDADES
+from core.constants.permisos import (
+    # Atención
+    ATENCION_EDITOR_ROLES,
+    ATENCION_VISUALIZACION_UNIDADES,
+
+    PACIENTE_HISTORIAL_UNIDADES,
+    # Imagenología
+    IMAGENOLOGIA_VISUALIZACION_UNIDADES,
+    # Reportes
+    REPORTES_UNIDADES,
+    REPORTES_ROLES,
+    # REFERENCIA
+    REFERENCIA_VISUALIZACION_UNIDADES
+)
+
 from core.constants.domain_constants import UnidadID
 from core.services.usuario_service import UsuarioService
 from core.services.ubicacion_service import UbicacionService
@@ -46,8 +60,8 @@ from reporte.validators import validar_informe
 
 class ReporteGeneradorView(UnidadRolRequiredMixin, TemplateView):
     template_name = "reporte/reportes_gen.html"
-    required_roles = ['admin','digitador', 'directivo', 'visitante']
-    required_unidades = ['ADMI', 'UAU','RX', ]
+    required_roles = REPORTES_ROLES
+    required_unidades = REPORTES_UNIDADES
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -80,9 +94,10 @@ class ReporteGeneradorView(UnidadRolRequiredMixin, TemplateView):
             (2, 'REFERENCIAS RECIBIDAS'),
         ]
 
+        usuario = self.request.user
         # SUPERUSUARIO o DIRECTIVOS => tienen acceso completo
-        if self.request.user.is_superuser or \
-        self.request.user.perfilunidad_set.filter(rol__in=ROLES_GLOBALES,alcance=2).exists():
+        if usuario.is_superuser or \
+        UsuarioService.es_global(usuario):
 
             modelos.extend([
                 ('paciente', 'Paciente'),
@@ -99,26 +114,24 @@ class ReporteGeneradorView(UnidadRolRequiredMixin, TemplateView):
 
         else:
             # --------- USUARIOS NORMALES ------------
-            user_unidades_ids = [pu.servicio_unidad.id for pu in self.request.user.perfilunidad_set.all()]
-
             # Paciente SIEMPRE disponible
             modelos.append(('paciente', 'Paciente'))
 
 
 
             # Admision
-            if UnidadID.ADMI in user_unidades_ids:
+            if UsuarioService.pertenece_unidades(usuario,PACIENTE_HISTORIAL_UNIDADES):
                 modelos.append(('ingreso', 'Ingreso'))
                 modelos.append(('atencion', 'Atencion'))
 
             # Imagenología
-            if UnidadID.RX in user_unidades_ids:
+            if UsuarioService.pertenece_unidades(usuario,IMAGENOLOGIA_VISUALIZACION_UNIDADES):
                 modelos.append(('imagenologia', 'Evaluación RX'))
                 modelos.append(('estudio_rx', 'Estudio RX'))
                 context.setdefault('informesRx', informesRx)  # evita pisar si ya existe
 
             # Referencia
-            if UnidadID.UAU in user_unidades_ids:
+            if UsuarioService.pertenece_unidades(usuario,REFERENCIA_VISUALIZACION_UNIDADES):
                 context.setdefault('informesReferencia', informesReferencia)
                 context.setdefault('informesCatalogo', informesCatalogo[:2])
                     

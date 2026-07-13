@@ -1,11 +1,13 @@
 
 from django.db import connections, OperationalError
 from expediente.models import PacienteAsignacion
-from core.services.servicio_service import ServicioService
 from paciente.models import Paciente, Defuncion, Tipo, ObitoFetal
-from imagenologia.models import PacienteExterno
+from types import SimpleNamespace
 from core.utils.utilidades_fechas import calcular_edad_texto, formatear_fecha_simple, obtener_edad_con_indicador
-from core.utils.utilidades_textos import formatear_ubicacion_completo, formatear_nombre_completo
+from core.utils.utilidades_textos import formatear_ubicacion_completo, formatear_nombre_completo, formatear_dni
+from core.services.ubicacion_service import UbicacionService
+from core.services.expediente_service import ExpedienteService
+from core.services.padre_service import PadreService
 from core.validators.fecha_validator import validar_fecha
 from django.db.models import Value, F, Max
 from django.db.models.functions import Concat, Coalesce, TruncDate
@@ -17,8 +19,11 @@ from django.db import connection, models
 from django.utils import timezone
 from django.core.exceptions import ValidationError
 from core.constants.domain_constants import LogApp
+from core.constants.choices_constants import TipoDefuncion
 from core.utils.utilidades_logging import *
 from core.constants.domain_constants import INDICADOR_ANIOS, EDAD_FERTIL_MAX, EDAD_FERTIL_MIN, GENERO_FEMENINO
+
+
 
 class PacienteService:
 
@@ -953,4 +958,60 @@ class PacienteService:
                 "unidad_clinica_id"
             )
         )
-            
+
+
+    @staticmethod
+    def obtener_datos_paciente(paciente):
+        return SimpleNamespace(
+        info_paciente=PacienteService._obtener_info_paciente(paciente),
+        info_expediente=ExpedienteService._obtener_info_expediente(paciente.id),
+        info_madre=PadreService.obtener_detalles_padre(paciente.madre_id),
+        info_defuncion=PacienteService._obtener_info_defuncion(paciente.id),
+        ultima_atencion=paciente.get_ultima_visita(),
+    )
+
+
+    @staticmethod
+    def _obtener_info_paciente(paciente):
+
+        base = {
+            "dni": formatear_dni(paciente.dni) if paciente.dni else "--------",
+            "telefono": paciente.telefono or "--------",
+            "nombreCompleto": formatear_nombre_completo(
+                paciente.primer_nombre,
+                paciente.segundo_nombre,
+                paciente.primer_apellido,
+                paciente.segundo_apellido
+            ),
+            "fechaNacimiento": paciente.fecha_nacimiento,
+            "edad": calcular_edad_texto(str(paciente.fecha_nacimiento)),
+            "sexo": paciente.get_sexo_display(),
+            "domicilio": UbicacionService.obtener_cadena_ubicacion_completa(paciente),
+        }
+
+        return base
+    
+
+    @staticmethod
+    def _obtener_info_defuncion(paciente_id):
+        """
+        Obtiene la información de defunción del paciente.
+        """
+        defuncion = PacienteService.obtener_defuncion(paciente_id)
+
+        if not defuncion:
+            return None
+
+        lugar = (
+            defuncion.unidad_clinica
+            if defuncion.tipo_defuncion == TipoDefuncion.INTRAHOSPITALARIA
+            else "EXTRAHOSPITALARIA"
+        )
+
+        return {
+            "id": defuncion.id,
+            "fecha": defuncion.fecha_defuncion,
+            "motivo": defuncion.motivo,
+            "fecha_registro": defuncion.fecha_registro,
+            "unidad_clinica": lugar,
+        }

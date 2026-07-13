@@ -4,6 +4,46 @@ from enum import Enum
 # Institución principal del sistema
 HEAC_INSTITUCION_ID = 65
 
+# ============================================================================
+# ExpedienteUbicacion
+# IDs fijos del catálogo de ubicaciones físicas del expediente.
+# Estos registros se crean durante la instalación inicial del sistema y son
+# utilizados para validar y actualizar la ubicación actual del expediente.
+# ============================================================================
+EXP_UBICA_ADMISION_ID = 1
+"""Ubicación física: Admisión."""
+
+EXP_UBICA_ESTADISTICA_ID = 32
+"""Ubicación física: Estadística (digitación posterior al egreso)."""
+
+# ============================================================================
+# ExpedientePrestamoEstado
+# IDs fijos del catálogo de estados de préstamo de expedientes.
+# Utilizados para determinar la disponibilidad del expediente.
+# ============================================================================
+PRESTAMO_ESTADO_ACTIVO_ID = 3 # id prestado en pretamod de la app prestamis
+APARTADO_ESTADO_ACTIVO_ID = 2 # id prestado en pretamod de la app prestamis
+DISPONIBLE_ESTADO_ACTIVO_ID = 1 # id prestado en pretamod de la app prestamis
+
+
+
+
+
+
+class MotivoEstadoExpediente:
+    """
+    Motivos que explican el estado físico actual del expediente.
+    """
+
+    RESGUARDO = "RESGUARDO"
+    HOSPITALIZACION = "HOSPITALIZACIÓN"
+    DIGITALIZACION = "DIGITALIZACIÓN"
+    ATENCION_AMBULATORIA = "ATENCIÓN AMBULATORIA"
+    PRESTAMO = "PRÉSTAMO"
+    APARTADO = "APARTADO"
+    NO_LOCALIZADO = "NO LOCALIZADO"
+
+
 class UnidadID:
     ADMI = 1
     RX = 2
@@ -23,6 +63,8 @@ class LogApp:
     GENERAL = "general"
     PACIENTE = "paciente"
     INGRESOS = "ingresos"
+    # [2026-06-26 LOG] Canal dedicado para trazas del flujo de mapeo de camas.
+    MAPEO_CAMAS = "mapeo_camas"
     RX = "rx"
     REFERENCIAS = "referencias"
     REPORTE = "reportes"
@@ -34,6 +76,7 @@ class LogApp:
     ATENCION = "atencion"
     AGENDA = "agenda"
     
+    S_EXP = "s_exp"          # Solicitud/Préstamo de Expedientes
 
 class EstadoTemporalPeriodo(str, Enum):
     FUTURO = "FUTURO"

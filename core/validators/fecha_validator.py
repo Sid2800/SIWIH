@@ -23,7 +23,8 @@ def validar_fecha(fecha, anio_minimo=2000, permitir_futuro=False, permitir_pasad
     
     if fecha_dt.year < anio_minimo:
         raise ValidationError(f"La fecha no puede ser menor al año {anio_minimo}.")
-
+    
+    return fecha_dt
 
 def validar_rango_fechas(
         fecha_inicio,

@@ -41,6 +41,23 @@ def configurar_locale():
         pass
 
 
+def convertir_fecha(fecha):
+    """
+    Convierte una fecha a datetime aware.
+    """
+
+    if isinstance(fecha, str):
+        fecha = datetime.strptime(fecha, "%Y-%m-%d").date()
+
+    if isinstance(fecha, date) and not isinstance(fecha, datetime):
+        fecha = datetime.combine(fecha, time(12, 0))
+
+    if timezone.is_naive(fecha):
+        fecha = timezone.make_aware(fecha, timezone.get_current_timezone())
+
+    return fecha
+
+
 def calcular_edad_texto(fecha_nacimiento):
     hoy = datetime.now()
     # Si viene como date, convertir a datetime
@@ -301,3 +318,25 @@ def obtener_fechas_por_dia_semana(fecha_inicio, fecha_fin, dia_semana ):
         fecha_actual += timedelta(days=1)
 
     return fechas
+# 2026-05-29: extraido de mapeo_camas/views.py (refactor B). Helpers globales
+def hora_local_iso(dt):
+    """Convierte un datetime aware a ISO en zona horaria local; '' si es falsy."""
+    if not dt:
+        return ""
+    return timezone.localtime(dt).isoformat()
+
+
+def parse_fecha_filtro_dia(fecha_texto, fin_del_dia=False):
+    """Convierte 'YYYY-MM-DD' a datetime aware en zona local (inicio o fin de dia)."""
+    if not fecha_texto:
+        return None
+    try:
+        fecha = datetime.strptime(fecha_texto, '%Y-%m-%d')
+    except ValueError:
+        return None
+    if fin_del_dia:
+        fecha = fecha.replace(hour=23, minute=59, second=59, microsecond=999999)
+    else:
+        fecha = fecha.replace(hour=0, minute=0, second=0, microsecond=0)
+    return timezone.make_aware(fecha, timezone.get_current_timezone())
+

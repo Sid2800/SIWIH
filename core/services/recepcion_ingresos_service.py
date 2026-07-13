@@ -6,7 +6,7 @@ from django.db import transaction
 from core.services.expediente_service import ExpedienteService
 from ingreso.models import Ingreso
 from django.utils import timezone
-from core.constants.domain_constants import LogApp
+from core.constants.domain_constants import LogApp, EXP_UBICA_ADMISION_ID, EXP_UBICA_ESTADISTICA_ID
 from core.utils.utilidades_logging import *
 
 class RecepcionIngresoServiceSala:
@@ -58,7 +58,7 @@ class RecepcionIngresoServiceSala:
                 'ingreso__sala__servicio__nombre_corto',
             ))
 
-        
+
     @staticmethod
     def procesar_recepcion_ingreso_sala(observaciones, ingresos, usuario):
         try:
@@ -69,14 +69,58 @@ class RecepcionIngresoServiceSala:
                     observaciones=observaciones
                 )
 
-                for ingreso in ingresos:
-                    id_ingreso = ingreso.get('id')
-                    id_sala = ingreso.get('idSala')
-                    id_paciente = ingreso.get('idPaciente')
-                    
-                    RecepcionIngresoServiceSala.procesar_recepcion_ingreso_detalle_sala(
-                        id_ingreso, id_sala, id_paciente, recepcion, usuario
+                detalles = []
+                ingresos_actualizar = []
+                expedientes = set()
+
+                fecha_egreso= timezone.now()
+
+                for item in ingresos:
+                    id_ingreso = item.get('id')
+                    id_sala = item.get('idSala')
+                    id_paciente = item.get('idPaciente')
+
+                    ingreso = Ingreso.objects.select_related(
+                        'paciente'
+                    ).get(
+                        id=id_ingreso,
+                        paciente_id=id_paciente,
+                        sala_id=id_sala
                     )
+
+                    ingreso.fecha_egreso = fecha_egreso
+                    ingreso.modificado_por = usuario
+
+                    ingresos_actualizar.append(ingreso)
+
+                    detalles.append(
+                        RecepcionIngresoDetalleSala(
+                            recepcion=recepcion,
+                            ingreso=ingreso)
+                        )
+                    
+                    expedientes.add(
+                        ingreso.paciente.expediente_numero
+                    )
+
+                #ACTUALIZACIOPN DE LOS INGRESOS 
+                Ingreso.objects.bulk_update(
+                    ingresos_actualizar,
+                    ['fecha_egreso','modificado_por']
+                )
+
+                # CREACION EN LOTES DEL DETALLE DE RECEPCION
+                RecepcionIngresoDetalleSala.objects.bulk_create(
+                    detalles
+                )
+
+
+                #cambiar la ubicacion de todos los expediente de ingresos recibidos
+                ExpedienteService.cambiar_ubicacion_lotes(
+                    expedientes,
+                    EXP_UBICA_ESTADISTICA_ID
+                )
+
 
             return {
                 'mensaje': "El proceso se realizó correctamente",
@@ -90,31 +134,6 @@ class RecepcionIngresoServiceSala:
             )
             raise
 
-
-    @staticmethod
-    def procesar_recepcion_ingreso_detalle_sala(idIngreso, idSala, idPaciente, recepcion, usuario):
-        try:
-            ingreso = Ingreso.objects.only("fecha_egreso").get(
-                id=idIngreso,
-                paciente_id=idPaciente,
-                sala_id=idSala
-            )
-            ingreso.fecha_egreso = timezone.now()
-            ingreso.modificado_por = usuario
-            ingreso.save()
-
-            RecepcionIngresoDetalleSala.objects.create(
-                recepcion=recepcion,
-                ingreso=ingreso
-            )
-            #en neceario cmabiar la ubicacion del expedienteasi 
-            cambio = ExpedienteService.cambiar_ubicacion(idPaciente,3, usuario.id) #e el id de SDGI
-
-            if not cambio:
-                raise Exception("No se logro cambiar la ubicacion del expedediente")
-
-        except Ingreso.DoesNotExist:
-            raise Exception("El ingreso indicado no existe")
 
 
 
@@ -136,60 +155,81 @@ class RecepcionIngresoServiceSDGI:
 
     @staticmethod
     def procesar_recepcion_ingreso_sdgi(observaciones, ingresos, usuario):
+
         try:
             with transaction.atomic():
+
                 recepcion = RecepcionIngresoSDGI.objects.create(
                     recibido_por=usuario,
                     modificado_por=usuario,
                     observaciones=observaciones
                 )
 
-                for ingreso in ingresos:
-                    id_ingreso = ingreso.get('id')
-                    id_paciente = ingreso.get('idPaciente')
+                detalles = []
+                ingresos_actualizar = []
+                expedientes = set()
 
-                    RecepcionIngresoServiceSDGI.procesar_recepcion_ingreso_detalle_sdgi(
-                        id_ingreso, id_paciente, recepcion, usuario
+                fecha_recepcion_sdgi = timezone.now()
+
+                for item in ingresos:
+
+                    id_ingreso = item.get("id")
+                    id_paciente = item.get("idPaciente")
+
+                    ingreso = Ingreso.objects.select_related(
+                        "paciente"
+                    ).get(
+                        id=id_ingreso,
+                        paciente_id=id_paciente
                     )
 
+                    ingreso.fecha_recepcion_sdgi = fecha_recepcion_sdgi
+                    ingreso.modificado_por = usuario
+
+                    ingresos_actualizar.append(ingreso)
+
+                    detalles.append(
+                        RecepcionIngresoDetalleSDGI(
+                            recepcion=recepcion,
+                            ingreso=ingreso
+                        )
+                    )
+
+                    expedientes.add(
+                        ingreso.paciente.expediente_numero
+                    )
+
+                # Actualizar ingresos
+                Ingreso.objects.bulk_update(
+                    ingresos_actualizar,
+                    ["fecha_recepcion_sdgi", "modificado_por"]
+                )
+
+                # Crear detalles de recepción
+                RecepcionIngresoDetalleSDGI.objects.bulk_create(
+                    detalles
+                )
+
+                # Cambiar ubicación de los expedientes a Admisión
+                log_info(expedientes)
+                ExpedienteService.cambiar_ubicacion_lotes(
+                    expedientes,
+                    EXP_UBICA_ADMISION_ID
+                )
+
             return {
-                'mensaje': "El proceso se realizó correctamente",
-                'idRecepcion': recepcion.id
+                "mensaje": "El proceso se realizó correctamente",
+                "idRecepcion": recepcion.id
             }
 
         except Exception as e:
+
             log_error(
                 f"[FALLO_RECEPCION_INGRESO_SDGI] usuario={usuario.id} total_ingresos={len(ingresos)} detalle={str(e)}",
                 app=LogApp.ATENCION
             )
+
             raise
-
-
-    @staticmethod
-    def procesar_recepcion_ingreso_detalle_sdgi(idIngreso, idPaciente, recepcion, usuario):
-        try:
-            ingreso = Ingreso.objects.only("fecha_recepcion_sdgi").get(
-                id=idIngreso,
-                paciente_id=idPaciente
-            )
-            ingreso.fecha_recepcion_sdgi = timezone.now()
-            ingreso.modificado_por = usuario
-            ingreso.save()
-
-            RecepcionIngresoDetalleSDGI.objects.create(
-                recepcion=recepcion,
-                ingreso=ingreso
-            )
-            #en neceario cmabiar la ubicacion del expedienteasi 
-            cambio = ExpedienteService.cambiar_ubicacion(idPaciente,1, usuario.id) #e el id de SDGI Archivo
-
-            if not cambio:
-                raise Exception("No se logro cambiar la ubicacion del expedediente")
-
-
-        except Ingreso.DoesNotExist:
-            raise Exception("El ingreso indicado no existe")
-
 
     def obtener_detalles_sdgi(self): # lo usa reporte
 

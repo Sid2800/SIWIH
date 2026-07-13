@@ -1,0 +1,154 @@
+{% extends 'core/base.html' %}
+{% load static %}
+{% load permisos_unidad %}
+
+{% block title %}Solicitar Expedientes{% endblock title %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'core/css/s_exp.css' %}">
+{% endblock extra_css %}
+
+{% block content %}
+<div class="contenedor2">
+    <div class="tituloFormulario sexp-margin-bottom-15">
+        <div class="tituloFormulario-texto">
+            <i class="bi bi-folder2-open"></i>
+            <h2 class="sin-margen">Solicitar Préstamo de Expedientes</h2>
+        </div>
+        <div class="tituloFormulario-subrallado"></div>
+    </div>
+
+    <!-- Navegación sub-módulos -->
+    <div class="sexp-nav-modulos">
+        <a href="{% url 's_exp_buscador' %}" class="sexp-nav-link sexp-nav-link--active">
+            <i class="bi bi-search"></i> Solicitar Expedientes
+        </a>
+        <a href="{% url 's_exp_seguimiento' %}" class="sexp-nav-link">
+            <i class="bi bi-clock-history"></i> Mis Solicitudes
+        </a>
+        {% if request.user|tiene_rol:"admin:ADMI" %}
+        <a href="{% url 's_exp_solicitudes' %}" class="sexp-nav-link">
+            <i class="bi bi-list-check"></i> Gestión Solicitudes
+        </a>
+        <a href="{% url 's_exp_monitoreo' %}" class="sexp-nav-link">
+            <i class="bi bi-binoculars"></i> Monitoreo
+        </a>
+        <a href="{% url 's_exp_devoluciones' %}" class="sexp-nav-link">
+            <i class="bi bi-arrow-return-left"></i> Devoluciones
+        </a>
+        <a href="{% url 's_exp_reportes' %}" class="sexp-nav-link">
+            <i class="bi bi-bar-chart-line"></i> Reportes
+        </a>
+        {% endif %}
+    </div>
+
+    <!-- Layout vertical: búsqueda arriba, resultados en grid abajo -->
+    <div class="sexp-buscador-vertical">
+
+        <!-- Sección 1: Caja de búsqueda -->
+        <div class="sexp-search-box sexp-search-box--top">
+            <select id="tipo-busqueda" class="sexp-search-select">
+                <option value="identidad" selected>Identidad</option>
+                <option value="nombre">Nombre</option>
+                <option value="expediente">N° Expediente</option>
+            </select>
+            <input type="text" id="busqueda-input" class="sexp-search-input"
+                placeholder="Ingrese identidad: ____-____-_____" autocomplete="off">
+            <button id="btn-buscar" class="sexp-search-btn">
+                <i class="bi bi-search"></i> Buscar
+            </button>
+        </div>
+
+        <!-- Sección 2: Resultados en grid responsivo de 3 columnas -->
+        <div class="sexp-buscador-resultados-wrap">
+            <h3 class="sexp-buscador-resultados-titulo">
+                <i class="bi bi-collection"></i> Expedientes encontrados
+            </h3>
+            <div id="resultados-busqueda" class="sexp-resultados-grid">
+                <p class="sexp-opacity-5 sexp-text-center sexp-grid-empty">
+                    Ingrese un criterio de búsqueda para encontrar expedientes disponibles.
+                </p>
+            </div>
+        </div>
+
+        <!-- Sección 3: Carrito de selección -->
+        <div class="sexp-carrito sexp-carrito--bottom">
+            <h3>
+                <i class="bi bi-folder-check"></i> Lista de expedientes
+                <span class="sexp-carrito-count" id="carrito-count">0</span>
+            </h3>
+            <div id="carrito-items">
+                <div class="sexp-carrito-empty">
+                    <i class="bi bi-folder-x" style="font-size:1.4rem;"></i><br>
+                    No hay expedientes seleccionados
+                </div>
+            </div>
+
+            <div class="sexp-carrito-form" id="carrito-form" style="display:none;">
+                <div class="sexp-carrito-form-grid">
+                    <div>
+                        <label>Motivo *</label>
+                        <select id="solicitud-motivo">
+                            <option value="">-- Cargando motivos --</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Observaciones</label>
+                        <textarea id="solicitud-observaciones" rows="2"
+                            placeholder="Detalles adicionales o área diferente a su unidad..."></textarea>
+                    </div>
+                </div>
+
+                <!-- Sugerencia opcional de tiempo de entrega -->
+                <div class="sexp-sugerir-tiempo">
+                    <label class="sexp-sugerir-tiempo-check">
+                        <input type="checkbox" id="solicitud-sugerir-tiempo">
+                        <span><i class="bi bi-clock-history"></i> Sugerir tiempo de entrega</span>
+                    </label>
+
+                    <div class="sexp-sugerir-tiempo-panel" id="sugerir-tiempo-panel" style="display:none;">
+                        <div class="sexp-sugerir-tiempo-grid">
+                            <div>
+                                <label for="solicitud-tiempo-cuando">¿Cuándo lo necesita?</label>
+                                <select id="solicitud-tiempo-cuando">
+                                    <option value="hoy">Mismo día (antes de 4:00 PM)</option>
+                                    <option value="dias">Días posteriores (máx. 3 días)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="solicitud-tiempo-valor">Tiempo</label>
+                                <div class="sexp-sugerir-tiempo-row">
+                                    <div class="sexp-tiempo-stepper">
+                                        <button type="button" class="sexp-stepper-btn" id="solicitud-tiempo-menos" aria-label="Disminuir">−</button>
+                                        <input type="number" id="solicitud-tiempo-valor" min="1" value="1" inputmode="numeric" pattern="[0-9]*">
+                                        <button type="button" class="sexp-stepper-btn" id="solicitud-tiempo-mas" aria-label="Aumentar">+</button>
+                                    </div>
+                                    <select id="solicitud-tiempo-unidad" disabled>
+                                        <option value="horas" selected>Horas</option>
+                                        <option value="dias">Días</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <p class="sexp-sugerir-tiempo-hint" id="sugerir-tiempo-hint">
+                            <i class="bi bi-info-circle"></i>
+                            <span>Mismo día: máximo hasta las 4:00 PM. Es solo una sugerencia, el administrador define el tiempo final.</span>
+                        </p>
+                    </div>
+                </div>
+
+                <p id="info-unidad" class="sexp-info-unidad"></p>
+
+                <button class="sexp-submit-btn" id="btn-enviar-solicitud" disabled>
+                    <i class="bi bi-send"></i> Enviar Solicitud
+                </button>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script src="{% static 'core/scripts/s_exp/buscador_carrito.js' %}"></script>
+{% endblock extra_js %}

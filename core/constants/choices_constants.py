@@ -13,7 +13,7 @@ class AlcanceUsuario(models.IntegerChoices):
 
 
 class TipoUnidad(models.IntegerChoices):
-    CLINICA = 1, "CLINICA"
+    # CLINICA = 1, "CLINICA"
     ADMINISTRATIVA = 2, "ADMINISTRATIVA"
     APOYO = 3, "APOYO"
 
@@ -106,3 +106,10 @@ class TipoAusencia(models.IntegerChoices):
     CAPACITACION = 4, "CAPACITACIÓN"
     CONGRESO = 5, "CONGRESO"
     OTROS = 6, "OTROS"
+
+
+class EstadoMapeoCategoria(models.TextChoices):
+    ESTADO_CAMA = "ESTADO_CAMA", "Estado de cama"
+    ESTADO_SESION = "ESTADO_SESION", "Estado de sesion"
+    TIPO_ACCION = "TIPO_ACCION", "Tipo de accion"
+    OBSERVACION = "OBSERVACION", "Observacion"

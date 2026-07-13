@@ -625,6 +625,10 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
 
+    // #actualizad un partial de card 
+    async function recargarEstadoExpediente() {
+        $("#estadoExpediente").load(urlEstadoExpediente);
+    }
 
     /**
      *  AGREGAR UN NUEVO INGRESO
@@ -659,13 +663,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
             
-            let nomprePaciente = document.getElementById('historialNombrePaciente').value;
-            const nombreSlug = slugify(`${nomprePaciente}`);
+            const nombreSlug = slugify(`${nombrePaciente}`);
             if (!nombreSlug) {
                 toastr.error("Hubo un problema al generar la URL.");
                 return;
             }
-            
+
             const ingresoUrl = API_URLS.agregarIngreso
                 .replace('0', idPaciente)
                 .replace('slug', nombreSlug);
@@ -681,9 +684,9 @@ document.addEventListener('DOMContentLoaded', function () {
         const selectedRow = tableIngresos.row('.selected').data();
 
         if (selectedRow) {
-                let nomprePaciente = document.getElementById('historialNombrePaciente').value;
+                
                 let nombreSlug = slugify(
-                    `${nomprePaciente}`
+                    `${nombrePaciente}`
                 ).substring(0, 30);
                 
             var editarUrl = API_URLS.editarIngreso.replace('0', selectedRow.id).replace('slug', nombreSlug);
@@ -706,8 +709,8 @@ document.addEventListener('DOMContentLoaded', function () {
     async function inactivarIngresoDatatable(){
 
         const selectedRow = tableIngresos.row('.selected').data();
-
-        if (selectedRow.id) {
+        
+        if (selectedRow) {
             const titulo = `Desactivar ingreso`;
             const mensaje = `¿ Realmente desea desactivar el ingreso, es un proceso irreversible ?`;
 
@@ -722,6 +725,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 await inactivarIngreso(selectedRow.id);
                 if (tableIngresos){
                     recargarTablaIngresos();
+                    recargarEstadoExpediente()
                 }
             } catch (error) {
                 console.error("Error al procesar la solicitud:", error);
@@ -740,11 +744,13 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        let nomprePaciente = document.getElementById('historialNombrePaciente').value;
 
         const paciente = {
-        id: idPaciente,
-        nombre: nomprePaciente,
+            id: idPaciente,
+            nombre: nombrePaciente,
+            expediente: numeroExpediente,
+            edad: edadPaciente,
+            sexo: sexoPaciente
         };
 
         // Hacemos la llamada al backend
@@ -768,6 +774,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if(resultado){
             setTimeout(() => {
                 recargarTablaAtenciones();
+                recargarEstadoExpediente()
             }, 500);
         }
 
@@ -782,13 +789,22 @@ document.addEventListener('DOMContentLoaded', function () {
             toastr.error("No hay ninguna fila seleccionada.");
             return;
         }
+
+        const paciente = {
+            id: idPaciente,
+            nombre: nombrePaciente,
+            expediente: numeroExpediente,
+            edad: edadPaciente,
+            sexo: sexoPaciente
+        };
         
-        let resultado = await AgregarAtencionModal(null,null,selectedRow.id);
+        let resultado = await AgregarAtencionModal(paciente,null,selectedRow.id);
 
         if (resultado?.guardo === true) {
             toastr.info(`Atencion procesada correctamente`, "Cambios realizados");
             setTimeout(() => {
                 recargarTablaAtenciones();
+                recargarEstadoExpediente();
             }, 500);
             
         } else if (resultado?.guardo === false) {
@@ -796,23 +812,25 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+
+
     function recargarTablaAtenciones() {
-    if (!idPaciente) {
-        console.error("ID de paciente no proporcionado para recargar la tabla.");
-        return;
-    }
-    const ajaxUrl = `${API_URLS.listadoAtencionesPaciente}?id_paciente=${idPaciente}`;
-    fetch(ajaxUrl)
-        .then(response => response.json())
-        .then(data => {
-            tableAtenciones.clear();
-            tableAtenciones.rows.add(data.data);
-            tableAtenciones.draw();
-        })
-        .catch(error => {
-            console.error("Error al recargar tabla:", error);
-            toastr.error("No se pudo recargar la tabla de atenciones");
-        });
+        if (!idPaciente) {
+            console.error("ID de paciente no proporcionado para recargar la tabla.");
+            return;
+        }
+        const ajaxUrl = `${API_URLS.listadoAtencionesPaciente}?id_paciente=${idPaciente}`;
+        fetch(ajaxUrl)
+            .then(response => response.json())
+            .then(data => {
+                tableAtenciones.clear();
+                tableAtenciones.rows.add(data.data);
+                tableAtenciones.draw();
+            })
+            .catch(error => {
+                console.error("Error al recargar tabla:", error);
+                toastr.error("No se pudo recargar la tabla de atenciones");
+            });
     }
 
     function recargarTablaIngresos() {
@@ -849,7 +867,7 @@ document.addEventListener('DOMContentLoaded', function () {
         titulo: "Evaluación",
             
         datos: {
-            "Paciente": document.getElementById('historialNombrePaciente').value,
+            "Paciente": nombrePaciente,
             "Unidad Clinica": selectedRow.unidad_clinica_descripcion,
             "Fecha": formatearFechaSimple(selectedRow.fecha),
             "Maquina": selectedRow.maquinarx__descripcion_maquina,
@@ -859,7 +877,7 @@ document.addEventListener('DOMContentLoaded', function () {
         parametros: {
             "idPaciente": idPaciente,
             "idEvaluacion": selectedRow.id,
-            "tituloAlbum": document.getElementById('historialNombrePaciente').value
+            "tituloAlbum": nombrePaciente
         },
 
 

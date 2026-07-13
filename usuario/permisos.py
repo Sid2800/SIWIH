@@ -1,6 +1,6 @@
 from usuario.models import PerfilUnidad
 from core.services.usuario_service import UsuarioService
-
+from core.utils.utilidades_logging import log_info
 
 def __verificar_permisos(user, roles=None, unidades=None):
     """
@@ -24,10 +24,10 @@ def __verificar_permisos(user, roles=None, unidades=None):
     if roles:
         filtros["rol__in"] = roles
 
+
     if not UsuarioService.es_global_roles(user, roles):
         if unidades:
             filtros["servicio_unidad__nombre_corto_unidad__in"] = unidades
-
 
     if len(filtros) == 1:  # solo tiene {"usuario": user}
         return False

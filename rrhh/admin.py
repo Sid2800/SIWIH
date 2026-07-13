@@ -6,7 +6,8 @@ class EmpleadoAdmin(admin.ModelAdmin):
     list_display = ('dni', 'nombre_completo', 'telefono', 'correo', 'estado')
     list_filter = ('estado',)
     search_fields = ('dni', 'primer_nombre', 'primer_apellido', 'usuario__username')
-    autocomplete_fields = ['paciente_ref']
+    autocomplete_fields = ['paciente_ref','creado_por',
+        'modificado_por', 'usuario']
 
     def nombre_completo(self, obj):
         return f"{obj.primer_nombre} {obj.primer_apellido}"
@@ -65,6 +66,13 @@ class PersonalNoClinicoAdmin(admin.ModelAdmin):
         'empleado__primer_apellido',
         'empleado__dni',
         'servicio_unidad__nombre_unidad'
+    )
+
+    autocomplete_fields = (
+        'empleado',
+        'servicio_unidad',
+        'creado_por',
+        'modificado_por',
     )
 
     def empleado_nombre(self, obj):

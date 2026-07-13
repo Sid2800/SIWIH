@@ -1,0 +1,109 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}{{ titulo }}{% endblock %}
+
+{% block content %}
+<div class="contenedor2 dataTables_wrapper">
+  <div class="tituloFormulario" style="margin-bottom: 1.5rem;">
+    <div class="tituloFormulario-texto">
+      <i class="bi bi-grid"></i>
+      <h2 class="sin-margen">{{ titulo }}</h2>
+    </div>
+    <div class="tituloFormulario-subrallado"></div>
+  </div>
+
+  <div class="mapa-acciones-superior" style="margin-bottom: 1rem;">
+    <div class="dt-buttons mapa-botones-acciones">
+      <button type="button" class="dt-button" title="Regresar a historiales" data-url="{% url 'mapeo_camas_historiales' %}" onclick="window.location.href=this.dataset.url">
+        <i class="bi bi-arrow-left-circle boton-exportacion"></i>
+      </button>
+      <button type="button" class="dt-button active" id="btn-vista-estructura" title="Vista estructura">
+        <i class="bi bi-grid boton-exportacion"></i>
+      </button>
+      <button type="button" class="dt-button" id="btn-vista-tabla" title="Vista tabla">
+        <i class="bi bi-table boton-exportacion"></i>
+      </button>
+    </div>
+    <div id="detalle-meta" class="detalle-meta"></div>
+  </div>
+
+  <div id="detalle-nota-servicios" class="detalle-nota-servicios" style="display:none;"></div>
+  <div id="detalle-resumen-comun" class="detalle-resumen-comun" style="display:none;"></div>
+
+  <div id="detalle-tabla-filtros" class="fechasfiltro" style="margin-bottom: 0.75rem;">
+    <label for="dtf-fecha-inicio">Desde</label>
+    <input type="date" id="dtf-fecha-inicio" class="formularioCampo-date">
+    <label for="dtf-fecha-fin">Hasta</label>
+    <input type="date" id="dtf-fecha-fin" class="formularioCampo-date">
+    <button type="button" class="dt-button" id="dtf-btn-limpiar" title="Limpiar filtros">
+      <i class="bi bi-eraser boton-exportacion"></i>
+    </button>
+  </div>
+
+  <div id="detalle-paginacion" class="detalle-paginacion" style="display:none;">
+    <div class="detalle-paginacion-nav">
+      <button type="button" class="dt-button detalle-page-btn" id="detalle-page-first" title="Primera página" aria-label="Primera página">
+        <i class="bi bi-chevron-double-left boton-exportacion"></i>
+      </button>
+      <button type="button" class="dt-button detalle-page-btn" id="detalle-page-prev" title="Página anterior" aria-label="Página anterior">
+        <i class="bi bi-chevron-left boton-exportacion"></i>
+      </button>
+      <span id="detalle-page-info" class="detalle-page-info">1-0 de 0</span>
+      <button type="button" class="dt-button detalle-page-btn" id="detalle-page-next" title="Página siguiente" aria-label="Página siguiente">
+        <i class="bi bi-chevron-right boton-exportacion"></i>
+      </button>
+      <button type="button" class="dt-button detalle-page-btn" id="detalle-page-last" title="Última página" aria-label="Última página">
+        <i class="bi bi-chevron-double-right boton-exportacion"></i>
+      </button>
+    </div>
+    <div class="detalle-paginacion-config">
+      <label for="detalle-page-size">Por página</label>
+      <select id="detalle-page-size" class="formularioCampo-select detalle-page-size">
+        <option value="25">25</option>
+        <option value="50" selected>50</option>
+        <option value="100">100</option>
+        <option value="200">200</option>
+      </select>
+    </div>
+  </div>
+
+  <div id="detalle-estructura-contenedor" class="detalle-estructura"></div>
+  <div id="detalle-cards-contenedor" class="historial-cards-grid"></div>
+
+  <div id="detalle-tabla-contenedor" style="display:none;">
+    <table id="tabla-detalle-camas" class="dataTable stripe hover row-border">
+      <thead>
+        <tr>
+          <th>Cama</th>
+          <th>Estado</th>
+          <th>Paciente</th>
+          <th>DNI</th>
+          <th>Acción / Transición</th>
+          <th id="detalle-th-fecha">Fecha</th>
+          <th id="detalle-th-total-mapeadas">Total camas mapeadas</th>
+          <th id="detalle-th-usuario">Usuario</th>
+        </tr>
+      </thead>
+      <tbody id="tabla-detalle-camas-body"></tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<!-- 2026-06-09: estáticos de mapeo centralizados en core/static/core/css -->
+<link rel="stylesheet" href="{% static 'core/css/mapeo/historialesDetalleCamas.css' %}?v=20260529a">
+{% endblock %}
+
+{% block extra_js %}
+{# [2026-06-01] URLs de la API inyectadas desde el template para evitar hardcodeo en JS. #}
+<script>
+  window.MAPA_CFG = {
+    urls: {
+      cards: "{% url 'mapeo_camas_historiales_cards' %}"
+    }
+  };
+</script>
+<script src="{% static 'core/scripts/mapeo/historialesDetalleCamas.js' %}?v=20260601a"></script>
+{% endblock %}

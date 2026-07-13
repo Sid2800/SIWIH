@@ -1,5 +1,6 @@
 from servicio import models as modelosServicio
 from servicio.models import Institucion_salud
+from mapeo_camas.models import AsignacionCamaPaciente, EstadoMapeo  # [2026-05-07] Se agregó EstadoMapeo para filtrar camas por estado VACIA
 from core.constants.domain_constants import HEAC_INSTITUCION_ID
 
 from django.db import transaction
@@ -47,9 +48,29 @@ class ServicioService:
 
 
     @staticmethod
-    def obtener_camas_activas():
-        qs = modelosServicio.Cama.objects.filter(estado=1)  # Filtramos las camas activas (estado=1)
-        return qs
+    def obtener_camas_activas(codigos_estado_permitidos=None):
+        # La disponibilidad se define unicamente por el estado de asignacion de cama.
+        # [2026-06-22] Permite filtrar por codigos de estado para reutilizar en ingreso/mapeo.
+        codigos_estado = codigos_estado_permitidos or ["VACIA"]
+        estados_permitidos_ids = list(
+            EstadoMapeo.objects.filter(
+                codigo__in=codigos_estado,
+                categoria="ESTADO_CAMA",
+            ).values_list("id", flat=True)
+        )
+        if not estados_permitidos_ids:
+            return modelosServicio.Cama.objects.none()
+
+        camas_disponibles_ids = AsignacionCamaPaciente.objects.filter(
+            estado_id__in=estados_permitidos_ids
+        ).values_list("cama_id", flat=True)
+
+        return (
+            modelosServicio.Cama.objects
+            .filter(numero_cama__in=camas_disponibles_ids)
+            .select_related("sala")
+            .order_by("numero_cama")
+        )
     
 
     @staticmethod

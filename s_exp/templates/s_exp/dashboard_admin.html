@@ -1,0 +1,80 @@
+{% extends 'core/base.html' %}
+{% load static %}
+{% load permisos_unidad %}
+
+{% block title %}Dashboard Expedientes{% endblock title %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'core/css/s_exp.css' %}">
+{% endblock extra_css %}
+
+{% block content %}
+<div class="contenedor2">
+    <div class="tituloFormulario sexp-margin-bottom-15">
+        <div class="tituloFormulario-texto">
+            <i class="bi bi-folder2-open"></i>
+            <h2 class="sin-margen">Dashboard — Préstamo de Expedientes</h2>
+        </div>
+        <div class="tituloFormulario-subrallado"></div>
+    </div>
+
+    <div class="sexp-nav-modulos">
+        <a href="{% url 's_exp_buscador' %}" class="sexp-nav-link">
+            <i class="bi bi-search"></i> Solicitar Expedientes
+        </a>
+        <a href="{% url 's_exp_seguimiento' %}" class="sexp-nav-link">
+            <i class="bi bi-clock-history"></i> Mis Solicitudes
+        </a>
+        
+        <a href="{% url 's_exp_solicitudes' %}" class="sexp-nav-link">
+            <i class="bi bi-list-check"></i> Gestión Solicitudes
+        </a>
+        <a href="{% url 's_exp_monitoreo' %}" class="sexp-nav-link">
+            <i class="bi bi-binoculars"></i> Monitoreo
+        </a>
+        <a href="{% url 's_exp_devoluciones' %}" class="sexp-nav-link">
+            <i class="bi bi-arrow-return-left"></i> Devoluciones
+        </a>
+        <a href="{% url 's_exp_reportes' %}" class="sexp-nav-link">
+            <i class="bi bi-bar-chart-line"></i> Reportes
+        </a>
+    </div>
+
+    <div class="sexp-dashboard">
+        <div class="sexp-kpi-grid">
+            <div class="sexp-kpi-card sexp-kpi-card--total">
+                <span class="sexp-kpi-card__valor" id="kpi-total">-</span>
+                <span class="sexp-kpi-card__titulo">Total Expedientes</span>
+            </div>
+            <div class="sexp-kpi-card sexp-kpi-card--disponible">
+                <span class="sexp-kpi-card__valor" id="kpi-disponibles">-</span>
+                <span class="sexp-kpi-card__titulo">Disponibles</span>
+            </div>
+            <div class="sexp-kpi-card sexp-kpi-card--prestado">
+                <span class="sexp-kpi-card__valor" id="kpi-prestados">-</span>
+                <span class="sexp-kpi-card__titulo">En Préstamo</span>
+            </div>
+            <div class="sexp-kpi-card sexp-kpi-card--pendiente">
+                <span class="sexp-kpi-card__valor" id="kpi-pendientes">-</span>
+                <span class="sexp-kpi-card__titulo">Solicitudes Pendientes</span>
+            </div>
+            <div class="sexp-kpi-card sexp-kpi-card--vencido">
+                <span class="sexp-kpi-card__valor" id="kpi-vencidos">-</span>
+                <span class="sexp-kpi-card__titulo">Préstamos Vencidos</span>
+            </div>
+            <div class="sexp-kpi-card sexp-kpi-card--proximo">
+                <span class="sexp-kpi-card__valor" id="kpi-proximos">-</span>
+                <span class="sexp-kpi-card__titulo">Próximos a Vencer</span>
+            </div>
+            <div class="sexp-kpi-card sexp-kpi-card--parcial">
+                <span class="sexp-kpi-card__valor" id="kpi-parciales">-</span>
+                <span class="sexp-kpi-card__titulo">Devoluciones Parciales</span>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script src="{% static 'core/scripts/s_exp/dashboard.js' %}"></script>
+{% endblock extra_js %}

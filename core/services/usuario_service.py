@@ -33,13 +33,12 @@ class UsuarioService:
 
         return list(usuarios)
 
-    @staticmethod
-    def pertenece_unidad(usuario, unidad_id):
-        perfiles = PerfilUnidad.objects.filter(usuario=usuario).values_list('servicio_unidad_id', flat=True)
-        return int(unidad_id) in perfiles
     
     @staticmethod
     def es_global_roles(usuario, roles=None):
+
+
+
         if usuario.is_superuser:
             return True
 
@@ -53,29 +52,65 @@ class UsuarioService:
         ).exists()
 
     @staticmethod
+    def pertenece_unidades(usuario, unidades):
+        """
+        Verifica si el usuario pertenece a alguna de las unidades indicadas.
+
+        Args:
+            usuario: Usuario autenticado.
+            unidades: Lista de nombres cortos de unidades
+            (ej. PACIENTE_VISUALIZACION_UNIDADES).
+
+        Returns:
+            bool
+        """
+
+        if usuario.is_superuser:
+            return True
+
+        if UsuarioService.es_global(usuario):
+            return True
+
+        return PerfilUnidad.objects.filter(
+            usuario=usuario,
+            servicio_unidad__nombre_corto_unidad__in=unidades
+        ).exists()
+
+
+
+    @staticmethod
     def obtener_tabs_usuario(usuario):
+
+        from core.constants.permisos import (
+            PACIENTE_HISTORIAL_UNIDADES,
+            IMAGENOLOGIA_VISUALIZACION_UNIDADES,
+            S_EXP_SOLICITANTE_UNIDADES,
+        )
+                
         tabs = {
             "ingresos": False,
             "atenciones": False,
             "radiologia": False,
+            "prestamos": False,
         }
 
         activo = None
         # Superuser y rectivos ve todo
-        if usuario.is_superuser or UsuarioService.es_directivo(usuario) or UsuarioService.es_admin_global(usuario) or UsuarioService.pertenece_unidad(usuario, UnidadID.SALA):
+        if usuario.is_superuser or UsuarioService.es_directivo(usuario) or UsuarioService.es_admin_global(usuario):
             for t in tabs.keys():
                 tabs[t] = True
             activo = "ingresos"
             return tabs, activo
 
-        # Usuarios por unidad
-        if UsuarioService.pertenece_unidad(usuario, UnidadID.ADMI):  # ADMISION
+        # Usuarios por unidad 
+        if UsuarioService.pertenece_unidades(usuario, PACIENTE_HISTORIAL_UNIDADES):  # ADMISION
             tabs["ingresos"] = True
             tabs["atenciones"] = True
+            tabs["prestamos"] = True
             if not activo:
                 activo = "ingresos"
 
-        if UsuarioService.pertenece_unidad(usuario, UnidadID.RX):  # IMAGENOLOGÍA
+        if UsuarioService.pertenece_unidades(usuario, IMAGENOLOGIA_VISUALIZACION_UNIDADES):# IMAGENOLOGÍA
             tabs["radiologia"] = True
             if not activo:
                 activo = "radiologia"

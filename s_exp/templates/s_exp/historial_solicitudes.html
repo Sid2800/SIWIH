@@ -1,0 +1,224 @@
+{% extends 'core/base.html' %}
+{% load static %}
+{% load permisos_unidad %}
+
+{% block title %}Historial de Solicitudes{% endblock title %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'core/css/s_exp.css' %}">
+{% endblock extra_css %}
+
+{% block content %}
+<div class="contenedor2 dataTables_wrapper">
+    <div class="tituloFormulario" style="margin-bottom: 1.5rem;">
+        <div class="tituloFormulario-texto">
+            <i class="bi bi-journal-text"></i>
+            <h2 class="sin-margen">Historial de Solicitudes</h2>
+        </div>
+        <div class="tituloFormulario-subrallado"></div>
+    </div>
+
+    <div class="sexp-nav-modulos">
+        <a href="{% url 's_exp_buscador' %}" class="sexp-nav-link">
+            <i class="bi bi-search"></i> Solicitar Expedientes
+        </a>
+        <a href="{% url 's_exp_seguimiento' %}" class="sexp-nav-link">
+            <i class="bi bi-clock-history"></i> Mis Solicitudes
+        </a>
+        <a href="{% url 's_exp_solicitudes' %}" class="sexp-nav-link">
+            <i class="bi bi-list-check"></i> Gestión Solicitudes
+        </a>
+        <a href="{% url 's_exp_monitoreo' %}" class="sexp-nav-link">
+            <i class="bi bi-binoculars"></i> Monitoreo
+        </a>
+        <a href="{% url 's_exp_devoluciones' %}" class="sexp-nav-link">
+            <i class="bi bi-arrow-return-left"></i> Devoluciones
+        </a>
+        <a href="{% url 's_exp_historial' %}" class="sexp-nav-link sexp-nav-link--active">
+            <i class="bi bi-journal-text"></i> Historial
+        </a>
+        <a href="{% url 's_exp_reportes' %}" class="sexp-nav-link">
+            <i class="bi bi-bar-chart-line"></i> Reportes
+        </a>
+    </div>
+
+    <!-- Filtros rápidos -->
+    <div class="sexp-filtros" style="margin-bottom:1.5rem;">
+        <button class="sexp-filtro-btn active" data-estado="">Todas</button>
+        <button class="sexp-filtro-btn" data-estado="SOL_FINALIZADA">Finalizadas</button>
+        <button class="sexp-filtro-btn" data-estado="SOL_INCOMPLETA">Incompletas</button>
+        <button class="sexp-filtro-btn" data-estado="SOL_RECHAZADA">Rechazadas</button>
+        <button class="sexp-filtro-btn" data-estado="SOL_EN_PRESTAMO">En Préstamo</button>
+    </div>
+
+    <table id="tabla_historial" class="dataTable stripe hover row-border" style="width:100%">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Solicitante</th>
+                <th>Fecha</th>
+                <th>Expedientes</th>
+                <th>Motivo</th>
+                <th>Estado</th>
+                <th>Evento</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<!-- Modal detalle de solicitud -->
+<div id="modal-detalle-solicitud" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;overflow-y:auto;">
+    <div style="background:var(--blanco);max-width:650px;margin:3rem auto;border-radius:12px;padding:2rem;color:var(--negro);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
+            <h3 style="margin:0;"><i class="bi bi-file-text"></i> Detalle de Solicitud</h3>
+            <button onclick="document.getElementById('modal-detalle-solicitud').style.display='none'" 
+                    style="background:none;border:none;font-size:2rem;cursor:pointer;color:var(--negro);">
+                <i class="bi bi-x"></i>
+            </button>
+        </div>
+        <div id="modal-detalle-contenido"></div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+let tablaHistorial;
+let estadoFiltroHistorial = '';
+
+$(document).ready(function () {
+    tablaHistorial = $('#tabla_historial').DataTable({
+        processing: true,
+        serverSide: true,
+        ajax: {
+            url: window.urls.s_exp_historial_api,
+            data: function (d) {
+                d.estado = estadoFiltroHistorial;
+            }
+        },
+        columns: [
+            {
+                data: 'id',
+                render: function(data) {
+                    return `<a href="#" onclick="verDetalle(${data})" style="font-weight:700;color:var(--negro);">#${data}</a>`;
+                }
+            },
+            {
+                data: null,
+                render: function (data) {
+                    return `<div><strong>${data.usuario_nombre}</strong><br><small style="opacity:0.6;">${data.usuario}</small></div>`;
+                }
+            },
+            { data: 'fecha_creacion' },
+            {
+                data: 'expedientes',
+                render: function (data) {
+                    return data.map(n => `<span class="sexp-exp-tag">#${n}</span>`).join(' ');
+                }
+            },
+            { data: 'motivo' },
+            {
+                data: 'estado_flujo',
+                render: function (data, type, row) {
+                    const clases = {
+                        'SOL_PENDIENTE': 'background:rgba(99,102,241,0.2);',
+                        'SOL_APROBADA_ORGANIZANDO': 'background:rgba(34,197,94,0.2);',
+                        'SOL_RECHAZADA': 'background:rgba(239,68,68,0.2);',
+                        'SOL_LISTO_RECOGER': 'background:rgba(16,185,129,0.2);',
+                        'SOL_EN_PRESTAMO': 'background:rgba(245,158,11,0.2);',
+                        'SOL_EN_DEVOLUCION': 'background:rgba(139,92,246,0.2);',
+                        'SOL_INCOMPLETA': 'background:rgba(249,115,22,0.3);border:1px solid #f97316;',
+                        'SOL_FINALIZADA': 'background:rgba(100,116,139,0.2);'
+                    };
+                    const estilo = clases[data] || '';
+                    return `<span style="padding:0.25rem 0.6rem;border-radius:20px;font-size:1.2rem;font-weight:600;color:var(--negro);${estilo}">${row.estado_flujo_nombre || data}</span>`;
+                }
+            },
+            {
+                data: 'evento_resumen',
+                render: function(data) {
+                    if (!data) return '<span style="opacity:0.5;">—</span>';
+                    return `<span style="font-size:1.2rem;">${data}</span>`;
+                }
+            }
+        ],
+        order: [[2, 'desc']],
+        language: {
+            processing: "Cargando...",
+            search: "Buscar:",
+            lengthMenu: "Mostrar _MENU_ registros",
+            info: "Mostrando _START_ a _END_ de _TOTAL_",
+            infoEmpty: "Sin registros",
+            loadingRecords: "Cargando...",
+            zeroRecords: "No se encontraron resultados",
+            paginate: { first: "Primero", last: "Último", next: "→", previous: "←" },
+            emptyTable: "No hay solicitudes"
+        },
+        responsive: true
+    });
+
+    // Filtros
+    $('.sexp-filtro-btn').on('click', function () {
+        $('.sexp-filtro-btn').removeClass('active');
+        $(this).addClass('active');
+        estadoFiltroHistorial = $(this).data('estado');
+        tablaHistorial.ajax.reload();
+    });
+});
+
+function verDetalle(solicitudId) {
+    $.ajax({
+        url: window.urls.s_exp_historial_detalle_api + solicitudId + '/',
+        method: 'GET',
+        success: function(resp) {
+            if (resp.data) {
+                renderModalDetalle(resp.data);
+                document.getElementById('modal-detalle-solicitud').style.display = 'block';
+            }
+        },
+        error: function() { toastr.error('Error al cargar detalle'); }
+    });
+}
+
+function renderModalDetalle(d) {
+    const eventoColor = {
+        'SOL_INCOMPLETA': '#f97316',
+        'SOL_FINALIZADA': '#22c55e',
+        'SOL_RECHAZADA': '#ef4444'
+    };
+    const color = eventoColor[d.estado_flujo] || '#6366f1';
+
+    let expHtml = d.expedientes.map(e => `
+        <div style="display:flex;justify-content:space-between;padding:0.6rem;border-bottom:1px solid rgba(0,0,0,0.06);">
+            <span style="font-weight:700;">#${e.numero}</span>
+            <span style="font-size:1.2rem;opacity:0.8;">${e.paciente || '—'}</span>
+            <span class="sexp-exp-tag" style="font-size:1.1rem;">${e.estado_fisico}</span>
+        </div>`).join('');
+
+    let logsHtml = d.logs.map(l => `
+        <div style="padding:0.5rem 0;border-bottom:1px solid rgba(0,0,0,0.05);font-size:1.2rem;">
+            <span style="opacity:0.6;">${l.fecha}</span> — 
+            <strong>${l.accion}</strong> por <em>${l.usuario}</em>
+            ${l.observacion ? `<br><span style="opacity:0.7;">${l.observacion}</span>` : ''}
+        </div>`).join('');
+
+    document.getElementById('modal-detalle-contenido').innerHTML = `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem;margin-bottom:1.5rem;font-size:1.3rem;">
+            <div><label style="opacity:0.6;display:block;">Solicitante</label><strong>${d.usuario_nombre}</strong></div>
+            <div><label style="opacity:0.6;display:block;">Fecha</label>${d.fecha_creacion}</div>
+            <div><label style="opacity:0.6;display:block;">Motivo</label>${d.motivo}</div>
+            <div><label style="opacity:0.6;display:block;">Área</label>${d.area_destino || '—'}</div>
+            <div><label style="opacity:0.6;display:block;">Estado</label>
+                <span style="padding:0.2rem 0.6rem;border-radius:12px;background:${color}20;border:1px solid ${color};font-size:1.2rem;font-weight:700;">${d.estado_flujo_nombre}</span>
+            </div>
+            ${d.prestamo ? `<div><label style="opacity:0.6;display:block;">Préstamo #</label>${d.prestamo.id}</div>` : ''}
+        </div>
+        <h4 style="margin-bottom:0.5rem;">Expedientes</h4>
+        ${expHtml || '<p style="opacity:0.5;">Sin expedientes</p>'}
+        <h4 style="margin-top:1.5rem;margin-bottom:0.5rem;">Historial de Cambios</h4>
+        ${logsHtml || '<p style="opacity:0.5;">Sin eventos registrados</p>'}
+    `;
+}
+</script>
+{% endblock extra_js %}

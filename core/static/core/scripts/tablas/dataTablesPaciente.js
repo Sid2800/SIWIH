@@ -237,9 +237,13 @@ document.addEventListener("DOMContentLoaded", () => {
             data: null,
             ordenable: false,
             render: function (data) {
-                let fecha = data.fecha_modificado ? formatFecha(data.fecha_modificado) : "No disponible";
-                let usuario = data.modificado_por__username || "Desconocido";
-                return `<span>📅 ${fecha} | 👤 ${usuario}</span>`;
+                const fecha = data.fecha_modificado
+                    ? formatoFecha_dd_mm_yy_hh_mm(data.fecha_modificado, true)
+                    : "--";
+
+                const usuario = data.modificado_por__username ?? "--";
+
+                return `📅 ${fecha} | 👤 ${usuario}`;
             },
             
             }, 
