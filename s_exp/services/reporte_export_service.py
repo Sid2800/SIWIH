@@ -249,9 +249,9 @@ def exportar_reporte_pdf(request):
         return JsonResponse({"error": "Sin permisos"}, status=403)
 
     try:
-        from reportlab.lib.units import inch
+        from reportlab.lib.pagesizes import landscape
         from .pdf_solicitud_service import (
-            IMG_GOB_SESAL, IMG_HEAC, IMG_FUNDAGES, IMG_SIWIH
+            IMG_GOB_SESAL, IMG_HEAC, IMG_FUNDAGES, IMG_SIWIH, OFICIO
         )
 
         fecha_inicio = request.GET.get('fecha_inicio', '')
@@ -266,8 +266,9 @@ def exportar_reporte_pdf(request):
         usuario_nombre = (f"{user.first_name} {user.last_name}".strip()) or user.username
         usuario_area = get_unidad_usuario(user) or '—'
 
-        # Tamaño de página: 8.5 x 13 pulgadas horizontal (13 ancho x 8.5 alto)
-        page_size = (13 * inch, 8.5 * inch)
+        # Tamaño de página: OFICIO horizontal (13 ancho x 8.5 alto). Comparte la
+        # constante OFICIO con el PDF de solicitud (fuente única de la verdad).
+        page_size = landscape(OFICIO)
         margen_top = 3 * cm
         margen_bot = 2.5 * cm
         margen_lat = 1.5 * cm

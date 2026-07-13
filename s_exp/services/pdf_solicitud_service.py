@@ -9,8 +9,8 @@ from datetime import timedelta, datetime
 from django.conf import settings
 from django.utils import timezone
 
-from reportlab.lib.pagesizes import LETTER, landscape
-from reportlab.lib.units import cm
+from reportlab.lib.pagesizes import landscape
+from reportlab.lib.units import cm, inch
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
@@ -29,6 +29,19 @@ IMG_GOB_SESAL = os.path.join(IMG_DIR, 'GOB_SESAL_COLOR.png')
 IMG_HEAC = os.path.join(IMG_DIR, 'logo_HEAC.png')
 IMG_FUNDAGES = os.path.join(IMG_DIR, 'logo_FUNDAGES2.png')
 IMG_SIWIH = os.path.join(IMG_DIR, 'SIWIFINAL_3.png')
+
+# =============================================================================
+# Tamaño de hoja OFICIO (legal/folio hondureño): 8.5 x 13 pulgadas (vertical).
+# -----------------------------------------------------------------------------
+# Se define UNA sola vez y se comparte entre el PDF de solicitud y el de
+# reportes. Todo el layout (anchos de columna, posición de logos, márgenes) se
+# calcula de forma PROPORCIONAL a doc.width / doc.height y a los bordes de la
+# hoja, por lo que si algún día se cambia este tamaño (p. ej. a carta), ambos
+# documentos se reacomodan automáticamente sin tocar el resto del código.
+# Los PDF se generan en horizontal (landscape) porque las tablas son anchas:
+#   landscape(OFICIO) -> 13" de ancho x 8.5" de alto.
+# =============================================================================
+OFICIO = (8.5 * inch, 13 * inch)
 
 
 def _checkbox_pdf(marcado=False, size=11):
@@ -235,7 +248,9 @@ def generar_pdf_solicitud(solicitud, admin_actual=None):
         ya_entregado = False
     con_hora_footer = not ya_entregado
 
-    page_size = landscape(LETTER)
+    # Hoja oficio horizontal (13" x 8.5"). Antes era landscape(LETTER) (11x8.5);
+    # se amplió a oficio para dar más área a la tabla de expedientes al imprimir.
+    page_size = landscape(OFICIO)
     ancho_pg, alto_pg = page_size
 
     # Márgenes: top 3cm, bottom 2.5cm
