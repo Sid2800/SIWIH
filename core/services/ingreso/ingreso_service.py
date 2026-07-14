@@ -499,8 +499,10 @@ class IngresoService:
                 fecha_recepcion_sdgi__isnull=True
             )
             .only("fecha_ingreso","fecha_egreso", "fecha_recepcion_sdgi")
+            .order_by("-fecha_ingreso", "-id")
             .first()
         )
+
 
         if not ingreso:
             return None
@@ -509,4 +511,9 @@ class IngresoService:
         if ingreso.fecha_egreso is None:
             return {
                 "fecha": ingreso.fecha_ingreso,
+            }
+        
+        if ingreso.fecha_recepcion_sdgi is None:
+            return {
+                "fecha": ingreso.fecha_egreso,
             }

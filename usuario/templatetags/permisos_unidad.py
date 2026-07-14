@@ -1,7 +1,7 @@
 from django import template
 from usuario.models import PerfilUnidad
 from core.services.usuario_service import UsuarioService
-
+from core.constants import permisos
 register = template.Library()
 
 @register.filter
@@ -161,3 +161,28 @@ def tiene_rol_global(user, roles_str):
 
     roles = [r.strip() for r in roles_str.split(':') if r.strip()]
     return PerfilUnidad.objects.filter(usuario=user, rol__in=roles).exists()
+
+
+from django.conf import settings
+
+
+@register.filter
+def tiene_unidades_config(user, nombre_constante):
+    if not user.is_authenticated:
+        return False
+
+    if user.is_superuser:
+        return True
+
+    if UsuarioService.es_global(user):
+        return True
+
+    unidades = getattr(permisos, nombre_constante, None)
+
+    if not unidades:
+        return False
+
+    return PerfilUnidad.objects.filter(
+        usuario=user,
+        servicio_unidad__nombre_corto_unidad__in=unidades
+    ).exists()

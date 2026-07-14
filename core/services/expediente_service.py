@@ -13,6 +13,7 @@ from s_exp.models import ExpedientePrestamo
 from expediente.models import ExpedienteUbicacion
 from servicio.models import Unidad_clinica, Unidad
 from core.constants.domain_constants import EXP_UBICA_ADMISION_ID
+from core.utils.utilidades_logging import log_info
 
 class ExpedienteService:
 
@@ -272,6 +273,7 @@ class ExpedienteService:
             else False
         )
 
+
         # ------------------------------------------------------------------
         # Ubicación clínica
         # ------------------------------------------------------------------
@@ -281,6 +283,7 @@ class ExpedienteService:
             estado_ingreso = IngresoService.obtener_estado_expediente(
                 numero_expediente
             )
+
 
             if estado_ingreso:
                 return _crear_estado(
@@ -308,39 +311,40 @@ class ExpedienteService:
                     ),
                 )
 
+
+
+
+        prestamo = getattr(expediente, "prestamo_info", None)
+
+
         # ------------------------------------------------------------------
         # Estadística (Digitalización)
         # ------------------------------------------------------------------
 
         if expediente.ubicacion_id == EXP_UBICA_ESTADISTICA_ID:
 
+
             estado_ingreso = IngresoService.obtener_estado_expediente(
                 numero_expediente
             )
+            
+            
 
-            if not estado_ingreso:
+            if  estado_ingreso:
+
                 return _crear_estado(
                     ubicacion=ubicacion,
                     estado="NO DISPONIBLE",
                     badge="icon-amarillo icon-amarillo-tenue",
                     motivo=MotivoEstadoExpediente.DIGITALIZACION,
+                    fecha=formatear_fecha_dd_mm_yyyy_hh_mm(
+                        estado_ingreso["fecha"]
+                    ),
                 )
-
-            return _crear_estado(
-                ubicacion=ubicacion,
-                estado="NO DISPONIBLE",
-                badge="icon-amarillo icon-amarillo-tenue",
-                motivo=MotivoEstadoExpediente.DIGITALIZACION,
-                fecha=formatear_fecha_dd_mm_yyyy_hh_mm(
-                    estado_ingreso["fecha"]
-                ),
-            )
 
         # ------------------------------------------------------------------
         # Préstamo
         # ------------------------------------------------------------------
-
-        prestamo = getattr(expediente, "prestamo_info", None)
 
         if prestamo:
 
@@ -391,6 +395,11 @@ class ExpedienteService:
                 ),
             )
 
+
+
+        
+
+        
         # ------------------------------------------------------------------
         # Disponible en Admisión
         # ------------------------------------------------------------------
@@ -477,18 +486,22 @@ class ExpedienteService:
             ubicacion=ubicacion
         )
     
+
     @staticmethod
-    def cambiar_ubicacion_lotes(numeros_expediente,ubicacion):
+    def cambiar_ubicacion_lotes(numeros_expediente, ubicacion):
         """
         Cambia la ubicación de varios expedientes.
         """
-
-        return (
+        actualizados = (
             Expediente.objects
             .filter(numero__in=numeros_expediente)
             .update(ubicacion_id=ubicacion)
         )
-    
+
+        log_info(f"Expedientes actualizados: {actualizados}")
+
+        return actualizados
+        
 
 
     # ejecion de una vez borrar 

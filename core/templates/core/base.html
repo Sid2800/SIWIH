@@ -91,38 +91,46 @@
             </li>
 
 
-            {% if request.user|tiene_unidad:"ADMI:SALA" %}
+            
 
-            {% if request.user|tiene_unidad:"ADMI:" %}
-            <li>
-               <a href="{% url 'listar_expedientes' %}" class="bn-navegacion__enlace" title="Expediente">
-                  <i class="bi bi-clipboard2-heart bn-navegacion-enlace__logo"></i>
-                  <span class="bn-navegacion-enlace__texto ocultar">Expediente</span>
-               </a>
-            </li>
-            {% endif %}
+               {% if request.user|tiene_unidad:"ADMI:" %}
+               <li>
+                  <a href="{% url 'listar_expedientes' %}" class="bn-navegacion__enlace" title="Expediente">
+                     <i class="bi bi-clipboard2-heart bn-navegacion-enlace__logo"></i>
+                     <span class="bn-navegacion-enlace__texto ocultar">Expediente</span>
+                  </a>
+               </li>
+               {% endif %}
 
-            <li>
-               <a href="{% url 'listar_ingresos' %}" class="bn-navegacion__enlace">
-                  <i class="bi bi-activity bn-navegacion-enlace__logo"></i>
-                  <span class="bn-navegacion-enlace__texto">Ingreso</span>
-               </a>
-            </li>
+               {% if request.user|tiene_unidades_config:"INGRESO_VISUALIZACION_UNIDADES" %}
+               <li>
+                  <a href="{% url 'listar_ingresos' %}" class="bn-navegacion__enlace">
+                     <i class="bi bi-activity bn-navegacion-enlace__logo"></i>
+                     <span class="bn-navegacion-enlace__texto">Ingreso</span>
+                  </a>
+               </li>
+               {% endif %}
 
-            <li>
-               <a href="{% url 'mapeo_camas_mapa' %}" class="bn-navegacion__enlace" title="Mapeo">
-                  <i class="bi bi-grid-3x3-gap bn-navegacion-enlace__logo"></i>
-                  <span class="bn-navegacion-enlace__texto">Mapeo</span>
-               </a>
-            </li>
 
-            <li>
-               <a href="{% url 'listar_atenciones' %}" class="bn-navegacion__enlace">
-                  <i class="bi-thermometer-half bn-navegacion-enlace__logo"></i>
-                  <span class="bn-navegacion-enlace__texto">Atencion</span>
-               </a>
-            </li>
-            {% endif %}
+               {% if request.user|tiene_unidades_config:"MAPEO_CAMAS_VISUALIZACION_UNIDADES" %}
+               <li>
+                  <a href="{% url 'mapeo_camas_mapa' %}" class="bn-navegacion__enlace" title="Mapeo">
+                     <i class="bi bi-grid-3x3-gap bn-navegacion-enlace__logo"></i>
+                     <span class="bn-navegacion-enlace__texto">Mapeo</span>
+                  </a>
+               </li>
+               {% endif %}
+
+               {% if request.user|tiene_unidades_config:"ATENCION_VISUALIZACION_UNIDADES" %}
+               <li>
+                  <a href="{% url 'listar_atenciones' %}" class="bn-navegacion__enlace">
+                     <i class="bi-thermometer-half bn-navegacion-enlace__logo"></i>
+                     <span class="bn-navegacion-enlace__texto">Atencion</span>
+                  </a>
+               </li>
+               {% endif %}
+
+            
             <!--
             <li>
                <a href="{% url 'home' %}" class="bn-navegacion__enlace">
@@ -134,7 +142,8 @@
 
 
 
-            {% if request.user|tiene_unidad:"RX:SALA" %}
+            {% if request.user|tiene_unidades_config:"IMAGENOLOGIA_VISUALIZACION_UNIDADES" %}
+
             <li>
                <a href="{% url 'listar_evalucionesrx' %}" class="bn-navegacion__enlace">
                   <i class="bi  bi-radioactive bn-navegacion-enlace__logo"></i>
@@ -144,7 +153,7 @@
             {% endif %}
 
 
-            {% if request.user|tiene_unidad:"UAU" %}
+            {% if request.user|tiene_unidades_config:"REFERENCIA_VISUALIZACION_UNIDADES" %}
             <li>
                <a href="{% url 'listar_referencias' %}" class="bn-navegacion__enlace">
                   <i class="bi bi-link-45deg bn-navegacion-enlace__logo"></i>
@@ -163,15 +172,15 @@
             </li>
 
 
-            <!-- Solo unidades NO CLINICAS (Estadistica, Admision, UAU, Archivo...). -->
-            {% if request.user|es_no_clinico %}
+            {% if request.user|tiene_unidades_config:"S_EXP_SOLICITANTE_UNIDADES" %}
             <li>
                <a href="{% url 's_exp_buscador' %}" class="bn-navegacion__enlace">
                   <i class="bi bi-folder-symlink bn-navegacion-enlace__logo"></i>
-                  <span class="bn-navegacion-enlace__texto">Prestamos Exp.</span>
+                  <span class="bn-navegacion-enlace__texto">Préstamos Exp.</span>
                </a>
             </li>
             {% endif %}
+
 
 
             <li>
