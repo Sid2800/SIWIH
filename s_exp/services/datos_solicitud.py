@@ -159,6 +159,10 @@ class DatosDetalleSolicitud:
             'fuera_de_tiempo': bool(detalle.fuera_de_tiempo),
             'motivo_rechazo_individual': detalle.motivo_rechazo_individual or '',
             'comentario_devolucion': detalle.comentario_devolucion or '',
+            # Decisión del usuario al iniciar la devolución (completa/parcial).
+            # None si aún no ha decidido. La usa el admin para precargar auditoría.
+            'usuario_solicita_devolver': detalle.usuario_solicita_devolver,
+            'comentario_usuario_devolucion': detalle.comentario_usuario_devolucion or '',
         }
 
 

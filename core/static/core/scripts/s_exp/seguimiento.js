@@ -94,7 +94,11 @@ function renderSolicitudes(data, filtro = '') {
     }
 
     let html = '';
+    // Guardamos las solicitudes por id para que el modal de "Devolución parcial"
+    // pueda leer sus expedientes sin volver a consultar al servidor.
+    window.__sexpMisSolic = {};
     data.forEach(function (s) {
+        window.__sexpMisSolic[s.id] = s;
         const claseEstado = s.estado_flujo.toLowerCase();
         const badgeEstilos = {
             'sol_pendiente': 'background:rgba(99,102,241,0.2);color:var(--negro);',
@@ -205,13 +209,12 @@ function renderSolicitudes(data, filtro = '') {
                     html += `<div class="sexp-sol-timer" style="${timerClass}"><i class="bi bi-clock"></i> ${timerText}</div>`;
                 }
 
-                // Botón devolver (solo en préstamo normal; no mostrar si ya está en devolución
-                // o si la solicitud está incompleta, en ese caso solo aplica "Entregar Faltantes")
+                // Botones de devolución (solo en préstamo normal; no mostrar si ya
+                // está en devolución o si la solicitud está incompleta, ahí aplica
+                // el bloque de "Faltantes" más abajo).
                 const esIncompleta = s.estado_flujo === 'SOL_INCOMPLETA' || p.estado === 'DevolucionParcial';
                 if (s.estado_flujo !== 'SOL_EN_DEVOLUCION' && !esIncompleta) {
-                    html += `<button class="sexp-devolver-btn" onclick="solicitarDevolucion(${s.id})">
-                        <i class="bi bi-arrow-return-left"></i> Solicitar Devolución
-                    </button>`;
+                    html += botonesDevolucion(s.id);
                 } else if (s.estado_flujo === 'SOL_EN_DEVOLUCION') {
                     html += `<div style="margin-top:0.6rem;font-size:1.5rem;opacity:0.85;display:flex;align-items:center;gap:0.5rem;"><i class="bi bi-hourglass-split" style="font-size:1.6rem;"></i><span>Devolución en proceso de revisión por el administrador.</span></div>`;
                 }
@@ -223,9 +226,7 @@ function renderSolicitudes(data, filtro = '') {
                     <strong>Devolución incompleta</strong>: Aún hay expedientes sin entregar. Pregüntele al administrador o entregue los faltantes.
                 </div>`;
                 if (s.prestamo && s.prestamo.estado === 'DevolucionParcial') {
-                    html += `<button class="sexp-devolver-btn sexp-entregar-faltantes-btn" onclick="solicitarDevolucion(${s.id})">
-                        <i class="bi bi-arrow-return-left"></i> Entregar Faltantes
-                    </button>`;
+                    html += botonesDevolucion(s.id);
                 }
             }
             if (p.comentarios) {
@@ -239,47 +240,185 @@ function renderSolicitudes(data, filtro = '') {
     container.html(html);
 }
 
-function solicitarDevolucion(solicitudId) {
+// customClass reutilizable para los modales de devolución (estilo del sistema).
+const _SEXP_DEV_MODAL_CLASS = {
+    icon: 'contenedor-modal-icon',
+    popup: 'contenedor-modal',
+    title: 'contener-modal-titulo',
+    confirmButton: 'contener-modal-boton-confirmar',
+    cancelButton: 'contener-modal-boton-cancelar',
+};
+
+function _sexpDevModalDidOpen() {
+    const actionsContainer = document.querySelector('.swal2-actions');
+    if (actionsContainer) actionsContainer.classList.add('contener-modal-contenedor-botones-min');
+    const htmlContainer = document.querySelector('.swal2-html-container');
+    if (htmlContainer) htmlContainer.classList.add('contener-modal-contenedor-html');
+}
+
+/**
+ * ¿Está permitido el horario de "devolución fuera de horario"?
+ * Regla: habilitado de 4:00 pm (16:00) hasta 7:00 am (07:00).
+ * Se evalúa con la hora local del navegador (el proceso backend queda pendiente).
+ */
+function _devolucionFueraHorarioPermitida() {
+    const h = new Date().getHours();
+    return (h >= 16 || h < 7);
+}
+
+/**
+ * HTML de los 3 botones de devolución del usuario. Se usa tanto en préstamo
+ * normal como al entregar faltantes de una solicitud incompleta.
+ */
+function botonesDevolucion(solicitudId) {
+    const fueraOK = _devolucionFueraHorarioPermitida();
+    const disF = fueraOK ? '' : 'disabled';
+    const titF = fueraOK
+        ? 'Devolución fuera de horario (proceso en construcción)'
+        : 'Disponible solo de 4:00 pm a 7:00 am';
+    return `
+        <div class="sexp-devolucion-botones">
+            <button class="sexp-devolver-btn sexp-devolver-btn--completa" onclick="devolucionCompleta(${solicitudId})">
+                <i class="bi bi-arrow-return-left"></i> Devolución completa
+            </button>
+            <button class="sexp-devolver-btn sexp-devolver-btn--parcial" onclick="devolucionParcial(${solicitudId})">
+                <i class="bi bi-list-check"></i> Devolución parcial
+            </button>
+            <button class="sexp-devolver-btn sexp-devolver-btn--fuera" onclick="devolucionFueraHorario(${solicitudId})" ${disF} title="${titF}">
+                <i class="bi bi-moon-stars"></i> Devolución fuera de horario
+            </button>
+        </div>`;
+}
+
+/** Envía la devolución al backend (completa o parcial) y refresca la lista. */
+function _enviarDevolucion(solicitudId, tipo, decisiones) {
+    $.ajax({
+        url: window.urls.s_exp_solicitar_devolucion_api,
+        method: 'POST',
+        headers: { 'X-CSRFToken': window.CSRF_TOKEN },
+        contentType: 'application/json',
+        data: JSON.stringify({ solicitud_id: solicitudId, tipo: tipo, decisiones: decisiones || [] }),
+        success: function (resp) {
+            if (resp.success) {
+                toastr.success('Devolución enviada. Entregue los expedientes al administrador para su revisión.');
+                cargarMisSolicitudes();
+            } else {
+                toastr.error(resp.error || 'No se pudo procesar la devolución.');
+            }
+        },
+        error: function (xhr) {
+            const err = xhr.responseJSON ? xhr.responseJSON.error : 'Error desconocido';
+            toastr.error(err);
+        }
+    });
+}
+
+/** Devolución completa: se devuelven TODOS los expedientes. */
+function devolucionCompleta(solicitudId) {
     Swal.fire({
-        title: 'Solicitar Devolución',
-        html: '¿Desea iniciar el proceso de devolución? Entregue los expedientes físicos al administrador para su revisión.',
+        title: 'Devolución completa',
+        html: '¿Desea devolver <strong>todos</strong> los expedientes? Entréguelos al administrador para su revisión.',
         icon: 'question',
         showCancelButton: true,
-        confirmButtonText: '<i class="bi bi-check-circle-fill"></i> Sí, Devolver',
+        confirmButtonText: '<i class="bi bi-check-circle-fill"></i> Sí, devolver todos',
         cancelButtonText: '<i class="bi bi-x-circle-fill"></i> Cancelar',
-        customClass: {
-            icon: 'contenedor-modal-icon',
-            popup: 'contenedor-modal',
-            title: 'contener-modal-titulo',
-            confirmButton: 'contener-modal-boton-confirmar',
-            cancelButton: 'contener-modal-boton-cancelar',
-        },
-        didOpen: () => {
-            const actionsContainer = document.querySelector('.swal2-actions');
-            if (actionsContainer) actionsContainer.classList.add('contener-modal-contenedor-botones-min');
-            const htmlContainer = document.querySelector('.swal2-html-container');
-            if (htmlContainer) htmlContainer.classList.add('contener-modal-contenedor-html');
+        customClass: _SEXP_DEV_MODAL_CLASS,
+        didOpen: _sexpDevModalDidOpen
+    }).then((result) => {
+        if (result.isConfirmed) _enviarDevolucion(solicitudId, 'completa', []);
+    });
+}
+
+/**
+ * Devolución parcial: abre un modal con los expedientes pendientes. Todos
+ * arrancan como "No devolver" con el comentario "Todavía en uso" (editable);
+ * el usuario marca "Devolver" los que sí entregará.
+ */
+function devolucionParcial(solicitudId) {
+    const s = (window.__sexpMisSolic || {})[solicitudId];
+    if (!s) { toastr.error('No se pudieron cargar los expedientes de la solicitud.'); return; }
+
+    const exps = (s.expedientes || []).filter(e => e.aprobado && !e.devuelto);
+    if (!exps.length) { toastr.info('No hay expedientes pendientes por devolver.'); return; }
+
+    const sanitize = (t) => (t || '').replace(/"/g, '&quot;');
+    const cards = exps.map(e => {
+        const ident = e.paciente_identidad || 'S/ID';
+        const nom = e.paciente_nombre || 'N/A';
+        return `
+            <div class="sexp-devparcial-card" data-detalle="${e.detalle_id}">
+                <div class="sexp-devparcial-head">
+                    <span class="sexp-exp-tag">#${e.numero}</span>
+                    <div class="sexp-devparcial-pac">
+                        <span class="sexp-devparcial-id">${ident}</span>
+                        <span class="sexp-devparcial-nom">${nom}</span>
+                    </div>
+                </div>
+                <div class="sexp-devparcial-radios">
+                    <label class="sexp-devparcial-radio sexp-devparcial-radio--ok">
+                        <input type="radio" name="dev_${e.detalle_id}" value="devolver" data-detalle="${e.detalle_id}">
+                        <i class="bi bi-arrow-return-left"></i> Devolver
+                    </label>
+                    <label class="sexp-devparcial-radio sexp-devparcial-radio--no">
+                        <input type="radio" name="dev_${e.detalle_id}" value="no_devolver" data-detalle="${e.detalle_id}" checked>
+                        <i class="bi bi-hourglass-split"></i> No devolver
+                    </label>
+                </div>
+                <input type="text" class="sexp-modal-input sexp-devparcial-coment" data-detalle="${e.detalle_id}"
+                       maxlength="200" value="Todavía en uso"
+                       placeholder="Comentario (irá al PDF si no se devuelve)">
+            </div>`;
+    }).join('');
+
+    Swal.fire({
+        title: 'Devolución parcial',
+        width: '90%',
+        html: `
+            <div class="sexp-devparcial-wrap">
+                <p class="sexp-auditoria-help">
+                    <i class="bi bi-info-circle"></i>
+                    Marque cuáles va a <strong>devolver</strong>. Los que siga usando quedan como
+                    "No devolver" con su comentario (por defecto "Todavía en uso").
+                </p>
+                ${cards}
+            </div>`,
+        showCancelButton: true,
+        confirmButtonText: '<i class="bi bi-check-circle-fill"></i> Devolver expedientes',
+        cancelButtonText: '<i class="bi bi-x-circle-fill"></i> Cancelar',
+        customClass: _SEXP_DEV_MODAL_CLASS,
+        didOpen: _sexpDevModalDidOpen,
+        preConfirm: () => {
+            const decisiones = [];
+            document.querySelectorAll('.sexp-devparcial-card').forEach(card => {
+                const did = parseInt(card.getAttribute('data-detalle'), 10);
+                const sel = card.querySelector('input[type="radio"]:checked');
+                const devolver = !!sel && sel.value === 'devolver';
+                const coment = (card.querySelector('.sexp-devparcial-coment').value || '').trim();
+                decisiones.push({ detalle_id: did, devolver: devolver, comentario: devolver ? '' : coment });
+            });
+            return decisiones;
         }
     }).then((result) => {
-        if (result.isConfirmed) {
-            $.ajax({
-                url: window.urls.s_exp_solicitar_devolucion_api,
-                method: 'POST',
-                headers: { 'X-CSRFToken': window.CSRF_TOKEN },
-                contentType: 'application/json',
-                data: JSON.stringify({ solicitud_id: solicitudId }),
-                success: function (resp) {
-                    if (resp.success) {
-                        toastr.success('Solicitud de devolución enviada. Por favor, entregue los expedientes.');
-                        cargarMisSolicitudes();
-                    }
-                },
-                error: function (xhr) {
-                    const err = xhr.responseJSON ? xhr.responseJSON.error : 'Error desconocido';
-                    toastr.error(err);
-                }
-            });
-        }
+        if (result.isConfirmed) _enviarDevolucion(solicitudId, 'parcial', result.value);
+    });
+}
+
+/**
+ * Devolución fuera de horario (4pm–7am). El proceso backend queda PENDIENTE:
+ * por ahora el botón solo se habilita en el horario y muestra un aviso.
+ */
+function devolucionFueraHorario(solicitudId) {
+    if (!_devolucionFueraHorarioPermitida()) {
+        toastr.warning('La devolución fuera de horario solo está disponible de 4:00 pm a 7:00 am.');
+        return;
+    }
+    Swal.fire({
+        title: 'Devolución fuera de horario',
+        html: 'Este proceso está <strong>en construcción</strong> y estará disponible próximamente.',
+        icon: 'info',
+        confirmButtonText: 'Entendido',
+        customClass: _SEXP_DEV_MODAL_CLASS,
+        didOpen: _sexpDevModalDidOpen
     });
 }
 

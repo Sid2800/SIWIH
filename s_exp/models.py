@@ -476,6 +476,27 @@ class SolicitudExpedienteDetalle(models.Model):
         null=True,
         verbose_name='Comentario de devolución del expediente'
     )
+    # -------------------------------------------------------------------------
+    # Decisión del USUARIO al iniciar la devolución (flujo devolución completa /
+    # parcial). Es distinta de 'devuelto'/'comentario_devolucion', que los llena
+    # el ADMIN durante la auditoría de recepción física.
+    #   - None  : el usuario aún no inició devolución para este expediente.
+    #   - True  : el usuario quiere devolver este expediente (completa, o los
+    #             marcados "Devolver" en la parcial).
+    #   - False : el usuario lo deja "todavía en uso" (parcial no devueltos).
+    # El admin usa este valor para PRE-CARGAR su auditoría (Recibido / No Recibido).
+    # -------------------------------------------------------------------------
+    usuario_solicita_devolver = models.BooleanField(
+        null=True,
+        blank=True,
+        default=None,
+        verbose_name='El usuario solicitó devolver este expediente'
+    )
+    comentario_usuario_devolucion = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name='Comentario del usuario al iniciar la devolución'
+    )
 
     class Meta:
         db_table = 's_exp_solicituddetalle'
