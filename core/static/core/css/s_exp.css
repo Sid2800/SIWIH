@@ -1747,6 +1747,29 @@ body.darkmode .sexp-devolver-btn--fuera:disabled {
 .sexp-devparcial-radio--ok { color: #16a34a; font-weight: 600; }
 .sexp-devparcial-radio--no { color: #d97706; font-weight: 600; }
 .sexp-devparcial-coment { font-size: 1.4rem !important; }
+.sexp-devparcial-coment:disabled { background-color: rgba(0, 0, 0, 0.05); cursor: not-allowed; }
+
+/* Grid de 3 columnas para aprovechar el ancho del modal */
+.sexp-devparcial-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.8rem;
+    max-height: 60vh;
+    overflow-y: auto;
+    padding: 0.2rem;
+}
+@media (max-width: 1024px) { .sexp-devparcial-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px)  { .sexp-devparcial-grid { grid-template-columns: 1fr; } }
+
+/* Resaltado según selección: amarillo = No devolver, verde suave = Devolver */
+.sexp-devparcial-card--no {
+    background-color: rgba(234, 179, 8, 0.16);
+    border-color: #d97706;
+}
+.sexp-devparcial-card--ok {
+    background-color: rgba(22, 163, 74, 0.10);
+    border-color: #16a34a;
+}
 
 
 /* ============================================================

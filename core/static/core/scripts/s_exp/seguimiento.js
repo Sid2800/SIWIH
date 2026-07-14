@@ -341,12 +341,14 @@ function devolucionParcial(solicitudId) {
     const exps = (s.expedientes || []).filter(e => e.aprobado && !e.devuelto);
     if (!exps.length) { toastr.info('No hay expedientes pendientes por devolver.'); return; }
 
-    const sanitize = (t) => (t || '').replace(/"/g, '&quot;');
     const cards = exps.map(e => {
         const ident = e.paciente_identidad || 'S/ID';
         const nom = e.paciente_nombre || 'N/A';
+        // Texto para el buscador local (identidad, número y nombre).
+        const buscar = `${ident} ${e.numero} ${nom}`.toLowerCase().replace(/"/g, '&quot;');
+        // Arranca en "No devolver" -> tarjeta amarilla.
         return `
-            <div class="sexp-devparcial-card" data-detalle="${e.detalle_id}">
+            <div class="sexp-devparcial-card sexp-devparcial-card--no" id="devp-card-${e.detalle_id}" data-buscar="${buscar}">
                 <div class="sexp-devparcial-head">
                     <span class="sexp-exp-tag">#${e.numero}</span>
                     <div class="sexp-devparcial-pac">
@@ -380,17 +382,82 @@ function devolucionParcial(solicitudId) {
                     Marque cuáles va a <strong>devolver</strong>. Los que siga usando quedan como
                     "No devolver" con su comentario (por defecto "Todavía en uso").
                 </p>
-                ${cards}
+                <div class="sexp-modal-buscador-row">
+                    <div class="sexp-modal-buscador-input">
+                        <i class="bi bi-search"></i>
+                        <input type="search" id="sexp-devp-buscar" class="sexp-modal-input"
+                               placeholder="Filtrar por identidad, nombre o número de expediente..."
+                               autocomplete="off">
+                        <button type="button" class="sexp-modal-buscador-clear" id="sexp-devp-buscar-clear"
+                                title="Limpiar filtro" aria-label="Limpiar filtro">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    </div>
+                    <span class="sexp-modal-buscador-info" id="sexp-devp-buscar-info"></span>
+                </div>
+                <div class="sexp-devparcial-grid">${cards}</div>
             </div>`,
         showCancelButton: true,
         confirmButtonText: '<i class="bi bi-check-circle-fill"></i> Devolver expedientes',
         cancelButtonText: '<i class="bi bi-x-circle-fill"></i> Cancelar',
-        customClass: _SEXP_DEV_MODAL_CLASS,
-        didOpen: _sexpDevModalDidOpen,
+        customClass: {
+            popup: 'contenedor-modal sexp-modal-grande',
+            title: 'contener-modal-titulo',
+            confirmButton: 'contener-modal-boton-confirmar',
+            cancelButton: 'contener-modal-boton-cancelar',
+        },
+        didOpen: () => {
+            const actionsContainer = document.querySelector('.swal2-actions');
+            if (actionsContainer) actionsContainer.classList.add('contener-modal-contenedor-botones');
+
+            // Color de la tarjeta + comentario según Devolver / No devolver:
+            //  - Devolver    -> quita el amarillo y BORRA el comentario (queda en blanco).
+            //  - No devolver -> amarillo y comentario editable (default si está vacío).
+            document.querySelectorAll('.sexp-devparcial-card input[type="radio"]').forEach(rad => {
+                rad.addEventListener('change', function () {
+                    const card = document.getElementById('devp-card-' + this.dataset.detalle);
+                    if (!card) return;
+                    const coment = card.querySelector('.sexp-devparcial-coment');
+                    if (this.value === 'devolver') {
+                        card.classList.remove('sexp-devparcial-card--no');
+                        card.classList.add('sexp-devparcial-card--ok');
+                        if (coment) { coment.value = ''; coment.disabled = true; }
+                    } else {
+                        card.classList.remove('sexp-devparcial-card--ok');
+                        card.classList.add('sexp-devparcial-card--no');
+                        if (coment) {
+                            coment.disabled = false;
+                            if (!coment.value.trim()) coment.value = 'Todavía en uso';
+                        }
+                    }
+                });
+            });
+
+            // Buscador local — solo filtra las tarjetas de esta ventana.
+            const inp = document.getElementById('sexp-devp-buscar');
+            const btnClear = document.getElementById('sexp-devp-buscar-clear');
+            const info = document.getElementById('sexp-devp-buscar-info');
+            const cardsEl = document.querySelectorAll('.sexp-devparcial-card');
+            function filtrar() {
+                const q = (inp.value || '').trim().toLowerCase();
+                let vis = 0;
+                cardsEl.forEach(card => {
+                    const match = !q || (card.dataset.buscar || '').indexOf(q) >= 0;
+                    card.style.display = match ? '' : 'none';
+                    if (match) vis++;
+                });
+                if (info) info.textContent = q ? `${vis} de ${cardsEl.length} expediente(s)` : `${cardsEl.length} expediente(s)`;
+                if (btnClear) btnClear.style.display = q ? '' : 'none';
+            }
+            inp.addEventListener('input', filtrar);
+            btnClear.addEventListener('click', function () { inp.value = ''; filtrar(); inp.focus(); });
+            filtrar();
+        },
         preConfirm: () => {
+            // Recorre TODAS las tarjetas (incluidas las ocultas por el filtro).
             const decisiones = [];
             document.querySelectorAll('.sexp-devparcial-card').forEach(card => {
-                const did = parseInt(card.getAttribute('data-detalle'), 10);
+                const did = parseInt(card.id.replace('devp-card-', ''), 10);
                 const sel = card.querySelector('input[type="radio"]:checked');
                 const devolver = !!sel && sel.value === 'devolver';
                 const coment = (card.querySelector('.sexp-devparcial-coment').value || '').trim();
