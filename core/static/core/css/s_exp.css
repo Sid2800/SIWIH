@@ -1126,6 +1126,7 @@ Usa colores del sistema (colorBoton, colorContendor, etc.)
 .sexp-auditoria-coment {
     font-size: 1.4rem !important;
 }
+.sexp-auditoria-coment:disabled { background-color: rgba(0, 0, 0, 0.05); cursor: not-allowed; }
 
 /* Resaltado de tarjetas según estado seleccionado */
 .sexp-auditoria-card--no {

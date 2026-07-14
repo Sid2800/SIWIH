@@ -313,14 +313,25 @@ function abrirModalAuditoria(prestamoId, detallesEncoded) {
             const actionsContainer = document.querySelector('.swal2-actions');
             if (actionsContainer) actionsContainer.classList.add('contener-modal-contenedor-botones');
 
-            // Aplicar clase visual inicial según pre-selección
+            // Aplicar clase visual inicial + estado del comentario según pre-selección.
+            // Si arranca en "Recibido" (y no está ya procesado), el comentario queda
+            // en blanco y deshabilitado; guardamos el comentario original por si el
+            // admin cambia de opción y hay que restaurarlo.
             document.querySelectorAll('.sexp-auditoria-card').forEach(card => {
                 const sel = card.querySelector('input[type="radio"]:checked');
                 if (sel && sel.value === 'no_recibido') card.classList.add('sexp-auditoria-card--no');
                 else if (sel && sel.value === 'perdido') card.classList.add('sexp-auditoria-card--lost');
+
+                const coment = card.querySelector('.sexp-auditoria-coment');
+                if (coment && !coment.disabled) {
+                    coment.dataset.comentOrig = coment.value;
+                    if (sel && sel.value === 'recibido') { coment.value = ''; coment.disabled = true; }
+                }
             });
 
-            // Resaltar tarjeta cuando se elija "no recibido" o "perdido"
+            // Resaltar tarjeta y manejar el comentario al cambiar de opción:
+            //  - Recibido    -> comentario en blanco y deshabilitado.
+            //  - No Recibido / Perdido -> comentario editable (restaura el original si está vacío).
             document.querySelectorAll('.sexp-auditoria-card input[type="radio"]').forEach(rad => {
                 rad.addEventListener('change', function () {
                     const det = this.dataset.detalle;
@@ -329,6 +340,17 @@ function abrirModalAuditoria(prestamoId, detallesEncoded) {
                     card.classList.remove('sexp-auditoria-card--no', 'sexp-auditoria-card--lost');
                     if (this.value === 'no_recibido') card.classList.add('sexp-auditoria-card--no');
                     else if (this.value === 'perdido') card.classList.add('sexp-auditoria-card--lost');
+
+                    const coment = card.querySelector('.sexp-auditoria-coment');
+                    if (coment) {
+                        if (this.value === 'recibido') {
+                            coment.value = '';
+                            coment.disabled = true;
+                        } else {
+                            coment.disabled = false;
+                            if (!coment.value.trim()) coment.value = coment.dataset.comentOrig || '';
+                        }
+                    }
                 });
             });
 
