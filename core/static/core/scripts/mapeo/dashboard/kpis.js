@@ -12,7 +12,6 @@
     disponibles: "kpi-disponibles",
     fuera_servicio: "kpi-fuera-servicio",
     porcentaje_ocupacion: "kpi-porcentaje-ocupacion",
-    mantenimiento: "kpi-mantenimiento",
     consulta_externa: "kpi-consulta-externa",
     pre_altas: "kpi-pre-altas",
   };
@@ -27,8 +26,9 @@
     const l2 = document.getElementById("kpi-label-ocupadas");
     const l3 = document.getElementById("kpi-label-disponibles");
     if (l1) l1.textContent = "Total camas";
-    if (l2) l2.textContent = "Ocupadas";
-    if (l3) l3.textContent = "Disponibles";
+    // [2026-07-10] Alinea labels con lectura por horas activas y porcentaje de ventana.
+    if (l2) l2.textContent = "Ocupadas (h / % ventana)";
+    if (l3) l3.textContent = "Disponibles (h / % ventana)";
   }
 
   function update(data) {

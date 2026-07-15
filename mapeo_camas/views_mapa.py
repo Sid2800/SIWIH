@@ -77,6 +77,7 @@ from ._permisos import (
     _tiene_permiso_mapear,
     _tiene_permiso_visualizacion_mapa,
     _validar_limite_intentos_salas,
+    _validar_mapeo_no_iniciado,
 )
 from ._sesion import (
     _cerrar_sesiones_mapeo_sin_sesion_django,
@@ -104,6 +105,7 @@ __all__ = [
     "mapa_camas_data",
     "buscar_pacientes_mapa",
     "camas_disponibles_mapa",
+    "validar_apertura_modal_mapa",
     "mover_paciente_cama",
     "actualizar_cama_mapa",
 ]
@@ -186,8 +188,19 @@ def _servicio_virtual_neonatologia_payload(servicio_pediatria, conflicto_mapeo=N
 
 
 # [2026-07-01] Clasifica el origen de actualización solo para el flujo del mapa.
+# [2026-07-09] REFACTOR: Coincidencia exacta primero para MOV_PAC vs MOV_PAC_DETALLE
 def _clasificar_origen_actualizacion_mapa(observacion_codigo="", ingreso_id=None):
-    codigo = (observacion_codigo or "").strip().upper()
+    # Verificar coincidencias exactas ANTES de convertir a mayúsculas
+    obs_strip = (observacion_codigo or "").strip()
+    if obs_strip == "Movimiento de paciente entre camas (mapa)":
+        return "CAMBIO_SALA"  # Inter-servicio: CUENTA en límite
+    if obs_strip == "Movimiento de paciente entre camas (mapa detalle)":
+        return "MAPEO"  # Intra-servicio: NO cuenta en límite
+    if obs_strip == "Cambio manual desde mapa":
+        return "CAMBIO_SALA"  # Cambio de estado desde modal
+    
+    # Pattern matching para otros tipos (ahora en mayúsculas)
+    codigo = obs_strip.upper()
     if "SALA" in codigo or "TRASLADO" in codigo:
         return "CAMBIO_SALA"
     if "MAPEO" in codigo or "MAPA" in codigo:
@@ -575,6 +588,21 @@ def camas_disponibles_mapa(request):
     return JsonResponse({"results": resultados})
 
 
+@login_required
+@require_GET
+def validar_apertura_modal_mapa(request):
+    """Valida si el usuario puede abrir el modal de edición en este momento."""
+    if not _puede_editar_cama_en_mapa(request.user):
+        return JsonResponse({"ok": False, "error": "Está en modo vista."}, status=403)
+
+    # [2026-07-09] Bloquea apertura para rol restringido cuando existe EN_PROGRESO.
+    error_mapeo = _validar_mapeo_no_iniciado(request.user)
+    if error_mapeo:
+        return error_mapeo
+
+    return JsonResponse({"ok": True})
+
+
 # =============================================================================
 # 2026-05-29 (Refactor B): la lógica transaccional vive ahora en
 # core.services.mapeo_camas_service.MapeoOperacionesMapaService.
@@ -588,6 +616,11 @@ def mover_paciente_cama(request):
 
     if not _puede_editar_cama_en_mapa(request.user):
         return JsonResponse({"ok": False, "error": "Está en modo vista."}, status=403)
+
+    # [2026-07-09] Validar que NO haya mapeo iniciado (solo para digitador ADMI/SALA)
+    error_mapeo = _validar_mapeo_no_iniciado(request.user)
+    if error_mapeo:
+        return error_mapeo
 
     cama_origen_id = request.POST.get("cama_origen_id")
     cama_destino_id = request.POST.get("cama_destino_id")
@@ -681,6 +714,11 @@ def actualizar_cama_mapa(request):
 
     if not _puede_editar_cama_en_mapa(request.user):
         return JsonResponse({"ok": False, "error": "Está en modo vista."}, status=403)
+
+    # [2026-07-09] Validar que NO haya mapeo iniciado (solo para digitador ADMI/SALA)
+    error_mapeo = _validar_mapeo_no_iniciado(request.user)
+    if error_mapeo:
+        return error_mapeo
 
     cama_id = request.POST.get("cama_id")
     estado_codigo = (request.POST.get("estado") or "").strip()

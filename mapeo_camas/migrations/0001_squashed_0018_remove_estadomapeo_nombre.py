@@ -112,7 +112,7 @@ class Migration(migrations.Migration):
                 ],
                 "constraints": [
                     models.CheckConstraint(
-                        check=models.Q(fecha_fin__isnull=True) | models.Q(fecha_fin__gte=models.F("fecha_inicio")),
+                        condition=models.Q(fecha_fin__isnull=True) | models.Q(fecha_fin__gte=models.F("fecha_inicio")),
                         name="chk_asig_fechas_validas",
                     ),
                 ],
