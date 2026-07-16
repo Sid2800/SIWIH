@@ -132,6 +132,7 @@ function renderSolicitudes(data, filtro = '') {
             // Construir objeto info para el popup
             let estadoTag = 'normal';
             if (e.aprobado === false) estadoTag = 'rechazado';
+            else if (e.prestamo_pendiente) estadoTag = 'prestamo_pendiente';
             else if (enPrestamo && e.devuelto === false) estadoTag = 'pendiente';
             else if (e.fuera_de_tiempo) estadoTag = 'late';
             else if (e.devuelto) estadoTag = 'devuelto';
@@ -145,7 +146,13 @@ function renderSolicitudes(data, filtro = '') {
                 comentario_devolucion: e.comentario_devolucion || '',
                 paciente_nombre: e.paciente_nombre || '',
                 paciente_identidad: e.paciente_identidad || '',
-                fuera_de_tiempo: !!e.fuera_de_tiempo
+                fuera_de_tiempo: !!e.fuera_de_tiempo,
+                // Trazabilidad por expediente (hora local 24h). En parciales cada
+                // uno lleva su propia fecha de devolución.
+                fecha_solicitud: s.fecha_creacion || '',
+                fecha_entrega: e.fecha_entrega || '',
+                fecha_devolucion: e.fecha_devolucion || '',
+                comentario_pendiente: e.comentario_pendiente || ''
             };
             const infoAttr = sanitize(JSON.stringify(info));
             const onClick = `onclick="mostrarInfoExpediente(JSON.parse(this.getAttribute('data-info')))"`;
@@ -155,6 +162,15 @@ function renderSolicitudes(data, filtro = '') {
             if (e.aprobado === false) {
                 const motivo = e.motivo_rechazo_individual || 'No se prestó este expediente';
                 return `<span class="sexp-exp-tag sexp-exp-tag--rechazado" title="${sanitize(motivo)}" ${dataAttr} ${onClick}>#${num}</span>`;
+            }
+            // MORADO: préstamo pendiente (encontrado pero aún no entregado).
+            // Va antes que el amarillo porque sigue reservado aunque el resto
+            // de la solicitud ya se haya entregado.
+            if (e.prestamo_pendiente) {
+                const txt = e.comentario_pendiente
+                    ? `Pendiente de entrega — ${sanitize(e.comentario_pendiente)}`
+                    : 'Pendiente de entrega';
+                return `<span class="sexp-exp-tag sexp-exp-tag--prestamo-pendiente" title="${txt}" ${dataAttr} ${onClick}>#${num}</span>`;
             }
             // AMARILLO: en préstamo activo y aún no devuelto
             if (enPrestamo && e.devuelto === false) {
@@ -338,7 +354,9 @@ function devolucionParcial(solicitudId) {
     const s = (window.__sexpMisSolic || {})[solicitudId];
     if (!s) { toastr.error('No se pudieron cargar los expedientes de la solicitud.'); return; }
 
-    const exps = (s.expedientes || []).filter(e => e.aprobado && !e.devuelto);
+    // Solo los que están realmente en su poder: aprobados, sin devolver y que no
+    // sigan como "préstamo pendiente" (esos aún no se le entregaron).
+    const exps = (s.expedientes || []).filter(e => e.aprobado && !e.devuelto && !e.prestamo_pendiente);
     if (!exps.length) { toastr.info('No hay expedientes pendientes por devolver.'); return; }
 
     const cards = exps.map(e => {
@@ -513,6 +531,7 @@ function mostrarInfoExpediente(info) {
     const labelEstado = {
         'rechazado': '<span class="sexp-exp-info-estado--rec"><i class="bi bi-x-circle-fill"></i> No prestado</span>',
         'pendiente': '<span class="sexp-exp-info-estado--pend"><i class="bi bi-hourglass-split"></i> Pendiente de devolver</span>',
+        'prestamo_pendiente': '<span class="sexp-exp-info-estado--prest-pend"><i class="bi bi-clock-history"></i> Pendiente de entrega</span>',
         'late': '<span class="sexp-exp-info-estado--late"><i class="bi bi-exclamation-triangle-fill"></i> Devuelto fuera de tiempo</span>',
         'devuelto': '<span class="sexp-exp-info-estado--ok"><i class="bi bi-check-circle-fill"></i> Devuelto correctamente</span>',
         'normal': '<span class="sexp-exp-info-estado--ok"><i class="bi bi-circle-fill"></i> En proceso</span>'
@@ -526,6 +545,24 @@ function mostrarInfoExpediente(info) {
         <div class="sexp-exp-info-fila">
             <span class="sexp-exp-info-label">Estado:</span>
             <span class="sexp-exp-info-valor">${labelEstado[estado] || labelEstado.normal}</span>
+        </div>`;
+
+    // ---- Trazabilidad de horas (solicitud / entrega / devolución) ----
+    // La entrega y la devolución son POR expediente: con préstamos pendientes y
+    // devoluciones parciales cada uno puede tener su propia fecha.
+    if (info.fecha_solicitud) {
+        filas += `<div class="sexp-exp-info-fila">
+            <span class="sexp-exp-info-label">Solicitado:</span>
+            <span class="sexp-exp-info-valor">${info.fecha_solicitud}</span>
+        </div>`;
+    }
+    filas += `<div class="sexp-exp-info-fila">
+            <span class="sexp-exp-info-label">Recibido (entrega):</span>
+            <span class="sexp-exp-info-valor">${info.fecha_entrega || '<span class="sexp-opacity-5">Sin entregar</span>'}</span>
+        </div>`;
+    filas += `<div class="sexp-exp-info-fila">
+            <span class="sexp-exp-info-label">Devuelto:</span>
+            <span class="sexp-exp-info-valor">${info.fecha_devolucion || '<span class="sexp-opacity-5">Sin devolver</span>'}</span>
         </div>`;
 
     if (info.paciente_identidad) {
@@ -544,6 +581,12 @@ function mostrarInfoExpediente(info) {
         filas += `<div class="sexp-exp-info-fila">
             <span class="sexp-exp-info-label">Motivo:</span>
             <span class="sexp-exp-info-valor">${info.motivo_rechazo}</span>
+        </div>`;
+    }
+    if (info.comentario_pendiente) {
+        filas += `<div class="sexp-exp-info-fila">
+            <span class="sexp-exp-info-label">Pendiente:</span>
+            <span class="sexp-exp-info-valor">${info.comentario_pendiente}</span>
         </div>`;
     }
     if (info.comentario_devolucion) {

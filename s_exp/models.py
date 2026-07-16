@@ -512,6 +512,23 @@ class SolicitudExpedienteDetalle(models.Model):
         null=True,
         verbose_name='Comentario del préstamo pendiente'
     )
+    # ---- Trazabilidad de horas POR EXPEDIENTE ----
+    # No basta con Prestamo.fecha_entrega / fecha_devolucion_real (que son de la
+    # solicitud completa) porque cada expediente puede moverse en momentos
+    # distintos:
+    #   - Un "préstamo pendiente" se entrega después que el resto.
+    #   - Una devolución parcial regresa solo algunos expedientes.
+    # La hora de SOLICITUD es común y sale de SolicitudPrestamo.fecha_creacion.
+    fecha_entrega = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='Fecha y hora en que se entregó este expediente'
+    )
+    fecha_devolucion = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='Fecha y hora en que se devolvió este expediente'
+    )
 
     class Meta:
         db_table = 's_exp_solicituddetalle'

@@ -182,6 +182,11 @@ def marcar_entregado_api(request):
             estado_anterior = d.expediente_prestamo.estado
             d.expediente_prestamo.estado_id = EstadoExpedienteFisico.id_de('EXP_PRESTADO')
 
+            # Hora de entrega POR expediente (los pendientes se sellarán luego,
+            # cuando se ejecute "Entregar pendientes").
+            d.fecha_entrega = ahora
+            d.save(update_fields=['fecha_entrega'])
+
             # NUEVO: registrar la ubicación actual via FK al catálogo unificado.
             if ubicacion_destino is not None:
                 d.expediente_prestamo.ubicacion = ubicacion_destino
@@ -350,6 +355,8 @@ def _resolver_pendientes(request, accion):
         else EstadoExpedienteFisico.id_de('EXP_DISPONIBLE')
     )
 
+    ahora = timezone.now()
+
     with transaction.atomic():
         for d in pendientes:
             ep = d.expediente_prestamo
@@ -358,6 +365,9 @@ def _resolver_pendientes(request, accion):
 
             if accion == 'entregar':
                 # Se entrega de verdad: el expediente viaja a la unidad solicitante.
+                # Se sella SU hora de entrega (distinta a la del resto de la
+                # solicitud, que se entregó antes).
+                d.fecha_entrega = ahora
                 if ubicacion_destino is not None:
                     ep.ubicacion = ubicacion_destino
                 ep.save()

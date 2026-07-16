@@ -168,6 +168,12 @@ class DatosDetalleSolicitud:
             # morado hasta que el admin lo entregue o cancele el pendiente.
             'prestamo_pendiente': bool(detalle.prestamo_pendiente),
             'comentario_pendiente': detalle.comentario_pendiente or '',
+            # Trazabilidad POR expediente, en hora local y formato 24h.
+            # Son por-detalle (no del préstamo) porque cada expediente puede
+            # entregarse o devolverse en momentos distintos (préstamos pendientes
+            # y devoluciones parciales).
+            'fecha_entrega': _fmt_local_dt(detalle.fecha_entrega),
+            'fecha_devolucion': _fmt_local_dt(detalle.fecha_devolucion),
         }
 
 

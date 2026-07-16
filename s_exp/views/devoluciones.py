@@ -251,10 +251,16 @@ def procesar_devolucion_api(request):
         except Exception as _e:
             log_warning(f"No se pudo resolver ubicacion ADMISION: {_e}", app=LogApp.S_EXP)
 
+        # Hora de ESTA auditoría: se sella en cada expediente recibido ahora.
+        # Clave para las devoluciones parciales: cada tanda queda con su propia
+        # fecha, así se sabe cuándo regresó realmente cada expediente.
+        ahora_dev = timezone.now()
+
         for det_id in detalles_recibidos:
             detalle = SolicitudExpedienteDetalle.objects.get(id=det_id, solicitud=solicitud)
             if not detalle.devuelto:
                 detalle.devuelto = True
+                detalle.fecha_devolucion = ahora_dev
                 if esta_vencido:
                     detalle.fuera_de_tiempo = True
                 detalle.comentario_devolucion = _comentario(det_id)
@@ -290,6 +296,8 @@ def procesar_devolucion_api(request):
             detalle = SolicitudExpedienteDetalle.objects.get(id=det_id, solicitud=solicitud)
             if not detalle.devuelto:
                 detalle.devuelto = True  # Se marca como procesado
+                # Fecha en que se cerró el expediente (aunque sea como perdido).
+                detalle.fecha_devolucion = ahora_dev
                 detalle.comentario_devolucion = _comentario(det_id) or 'Marcado como perdido'
                 detalle.save()
                 
