@@ -204,9 +204,14 @@ def historial_prestamos_paciente_api(request, paciente_id):
         if not expediente_ids:
             return JsonResponse({"data": [], "en_prestamo": False})
 
-        # Buscar detalles de solicitud que involucren esos expedientes
+        # Detalles de solicitud que involucren esos expedientes.
+        # Mismo criterio que el historial del expediente: solo lo que SÍ se
+        # prestó (aprobado=True). Quedan fuera los pendientes cancelados y los
+        # no encontrados en la revisión, porque el expediente nunca salió del
+        # archivo. Los aprobados y los pendientes de entrega sí aparecen.
         detalles = SolicitudExpedienteDetalle.objects.filter(
-            expediente_prestamo__expediente_id__in=expediente_ids
+            expediente_prestamo__expediente_id__in=expediente_ids,
+            aprobado=True,
         ).select_related(
             'solicitud', 'solicitud__usuario', 'solicitud__motivo',
             'solicitud__estado_flujo', 'solicitud__servicio_unidad',
