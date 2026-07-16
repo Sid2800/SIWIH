@@ -605,17 +605,40 @@ class Prestamo(models.Model):
     def __str__(self):
         return f"Préstamo #{self.id} - Solicitud #{self.solicitud.id} - {self.estado}"
 
+    # Estados en los que el préstamo sigue vigente (hay expedientes fuera del
+    # archivo) y por lo tanto el CRONÓMETRO debe seguir corriendo:
+    #   - Entregado         → préstamo normal en curso.
+    #   - Vencido           → se pasó del límite, pero sigue sin devolverse.
+    #   - DevolucionParcial → solo regresaron ALGUNOS expedientes; la solicitud
+    #                         NO ha terminado y los que siguen prestados
+    #                         continúan consumiendo tiempo.
+    # Se excluyen Cerrado y DevueltoVencido (ahí el préstamo ya finalizó).
+    ESTADOS_CRONOMETRO_ACTIVO = ('Entregado', 'Vencido', 'DevolucionParcial')
+
+    @property
+    def cronometro_activo(self):
+        """
+        True si el tiempo del préstamo debe seguir contando.
+
+        Antes las propiedades de tiempo exigían estado == 'Entregado', por lo que
+        al registrar una devolución PARCIAL (estado 'DevolucionParcial') el
+        cronómetro desaparecía aunque la solicitud siguiera abierta.
+        """
+        return self.estado_id in {
+            EstadoPrestamo.id_de(codigo) for codigo in self.ESTADOS_CRONOMETRO_ACTIVO
+        }
+
     @property
     def esta_vencido(self):
         from django.utils import timezone
-        if self.fecha_limite and self.estado_id == EstadoPrestamo.id_de('Entregado'):
+        if self.fecha_limite and self.cronometro_activo:
             return timezone.now() > self.fecha_limite
         return False
 
     @property
     def tiempo_restante_segundos(self):
         from django.utils import timezone
-        if self.fecha_limite and self.estado_id == EstadoPrestamo.id_de('Entregado'):
+        if self.fecha_limite and self.cronometro_activo:
             delta = self.fecha_limite - timezone.now()
             return max(0, int(delta.total_seconds()))
         return None
@@ -623,7 +646,7 @@ class Prestamo(models.Model):
     @property
     def porcentaje_tiempo_usado(self):
         from django.utils import timezone
-        if self.fecha_entrega and self.fecha_limite and self.estado_id == EstadoPrestamo.id_de('Entregado'):
+        if self.fecha_entrega and self.fecha_limite and self.cronometro_activo:
             total = (self.fecha_limite - self.fecha_entrega).total_seconds()
             usado = (timezone.now() - self.fecha_entrega).total_seconds()
             if total > 0:

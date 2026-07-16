@@ -50,7 +50,34 @@ function initTabla() {
             {
                 data: 'expedientes',
                 render: function (data) {
-                    return data.map(n => `<span class="sexp-exp-tag">#${n}</span>`).join(' ');
+                    // La API manda detalles ENRIQUECIDOS para poder colorear cada
+                    // expediente según su estado real (antes venían solo números,
+                    // por eso salían todos sin color). Se mantiene compatibilidad
+                    // por si llegara un número suelto.
+                    return (data || []).map(e => {
+                        if (typeof e !== 'object') return `<span class="sexp-exp-tag">#${e}</span>`;
+                        const sanitize = (t) => (t || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                        let cls = 'sexp-exp-tag';
+                        let title = '';
+                        if (e.prestamo_pendiente) {
+                            // Morado: encontrado pero aún no entregado (reservado).
+                            cls += ' sexp-exp-tag--prestamo-pendiente';
+                            title = e.comentario_pendiente
+                                ? `Pendiente de entrega: ${e.comentario_pendiente}`
+                                : 'Pendiente de entrega';
+                        } else if (e.fuera_de_tiempo) {
+                            cls += ' sexp-exp-tag--late';
+                            title = 'Devuelto fuera de tiempo';
+                        } else if (e.devuelto) {
+                            // Ya devuelto (p. ej. en una devolución parcial previa).
+                            title = e.comentario_devolucion || 'Devuelto correctamente';
+                        } else {
+                            // Sigue prestado: el tiempo le corre.
+                            cls += ' sexp-exp-tag--pendiente';
+                            title = 'Pendiente de devolver';
+                        }
+                        return `<span class="${cls}" title="${sanitize(title)}">#${e.numero}</span>`;
+                    }).join(' ');
                 }
             },
             {
@@ -78,7 +105,13 @@ function initTabla() {
             {
                 data: null,
                 render: function (p) {
-                    if (p.estado === 'Entregado' && p.fecha_limite) {
+                    // El cronómetro sigue corriendo mientras haya expedientes fuera
+                    // del archivo. Incluye DevolucionParcial: en una parcial solo
+                    // regresaron algunos, la solicitud NO terminó y el tiempo debe
+                    // continuar (antes solo se contemplaba 'Entregado' y por eso el
+                    // tiempo desaparecía al hacer una devolución parcial).
+                    const CON_CRONOMETRO = ['Entregado', 'Vencido', 'DevolucionParcial'];
+                    if (CON_CRONOMETRO.includes(p.estado) && p.fecha_limite) {
                         const timerId = 'timer-' + p.id;
                         return `<div>
                             <span class="sexp-timer" id="${timerId}" data-limite="${p.fecha_limite}" data-porcentaje="${p.porcentaje_tiempo_usado}">--:--:--</span>

@@ -77,14 +77,17 @@ def prestamos_activos_api(request):
 
         data = []
         for p in prestamos:
-            numeros = list(
-                p.solicitud.detalles.select_related('expediente_prestamo__expediente')
-                .filter(aprobado=True)
-                .values_list('expediente_prestamo__expediente__numero', flat=True)
-            )
-
-            # Usamos los servicios para evitar acceso directo a snapshots
-            from s_exp.services.datos_solicitud import DatosSolicitud
+            # Detalles ENRIQUECIDOS (no solo el número): el monitoreo necesita el
+            # estado de cada expediente (devuelto / pendiente / fuera de tiempo /
+            # préstamo pendiente) para poder colorear cada tag. Antes se enviaba
+            # solo values_list(numero), por eso todos salían sin color.
+            from s_exp.services.datos_solicitud import DatosSolicitud, DatosDetalleSolicitud
+            numeros = [
+                DatosDetalleSolicitud.enriquecer(d)
+                for d in p.solicitud.detalles.select_related(
+                    'expediente_prestamo__expediente', 'paciente'
+                ).filter(aprobado=True)
+            ]
             data.append({
                 "id": p.id,
                 "solicitud_id": p.solicitud.id,
