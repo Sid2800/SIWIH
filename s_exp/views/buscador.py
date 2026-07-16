@@ -290,6 +290,11 @@ def historial_prestamos_expediente_api(request, expediente_id):
                 "solicitante": DatosSolicitud.usuario_nombre_completo(s),
                 "estado": DatosSolicitud.estado_nombre(s),
                 "devuelto": d.devuelto,
+                # Fechas reales POR expediente (no del préstamo completo): con
+                # préstamos pendientes y devoluciones parciales cada expediente
+                # tiene su propia hora de entrega y de devolución.
+                "fecha_entrega": _fmt_local(d.fecha_entrega) if d.fecha_entrega else '',
+                "fecha_devolucion": _fmt_local(d.fecha_devolucion) if d.fecha_devolucion else '',
                 # Área a la que se prestó EN ESE MOMENTO (snapshot por la FK
                 # servicio_unidad capturada al crear la solicitud; NO cambia
                 # aunque el solicitante luego cambie de puesto).

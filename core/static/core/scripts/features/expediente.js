@@ -194,6 +194,22 @@ $(document).ready(function () {
                     columns: [
                         { data: 'numero_expediente' },
                         { data: 'fecha_solicitud' },
+                        {
+                            // Fecha/hora en que se ENTREGÓ este expediente.
+                            data: 'fecha_entrega',
+                            render: function (data) {
+                                return data || '<span class="sexp-opacity-5">Sin entregar</span>';
+                            }
+                        },
+                        {
+                            // Fecha/hora en que se DEVOLVIÓ este expediente. Es por
+                            // expediente (no del préstamo completo), así que en una
+                            // devolución parcial cada uno muestra su fecha real.
+                            data: 'fecha_devolucion',
+                            render: function (data) {
+                                return data || '<span class="sexp-opacity-5">Sin devolver</span>';
+                            }
+                        },
                         { data: 'motivo' },
                         { data: 'solicitante' },
                         { data: 'area_destino' },
