@@ -86,13 +86,21 @@ function verificarAlertasGlobales() {
             // Tomar la PRIMERA alerta sticky válida y mostrar solo esa.
             const pendiente = resp.alertas.find(function (a) {
                 return a.sticky && (
-                    (a.tipo_alerta === 'vencimiento' && a.prestamo_id) || a.solicitud_id
+                    (a.tipo_alerta === 'vencimiento' && a.prestamo_id) ||
+                    (a.tipo_alerta === 'recuperacion' && a.detalle_id) ||
+                    a.solicitud_id
                 );
             });
             if (!pendiente) return;
 
             if (pendiente.tipo_alerta === 'vencimiento' && pendiente.prestamo_id) {
                 mostrarModalAlertaVencimiento(pendiente);
+            } else if (pendiente.tipo_alerta === 'recuperacion' && pendiente.detalle_id) {
+                // Va ANTES del caso genérico: esta alerta también trae
+                // solicitud_id, y el genérico marcaba 'notificado_listo' de la
+                // solicitud, que no es lo que apaga este aviso. Por eso reaparecía
+                // indefinidamente aunque el usuario diera "Entendido".
+                mostrarModalAlertaRecuperacion(pendiente);
             } else if (pendiente.solicitud_id) {
                 mostrarModalAlertaSticky(pendiente);
             }
@@ -140,6 +148,49 @@ function mostrarModalAlertaSticky(alerta) {
         }
         if (result.isConfirmed) {
             marcarAlertaLeida(alerta.solicitud_id);
+        }
+    });
+}
+
+/**
+ * Aviso de que Admisión recuperó un expediente de urgencia.
+ *
+ * Necesita su propio modal porque se marca por DETALLE (el expediente concreto),
+ * no por solicitud: una misma solicitud puede tener varios expedientes y solo
+ * algunos recuperados.
+ */
+function mostrarModalAlertaRecuperacion(alerta) {
+    const clave = 'recuperacion-' + alerta.detalle_id;
+    if (window.__sexp_modales_activos && window.__sexp_modales_activos.has(clave)) return;
+    if (window.__sexp_modales_activos) window.__sexp_modales_activos.add(clave);
+
+    Swal.fire({
+        title: `<span>${alerta.titulo || '¡Aviso!'}</span>`,
+        html: `<div style="font-size: 1.4rem;">${alerta.mensaje}</div>`,
+        icon: 'warning',
+        confirmButtonText: '<i class="bi bi-check-circle"></i> Entendido',
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        customClass: {
+            popup: 'contenedor-modal',
+            confirmButton: 'contener-modal-boton-confirmar sexp-sticky-btn',
+        },
+    }).then((result) => {
+        if (window.__sexp_modales_activos) window.__sexp_modales_activos.delete(clave);
+        if (result.isConfirmed) marcarRecuperacionLeida(alerta.detalle_id);
+    });
+}
+
+/** Apaga definitivamente el aviso de recuperación de ese expediente. */
+function marcarRecuperacionLeida(detalleId) {
+    $.ajax({
+        url: window.urls.s_exp_recuperacion_leida_api,
+        method: 'POST',
+        headers: { 'X-CSRFToken': window.CSRF_TOKEN },
+        contentType: 'application/json',
+        data: JSON.stringify({ detalle_id: detalleId }),
+        error: function (xhr) {
+            console.error('[Alertas] No se pudo marcar la recuperación como leída:', xhr && xhr.status);
         }
     });
 }

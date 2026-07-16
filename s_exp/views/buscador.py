@@ -185,6 +185,28 @@ def buscar_expedientes_api(request):
 # API: Historial de préstamos por paciente
 # ============================================
 
+def _estado_del_expediente(d):
+    """
+    Estado de ESTE expediente dentro del préstamo, NO el de la solicitud.
+
+    Son cosas distintas: el expediente puede haber terminado su ciclo (devuelto,
+    o recuperado de urgencia por Admisión) mientras la solicitud sigue abierta
+    porque OTROS expedientes suyos siguen prestados. Antes esta columna mostraba
+    el estado de la SOLICITUD, por lo que un expediente ya devuelto seguía
+    apareciendo como "En prestamo".
+
+    Lo usan los dos historiales (expediente y paciente) para ser consistentes.
+    """
+    if d.devuelto:
+        # Su proceso terminó, sin importar cómo esté la solicitud.
+        return 'Recuperado por Admisión' if d.recuperado_admision else 'Finalizado'
+    if d.prestamo_pendiente:
+        return 'Pendiente de entrega'
+    if d.fecha_entrega:
+        return 'En préstamo'
+    return 'En preparación'
+
+
 @require_GET
 def historial_prestamos_paciente_api(request, paciente_id):
     """Retorna el historial de préstamos asociados a un paciente."""
@@ -235,7 +257,8 @@ def historial_prestamos_paciente_api(request, paciente_id):
                 "fecha_solicitud": _fmt_local(s.fecha_creacion),
                 "motivo": DatosSolicitud.motivo_nombre(s),
                 "solicitante": DatosSolicitud.usuario_nombre_completo(s),
-                "estado": DatosSolicitud.estado_nombre(s),
+                # Estado del EXPEDIENTE en este prestamo (no el de la solicitud).
+                "estado": _estado_del_expediente(d),
                 "devuelto": d.devuelto,
                 # alias de retrocompat (frontend espera 'area_destino')
                 "area_destino": DatosSolicitud.unidad_nombre(s),
@@ -304,7 +327,8 @@ def historial_prestamos_expediente_api(request, expediente_id):
                 "fecha_solicitud": _fmt_local(s.fecha_creacion),
                 "motivo": DatosSolicitud.motivo_nombre(s),
                 "solicitante": DatosSolicitud.usuario_nombre_completo(s),
-                "estado": DatosSolicitud.estado_nombre(s),
+                # Estado del EXPEDIENTE en este prestamo (no el de la solicitud).
+                "estado": _estado_del_expediente(d),
                 "devuelto": d.devuelto,
                 # Fechas reales POR expediente (no del préstamo completo): con
                 # préstamos pendientes y devoluciones parciales cada expediente
