@@ -3170,3 +3170,105 @@ body.darkmode .sexp-sugerir-tiempo {
     /* El nombre completo se ve; si es muy largo, parte en 2 líneas. */
     word-break: break-word;
 }
+
+/* ============================================================
+   RESPONSIVE del módulo s_exp (solo clases sexp-*)
+   ============================================================ */
+
+/* ---- Avisos colapsables en móvil ----------------------------
+   En PC el aviso se lee completo. En teléfono ese texto ocupa
+   media pantalla antes de llegar a lo que importa (la lista o
+   los botones), así que se recorta a 2 líneas y se toca para
+   ampliar. En PC no se recorta ni se vuelve pulsable.
+   ------------------------------------------------------------ */
+@media (max-width: 768px) {
+    .sexp-auditoria-help,
+    .sexp-revision-help {
+        position: relative;
+        cursor: pointer;
+        padding-right: 3.2rem;   /* espacio para el chevron */
+        font-size: 1.3rem !important;
+    }
+
+    /* Recorte a 2 líneas mientras esté cerrado */
+    .sexp-auditoria-help:not(.sexp-help--abierto),
+    .sexp-revision-help:not(.sexp-help--abierto) {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    /* Indicador de "tocar para ampliar" */
+    .sexp-auditoria-help::after,
+    .sexp-revision-help::after {
+        content: "\F282";                 /* bi-chevron-down */
+        font-family: "bootstrap-icons";
+        position: absolute;
+        top: 0.7rem;
+        right: 1rem;
+        font-size: 1.4rem;
+        color: var(--colorBoton);
+        transition: transform 0.2s ease;
+    }
+    .sexp-auditoria-help.sexp-help--abierto::after,
+    .sexp-revision-help.sexp-help--abierto::after {
+        transform: rotate(180deg);
+    }
+}
+
+/* ---- Botones de acción de las tablas ------------------------ */
+@media (max-width: 768px) {
+    /* Se apilan a lo ancho para que el texto no se corte ni
+       desborde la celda. */
+    .sexp-action-group {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.4rem;
+    }
+    .sexp-action-btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    /* Filtros de estado: se envuelven en vez de desbordar. */
+    .sexp-filtros { flex-direction: column; align-items: stretch; gap: 0.6rem; }
+    .sexp-flex-gap-1 { flex-wrap: wrap; justify-content: center; }
+    .sexp-filtro-btn { flex: 1 1 auto; }
+
+    /* Barra de sub-módulos: centrada y envolviendo. */
+    .sexp-nav-modulos { flex-wrap: wrap; justify-content: center; gap: 0.5rem; }
+    .sexp-nav-link { font-size: 1.3rem; padding: 0.6rem 1rem; }
+
+    /* Devolución (usuario): botones a ancho completo. */
+    .sexp-devolucion-botones { flex-direction: column; align-items: stretch; }
+    .sexp-devolver-btn { width: 100%; justify-content: center; }
+
+    /* Modales: botones apilados y a ancho completo, sin desbordar. */
+    .contener-modal-contenedor-botones {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.6rem !important;
+    }
+    .sexp-modal-grande .contener-modal-boton-confirmar,
+    .sexp-modal-grande .contener-modal-boton-cancelar {
+        min-width: 0;
+        width: 100%;
+        font-size: 1.4rem !important;
+        height: 4.2rem;
+    }
+    /* El de confirmar de Recuperación tiene ancho fijo en PC. */
+    .recepcionIngresoBotones #recup-confirmar { width: 100%; }
+    .recepcionIngresoBotones { flex-direction: column; align-items: stretch; }
+}
+
+/* ---- Recuperación: la fila es ancha; en móvil se prioriza --- */
+@media (max-width: 768px) {
+    /* Se ocultan las columnas menos decisivas: para identificar el
+       expediente bastan número, identidad y nombre. El resto sigue
+       en el tooltip y en el modal de confirmación. */
+    .sexp-recup-c--sol,
+    .sexp-recup-c--per,
+    .sexp-recup-c--area { display: none; }
+    .sexp-recup-c--nom { width: 16rem; }
+}
