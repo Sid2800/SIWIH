@@ -10,9 +10,14 @@
 {% endblock extra_css %}
 
 {% block content %}
-{# Pantalla de recuperación de URGENCIA (solo Admisión).
-   Reusa las clases de la Recepción de egresos SDGI (contendorLista, listbox,
-   listasRecepcion...) para no duplicar estilos ya existentes. #}
+{% comment %}
+Pantalla de recuperacion de URGENCIA (solo Admision).
+Reusa las clases de la Recepcion de egresos SDGI (contendorLista, listbox,
+listasRecepcion...) para no duplicar estilos ya existentes.
+Los comentarios multilinea van con este tag, no con la sintaxis de una linea:
+esa solo admite UNA linea y, si se parte, se renderiza como texto y rompe el
+layout flex de las listas.
+{% endcomment %}
 <div class="contenedor2 contenedorListaRecepcion">
     <div class="tituloFormulario sexp-margin-bottom-15">
         <div class="tituloFormulario-texto">
@@ -78,9 +83,9 @@
 
     <div class="listasRecepcion">
         <!-- Izquierda: todos los expedientes prestados que se pueden exigir -->
-        {# Incluye TODA solicitud activa (sin finalizar), no solo las entregadas:
-           una reservada o lista para recoger también puede exigirse. Los que aún
-           no se entregan muestran "Sin entregar" en la fecha. #}
+        <!-- Incluye TODA solicitud activa (sin finalizar), no solo las entregadas:
+             una reservada o lista para recoger tambien puede exigirse. Las que aun
+             no se entregan muestran "Sin entregar" en la fecha. -->
         <div class="contendorLista">
             <h3 class="sin-margen">Expedientes activos</h3>
             <input type="text" class="formularioCampo-text" id="recup-buscar-izq"

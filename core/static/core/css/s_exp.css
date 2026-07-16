@@ -3053,3 +3053,18 @@ body.darkmode .sexp-sugerir-tiempo {
     opacity: 0.55;
     font-size: 1.4rem;
 }
+
+/* El boton de confirmar necesita ancho propio: la regla de SDGI apunta a
+   #recepcionIngresoBoton y aqui el id es otro, por eso el texto se desbordaba. */
+.recepcionIngresoBotones #recup-confirmar {
+    justify-content: center;
+    text-align: center;
+}
+@media (min-width: 30rem) {
+    .recepcionIngresoBotones #recup-confirmar { width: 30rem; }
+}
+/* En movil las listas van una sobre otra (flex column heredado de SDGI);
+   se le da algo mas de alto util al listado para que se vean varios items. */
+@media (max-width: 60rem) {
+    .contenedorListaRecepcion .listbox { height: 26rem; }
+}
