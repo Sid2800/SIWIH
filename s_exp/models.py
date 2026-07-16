@@ -497,6 +497,21 @@ class SolicitudExpedienteDetalle(models.Model):
         null=True,
         verbose_name='Comentario del usuario al iniciar la devolución'
     )
+    # ---- Préstamo pendiente (marcado en la Revisión de Entrega) ----
+    # El expediente fue encontrado pero NO se entrega aún: queda RESERVADO
+    # (expediente_prestamo.estado = EXP_PENDIENTE_PRESTAMO, no disponible para
+    # otros) hasta que el admin lo entregue ("Entregar pendientes") o lo cancele
+    # ("Cancelar pendientes"). Persiste aunque el resto de la solicitud ya se
+    # haya entregado; se muestra en morado en los listados.
+    prestamo_pendiente = models.BooleanField(
+        default=False,
+        verbose_name='Marcado como préstamo pendiente'
+    )
+    comentario_pendiente = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name='Comentario del préstamo pendiente'
+    )
 
     class Meta:
         db_table = 's_exp_solicituddetalle'
