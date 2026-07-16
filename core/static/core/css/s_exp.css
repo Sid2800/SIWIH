@@ -1747,23 +1747,6 @@ body.darkmode .sexp-entregar-faltantes-btn:hover {
     color: #000 !important;
 }
 .sexp-devolver-btn--parcial:hover { background-color: #d97706 !important; opacity: 1; }
-/* Fuera de horario — índigo; deshabilitado fuera de 4pm–7am */
-.sexp-devolver-btn--fuera {
-    background-color: #6366f1 !important;
-    color: #fff !important;
-}
-.sexp-devolver-btn--fuera:hover { background-color: #4f46e5 !important; opacity: 1; }
-.sexp-devolver-btn--fuera:disabled {
-    background-color: #cbd5e1 !important;
-    color: #64748b !important;
-    cursor: not-allowed;
-    transform: none;
-    box-shadow: none;
-}
-body.darkmode .sexp-devolver-btn--fuera:disabled {
-    background-color: #334155 !important;
-    color: #94a3b8 !important;
-}
 
 /* ============================================================
    Modal "Devolución parcial" (usuario) — tarjetas por expediente

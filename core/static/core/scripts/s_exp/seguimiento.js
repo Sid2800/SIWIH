@@ -278,25 +278,10 @@ function _sexpDevModalDidOpen() {
 }
 
 /**
- * ¿Está permitido el horario de "devolución fuera de horario"?
- * Regla: habilitado de 4:00 pm (16:00) hasta 7:00 am (07:00).
- * Se evalúa con la hora local del navegador (el proceso backend queda pendiente).
- */
-function _devolucionFueraHorarioPermitida() {
-    const h = new Date().getHours();
-    return (h >= 16 || h < 7);
-}
-
-/**
- * HTML de los 3 botones de devolución del usuario. Se usa tanto en préstamo
+ * HTML de los botones de devolución del usuario. Se usa tanto en préstamo
  * normal como al entregar faltantes de una solicitud incompleta.
  */
 function botonesDevolucion(solicitudId) {
-    const fueraOK = _devolucionFueraHorarioPermitida();
-    const disF = fueraOK ? '' : 'disabled';
-    const titF = fueraOK
-        ? 'Devolución fuera de horario (proceso en construcción)'
-        : 'Disponible solo de 4:00 pm a 7:00 am';
     return `
         <div class="sexp-devolucion-botones">
             <button class="sexp-devolver-btn sexp-devolver-btn--completa" onclick="devolucionCompleta(${solicitudId})">
@@ -304,9 +289,6 @@ function botonesDevolucion(solicitudId) {
             </button>
             <button class="sexp-devolver-btn sexp-devolver-btn--parcial" onclick="devolucionParcial(${solicitudId})">
                 <i class="bi bi-list-check"></i> Devolución parcial
-            </button>
-            <button class="sexp-devolver-btn sexp-devolver-btn--fuera" onclick="devolucionFueraHorario(${solicitudId})" ${disF} title="${titF}">
-                <i class="bi bi-moon-stars"></i> Devolución fuera de horario
             </button>
         </div>`;
 }
@@ -491,26 +473,6 @@ function devolucionParcial(solicitudId) {
         }
     }).then((result) => {
         if (result.isConfirmed) _enviarDevolucion(solicitudId, 'parcial', result.value);
-    });
-}
-
-/**
- * Devolución fuera de horario (4pm–7am). El proceso backend queda PENDIENTE:
- * por ahora el botón solo se habilita en el horario y muestra un aviso.
- */
-function devolucionFueraHorario(solicitudId) {
-    if (!_devolucionFueraHorarioPermitida()) {
-        toastr.warning('La devolución fuera de horario solo está disponible de 4:00 pm a 7:00 am.');
-        return;
-    }
-    Swal.fire({
-        title: 'Devolución fuera de horario',
-        html: 'Este proceso está <strong>en construcción</strong> y estará disponible próximamente.',
-        icon: 'info',
-        confirmButtonText: 'Entendido',
-        width: _SEXP_DEV_MODAL_ANCHO,
-        customClass: _SEXP_DEV_MODAL_CLASS,
-        didOpen: _sexpDevModalDidOpen
     });
 }
 
