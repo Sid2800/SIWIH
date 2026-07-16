@@ -55,6 +55,19 @@ ESTADOS_ACTIVOS = [
 ]
 
 
+def _ids_estados_activos():
+    """
+    Traduce los códigos de arriba a sus ids ENTEROS.
+
+    Se filtra por id y no por `estado_flujo__codigo__in=[...]`: esa forma obliga a
+    un JOIN contra el catálogo y a comparar texto en cada fila. Con los ids el
+    filtro es un IN sobre la FK (columna indexada, entero) y no toca el catálogo.
+    EstadoSolicitud.id_de() cachea el mapeo código->id, así que la resolución no
+    cuesta consultas extra.
+    """
+    return [EstadoSolicitud.id_de(codigo) for codigo in ESTADOS_ACTIVOS]
+
+
 @require_GET
 def expedientes_recuperables_api(request):
     """
@@ -76,7 +89,7 @@ def expedientes_recuperables_api(request):
             'solicitud__usuario', 'solicitud__servicio_unidad', 'solicitud__estado_flujo',
             'expediente_prestamo__expediente', 'paciente',
         ).filter(
-            solicitud__estado_flujo__codigo__in=ESTADOS_ACTIVOS,
+            solicitud__estado_flujo_id__in=_ids_estados_activos(),
             aprobado=True,        # solo lo que sí se prestó
             devuelto=False,       # lo ya devuelto no se recupera
             prestamo_pendiente=False,  # aún no se entregó: no está fuera del archivo
@@ -144,7 +157,7 @@ def recuperar_expedientes_api(request):
                 id__in=detalle_ids,
                 aprobado=True,
                 devuelto=False,
-                solicitud__estado_flujo__codigo__in=ESTADOS_ACTIVOS,
+                solicitud__estado_flujo_id__in=_ids_estados_activos(),
             )
         )
         if not detalles:
