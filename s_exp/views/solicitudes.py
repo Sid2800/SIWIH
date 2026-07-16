@@ -329,6 +329,10 @@ def expedientes_revision_api(request, solicitud_id):
             "paciente_id": DatosDetalleSolicitud.paciente_id(d),
             "paciente_nombre": DatosDetalleSolicitud.paciente_nombre_completo(d),
             "paciente_identidad": DatosDetalleSolicitud.paciente_dni(d),
+            # Marca de "préstamo pendiente" para pre-cargar el check y su
+            # comentario si la revisión ya se había guardado antes.
+            "prestamo_pendiente": bool(d.prestamo_pendiente),
+            "comentario_pendiente": d.comentario_pendiente or '',
         })
     return JsonResponse({"expedientes": expedientes})
 
@@ -438,37 +442,86 @@ def revisar_entrega_api(request):
     try:
         mapa = {d.get('detalle_id'): d for d in decisiones if d.get('detalle_id') is not None}
         cambios = 0
-        for d in solicitud.detalles.select_related('expediente_prestamo__expediente'):
-            info = mapa.get(d.id)
-            if info is None:
-                continue
-            encontrado = bool(info.get('encontrado', True))
-            comentario = (info.get('comentario') or '').strip()
+        # Atómico: si algo falla a mitad, no queda la revisión aplicada a medias
+        # (expedientes con estado cambiado pero detalles sin actualizar).
+        with transaction.atomic():
+            for d in solicitud.detalles.select_related('expediente_prestamo__expediente'):
+                info = mapa.get(d.id)
+                if info is None:
+                    continue
+                encontrado = bool(info.get('encontrado', True))
+                comentario = (info.get('comentario') or '').strip()
+                # "Préstamo pendiente": el expediente SÍ se encontró pero todavía no
+                # se entrega. Solo aplica si está marcado como encontrado; si se
+                # desmarca "encontrado", la marca y su comentario se limpian.
+                pendiente = encontrado and bool(info.get('prestamo_pendiente', False))
 
-            if not encontrado and d.aprobado:
-                # Marcado como no encontrado físicamente
-                d.aprobado = False
-                d.motivo_rechazo_individual = comentario or 'No encontrado físicamente'
-                d.save()
+                if not encontrado and d.aprobado:
+                    # Marcado como no encontrado físicamente
+                    d.aprobado = False
+                    d.motivo_rechazo_individual = comentario or 'No encontrado físicamente'
+                    # Al no encontrarse se limpia cualquier marca de pendiente previa.
+                    d.prestamo_pendiente = False
+                    d.comentario_pendiente = None
+                    d.save()
 
-                ep = d.expediente_prestamo
-                estado_ant = ep.estado
-                ep.estado_id = EstadoExpedienteFisico.id_de('EXP_DISPONIBLE')
-                ep.save()
-                ExpedienteEstadoLog.objects.create(
-                    expediente=ep.expediente,
-                    estado_anterior=estado_ant,
-                    estado_nuevo_id=EstadoExpedienteFisico.id_de('EXP_DISPONIBLE'),
-                    usuario=request.user,
-                    solicitud=solicitud,
-                    observacion=f"Revisión de entrega: {d.motivo_rechazo_individual}"
-                )
-                cambios += 1
-            elif encontrado and comentario and comentario != (d.motivo_rechazo_individual or ''):
-                # Sólo actualizar comentario sin cambiar aprobación
-                d.motivo_rechazo_individual = comentario
-                d.save()
-                cambios += 1
+                    ep = d.expediente_prestamo
+                    estado_ant = ep.estado
+                    ep.estado_id = EstadoExpedienteFisico.id_de('EXP_DISPONIBLE')
+                    ep.save()
+                    ExpedienteEstadoLog.objects.create(
+                        expediente=ep.expediente,
+                        estado_anterior=estado_ant,
+                        estado_nuevo_id=EstadoExpedienteFisico.id_de('EXP_DISPONIBLE'),
+                        usuario=request.user,
+                        solicitud=solicitud,
+                        observacion=f"Revisión de entrega: {d.motivo_rechazo_individual}"
+                    )
+                    cambios += 1
+                    continue
+
+                if not encontrado:
+                    # Ya venía rechazado de una revisión previa: nada que hacer.
+                    continue
+
+                # ---- Encontrado: gestionar la marca de "préstamo pendiente" ----
+                if pendiente != d.prestamo_pendiente:
+                    ep = d.expediente_prestamo
+                    estado_ant = ep.estado
+                    if pendiente:
+                        # Queda RESERVADO (EXP_PENDIENTE_PRESTAMO): no disponible
+                        # para otras solicitudes hasta entregarlo o cancelarlo.
+                        d.prestamo_pendiente = True
+                        d.comentario_pendiente = comentario or 'Préstamo pendiente'
+                        ep.estado_id = EstadoExpedienteFisico.id_de('EXP_PENDIENTE_PRESTAMO')
+                        obs = f"Marcado como préstamo pendiente: {d.comentario_pendiente}"
+                    else:
+                        # Se quitó el pendiente: vuelve a quedar apartado en la solicitud.
+                        d.prestamo_pendiente = False
+                        d.comentario_pendiente = None
+                        ep.estado_id = EstadoExpedienteFisico.id_de('EXP_APARTADO')
+                        obs = "Se quitó la marca de préstamo pendiente"
+                    ep.save()
+                    ExpedienteEstadoLog.objects.create(
+                        expediente=ep.expediente,
+                        estado_anterior=estado_ant,
+                        estado_nuevo_id=ep.estado_id,
+                        usuario=request.user,
+                        solicitud=solicitud,
+                        observacion=obs
+                    )
+                    d.save()
+                    cambios += 1
+                elif pendiente and comentario != (d.comentario_pendiente or ''):
+                    # Sigue pendiente, solo cambió el comentario.
+                    d.comentario_pendiente = comentario or 'Préstamo pendiente'
+                    d.save()
+                    cambios += 1
+                elif not pendiente and comentario and comentario != (d.motivo_rechazo_individual or ''):
+                    # Comportamiento previo: actualizar comentario sin cambiar aprobación.
+                    d.motivo_rechazo_individual = comentario
+                    d.save()
+                    cambios += 1
 
         # Si todos los expedientes quedaron rechazados, cerrar la solicitud
         aprobados_restantes = solicitud.detalles.filter(aprobado=True).count()

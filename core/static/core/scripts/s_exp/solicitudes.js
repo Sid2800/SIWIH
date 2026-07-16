@@ -782,8 +782,12 @@ function _mostrarModalRevision(id, expedientes) {
     const filasHtml = expedientes.map(function (exp) {
         const identidad = exp.paciente_identidad || exp.identidad || '';
         const nombre = exp.paciente_nombre || exp.nombre || '';
+        // Pre-carga: si la revisión ya se guardó antes con "préstamo pendiente",
+        // el check viene marcado y el comentario trae su texto.
+        const pend = !!exp.prestamo_pendiente;
+        const comentPrev = (exp.comentario_pendiente || '').replace(/"/g, '&quot;');
         return `
-        <div class="sexp-revision-card" id="rev-row-${exp.detalle_id}">
+        <div class="sexp-revision-card${pend ? ' sexp-revision-card--pendiente' : ''}" id="rev-row-${exp.detalle_id}">
             <div class="sexp-revision-card-header">
                 <label class="sexp-exp-dec-check" title="Marcado = encontrado, desmarcado = NO encontrado">
                     <input type="checkbox" class="sexp-revision-check" data-detalle="${exp.detalle_id}" checked>
@@ -796,9 +800,16 @@ function _mostrarModalRevision(id, expedientes) {
                 </div>
             </div>
             <div class="sexp-revision-card-comentario">
+                <label class="sexp-exp-dec-check sexp-revision-pend-check"
+                       title="Se encontró el expediente pero NO se entrega todavía: queda reservado">
+                    <input type="checkbox" class="sexp-revision-pendiente" data-detalle="${exp.detalle_id}"${pend ? ' checked' : ''}>
+                    <span class="sexp-exp-dec-checkmark"></span>
+                    <span class="sexp-revision-pend-label">Marcar como préstamo pendiente</span>
+                </label>
                 <label class="sexp-revision-card-label">Comentario:</label>
                 <input type="text" class="sexp-revision-comentario" data-detalle="${exp.detalle_id}"
-                       placeholder="Obligatorio si se desmarca" maxlength="200">
+                       value="${pend ? comentPrev : ''}"
+                       placeholder="Obligatorio si se desmarca o si es préstamo pendiente" maxlength="200">
             </div>
         </div>`;
     }).join('');
@@ -843,11 +854,29 @@ function _mostrarModalRevision(id, expedientes) {
                 chk.addEventListener('change', function () {
                     const det = this.dataset.detalle;
                     const row = document.getElementById('rev-row-' + det);
+                    const pend = document.querySelector(`.sexp-revision-pendiente[data-detalle="${det}"]`);
+                    const com = document.querySelector(`.sexp-revision-comentario[data-detalle="${det}"]`);
                     if (this.checked) {
                         row.classList.remove('sexp-revision-card--rechazado');
+                        // Se vuelve a habilitar la opción de préstamo pendiente.
+                        if (pend) pend.disabled = false;
                     } else {
                         row.classList.add('sexp-revision-card--rechazado');
+                        // Si NO se encontró, "préstamo pendiente" no aplica:
+                        // se limpia la marca y el texto escrito previamente.
+                        if (pend) { pend.checked = false; pend.disabled = true; }
+                        row.classList.remove('sexp-revision-card--pendiente');
+                        if (com) com.value = '';
                     }
+                });
+            });
+
+            // Check "Marcar como préstamo pendiente": resalta la tarjeta en morado.
+            document.querySelectorAll('.sexp-revision-pendiente').forEach(chk => {
+                chk.addEventListener('change', function () {
+                    const row = document.getElementById('rev-row-' + this.dataset.detalle);
+                    if (!row) return;
+                    row.classList.toggle('sexp-revision-card--pendiente', this.checked);
                 });
             });
 
@@ -884,15 +913,32 @@ function _mostrarModalRevision(id, expedientes) {
         preConfirm: () => {
             const decisiones = [];
             const desmarcadosSinComentario = [];
+            const pendientesSinComentario = [];
             document.querySelectorAll('.sexp-revision-check').forEach(chk => {
                 const det = parseInt(chk.dataset.detalle, 10);
                 const encontrado = chk.checked;
+                const pendChk = document.querySelector(`.sexp-revision-pendiente[data-detalle="${det}"]`);
+                // "Préstamo pendiente" solo tiene sentido si se encontró el expediente.
+                const pendiente = encontrado && !!pendChk && pendChk.checked;
                 const com = (document.querySelector(`.sexp-revision-comentario[data-detalle="${det}"]`).value || '').trim();
+
+                // Comentario obligatorio en dos casos: no encontrado, o préstamo pendiente.
                 if (!encontrado && !com) desmarcadosSinComentario.push(det);
-                decisiones.push({ detalle_id: det, encontrado: encontrado, comentario: com });
+                if (pendiente && !com) pendientesSinComentario.push(det);
+
+                decisiones.push({
+                    detalle_id: det,
+                    encontrado: encontrado,
+                    prestamo_pendiente: pendiente,
+                    comentario: com,
+                });
             });
             if (desmarcadosSinComentario.length) {
                 Swal.showValidationMessage('Agregue un comentario para cada expediente desmarcado.');
+                return false;
+            }
+            if (pendientesSinComentario.length) {
+                Swal.showValidationMessage('El comentario es obligatorio para los marcados como préstamo pendiente.');
                 return false;
             }
             return { decisiones };

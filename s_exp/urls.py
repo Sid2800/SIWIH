@@ -33,6 +33,10 @@ urlpatterns = [
     path('api/rechazar-solicitud/', views.rechazar_solicitud_api, name='s_exp_rechazar_solicitud_api'),
     path('api/prestamos-activos/', views.prestamos_activos_api, name='s_exp_prestamos_activos_api'),
     path('api/marcar-entregado/', views.marcar_entregado_api, name='s_exp_marcar_entregado_api'),
+    # Préstamos pendientes (expedientes en estado EXP_PENDIENTE_PRESTAMO)
+    path('api/pendientes-prestamo/', views.pendientes_prestamo_api, name='s_exp_pendientes_prestamo_api'),
+    path('api/entregar-pendientes/', views.entregar_pendientes_api, name='s_exp_entregar_pendientes_api'),
+    path('api/cancelar-pendientes/', views.cancelar_pendientes_api, name='s_exp_cancelar_pendientes_api'),
     path('api/prestamos-devolucion/', views.prestamos_para_devolucion_api, name='s_exp_prestamos_devolucion_api'),
     path('api/procesar-devolucion/', views.procesar_devolucion_api, name='s_exp_procesar_devolucion_api'),
     path('api/reportes-data/', views.reportes_data_api, name='s_exp_reportes_data_api'),

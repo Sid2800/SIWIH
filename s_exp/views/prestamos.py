@@ -168,8 +168,14 @@ def marcar_entregado_api(request):
         except Exception as _e:
             log_warning(f"No se pudo resolver ubicacion del solicitante: {_e}", app=LogApp.S_EXP)
 
-        # Solo marcar como prestados los expedientes aprobados
-        for d in prestamo.solicitud.detalles.select_related('expediente_prestamo__expediente').filter(aprobado=True):
+        # Solo marcar como prestados los expedientes aprobados.
+        # Se EXCLUYEN los marcados como "préstamo pendiente" (prestamo_pendiente=True):
+        # esos se encontraron pero no se entregan ahora, así que conservan su estado
+        # EXP_PENDIENTE_PRESTAMO (reservados) aunque el resto de la solicitud ya se
+        # haya entregado. Se liberan luego con "Entregar pendientes" o "Cancelar pendientes".
+        for d in prestamo.solicitud.detalles.select_related(
+            'expediente_prestamo__expediente'
+        ).filter(aprobado=True, prestamo_pendiente=False):
             estado_anterior = d.expediente_prestamo.estado
             d.expediente_prestamo.estado_id = EstadoExpedienteFisico.id_de('EXP_PRESTADO')
 
@@ -215,4 +221,204 @@ def marcar_entregado_api(request):
 
     except Exception as e:
         log_error(f"Error en marcar_entregado_api: {e}", app=LogApp.S_EXP)
+        return JsonResponse({"error": "Error interno del servidor"}, status=500)
+
+
+# ============================================================================
+# APIs ADMIN - Préstamos PENDIENTES (estado EXP_PENDIENTE_PRESTAMO)
+# ----------------------------------------------------------------------------
+# Origen del flujo: en la "Revisión de Entrega" el admin marca un expediente
+# como "préstamo pendiente" (lo encontró, pero no se entrega todavía). Ese
+# expediente queda RESERVADO y NO se entrega junto con el resto de la solicitud
+# (marcar_entregado_api lo excluye). Queda pendiente indefinidamente hasta que
+# el admin ejecute una de estas dos acciones:
+#   - entregar_pendientes_api  -> pasa a EXP_PRESTADO (se entrega de verdad).
+#   - cancelar_pendientes_api  -> pasa a EXP_DISPONIBLE (se libera, no se presta).
+# pendientes_prestamo_api alimenta la alerta periódica (cada 5 min) del admin.
+# ============================================================================
+
+@require_GET
+def pendientes_prestamo_api(request):
+    """
+    Lista los expedientes marcados como "préstamo pendiente" agrupados por solicitud.
+
+    La usa la alerta periódica del admin (cada 5 min) y los listados para saber
+    si hay pendientes sin resolver. Rendimiento: un solo queryset con
+    select_related, sin N+1 dentro del loop.
+    """
+    if not _es_exp_admin(request.user):
+        return JsonResponse({"error": "Sin permisos"}, status=403)
+
+    try:
+        from s_exp.models import SolicitudExpedienteDetalle
+        from s_exp.services.datos_solicitud import DatosDetalleSolicitud, DatosSolicitud
+
+        qs = SolicitudExpedienteDetalle.objects.select_related(
+            'expediente_prestamo__expediente', 'paciente',
+            'solicitud__usuario', 'solicitud__servicio_unidad',
+        ).filter(prestamo_pendiente=True, aprobado=True)
+
+        # Agrupar por solicitud para que la alerta muestre "Solicitud #X: N exp."
+        por_solicitud = {}
+        for d in qs:
+            s = d.solicitud
+            item = por_solicitud.setdefault(s.id, {
+                "solicitud_id": s.id,
+                "usuario_nombre": DatosSolicitud.usuario_nombre_completo(s),
+                "unidad": DatosSolicitud.unidad_nombre(s),
+                "expedientes": [],
+            })
+            item["expedientes"].append({
+                "detalle_id": d.id,
+                "numero": DatosDetalleSolicitud.numero_expediente(d),
+                "paciente_nombre": DatosDetalleSolicitud.paciente_nombre_completo(d),
+                "paciente_identidad": DatosDetalleSolicitud.paciente_dni(d),
+                "comentario": d.comentario_pendiente or '',
+            })
+
+        data = list(por_solicitud.values())
+        total = sum(len(i["expedientes"]) for i in data)
+        return JsonResponse({"data": data, "total": total})
+
+    except Exception as e:
+        log_error(f"Error en pendientes_prestamo_api: {e}", app=LogApp.S_EXP)
+        return JsonResponse({"error": "Error interno del servidor"}, status=500)
+
+
+def _resolver_pendientes(request, accion):
+    """
+    Helper común de "Entregar pendientes" / "Cancelar pendientes".
+
+    Ambas acciones recorren los mismos detalles (prestamo_pendiente=True) y solo
+    difieren en el estado destino y los efectos, por eso comparten el cuerpo:
+
+      - accion='entregar': EXP_PRESTADO + se mueve la ubicación a la unidad del
+        solicitante (igual que la entrega normal). El expediente queda prestado.
+      - accion='cancelar':  EXP_DISPONIBLE + el detalle queda aprobado=False con
+        su motivo, de modo que el PDF lo muestre como NO PRESTADO y el
+        expediente vuelva a estar disponible para otros.
+
+    Todo va dentro de una transacción: o se resuelven todos los pendientes de la
+    solicitud o no se toca ninguno (evita dejar expedientes a medio liberar).
+    """
+    if not _es_exp_admin(request.user):
+        return JsonResponse({"error": "Sin permisos"}, status=403)
+
+    try:
+        body = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Datos inválidos"}, status=400)
+
+    solicitud_id = body.get('solicitud_id')
+    # Opcional: lista de detalle_id concretos. Si no viene, se resuelven todos
+    # los pendientes de la solicitud.
+    detalle_ids = body.get('detalle_ids') or None
+
+    from django.db import transaction
+    from s_exp.models import SolicitudPrestamo
+
+    try:
+        solicitud = SolicitudPrestamo.objects.get(id=solicitud_id)
+    except SolicitudPrestamo.DoesNotExist:
+        return JsonResponse({"error": "Solicitud no encontrada"}, status=404)
+
+    qs = solicitud.detalles.select_related('expediente_prestamo__expediente').filter(
+        prestamo_pendiente=True, aprobado=True
+    )
+    if detalle_ids:
+        qs = qs.filter(id__in=detalle_ids)
+
+    pendientes = list(qs)
+    if not pendientes:
+        return JsonResponse({"error": "No hay préstamos pendientes por resolver"}, status=400)
+
+    # Para 'entregar' se necesita la ubicación destino (unidad del solicitante),
+    # se resuelve UNA sola vez fuera del loop para no repetir consultas.
+    ubicacion_destino = None
+    if accion == 'entregar':
+        from expediente.services.ubicaciones import CatalogoUbicaciones
+        try:
+            ubicacion_destino = CatalogoUbicaciones.ubicacion_del_solicitante(solicitud)
+        except Exception as _e:
+            log_warning(f"No se pudo resolver ubicacion del solicitante: {_e}", app=LogApp.S_EXP)
+
+    estado_destino = (
+        EstadoExpedienteFisico.id_de('EXP_PRESTADO') if accion == 'entregar'
+        else EstadoExpedienteFisico.id_de('EXP_DISPONIBLE')
+    )
+
+    with transaction.atomic():
+        for d in pendientes:
+            ep = d.expediente_prestamo
+            estado_ant = ep.estado
+            ep.estado_id = estado_destino
+
+            if accion == 'entregar':
+                # Se entrega de verdad: el expediente viaja a la unidad solicitante.
+                if ubicacion_destino is not None:
+                    ep.ubicacion = ubicacion_destino
+                ep.save()
+                try:
+                    _set_localizacion_por_solicitud(
+                        ep.expediente, solicitud, request.user,
+                        ubicacion_obj=ubicacion_destino,
+                    )
+                except Exception as _e:
+                    log_warning(f"No se pudo actualizar ubicacion al entregar pendiente: {_e}",
+                                app=LogApp.S_EXP)
+                observacion = f"Préstamo pendiente entregado: {d.comentario_pendiente or ''}".strip()
+            else:
+                # Se cancela: el expediente vuelve a estar disponible y el detalle
+                # queda como NO prestado (con su motivo) para el PDF/historial.
+                ep.save()
+                d.aprobado = False
+                d.motivo_rechazo_individual = (
+                    d.comentario_pendiente or 'Préstamo pendiente cancelado'
+                )
+                observacion = f"Préstamo pendiente cancelado: {d.motivo_rechazo_individual}"
+
+            # En ambos casos deja de estar pendiente.
+            d.prestamo_pendiente = False
+            d.comentario_pendiente = None
+            d.save()
+
+            ExpedienteEstadoLog.objects.create(
+                expediente=ep.expediente,
+                estado_anterior=estado_ant,
+                estado_nuevo_id=estado_destino,
+                usuario=request.user,
+                solicitud=solicitud,
+                observacion=observacion,
+            )
+
+    _registrar_log(
+        request.user,
+        'PRESTAMO_PENDIENTE_ENTREGADO' if accion == 'entregar' else 'PRESTAMO_PENDIENTE_CANCELADO',
+        f'{len(pendientes)} préstamo(s) pendiente(s) '
+        f'{"entregado(s)" if accion == "entregar" else "cancelado(s)"} '
+        f'en la solicitud #{solicitud.id}.',
+        'SolicitudPrestamo', solicitud.id
+    )
+    return JsonResponse({"success": True, "resueltos": len(pendientes)})
+
+
+@csrf_protect
+@require_POST
+def entregar_pendientes_api(request):
+    """Entrega los expedientes que quedaron como 'préstamo pendiente'."""
+    try:
+        return _resolver_pendientes(request, 'entregar')
+    except Exception as e:
+        log_error(f"Error en entregar_pendientes_api: {e}", app=LogApp.S_EXP)
+        return JsonResponse({"error": "Error interno del servidor"}, status=500)
+
+
+@csrf_protect
+@require_POST
+def cancelar_pendientes_api(request):
+    """Cancela los 'préstamos pendientes': libera los expedientes (quedan disponibles)."""
+    try:
+        return _resolver_pendientes(request, 'cancelar')
+    except Exception as e:
+        log_error(f"Error en cancelar_pendientes_api: {e}", app=LogApp.S_EXP)
         return JsonResponse({"error": "Error interno del servidor"}, status=500)

@@ -823,6 +823,36 @@ Usa colores del sistema (colorBoton, colorContendor, etc.)
     background-color: var(--blanco) !important;
 }
 
+/* ---- Préstamo pendiente (morado) ----
+   Se encontró el expediente pero no se entrega todavía: queda reservado.
+   Usa el mismo morado del estado "en devolución" para mantener la paleta. */
+.sexp-revision-card--pendiente {
+    background-color: rgba(139, 92, 246, 0.14);
+    border-color: #8b5cf6;
+}
+.sexp-revision-card--pendiente .sexp-exp-tag {
+    background: rgba(139, 92, 246, 0.2) !important;
+    color: var(--negro) !important;
+    border: 1px solid rgba(139, 92, 246, 0.6) !important;
+    font-weight: 700 !important;
+}
+.sexp-revision-card--pendiente .sexp-revision-comentario {
+    border-color: #8b5cf6 !important;
+}
+/* Check "Marcar como préstamo pendiente" (va encima del comentario) */
+.sexp-revision-pend-check {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 0.4rem;
+    cursor: pointer;
+}
+.sexp-revision-pend-label {
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: var(--negro);
+}
+
 /* Mantener compatibilidad con clases antiguas */
 .sexp-revision-row {
     display: flex;
