@@ -3272,3 +3272,15 @@ body.darkmode .sexp-sugerir-tiempo {
     .sexp-recup-c--area { display: none; }
     .sexp-recup-c--nom { width: 16rem; }
 }
+
+/* ---- Página de Recuperación: alineación como el resto del módulo ----
+   Reusa .contenedorListaRecepcion (de la Recepción SDGI) para heredar el
+   layout de la doble lista, pero ese contenedor trae align-items/justify-content
+   en center y centraba TODO: el título y la barra de sub-módulos salían
+   centrados, a diferencia de las demás pantallas del módulo. En SDGI no se nota
+   porque sus hijos llevan width:100%.
+   Se corrige solo aquí (clase propia); no se toca la pantalla de SDGI. */
+.sexp-recup-page.contenedorListaRecepcion {
+    align-items: stretch;
+    justify-content: flex-start;
+}
