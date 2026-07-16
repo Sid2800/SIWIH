@@ -3016,42 +3016,71 @@ body.darkmode .sexp-sugerir-tiempo {
 
 /* ============================================================
    Recuperación de expedientes de urgencia (solo Admisión)
-   Ítems de la doble lista. Reusa .listbox/.contendorLista de la
-   Recepción SDGI; aquí solo se define el contenido de cada <li>.
+   -----------------------------------------------------------
+   UNA fila por expediente (no un bloque): con varios registros
+   un bloque de 2 líneas se acumula y hace la lista inmanejable.
+   La fila no se parte; si no cabe, el listado desplaza en
+   horizontal. Reusa .listbox/.contendorLista de la Recepción SDGI.
    ============================================================ */
+.contenedorListaRecepcion .listbox {
+    /* Permite ver la fila completa cuando no cabe a lo ancho. */
+    overflow-x: auto;
+}
 .sexp-recup-item {
     display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    padding: 0.6rem 0.8rem;
+    align-items: center;
+    gap: 0.8rem;
+    padding: 0.4rem 0.6rem;
     border-bottom: 1px dashed var(--colorLinea);
     cursor: pointer;
     list-style: none;
+    /* La fila se mantiene en una sola línea. */
+    white-space: nowrap;
+    /* .listbox usa 1.7rem: demasiado para 8 datos en línea. */
+    font-size: 1.25rem;
+    line-height: 1.6;
 }
 .sexp-recup-item:hover { background-color: rgba(0, 139, 139, 0.08); }
 /* Marcado (click) — se moverá con las flechas */
 .sexp-recup-item--sel {
     background-color: rgba(0, 139, 139, 0.18);
-    border-left: 3px solid var(--colorBoton);
+    box-shadow: inset 3px 0 0 0 var(--colorBoton);
 }
-.sexp-recup-l1 {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    flex-wrap: wrap;
-    font-size: 1.4rem;
+/* Columnas: anchos fijos para que las filas se lean alineadas entre sí. */
+.sexp-recup-c {
+    flex: 0 0 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
-.sexp-recup-l2 {
-    font-size: 1.2rem;
-    opacity: 0.85;
-    line-height: 1.4;
+.sexp-recup-c + .sexp-recup-c { border-left: 1px solid var(--colorLinea); padding-left: 0.8rem; }
+.sexp-recup-c--exp  { width: 7rem;  font-weight: 700; color: var(--colorBoton); }
+.sexp-recup-c--id   { width: 12rem; font-weight: 600; }
+.sexp-recup-c--nom  { width: 21rem; }
+.sexp-recup-c--sol  { width: 6rem;  opacity: 0.85; }
+.sexp-recup-c--fec  { width: 10rem; opacity: 0.85; }
+.sexp-recup-c--per  { width: 14rem; font-weight: 600; }
+.sexp-recup-c--area { width: 13rem; opacity: 0.85; }
+
+/* Cabecera de columnas: fija arriba y se desplaza en horizontal con las filas. */
+.sexp-recup-head {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background-color: var(--colorContendor);
+    font-weight: 700;
+    cursor: default;
+    border-bottom: 1px solid var(--colorBoton);
 }
+.sexp-recup-head:hover { background-color: var(--colorContendor); }
+.sexp-recup-head .sexp-recup-c { color: var(--negro); opacity: 1; }
+
 .sexp-recup-vacio {
     list-style: none;
     padding: 1.2rem;
     text-align: center;
     opacity: 0.55;
     font-size: 1.4rem;
+    text-transform: none;
 }
 
 /* El boton de confirmar necesita ancho propio: la regla de SDGI apunta a
