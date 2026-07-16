@@ -76,53 +76,31 @@ function visibles(lista, selectorInput) {
     return lista.filter(e => e._buscar.indexOf(q) >= 0);
 }
 
-/** Recorta la fecha "dd/mm/aaaa hh:mm" a "dd/mm hh:mm" para que la fila quepa. */
-function _fechaCorta(f) {
-    if (!f) return '—';
-    return f.replace(/^(\d{2}\/\d{2})\/\d{4}\s/, '$1 ');
-}
-
-/**
- * Cabecera de columnas. Va DENTRO del <ul> (sticky) para que se desplace en
- * horizontal junto con las filas y quede siempre alineada con ellas.
- */
-function cabeceraHtml() {
-    return `
-        <li class="sexp-recup-item sexp-recup-head">
-            <span class="sexp-recup-c sexp-recup-c--exp">Exp.</span>
-            <span class="sexp-recup-c sexp-recup-c--id">Identidad</span>
-            <span class="sexp-recup-c sexp-recup-c--nom">Nombre</span>
-            <span class="sexp-recup-c sexp-recup-c--sol">Sol.</span>
-            <span class="sexp-recup-c sexp-recup-c--fec">Solicitado</span>
-            <span class="sexp-recup-c sexp-recup-c--fec">Entregado</span>
-            <span class="sexp-recup-c sexp-recup-c--per">Prestado a</span>
-            <span class="sexp-recup-c sexp-recup-c--area">Área</span>
-        </li>`;
-}
-
 /**
  * HTML de un ítem: UNA sola fila por expediente.
  *
- * Se muestran los 8 datos en línea (como la Recepción SDGI) en vez de un
- * bloque por expediente: con varios registros un bloque de dos líneas se
- * acumula y hace la lista inmanejable. La fila no se parte (nowrap) y, si no
- * cabe, el listado desplaza en horizontal; el title trae el detalle completo.
+ * Las fechas de solicitud/entrega NO van en la fila: alargaban la línea y
+ * obligaban a desplazar en horizontal. Siguen disponibles en el tooltip.
+ *
+ * La clase 'selected' es la del listbox de SDGI: así el marcado usa sus mismos
+ * colores (fondo negro/texto blanco en claro, invertido en oscuro) sin definir
+ * colores propios.
  */
 function itemHtml(e, marcado) {
     const sanitize = (t) => (t || '').replace(/"/g, '&quot;').replace(/</g, '&lt;');
     const entrega = e.fecha_entrega || 'Sin entregar';
-    const tip = `Solicitud #${e.solicitud_id} — Exp #${e.numero} — ${sanitize(e.paciente_nombre)}\n`
-              + `Solicitado: ${e.fecha_solicitud || '—'} | Entregado: ${entrega}\n`
-              + `Prestado a: ${sanitize(e.prestado_a)} — ${sanitize(e.area)}`;
+    const tip = [
+        `Solicitud #${e.solicitud_id} — Exp #${e.numero} — ${sanitize(e.paciente_nombre)}`,
+        `Solicitado: ${e.fecha_solicitud || '—'} | Entregado: ${entrega}`,
+        `Prestado a: ${sanitize(e.prestado_a)} — ${sanitize(e.area)}`,
+    ].join('&#10;');
     return `
-        <li class="sexp-recup-item${marcado ? ' sexp-recup-item--sel' : ''}" data-id="${e.detalle_id}"
+        <li class="sexp-recup-item${marcado ? ' selected' : ''}" data-id="${e.detalle_id}"
             title="${tip}">
             <span class="sexp-recup-c sexp-recup-c--exp">#${e.numero}</span>
             <span class="sexp-recup-c sexp-recup-c--id">${sanitize(e.paciente_identidad) || 'S/ID'}</span>
             <span class="sexp-recup-c sexp-recup-c--nom">${sanitize(e.paciente_nombre) || 'N/A'}</span>
             <span class="sexp-recup-c sexp-recup-c--sol">Sol.${e.solicitud_id}</span>
-            <span class="sexp-recup-c sexp-recup-c--fec">${_fechaCorta(e.fecha_solicitud)}</span>
-            <span class="sexp-recup-c sexp-recup-c--fec">${e.fecha_entrega ? _fechaCorta(e.fecha_entrega) : 'Sin entregar'}</span>
             <span class="sexp-recup-c sexp-recup-c--per">${sanitize(e.prestado_a) || '—'}</span>
             <span class="sexp-recup-c sexp-recup-c--area">${sanitize(e.area) || '—'}</span>
         </li>`;
@@ -131,9 +109,7 @@ function itemHtml(e, marcado) {
 function pintarIzquierda() {
     const lista = visibles(disponibles(), '#recup-buscar-izq');
     const filas = lista.map(e => itemHtml(e, _selIzq.has(e.detalle_id))).join('');
-    $('#recup-lista-izq').html(filas
-        ? cabeceraHtml() + filas
-        : '<li class="sexp-recup-vacio">Sin expedientes</li>');
+    $('#recup-lista-izq').html(filas || '<li class="sexp-recup-vacio">Sin expedientes</li>');
     $('#recup-total-izq').text(disponibles().length);
     $('#recup-sub-izq').text(lista.length);
 }
@@ -141,9 +117,7 @@ function pintarIzquierda() {
 function pintarDerecha() {
     const lista = visibles(seleccionados(), '#recup-buscar-der');
     const filas = lista.map(e => itemHtml(e, _selDer.has(e.detalle_id))).join('');
-    $('#recup-lista-der').html(filas
-        ? cabeceraHtml() + filas
-        : '<li class="sexp-recup-vacio">Seleccione los expedientes requeridos</li>');
+    $('#recup-lista-der').html(filas || '<li class="sexp-recup-vacio">Seleccione los expedientes requeridos</li>');
     $('#recup-total-der').text(seleccionados().length);
     $('#recup-sub-der').text(lista.length);
 }
@@ -151,20 +125,20 @@ function pintarDerecha() {
 function repintar() { pintarIzquierda(); pintarDerecha(); }
 
 // Marcar/desmarcar un ítem (click) y mover con doble click, como en SDGI.
-$(document).on('click', '#recup-lista-izq .sexp-recup-item:not(.sexp-recup-head)', function () {
+$(document).on('click', '#recup-lista-izq .sexp-recup-item', function () {
     const id = parseInt(this.dataset.id, 10);
     _selIzq.has(id) ? _selIzq.delete(id) : _selIzq.add(id);
     pintarIzquierda();
 });
-$(document).on('click', '#recup-lista-der .sexp-recup-item:not(.sexp-recup-head)', function () {
+$(document).on('click', '#recup-lista-der .sexp-recup-item', function () {
     const id = parseInt(this.dataset.id, 10);
     _selDer.has(id) ? _selDer.delete(id) : _selDer.add(id);
     pintarDerecha();
 });
-$(document).on('dblclick', '#recup-lista-izq .sexp-recup-item:not(.sexp-recup-head)', function () {
+$(document).on('dblclick', '#recup-lista-izq .sexp-recup-item', function () {
     _idsDerecha.add(parseInt(this.dataset.id, 10)); _selIzq.clear(); repintar();
 });
-$(document).on('dblclick', '#recup-lista-der .sexp-recup-item:not(.sexp-recup-head)', function () {
+$(document).on('dblclick', '#recup-lista-der .sexp-recup-item', function () {
     _idsDerecha.delete(parseInt(this.dataset.id, 10)); _selDer.clear(); repintar();
 });
 

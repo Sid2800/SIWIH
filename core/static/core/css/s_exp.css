@@ -3017,62 +3017,44 @@ body.darkmode .sexp-sugerir-tiempo {
 /* ============================================================
    Recuperación de expedientes de urgencia (solo Admisión)
    -----------------------------------------------------------
-   UNA fila por expediente (no un bloque): con varios registros
-   un bloque de 2 líneas se acumula y hace la lista inmanejable.
-   La fila no se parte; si no cabe, el listado desplaza en
-   horizontal. Reusa .listbox/.contendorLista de la Recepción SDGI.
+   UNA fila por expediente. Se usan las MISMAS reglas de color que
+   el listbox de la Recepción SDGI (.listbox li:hover / li.selected):
+   hover gris y, al marcar, fondo var(--negro) con texto
+   var(--blanco). Como son tokens de tema, en modo oscuro se
+   invierten solos, que es justo el comportamiento pedido.
+   NO se define color propio aquí para no pisar esas reglas.
+
+   Tampoco hay cabecera fija: una fila sticky dentro de un <ul> con
+   scroll horizontal se despegaba y se encimaba sobre los datos.
    ============================================================ */
-.contenedorListaRecepcion .listbox {
-    /* Permite ver la fila completa cuando no cabe a lo ancho. */
-    overflow-x: auto;
-}
 .sexp-recup-item {
     display: flex;
     align-items: center;
     gap: 0.8rem;
-    padding: 0.4rem 0.6rem;
-    border-bottom: 1px dashed var(--colorLinea);
-    cursor: pointer;
-    list-style: none;
-    /* La fila se mantiene en una sola línea. */
+    /* .listbox li trae white-space:pre; aquí las columnas son spans. */
     white-space: nowrap;
-    /* .listbox usa 1.7rem: demasiado para 8 datos en línea. */
+    /* .listbox usa 1.7rem: demasiado para varios datos en línea. */
     font-size: 1.25rem;
-    line-height: 1.6;
+    line-height: 1.7;
 }
-.sexp-recup-item:hover { background-color: rgba(0, 139, 139, 0.08); }
-/* Marcado (click) — se moverá con las flechas */
-.sexp-recup-item--sel {
-    background-color: rgba(0, 139, 139, 0.18);
-    box-shadow: inset 3px 0 0 0 var(--colorBoton);
-}
+
 /* Columnas: anchos fijos para que las filas se lean alineadas entre sí. */
 .sexp-recup-c {
     flex: 0 0 auto;
     overflow: hidden;
     text-overflow: ellipsis;
 }
-.sexp-recup-c + .sexp-recup-c { border-left: 1px solid var(--colorLinea); padding-left: 0.8rem; }
-.sexp-recup-c--exp  { width: 7rem;  font-weight: 700; color: var(--colorBoton); }
+.sexp-recup-c--exp  { width: 7rem;  font-weight: 700; }
 .sexp-recup-c--id   { width: 12rem; font-weight: 600; }
-.sexp-recup-c--nom  { width: 21rem; }
-.sexp-recup-c--sol  { width: 6rem;  opacity: 0.85; }
-.sexp-recup-c--fec  { width: 10rem; opacity: 0.85; }
+.sexp-recup-c--nom  { flex: 1 1 auto; min-width: 12rem; }
+.sexp-recup-c--sol  { width: 5.5rem; }
 .sexp-recup-c--per  { width: 14rem; font-weight: 600; }
-.sexp-recup-c--area { width: 13rem; opacity: 0.85; }
+.sexp-recup-c--area { width: 13rem; }
 
-/* Cabecera de columnas: fija arriba y se desplaza en horizontal con las filas. */
-.sexp-recup-head {
-    position: sticky;
-    top: 0;
-    z-index: 1;
-    background-color: var(--colorContendor);
-    font-weight: 700;
-    cursor: default;
-    border-bottom: 1px solid var(--colorBoton);
-}
-.sexp-recup-head:hover { background-color: var(--colorContendor); }
-.sexp-recup-head .sexp-recup-c { color: var(--negro); opacity: 1; }
+/* Hover y marcado heredan el color del <li> (reglas de .listbox),
+   por eso las columnas no fijan color propio. */
+.listbox li:hover .sexp-recup-c,
+.listbox li.selected .sexp-recup-c { color: inherit; }
 
 .sexp-recup-vacio {
     list-style: none;
@@ -3081,7 +3063,10 @@ body.darkmode .sexp-sugerir-tiempo {
     opacity: 0.55;
     font-size: 1.4rem;
     text-transform: none;
+    white-space: normal;
+    cursor: default;
 }
+.sexp-recup-vacio:hover { background-color: transparent !important; color: inherit !important; }
 
 /* El boton de confirmar necesita ancho propio: la regla de SDGI apunta a
    #recepcionIngresoBoton y aqui el id es otro, por eso el texto se desbordaba. */
