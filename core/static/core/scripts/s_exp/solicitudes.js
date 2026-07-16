@@ -66,6 +66,9 @@ $(document).ready(function () {
             }, false);
         }, 5, { etiqueta: 'solicitudes' });
     }
+
+    // ===== Recordatorio de préstamos pendientes (modal cada 5 min) =====
+    SexpPendientes.iniciar();
 });
 
 /**
@@ -81,6 +84,8 @@ function mostrarInfoExpediente(info) {
     const labelEstado = {
         'rechazado': '<span class="sexp-exp-info-estado--rec"><i class="bi bi-x-circle-fill"></i> No prestado</span>',
         'pendiente': '<span class="sexp-exp-info-estado--pend"><i class="bi bi-hourglass-split"></i> Pendiente de devolver</span>',
+        // Préstamo pendiente: encontrado pero aún no entregado (reservado).
+        'prestamo_pendiente': '<span class="sexp-exp-info-estado--prest-pend"><i class="bi bi-clock-history"></i> Pendiente de entrega</span>',
         'late': '<span class="sexp-exp-info-estado--late"><i class="bi bi-exclamation-triangle-fill"></i> Devuelto fuera de tiempo</span>',
         'devuelto': '<span class="sexp-exp-info-estado--ok"><i class="bi bi-check-circle-fill"></i> Devuelto correctamente</span>',
         'normal': '<span class="sexp-exp-info-estado--ok"><i class="bi bi-circle-fill"></i> En proceso</span>'
@@ -118,6 +123,13 @@ function mostrarInfoExpediente(info) {
         filas += `<div class="sexp-exp-info-fila">
             <span class="sexp-exp-info-label">Comentario:</span>
             <span class="sexp-exp-info-valor">${info.comentario_devolucion}</span>
+        </div>`;
+    }
+    // Motivo por el que quedó pendiente de entrega (préstamo pendiente).
+    if (info.comentario_pendiente) {
+        filas += `<div class="sexp-exp-info-fila">
+            <span class="sexp-exp-info-label">Pendiente:</span>
+            <span class="sexp-exp-info-valor">${info.comentario_pendiente}</span>
         </div>`;
     }
 
@@ -184,6 +196,15 @@ function initTabla() {
                             cls = 'sexp-exp-tag sexp-exp-tag--rechazado';
                             title = e.motivo_rechazo_individual ? `No prestado: ${e.motivo_rechazo_individual}` : 'No prestado';
                             estadoTag = 'rechazado';
+                        } else if (e.prestamo_pendiente) {
+                            // Préstamo pendiente (morado): se encontró pero no se entregó.
+                            // Tiene prioridad sobre "pendiente de devolver" porque el
+                            // expediente sigue reservado aunque el resto ya se entregó.
+                            cls = 'sexp-exp-tag sexp-exp-tag--prestamo-pendiente';
+                            title = e.comentario_pendiente
+                                ? `Pendiente de entrega: ${e.comentario_pendiente}`
+                                : 'Pendiente de entrega';
+                            estadoTag = 'prestamo_pendiente';
                         } else if (enPrestamo && e.devuelto === false) {
                             cls = 'sexp-exp-tag sexp-exp-tag--pendiente';
                             title = 'Pendiente de devolver';
@@ -201,7 +222,8 @@ function initTabla() {
                             paciente_nombre: e.paciente_nombre || '',
                             paciente_identidad: e.paciente_identidad || '',
                             motivo_rechazo: e.motivo_rechazo_individual || '',
-                            comentario_devolucion: e.comentario_devolucion || ''
+                            comentario_devolucion: e.comentario_devolucion || '',
+                            comentario_pendiente: e.comentario_pendiente || ''
                         };
                         const dataAttr = `data-info="${sanitize(JSON.stringify(info))}"`;
                         const onClick = `onclick="mostrarInfoExpediente(JSON.parse(this.getAttribute('data-info')))"`;
@@ -243,6 +265,23 @@ function initTabla() {
                         <button class="sexp-action-btn sexp-action-btn--imprimir" onclick="imprimirSolicitud(${data.id})">
                             <i class="bi bi-printer"></i> Imprimir
                         </button>`;
+
+                    // Préstamos pendientes: aparecen SIEMPRE que la solicitud tenga
+                    // algún expediente marcado, sin importar el estado del flujo,
+                    // porque siguen pendientes aunque el resto ya se haya entregado.
+                    const nPendientes = (data.expedientes || []).filter(e => e.prestamo_pendiente).length;
+                    const btnsPendientes = nPendientes ? `
+                        <button class="sexp-action-btn sexp-action-btn--entregar-pend"
+                                title="Entregar los ${nPendientes} expediente(s) que quedaron pendientes"
+                                onclick="entregarPendientes(${data.id}, ${nPendientes})">
+                            <i class="bi bi-box-arrow-up-right"></i> Entregar pendientes (${nPendientes})
+                        </button>
+                        <button class="sexp-action-btn sexp-action-btn--cancelar-pend"
+                                title="Cancelar los pendientes: los expedientes vuelven a estar disponibles"
+                                onclick="cancelarPendientes(${data.id}, ${nPendientes})">
+                            <i class="bi bi-x-octagon"></i> Cancelar pendientes
+                        </button>` : '';
+
                     if (data.estado_flujo === 'SOL_APROBADA_ORGANIZANDO') {
                         const haImpreso = sexpFlujoLocal.haImpreso(data.id);
                         const haRevisado = sexpFlujoLocal.haRevisado(data.id);
@@ -275,6 +314,7 @@ function initTabla() {
                                 ${btnImprimir}
                                 ${btnRevisar}
                                 ${btnListo}
+                                ${btnsPendientes}
                             </div>`;
                     }
                     if (data.estado_flujo === 'SOL_LISTO_RECOGER') {
@@ -284,13 +324,15 @@ function initTabla() {
                                 <button class="sexp-action-btn sexp-action-btn--entregar" onclick="entregarPrestamoDesdeGestion(${data.prestamo_id || 0}, ${data.id})">
                                     <i class="bi bi-box-arrow-up-right"></i> Entregar
                                 </button>
+                                ${btnsPendientes}
                             </div>`;
                     }
                     const estadosImprimibles = ['SOL_EN_PRESTAMO', 'SOL_EN_DEVOLUCION', 'SOL_FINALIZADA', 'SOL_INCOMPLETA'];
                     if (estadosImprimibles.includes(data.estado_flujo)) {
-                        return btnImprimir;
+                        return `<div class="sexp-action-group">${btnImprimir}${btnsPendientes}</div>`;
                     }
-                    return '';
+                    // Otros estados (p. ej. rechazada): solo se muestran los pendientes si los hay.
+                    return btnsPendientes ? `<div class="sexp-action-group">${btnsPendientes}</div>` : '';
                 }
             }
         ],
@@ -1022,3 +1064,176 @@ function entregarPrestamoDesdeGestion(prestamoId, solicitudId) {
         });
     });
 }
+
+
+/* =============================================================================
+ * PRÉSTAMOS PENDIENTES (estado EXP_PENDIENTE_PRESTAMO)
+ * -----------------------------------------------------------------------------
+ * Origen: en la "Revisión de Entrega" el admin marca un expediente como
+ * "préstamo pendiente" (lo encontró pero no lo entrega todavía). Ese expediente
+ * queda RESERVADO y no se entrega con el resto de la solicitud, así que sigue
+ * pendiente hasta que el admin ejecute una de estas dos acciones.
+ * =========================================================================== */
+
+/**
+ * Cuerpo común de "Entregar pendientes" / "Cancelar pendientes".
+ * Ambas confirman con el mismo modal y solo cambian textos y endpoint, por eso
+ * comparten esta función (reusa las clases de modal ya existentes del módulo).
+ *
+ * @param {Object} cfg - {url, titulo, html, confirmText, icon, okMsg, solicitudId}
+ */
+function _resolverPendientes(cfg) {
+    Swal.fire({
+        title: cfg.titulo,
+        html: cfg.html,
+        icon: cfg.icon || 'question',
+        showCancelButton: true,
+        confirmButtonText: cfg.confirmText,
+        cancelButtonText: '<i class="bi bi-x-circle-fill"></i> Cancelar',
+        customClass: {
+            popup: 'contenedor-modal',
+            title: 'contener-modal-titulo',
+            confirmButton: 'contener-modal-boton-confirmar',
+            cancelButton: 'contener-modal-boton-cancelar',
+        },
+        didOpen: () => {
+            const actionsContainer = document.querySelector('.swal2-actions');
+            if (actionsContainer) actionsContainer.classList.add('contener-modal-contenedor-botones');
+        }
+    }).then(function (result) {
+        if (!result.isConfirmed) return;
+        $.ajax({
+            url: cfg.url,
+            method: 'POST',
+            headers: { 'X-CSRFToken': window.CSRF_TOKEN },
+            contentType: 'application/json',
+            data: JSON.stringify({ solicitud_id: cfg.solicitudId }),
+            success: function (resp) {
+                if (resp.success) {
+                    toastr.success(cfg.okMsg.replace('{n}', resp.resueltos));
+                    // La tabla se recarga sola; NO se re-chequean los pendientes aquí
+                    // para no reabrir el modal recordatorio justo después de actuar.
+                    if (typeof tablaSolicitudes !== 'undefined') tablaSolicitudes.ajax.reload(null, false);
+                }
+            },
+            error: function (xhr) {
+                const err = xhr.responseJSON ? xhr.responseJSON.error : 'Error desconocido';
+                toastr.error(err);
+            }
+        });
+    });
+}
+
+/** Entrega los expedientes que quedaron pendientes (pasan a EXP_PRESTADO). */
+function entregarPendientes(solicitudId, cantidad) {
+    _resolverPendientes({
+        url: window.urls.s_exp_entregar_pendientes_api,
+        solicitudId: solicitudId,
+        titulo: '¿Entregar pendientes?',
+        html: `Se entregarán <strong>${cantidad}</strong> expediente(s) que quedaron pendientes de la solicitud <strong>#${solicitudId}</strong>. Pasarán a estar prestados y se moverán a la unidad del solicitante.`,
+        confirmText: '<i class="bi bi-check-circle-fill"></i> Sí, entregar',
+        okMsg: '{n} préstamo(s) pendiente(s) entregado(s).',
+    });
+}
+
+/** Cancela los pendientes: los expedientes vuelven a estar disponibles. */
+function cancelarPendientes(solicitudId, cantidad) {
+    _resolverPendientes({
+        url: window.urls.s_exp_cancelar_pendientes_api,
+        solicitudId: solicitudId,
+        titulo: '¿Cancelar pendientes?',
+        html: `Se cancelarán <strong>${cantidad}</strong> préstamo(s) pendiente(s) de la solicitud <strong>#${solicitudId}</strong>.<br><br>Los expedientes quedarán <strong>disponibles</strong> de nuevo y se registrarán como <strong>NO prestados</strong> en la solicitud.`,
+        icon: 'warning',
+        confirmText: '<i class="bi bi-x-octagon-fill"></i> Sí, cancelar',
+        okMsg: '{n} préstamo(s) pendiente(s) cancelado(s).',
+    });
+}
+
+
+/* =============================================================================
+ * SexpPendientes — Alerta periódica de préstamos pendientes (cada 5 min)
+ * -----------------------------------------------------------------------------
+ * Si el admin dejó expedientes marcados como "préstamo pendiente" y no ejecuta
+ * "Entregar pendientes" ni "Cancelar pendientes", cada 5 minutos se le recuerda
+ * con un modal.
+ *
+ * Reusa infraestructura existente en vez de crear cosas nuevas:
+ *   - RealtimeSExp.registrar(): polling que se pausa solo cuando la pestaña no
+ *     está visible, con backoff ante errores y sin renovar la sesión
+ *     (header X-Polling-Request).
+ *   - Clases de modal del módulo (contenedor-modal, contener-modal-*).
+ * =========================================================================== */
+const SexpPendientes = (function () {
+    'use strict';
+
+    const INTERVALO_SEG = 300; // 5 minutos
+
+    /** Arma y muestra el modal recordatorio con el detalle por solicitud. */
+    function _mostrarAlerta(resp) {
+        // No interrumpir si el admin ya tiene otro modal abierto (p. ej. la
+        // revisión de entrega): se le recordará en el siguiente ciclo.
+        if (Swal.isVisible()) return;
+
+        const filas = (resp.data || []).map(function (s) {
+            const exps = (s.expedientes || []).map(e => `#${e.numero}`).join(', ');
+            return `
+                <div class="sexp-exp-info-fila">
+                    <span class="sexp-exp-info-label">Solicitud #${s.solicitud_id}</span>
+                    <span class="sexp-exp-info-valor">
+                        <strong>${s.expedientes.length}</strong> pendiente(s): ${exps}
+                        <br><small>${s.usuario_nombre || ''}${s.unidad ? ' — ' + s.unidad : ''}</small>
+                    </span>
+                </div>`;
+        }).join('');
+
+        Swal.fire({
+            title: 'Préstamos pendientes sin resolver',
+            html: `
+                <div class="sexp-exp-info-popup">
+                    <p class="sexp-auditoria-help">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        Hay <strong>${resp.total}</strong> expediente(s) marcados como
+                        <strong>préstamo pendiente</strong>. Siguen reservados (no disponibles).
+                        Use <strong>Entregar pendientes</strong> o <strong>Cancelar pendientes</strong>
+                        en la solicitud correspondiente.
+                    </p>
+                    ${filas}
+                </div>`,
+            icon: 'warning',
+            confirmButtonText: '<i class="bi bi-check-circle-fill"></i> Entendido',
+            customClass: {
+                popup: 'contenedor-modal',
+                title: 'contener-modal-titulo',
+                confirmButton: 'contener-modal-boton-confirmar',
+            },
+            didOpen: () => {
+                const actionsContainer = document.querySelector('.swal2-actions');
+                if (actionsContainer) actionsContainer.classList.add('contener-modal-contenedor-botones-min');
+            }
+        });
+    }
+
+    /** Consulta la API y alerta solo si quedan pendientes. */
+    function revisarAhora() {
+        if (!window.urls || !window.urls.s_exp_pendientes_prestamo_api) return;
+        $.ajax({
+            url: window.urls.s_exp_pendientes_prestamo_api,
+            method: 'GET',
+            // No renovar la sesión por una comprobación automática.
+            beforeSend: function (xhr) { xhr.setRequestHeader('X-Polling-Request', 'true'); },
+            success: function (resp) {
+                if (resp && resp.total > 0) _mostrarAlerta(resp);
+            },
+            error: function () { /* silencioso: es un recordatorio, no crítico */ }
+        });
+    }
+
+    /** Registra la revisión periódica (5 min). */
+    function iniciar() {
+        if (window.RealtimeSExp) {
+            RealtimeSExp.registrar('pendientes-prestamo', revisarAhora, INTERVALO_SEG);
+        }
+    }
+
+    return { iniciar: iniciar, revisarAhora: revisarAhora };
+})();

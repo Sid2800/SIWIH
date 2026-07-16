@@ -129,6 +129,20 @@ body.darkmode .sexp-exp-tag--pendiente {
     border-color: rgba(234, 179, 8, 0.55);
 }
 
+/* Préstamo pendiente (morado): encontrado pero aún no entregado; reservado. */
+.sexp-exp-tag--prestamo-pendiente {
+    background: rgba(139, 92, 246, 0.18);
+    color: var(--negro);
+    border: 1px solid rgba(139, 92, 246, 0.6);
+    font-weight: 700;
+}
+
+body.darkmode .sexp-exp-tag--prestamo-pendiente {
+    color: #c4b5fd;
+    background: rgba(139, 92, 246, 0.25);
+    border-color: rgba(139, 92, 246, 0.65);
+}
+
 
 /* ======= Estado Badges para DataTable (Gestión Solicitudes) =======
    Colores que funcionan correctamente en modo claro Y oscuro.
@@ -255,6 +269,19 @@ body.darkmode .sexp-exp-tag--pendiente {
     background: rgba(13, 148, 136, 0.2);
     color: #0d9488;
     border: 1px solid rgba(13, 148, 136, 0.4);
+}
+
+/* Acciones de préstamos pendientes (morado = pendiente, rojo = cancelar) */
+.sexp-action-btn--entregar-pend {
+    background: rgba(139, 92, 246, 0.2);
+    color: #6d28d9;
+    border: 1px solid rgba(139, 92, 246, 0.45);
+}
+
+.sexp-action-btn--cancelar-pend {
+    background: rgba(239, 68, 68, 0.15);
+    color: #b91c1c;
+    border: 1px solid rgba(239, 68, 68, 0.4);
 }
 
 
@@ -1016,6 +1043,12 @@ Usa colores del sistema (colorBoton, colorContendor, etc.)
 
 .sexp-exp-info-popup .sexp-exp-info-estado--pend {
     color: #d97706;
+    font-weight: 700;
+}
+
+/* Préstamo pendiente (morado) en el popup de info del expediente */
+.sexp-exp-info-popup .sexp-exp-info-estado--prest-pend {
+    color: #7c3aed;
     font-weight: 700;
 }
 
@@ -2465,6 +2498,19 @@ body.darkmode .sexp-exp-tag.sexp-exp-tag--pendiente {
     color: #fbbf24 !important;
     background: rgba(234, 179, 8, 0.25) !important;
     border-color: rgba(234, 179, 8, 0.6) !important;
+}
+
+/* Préstamo pendiente (morado) — misma especificidad que el resto de tags */
+.sexp-exp-tag.sexp-exp-tag--prestamo-pendiente {
+    background: rgba(139, 92, 246, 0.22) !important;
+    color: var(--negro) !important;
+    border: 1px solid rgba(139, 92, 246, 0.65) !important;
+    font-weight: 700 !important;
+}
+body.darkmode .sexp-exp-tag.sexp-exp-tag--prestamo-pendiente {
+    color: #c4b5fd !important;
+    background: rgba(139, 92, 246, 0.28) !important;
+    border-color: rgba(139, 92, 246, 0.65) !important;
 }
 
 .sexp-exp-tag.sexp-exp-tag--late {

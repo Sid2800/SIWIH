@@ -163,6 +163,11 @@ class DatosDetalleSolicitud:
             # None si aún no ha decidido. La usa el admin para precargar auditoría.
             'usuario_solicita_devolver': detalle.usuario_solicita_devolver,
             'comentario_usuario_devolucion': detalle.comentario_usuario_devolucion or '',
+            # Préstamo pendiente: el expediente se encontró pero no se entregó
+            # todavía; queda reservado (EXP_PENDIENTE_PRESTAMO) y se muestra en
+            # morado hasta que el admin lo entregue o cancele el pendiente.
+            'prestamo_pendiente': bool(detalle.prestamo_pendiente),
+            'comentario_pendiente': detalle.comentario_pendiente or '',
         }
 
 
