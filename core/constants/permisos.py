@@ -309,6 +309,18 @@ ROLES_GLOBALES = ['directivo', 'admin']
 S_EXP_ADMIN_ROLES = ['admin']
 S_EXP_ADMIN_UNIDADES = ['ADMI']
 
+# Recuperación de expedientes de URGENCIA: forzar la devolución inmediata de un
+# expediente prestado, saltándose el flujo normal (emergencias).
+# Es exclusivo de Admisión: son quienes reciben físicamente el expediente.
+# Se separa de S_EXP_ADMIN_ROLES a propósito:
+#   - S_EXP_ADMIN_ROLES = ['admin'] dejaría fuera al personal real de Admisión,
+#     que en la práctica tiene rol 'digitador' en la unidad ADMI.
+#   - es_exp_admin() sería demasiado amplio: incluye digitador/directivo de
+#     CUALQUIER unidad, y esta acción no le corresponde a otras áreas.
+# staff/superuser tienen acceso siempre (se resuelve en el servicio).
+S_EXP_RECUPERACION_ROLES = ['admin', 'digitador']
+S_EXP_RECUPERACION_UNIDADES = ['ADMI']
+
 # Acceso de usuario solicitante (buscar, solicitar, seguimiento)
 S_EXP_SOLICITANTE_ROLES = ['admin', 'digitador', 'directivo']
 S_EXP_SOLICITANTE_UNIDADES = [
