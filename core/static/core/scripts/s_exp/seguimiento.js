@@ -257,9 +257,14 @@ function renderSolicitudes(data, filtro = '') {
 }
 
 // customClass reutilizable para los modales de devolución (estilo del sistema).
+// Ancho de los modales de devolución. El default de SweetAlert (32rem) se ve
+// muy pequeño para estos textos, por eso se define aquí una sola vez.
+const _SEXP_DEV_MODAL_ANCHO = '46rem';
+
 const _SEXP_DEV_MODAL_CLASS = {
     icon: 'contenedor-modal-icon',
-    popup: 'contenedor-modal',
+    // sexp-modal-grande agranda tipografía y botones (clase ya existente).
+    popup: 'contenedor-modal sexp-modal-grande',
     title: 'contener-modal-titulo',
     confirmButton: 'contener-modal-boton-confirmar',
     cancelButton: 'contener-modal-boton-cancelar',
@@ -338,6 +343,7 @@ function devolucionCompleta(solicitudId) {
         showCancelButton: true,
         confirmButtonText: '<i class="bi bi-check-circle-fill"></i> Sí, devolver todos',
         cancelButtonText: '<i class="bi bi-x-circle-fill"></i> Cancelar',
+        width: _SEXP_DEV_MODAL_ANCHO,
         customClass: _SEXP_DEV_MODAL_CLASS,
         didOpen: _sexpDevModalDidOpen
     }).then((result) => {
@@ -502,6 +508,7 @@ function devolucionFueraHorario(solicitudId) {
         html: 'Este proceso está <strong>en construcción</strong> y estará disponible próximamente.',
         icon: 'info',
         confirmButtonText: 'Entendido',
+        width: _SEXP_DEV_MODAL_ANCHO,
         customClass: _SEXP_DEV_MODAL_CLASS,
         didOpen: _sexpDevModalDidOpen
     });
@@ -517,98 +524,3 @@ function toggleCard(headerEl) {
     card.toggleClass('sexp-collapsed');
 }
 
-/**
- * Muestra un popup con la información del expediente al tocar/clickear el tag.
- * Útil en móvil/tablet donde el tooltip nativo no aparece sin mouse.
- * @param {Object} info - Datos del expediente y su estado.
- */
-function mostrarInfoExpediente(info) {
-    if (!info) return;
-    info = info || {};
-    const num = info.numero || '—';
-    const estado = info.estado || 'normal';
-
-    const labelEstado = {
-        'rechazado': '<span class="sexp-exp-info-estado--rec"><i class="bi bi-x-circle-fill"></i> No prestado</span>',
-        'pendiente': '<span class="sexp-exp-info-estado--pend"><i class="bi bi-hourglass-split"></i> Pendiente de devolver</span>',
-        'prestamo_pendiente': '<span class="sexp-exp-info-estado--prest-pend"><i class="bi bi-clock-history"></i> Pendiente de entrega</span>',
-        'late': '<span class="sexp-exp-info-estado--late"><i class="bi bi-exclamation-triangle-fill"></i> Devuelto fuera de tiempo</span>',
-        'devuelto': '<span class="sexp-exp-info-estado--ok"><i class="bi bi-check-circle-fill"></i> Devuelto correctamente</span>',
-        'normal': '<span class="sexp-exp-info-estado--ok"><i class="bi bi-circle-fill"></i> En proceso</span>'
-    };
-
-    let filas = `
-        <div class="sexp-exp-info-fila">
-            <span class="sexp-exp-info-label">Expediente:</span>
-            <span class="sexp-exp-info-valor"><strong>#${num}</strong></span>
-        </div>
-        <div class="sexp-exp-info-fila">
-            <span class="sexp-exp-info-label">Estado:</span>
-            <span class="sexp-exp-info-valor">${labelEstado[estado] || labelEstado.normal}</span>
-        </div>`;
-
-    // ---- Trazabilidad de horas (solicitud / entrega / devolución) ----
-    // La entrega y la devolución son POR expediente: con préstamos pendientes y
-    // devoluciones parciales cada uno puede tener su propia fecha.
-    if (info.fecha_solicitud) {
-        filas += `<div class="sexp-exp-info-fila">
-            <span class="sexp-exp-info-label">Solicitado:</span>
-            <span class="sexp-exp-info-valor">${info.fecha_solicitud}</span>
-        </div>`;
-    }
-    filas += `<div class="sexp-exp-info-fila">
-            <span class="sexp-exp-info-label">Recibido (entrega):</span>
-            <span class="sexp-exp-info-valor">${info.fecha_entrega || '<span class="sexp-opacity-5">Sin entregar</span>'}</span>
-        </div>`;
-    filas += `<div class="sexp-exp-info-fila">
-            <span class="sexp-exp-info-label">Devuelto:</span>
-            <span class="sexp-exp-info-valor">${info.fecha_devolucion || '<span class="sexp-opacity-5">Sin devolver</span>'}</span>
-        </div>`;
-
-    if (info.paciente_identidad) {
-        filas += `<div class="sexp-exp-info-fila">
-            <span class="sexp-exp-info-label">Identidad:</span>
-            <span class="sexp-exp-info-valor">${info.paciente_identidad}</span>
-        </div>`;
-    }
-    if (info.paciente_nombre) {
-        filas += `<div class="sexp-exp-info-fila">
-            <span class="sexp-exp-info-label">Paciente:</span>
-            <span class="sexp-exp-info-valor">${info.paciente_nombre}</span>
-        </div>`;
-    }
-    if (info.motivo_rechazo) {
-        filas += `<div class="sexp-exp-info-fila">
-            <span class="sexp-exp-info-label">Motivo:</span>
-            <span class="sexp-exp-info-valor">${info.motivo_rechazo}</span>
-        </div>`;
-    }
-    if (info.comentario_pendiente) {
-        filas += `<div class="sexp-exp-info-fila">
-            <span class="sexp-exp-info-label">Pendiente:</span>
-            <span class="sexp-exp-info-valor">${info.comentario_pendiente}</span>
-        </div>`;
-    }
-    if (info.comentario_devolucion) {
-        filas += `<div class="sexp-exp-info-fila">
-            <span class="sexp-exp-info-label">Comentario:</span>
-            <span class="sexp-exp-info-valor">${info.comentario_devolucion}</span>
-        </div>`;
-    }
-
-    Swal.fire({
-        title: `Expediente #${num}`,
-        html: `<div class="sexp-exp-info-popup">${filas}</div>`,
-        showCancelButton: false,
-        confirmButtonText: '<i class="bi bi-check-circle-fill"></i> Cerrar',
-        customClass: {
-            popup: 'contenedor-modal',
-            title: 'contener-modal-titulo',
-            confirmButton: 'contener-modal-boton-confirmar',
-        },
-        didOpen: () => {
-            const actionsContainer = document.querySelector('.swal2-actions');
-            if (actionsContainer) actionsContainer.classList.add('contener-modal-contenedor-botones-min');
-        }
-    });
-}

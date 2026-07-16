@@ -242,56 +242,8 @@ def marcar_entregado_api(request):
 # el admin ejecute una de estas dos acciones:
 #   - entregar_pendientes_api  -> pasa a EXP_PRESTADO (se entrega de verdad).
 #   - cancelar_pendientes_api  -> pasa a EXP_DISPONIBLE (se libera, no se presta).
-# pendientes_prestamo_api alimenta la alerta periódica (cada 5 min) del admin.
+# Los botones de ambas acciones solo aparecen una vez entregada la solicitud.
 # ============================================================================
-
-@require_GET
-def pendientes_prestamo_api(request):
-    """
-    Lista los expedientes marcados como "préstamo pendiente" agrupados por solicitud.
-
-    La usa la alerta periódica del admin (cada 5 min) y los listados para saber
-    si hay pendientes sin resolver. Rendimiento: un solo queryset con
-    select_related, sin N+1 dentro del loop.
-    """
-    if not _es_exp_admin(request.user):
-        return JsonResponse({"error": "Sin permisos"}, status=403)
-
-    try:
-        from s_exp.models import SolicitudExpedienteDetalle
-        from s_exp.services.datos_solicitud import DatosDetalleSolicitud, DatosSolicitud
-
-        qs = SolicitudExpedienteDetalle.objects.select_related(
-            'expediente_prestamo__expediente', 'paciente',
-            'solicitud__usuario', 'solicitud__servicio_unidad',
-        ).filter(prestamo_pendiente=True, aprobado=True)
-
-        # Agrupar por solicitud para que la alerta muestre "Solicitud #X: N exp."
-        por_solicitud = {}
-        for d in qs:
-            s = d.solicitud
-            item = por_solicitud.setdefault(s.id, {
-                "solicitud_id": s.id,
-                "usuario_nombre": DatosSolicitud.usuario_nombre_completo(s),
-                "unidad": DatosSolicitud.unidad_nombre(s),
-                "expedientes": [],
-            })
-            item["expedientes"].append({
-                "detalle_id": d.id,
-                "numero": DatosDetalleSolicitud.numero_expediente(d),
-                "paciente_nombre": DatosDetalleSolicitud.paciente_nombre_completo(d),
-                "paciente_identidad": DatosDetalleSolicitud.paciente_dni(d),
-                "comentario": d.comentario_pendiente or '',
-            })
-
-        data = list(por_solicitud.values())
-        total = sum(len(i["expedientes"]) for i in data)
-        return JsonResponse({"data": data, "total": total})
-
-    except Exception as e:
-        log_error(f"Error en pendientes_prestamo_api: {e}", app=LogApp.S_EXP)
-        return JsonResponse({"error": "Error interno del servidor"}, status=500)
-
 
 def _resolver_pendientes(request, accion):
     """

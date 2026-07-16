@@ -475,7 +475,6 @@
          s_exp_rechazar_solicitud_api: "{% url 's_exp_rechazar_solicitud_api' %}",
          s_exp_prestamos_activos_api: "{% url 's_exp_prestamos_activos_api' %}",
          s_exp_marcar_entregado_api: "{% url 's_exp_marcar_entregado_api' %}",
-         s_exp_pendientes_prestamo_api: "{% url 's_exp_pendientes_prestamo_api' %}",
          s_exp_entregar_pendientes_api: "{% url 's_exp_entregar_pendientes_api' %}",
          s_exp_cancelar_pendientes_api: "{% url 's_exp_cancelar_pendientes_api' %}",
          s_exp_prestamos_devolucion_api: "{% url 's_exp_prestamos_devolucion_api' %}",
@@ -549,6 +548,7 @@
    <!-- Realtime + Notificaciones globales s_exp -->
    {% if user.is_authenticated %}
    <script src="{% static 'core/scripts/s_exp/realtime.js' %}"></script>
+   <script src="{% static 'core/scripts/s_exp/expediente_info.js' %}"></script>
    <script src="{% static 'core/scripts/s_exp/notificaciones_globales.js' %}"></script>
    {% endif %}
 

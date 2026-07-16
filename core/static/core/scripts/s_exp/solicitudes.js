@@ -66,89 +66,7 @@ $(document).ready(function () {
             }, false);
         }, 5, { etiqueta: 'solicitudes' });
     }
-
-    // ===== Recordatorio de préstamos pendientes (modal cada 5 min) =====
-    SexpPendientes.iniciar();
 });
-
-/**
- * Muestra un popup con la información del expediente al tocar/clickear el tag.
- * Útil en móvil/tablet donde el tooltip nativo no aparece sin mouse.
- * @param {Object} info - Datos del expediente y su estado.
- */
-function mostrarInfoExpediente(info) {
-    if (!info) return;
-    const num = info.numero || '—';
-    const estado = info.estado || 'normal';
-
-    const labelEstado = {
-        'rechazado': '<span class="sexp-exp-info-estado--rec"><i class="bi bi-x-circle-fill"></i> No prestado</span>',
-        'pendiente': '<span class="sexp-exp-info-estado--pend"><i class="bi bi-hourglass-split"></i> Pendiente de devolver</span>',
-        // Préstamo pendiente: encontrado pero aún no entregado (reservado).
-        'prestamo_pendiente': '<span class="sexp-exp-info-estado--prest-pend"><i class="bi bi-clock-history"></i> Pendiente de entrega</span>',
-        'late': '<span class="sexp-exp-info-estado--late"><i class="bi bi-exclamation-triangle-fill"></i> Devuelto fuera de tiempo</span>',
-        'devuelto': '<span class="sexp-exp-info-estado--ok"><i class="bi bi-check-circle-fill"></i> Devuelto correctamente</span>',
-        'normal': '<span class="sexp-exp-info-estado--ok"><i class="bi bi-circle-fill"></i> En proceso</span>'
-    };
-
-    let filas = `
-        <div class="sexp-exp-info-fila">
-            <span class="sexp-exp-info-label">Expediente:</span>
-            <span class="sexp-exp-info-valor"><strong>#${num}</strong></span>
-        </div>
-        <div class="sexp-exp-info-fila">
-            <span class="sexp-exp-info-label">Estado:</span>
-            <span class="sexp-exp-info-valor">${labelEstado[estado] || labelEstado.normal}</span>
-        </div>`;
-
-    if (info.paciente_identidad) {
-        filas += `<div class="sexp-exp-info-fila">
-            <span class="sexp-exp-info-label">Identidad:</span>
-            <span class="sexp-exp-info-valor">${info.paciente_identidad}</span>
-        </div>`;
-    }
-    if (info.paciente_nombre) {
-        filas += `<div class="sexp-exp-info-fila">
-            <span class="sexp-exp-info-label">Paciente:</span>
-            <span class="sexp-exp-info-valor">${info.paciente_nombre}</span>
-        </div>`;
-    }
-    if (info.motivo_rechazo) {
-        filas += `<div class="sexp-exp-info-fila">
-            <span class="sexp-exp-info-label">Motivo:</span>
-            <span class="sexp-exp-info-valor">${info.motivo_rechazo}</span>
-        </div>`;
-    }
-    if (info.comentario_devolucion) {
-        filas += `<div class="sexp-exp-info-fila">
-            <span class="sexp-exp-info-label">Comentario:</span>
-            <span class="sexp-exp-info-valor">${info.comentario_devolucion}</span>
-        </div>`;
-    }
-    // Motivo por el que quedó pendiente de entrega (préstamo pendiente).
-    if (info.comentario_pendiente) {
-        filas += `<div class="sexp-exp-info-fila">
-            <span class="sexp-exp-info-label">Pendiente:</span>
-            <span class="sexp-exp-info-valor">${info.comentario_pendiente}</span>
-        </div>`;
-    }
-
-    Swal.fire({
-        title: `Expediente #${num}`,
-        html: `<div class="sexp-exp-info-popup">${filas}</div>`,
-        showCancelButton: false,
-        confirmButtonText: '<i class="bi bi-check-circle-fill"></i> Cerrar',
-        customClass: {
-            popup: 'contenedor-modal',
-            title: 'contener-modal-titulo',
-            confirmButton: 'contener-modal-boton-confirmar',
-        },
-        didOpen: () => {
-            const actionsContainer = document.querySelector('.swal2-actions');
-            if (actionsContainer) actionsContainer.classList.add('contener-modal-contenedor-botones-min');
-        }
-    });
-}
 
 /**
  * Inicializa el DataTable de gestión de solicitudes.
@@ -1098,11 +1016,12 @@ function _resolverPendientes(cfg) {
         title: cfg.titulo,
         html: cfg.html,
         icon: cfg.icon || 'question',
+        width: '46rem',
         showCancelButton: true,
         confirmButtonText: cfg.confirmText,
         cancelButtonText: '<i class="bi bi-x-circle-fill"></i> Cancelar',
         customClass: {
-            popup: 'contenedor-modal',
+            popup: 'contenedor-modal sexp-modal-grande',
             title: 'contener-modal-titulo',
             confirmButton: 'contener-modal-boton-confirmar',
             cancelButton: 'contener-modal-boton-cancelar',
@@ -1159,106 +1078,3 @@ function cancelarPendientes(solicitudId, cantidad) {
         okMsg: '{n} préstamo(s) pendiente(s) cancelado(s).',
     });
 }
-
-
-/* =============================================================================
- * SexpPendientes — Alerta periódica de préstamos pendientes (cada 5 min)
- * -----------------------------------------------------------------------------
- * Si el admin dejó expedientes marcados como "préstamo pendiente" y no ejecuta
- * "Entregar pendientes" ni "Cancelar pendientes", cada 5 minutos se le recuerda
- * con un modal.
- *
- * Reusa infraestructura existente en vez de crear cosas nuevas:
- *   - RealtimeSExp.registrar(): polling que se pausa solo cuando la pestaña no
- *     está visible, con backoff ante errores y sin renovar la sesión
- *     (header X-Polling-Request).
- *   - Clases de modal del módulo (contenedor-modal, contener-modal-*).
- * =========================================================================== */
-const SexpPendientes = (function () {
-    'use strict';
-
-    const INTERVALO_SEG = 300; // 5 minutos
-
-    // Momento del último aviso. RealtimeSExp.reanudar() vuelve a ejecutar el
-    // chequeo EN CUANTO la pestaña recupera visibilidad, así que sin este
-    // control el modal salía apenas se volvía a la pestaña. Con esto el aviso
-    // respeta siempre los 5 minutos, sin importar qué dispare el chequeo.
-    let ultimaAlerta = 0;
-
-    /** Arma y muestra el modal recordatorio con el detalle por solicitud. */
-    function _mostrarAlerta(resp) {
-        // No interrumpir si el admin ya tiene otro modal abierto (p. ej. la
-        // revisión de entrega): se le recordará en el siguiente ciclo.
-        if (Swal.isVisible()) return;
-        // Respetar el intervalo real entre avisos.
-        if (Date.now() - ultimaAlerta < INTERVALO_SEG * 1000) return;
-
-        const filas = (resp.data || []).map(function (s) {
-            const exps = (s.expedientes || []).map(e => `#${e.numero}`).join(', ');
-            return `
-                <div class="sexp-exp-info-fila">
-                    <span class="sexp-exp-info-label">Solicitud #${s.solicitud_id}</span>
-                    <span class="sexp-exp-info-valor">
-                        <strong>${s.expedientes.length}</strong> pendiente(s): ${exps}
-                        <br><small>${s.usuario_nombre || ''}${s.unidad ? ' — ' + s.unidad : ''}</small>
-                    </span>
-                </div>`;
-        }).join('');
-
-        ultimaAlerta = Date.now();
-        Swal.fire({
-            title: 'Préstamos pendientes sin resolver',
-            width: '90%',
-            html: `
-                <div class="sexp-revision-modal">
-                    <p class="sexp-auditoria-help">
-                        <i class="bi bi-exclamation-triangle"></i>
-                        <span>Hay <strong>${resp.total}</strong> expediente(s) marcados como
-                        <strong>préstamo pendiente</strong>. Siguen reservados (no disponibles).
-                        Use <strong>Entregar pendientes</strong> o <strong>Cancelar pendientes</strong>
-                        en la solicitud correspondiente.</span>
-                    </p>
-                    <div class="sexp-exp-info-popup">${filas}</div>
-                </div>`,
-            icon: 'warning',
-            confirmButtonText: '<i class="bi bi-check-circle-fill"></i> Entendido',
-            customClass: {
-                popup: 'contenedor-modal sexp-modal-grande',
-                title: 'contener-modal-titulo',
-                confirmButton: 'contener-modal-boton-confirmar',
-            },
-            didOpen: () => {
-                const actionsContainer = document.querySelector('.swal2-actions');
-                if (actionsContainer) actionsContainer.classList.add('contener-modal-contenedor-botones-min');
-            }
-        });
-    }
-
-    /** Consulta la API y alerta solo si quedan pendientes. */
-    function revisarAhora() {
-        if (!window.urls || !window.urls.s_exp_pendientes_prestamo_api) return;
-        $.ajax({
-            url: window.urls.s_exp_pendientes_prestamo_api,
-            method: 'GET',
-            // No renovar la sesión por una comprobación automática.
-            beforeSend: function (xhr) { xhr.setRequestHeader('X-Polling-Request', 'true'); },
-            success: function (resp) {
-                if (resp && resp.total > 0) _mostrarAlerta(resp);
-            },
-            error: function () { /* silencioso: es un recordatorio, no crítico */ }
-        });
-    }
-
-    /** Registra la revisión periódica (5 min). */
-    function iniciar() {
-        // Arrancar el contador ahora: así el primer aviso nunca sale antes de
-        // los 5 minutos, ni siquiera si el usuario cambia de pestaña y vuelve
-        // (lo que hace que RealtimeSExp ejecute el chequeo de inmediato).
-        ultimaAlerta = Date.now();
-        if (window.RealtimeSExp) {
-            RealtimeSExp.registrar('pendientes-prestamo', revisarAhora, INTERVALO_SEG);
-        }
-    }
-
-    return { iniciar: iniciar, revisarAhora: revisarAhora };
-})();

@@ -25,6 +25,10 @@ $(document).ready(function () {
  */
 function initTabla() {
     tablaPrestamos = $('#tabla_prestamos').DataTable({
+        // responsive: en pantallas chicas la tabla NO se estira; las columnas que
+        // no caben se colapsan y se ven tocando/clickeando la fila (fila hija),
+        // igual que el resto de tablas del sistema.
+        responsive: true,
         processing: true,
         serverSide: true,
         ajax: {
@@ -39,9 +43,13 @@ function initTabla() {
             }
         },
         columns: [
-            { data: 'id', render: (data) => `#${data}` },
+            // responsivePriority: menor número = se conserva visible por más tiempo.
+            // Lo esencial (préstamo, solicitante, cronómetro y acciones) permanece;
+            // el resto (expedientes, área, motivo) se colapsa en la fila hija.
+            { data: 'id', responsivePriority: 1, render: (data) => `#${data}` },
             {
                 data: null,
+                responsivePriority: 2,
                 render: function (data) {
                     return `<div><strong>${data.usuario_nombre}</strong><br><small class="sexp-opacity-6">${data.usuario}</small></div>`;
                 }
@@ -59,24 +67,45 @@ function initTabla() {
                         const sanitize = (t) => (t || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
                         let cls = 'sexp-exp-tag';
                         let title = '';
+                        let estadoTag = 'normal';
                         if (e.prestamo_pendiente) {
                             // Morado: encontrado pero aún no entregado (reservado).
                             cls += ' sexp-exp-tag--prestamo-pendiente';
                             title = e.comentario_pendiente
                                 ? `Pendiente de entrega: ${e.comentario_pendiente}`
                                 : 'Pendiente de entrega';
+                            estadoTag = 'prestamo_pendiente';
                         } else if (e.fuera_de_tiempo) {
                             cls += ' sexp-exp-tag--late';
                             title = 'Devuelto fuera de tiempo';
+                            estadoTag = 'late';
                         } else if (e.devuelto) {
                             // Ya devuelto (p. ej. en una devolución parcial previa).
                             title = e.comentario_devolucion || 'Devuelto correctamente';
+                            estadoTag = 'devuelto';
                         } else {
                             // Sigue prestado: el tiempo le corre.
                             cls += ' sexp-exp-tag--pendiente';
                             title = 'Pendiente de devolver';
+                            estadoTag = 'pendiente';
                         }
-                        return `<span class="${cls}" title="${sanitize(title)}">#${e.numero}</span>`;
+                        // Tocar/clickear el expediente abre su info (mostrarInfoExpediente
+                        // vive en expediente_info.js, cargado globalmente). Necesario
+                        // sobre todo en móvil, donde no hay tooltip al pasar el mouse.
+                        const info = {
+                            numero: e.numero,
+                            estado: estadoTag,
+                            paciente_nombre: e.paciente_nombre || '',
+                            paciente_identidad: e.paciente_identidad || '',
+                            fecha_entrega: e.fecha_entrega || '',
+                            fecha_devolucion: e.fecha_devolucion || '',
+                            motivo_rechazo: e.motivo_rechazo_individual || '',
+                            comentario_devolucion: e.comentario_devolucion || '',
+                            comentario_pendiente: e.comentario_pendiente || ''
+                        };
+                        const dataAttr = `data-info="${sanitize(JSON.stringify(info))}"`;
+                        const onClick = `onclick="mostrarInfoExpediente(JSON.parse(this.getAttribute('data-info')))"`;
+                        return `<span class="${cls}" title="${sanitize(title)}" ${dataAttr} ${onClick}>#${e.numero}</span>`;
                     }).join(' ');
                 }
             },
@@ -104,6 +133,7 @@ function initTabla() {
             },
             {
                 data: null,
+                responsivePriority: 3,
                 render: function (p) {
                     // El cronómetro sigue corriendo mientras haya expedientes fuera
                     // del archivo. Incluye DevolucionParcial: en una parcial solo
@@ -128,6 +158,7 @@ function initTabla() {
             {
                 data: null,
                 orderable: false,
+                responsivePriority: 2,
                 render: function (p) {
                     if (p.estado === 'Activo' && p.solicitud_estado_flujo === 'SOL_LISTO_RECOGER') {
                         return `<button class="sexp-action-btn sexp-action-btn--aprobar" onclick="marcarEntregado(${p.id})">

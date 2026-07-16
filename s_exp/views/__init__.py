@@ -48,7 +48,6 @@ from .solicitudes import (
 from .prestamos import (
     prestamos_activos_api,
     marcar_entregado_api,
-    pendientes_prestamo_api,
     entregar_pendientes_api,
     cancelar_pendientes_api,
 )
@@ -114,7 +113,6 @@ __all__ = [
     "mis_solicitudes_api",
     "prestamos_activos_api",
     "marcar_entregado_api",
-    "pendientes_prestamo_api",
     "entregar_pendientes_api",
     "cancelar_pendientes_api",
     "prestamos_para_devolucion_api",
