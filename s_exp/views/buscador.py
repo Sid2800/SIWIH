@@ -250,9 +250,20 @@ def historial_prestamos_expediente_api(request, expediente_id):
         return JsonResponse({"error": "No autenticado"}, status=401)
 
     try:
-        # Buscar detalles de solicitud que involucren ese expediente
+        # Detalles de solicitud que involucren ese expediente.
+        #
+        # Solo se listan los que SÍ se prestaron (aprobado=True). Se excluyen:
+        #   - Préstamos pendientes CANCELADOS: nunca se entregaron.
+        #   - Expedientes no encontrados / rechazados en la revisión de entrega.
+        # En ambos casos el expediente jamás salió del archivo, así que no
+        # pertenecen al historial de PRÉSTAMOS del expediente.
+        #
+        # El filtro se evalúa en vivo: al cancelar un pendiente (que pone
+        # aprobado=False) el registro desaparece del historial de inmediato, sin
+        # esperar a que la solicitud finalice.
         detalles = SolicitudExpedienteDetalle.objects.filter(
-            expediente_prestamo__expediente_id=expediente_id
+            expediente_prestamo__expediente_id=expediente_id,
+            aprobado=True,
         ).select_related(
             'solicitud', 'solicitud__usuario', 'solicitud__motivo',
             'solicitud__estado_flujo', 'solicitud__servicio_unidad',
