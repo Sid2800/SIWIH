@@ -256,7 +256,8 @@ def _resolver_pendientes(request, accion):
         solicitante (igual que la entrega normal). El expediente queda prestado.
       - accion='cancelar':  EXP_DISPONIBLE + el detalle queda aprobado=False con
         su motivo, de modo que el PDF lo muestre como NO PRESTADO y el
-        expediente vuelva a estar disponible para otros.
+        expediente vuelva a estar disponible para otros. Exige un comentario
+        que JUSTIFIQUE la cancelación (ver abajo).
 
     Todo va dentro de una transacción: o se resuelven todos los pendientes de la
     solicitud o no se toca ninguno (evita dejar expedientes a medio liberar).
@@ -273,6 +274,15 @@ def _resolver_pendientes(request, accion):
     # Opcional: lista de detalle_id concretos. Si no viene, se resuelven todos
     # los pendientes de la solicitud.
     detalle_ids = body.get('detalle_ids') or None
+    # Justificación de la CANCELACIÓN. Es un comentario NUEVO y distinto de
+    # detalle.comentario_pendiente: aquel explicaba por qué el expediente quedó
+    # pendiente; este explica por qué finalmente NO se presta. Por eso es
+    # obligatorio al cancelar (al entregar no aplica: el pendiente se cumple).
+    comentario = (body.get('comentario') or '').strip()
+    if accion == 'cancelar' and not comentario:
+        return JsonResponse(
+            {"error": "Debe justificar la cancelación con un comentario."}, status=400
+        )
 
     from django.db import transaction
     from s_exp.models import SolicitudPrestamo
@@ -334,13 +344,19 @@ def _resolver_pendientes(request, accion):
                 observacion = f"Préstamo pendiente entregado: {d.comentario_pendiente or ''}".strip()
             else:
                 # Se cancela: el expediente vuelve a estar disponible y el detalle
-                # queda como NO prestado (con su motivo) para el PDF/historial.
+                # queda como NO prestado, con la JUSTIFICACIÓN de la cancelación
+                # (no con el comentario del pendiente) para el PDF/historial.
                 ep.save()
                 d.aprobado = False
-                d.motivo_rechazo_individual = (
-                    d.comentario_pendiente or 'Préstamo pendiente cancelado'
+                d.motivo_rechazo_individual = comentario
+                # En la bitácora se conservan AMBOS motivos: por qué había quedado
+                # pendiente y por qué se canceló. Así no se pierde el contexto al
+                # limpiar comentario_pendiente más abajo.
+                motivo_previo = d.comentario_pendiente or '—'
+                observacion = (
+                    f"Préstamo pendiente cancelado: {comentario} "
+                    f"(quedó pendiente por: {motivo_previo})"
                 )
-                observacion = f"Préstamo pendiente cancelado: {d.motivo_rechazo_individual}"
 
             # En ambos casos deja de estar pendiente.
             d.prestamo_pendiente = False
@@ -361,7 +377,8 @@ def _resolver_pendientes(request, accion):
         'PRESTAMO_PENDIENTE_ENTREGADO' if accion == 'entregar' else 'PRESTAMO_PENDIENTE_CANCELADO',
         f'{len(pendientes)} préstamo(s) pendiente(s) '
         f'{"entregado(s)" if accion == "entregar" else "cancelado(s)"} '
-        f'en la solicitud #{solicitud.id}.',
+        f'en la solicitud #{solicitud.id}.'
+        + (f' Motivo: {comentario}' if accion == 'cancelar' else ''),
         'SolicitudPrestamo', solicitud.id
     )
     return JsonResponse({"success": True, "resueltos": len(pendientes)})

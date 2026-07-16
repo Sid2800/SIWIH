@@ -1009,12 +1009,25 @@ function entregarPrestamoDesdeGestion(prestamoId, solicitudId) {
  * Ambas confirman con el mismo modal y solo cambian textos y endpoint, por eso
  * comparten esta función (reusa las clases de modal ya existentes del módulo).
  *
- * @param {Object} cfg - {url, titulo, html, confirmText, icon, okMsg, solicitudId}
+ * @param {Object} cfg - {url, titulo, html, confirmText, icon, okMsg, solicitudId,
+ *                        requiereComentario}
+ *   requiereComentario: muestra un campo de motivo OBLIGATORIO. Se usa al
+ *   cancelar, porque hay que justificar por qué finalmente no se presta (es un
+ *   motivo distinto del que explicaba por qué había quedado pendiente).
  */
 function _resolverPendientes(cfg) {
+    const campoComentario = cfg.requiereComentario ? `
+        <div class="sexp-revision-card-comentario" style="margin-top:1.2rem;text-align:left;">
+            <label class="sexp-revision-card-label" for="sexp-pend-coment">
+                Motivo de la cancelación (obligatorio):
+            </label>
+            <input type="text" id="sexp-pend-coment" class="sexp-modal-input" maxlength="200"
+                   placeholder="Explique por qué se cancela el préstamo pendiente">
+        </div>` : '';
+
     Swal.fire({
         title: cfg.titulo,
-        html: cfg.html,
+        html: cfg.html + campoComentario,
         icon: cfg.icon || 'question',
         width: '46rem',
         showCancelButton: true,
@@ -1029,15 +1042,25 @@ function _resolverPendientes(cfg) {
         didOpen: () => {
             const actionsContainer = document.querySelector('.swal2-actions');
             if (actionsContainer) actionsContainer.classList.add('contener-modal-contenedor-botones');
-        }
+        },
+        preConfirm: cfg.requiereComentario ? () => {
+            const v = (document.getElementById('sexp-pend-coment').value || '').trim();
+            if (!v) {
+                Swal.showValidationMessage('Debe justificar la cancelación con un comentario.');
+                return false;
+            }
+            return v;
+        } : undefined
     }).then(function (result) {
         if (!result.isConfirmed) return;
+        // Solo la cancelación envía comentario (result.value viene del preConfirm).
+        const comentario = cfg.requiereComentario ? (result.value || '') : '';
         $.ajax({
             url: cfg.url,
             method: 'POST',
             headers: { 'X-CSRFToken': window.CSRF_TOKEN },
             contentType: 'application/json',
-            data: JSON.stringify({ solicitud_id: cfg.solicitudId }),
+            data: JSON.stringify({ solicitud_id: cfg.solicitudId, comentario: comentario }),
             success: function (resp) {
                 if (resp.success) {
                     toastr.success(cfg.okMsg.replace('{n}', resp.resueltos));
@@ -1066,7 +1089,12 @@ function entregarPendientes(solicitudId, cantidad) {
     });
 }
 
-/** Cancela los pendientes: los expedientes vuelven a estar disponibles. */
+/**
+ * Cancela los pendientes: los expedientes vuelven a estar disponibles.
+ * Pide un motivo OBLIGATORIO: es la justificación de por qué finalmente no se
+ * presta, distinta del comentario que explicaba por qué quedó pendiente. Ese
+ * motivo queda como "NO prestado" en la solicitud y sale en el PDF/historial.
+ */
 function cancelarPendientes(solicitudId, cantidad) {
     _resolverPendientes({
         url: window.urls.s_exp_cancelar_pendientes_api,
@@ -1076,5 +1104,6 @@ function cancelarPendientes(solicitudId, cantidad) {
         icon: 'warning',
         confirmText: '<i class="bi bi-x-octagon-fill"></i> Sí, cancelar',
         okMsg: '{n} préstamo(s) pendiente(s) cancelado(s).',
+        requiereComentario: true,
     });
 }
