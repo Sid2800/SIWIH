@@ -182,21 +182,40 @@ function confirmarRecuperacion() {
         return;
     }
 
-    // Resumen por persona: deja claro a quién se le va a quitar el expediente.
+    // Resumen agrupado POR RESPONSABLE: deja claro a quién se le quita cada
+    // expediente. Se agrupa porque una recuperación puede tocar a varias áreas
+    // a la vez, y así se revisa antes de confirmar (la acción es irreversible).
+    const sanitize = (t) => (t || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const porPersona = {};
     elegidos.forEach(e => {
-        const k = `${e.prestado_a || '—'} — ${e.area || '—'}`;
-        (porPersona[k] = porPersona[k] || []).push('#' + e.numero);
+        const k = `${e.prestado_a || '—'}||${e.area || '—'}`;
+        (porPersona[k] = porPersona[k] || []).push(e);
     });
-    const detalle = Object.entries(porPersona).map(([k, v]) =>
-        `<div class="sexp-exp-info-fila">
-            <span class="sexp-exp-info-label">${k}</span>
-            <span class="sexp-exp-info-valor">${v.join(', ')}</span>
-         </div>`).join('');
+
+    const detalle = Object.entries(porPersona).map(([k, exps]) => {
+        const [persona, area] = k.split('||');
+        // Tarjetas en grid (3 columnas en PC): expediente, identidad y nombre.
+        const tarjetas = exps.map(e => `
+            <div class="sexp-recup-card">
+                <span class="sexp-exp-tag">#${e.numero}</span>
+                <span class="sexp-recup-card-id">${sanitize(e.paciente_identidad) || 'S/ID'}</span>
+                <span class="sexp-recup-card-nom">${sanitize(e.paciente_nombre) || 'N/A'}</span>
+            </div>`).join('');
+        return `
+            <div class="sexp-recup-grupo">
+                <div class="sexp-recup-grupo-tit">
+                    <i class="bi bi-person-badge"></i>
+                    <strong>${sanitize(persona)}</strong>
+                    <span class="sexp-recup-grupo-area">${sanitize(area)}</span>
+                    <span class="sexp-recup-grupo-n">${exps.length}</span>
+                </div>
+                <div class="sexp-recup-cards">${tarjetas}</div>
+            </div>`;
+    }).join('');
 
     Swal.fire({
         title: '¿Recuperar expedientes?',
-        width: '52rem',
+        width: '80rem',
         html: `
             <div class="sexp-revision-modal">
                 <p class="sexp-auditoria-help">
@@ -205,7 +224,7 @@ function confirmarRecuperacion() {
                     Volverán <strong>de inmediato a Admisión</strong> y se notificará a quien los tiene.
                     Esta acción <strong>no se puede deshacer</strong>.</span>
                 </p>
-                <div class="sexp-exp-info-popup">${detalle}</div>
+                <div class="sexp-recup-conf">${detalle}</div>
             </div>`,
         icon: 'warning',
         showCancelButton: true,

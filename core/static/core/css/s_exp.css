@@ -3097,3 +3097,78 @@ body.darkmode .sexp-sugerir-tiempo {
 @media (max-width: 60rem) {
     .contenedorListaRecepcion .listbox { height: 26rem; }
 }
+
+/* ============================================================
+   Modal de confirmación de la recuperación
+   -----------------------------------------------------------
+   Los expedientes se agrupan por RESPONSABLE y se muestran como
+   tarjetas en grid. Antes se listaban como números apilados a la
+   derecha del nombre, que se acumulaban y no permitían revisar
+   qué paciente era cada uno antes de confirmar.
+   ============================================================ */
+.sexp-recup-conf {
+    text-align: left;
+    max-height: 55vh;
+    overflow-y: auto;
+    padding: 0.2rem;
+}
+
+.sexp-recup-grupo { margin-bottom: 1.4rem; }
+.sexp-recup-grupo:last-child { margin-bottom: 0; }
+
+/* Encabezado del grupo: a quién se le van a quitar */
+.sexp-recup-grupo-tit {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    padding: 0.5rem 0.8rem;
+    margin-bottom: 0.6rem;
+    border-radius: 0.5rem;
+    background-color: rgba(0, 139, 139, 0.12);
+    border-left: 3px solid var(--colorBoton);
+    font-size: 1.45rem;
+}
+.sexp-recup-grupo-tit i { color: var(--colorBoton); font-size: 1.7rem; }
+.sexp-recup-grupo-area { opacity: 0.75; font-size: 1.3rem; }
+/* Contador de expedientes de ese responsable */
+.sexp-recup-grupo-n {
+    margin-left: auto;
+    background-color: var(--colorBoton);
+    color: var(--blanco);
+    border-radius: 999px;
+    padding: 0.1rem 0.8rem;
+    font-weight: 700;
+    font-size: 1.25rem;
+}
+
+/* 3 columnas en PC, 2 en tablet, 1 en móvil */
+.sexp-recup-cards {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.7rem;
+}
+@media (max-width: 62rem) { .sexp-recup-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 40rem) { .sexp-recup-cards { grid-template-columns: 1fr; } }
+
+.sexp-recup-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    padding: 0.6rem 0.8rem;
+    border: 1px solid var(--colorLinea);
+    border-radius: 0.5rem;
+    background-color: var(--blanco);
+    min-width: 0;
+}
+.sexp-recup-card-id {
+    font-weight: 700;
+    font-size: 1.3rem;
+}
+.sexp-recup-card-nom {
+    font-size: 1.25rem;
+    opacity: 0.85;
+    line-height: 1.35;
+    /* El nombre completo se ve; si es muy largo, parte en 2 líneas. */
+    word-break: break-word;
+}
