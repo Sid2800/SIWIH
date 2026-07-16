@@ -19,6 +19,7 @@ from expediente.models import Expediente
 
 from .comunes import (
     SExpAdminMixin,
+    SExpRecuperacionMixin,
     SExpUsuarioMixin,
     _es_exp_admin,
     _get_unidad_usuario,
@@ -53,6 +54,15 @@ class ControlDevolucionesView(SExpAdminMixin, TemplateView):
 
 class ReportesView(SExpAdminMixin, TemplateView):
     template_name = 's_exp/reportes.html'
+
+
+class RecuperacionExpedientesView(SExpRecuperacionMixin, TemplateView):
+    """
+    Pantalla de recuperación de expedientes de URGENCIA (solo Admisión).
+    Permite exigir un expediente ya prestado y devolverlo de inmediato al
+    archivo, saltándose el flujo normal de devolución.
+    """
+    template_name = 's_exp/recuperacion_expedientes.html'
 
 
 # ============================================

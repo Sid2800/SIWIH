@@ -12,6 +12,7 @@ urlpatterns = [
     path('devoluciones/', views.ControlDevolucionesView.as_view(), name='s_exp_devoluciones'),
     path('historial/', views.HistorialSolicitudesView.as_view(), name='s_exp_historial'),
     path('reportes/', views.ReportesView.as_view(), name='s_exp_reportes'),
+    path('recuperacion/', views.RecuperacionExpedientesView.as_view(), name='s_exp_recuperacion'),
 
     # ==========================================
     # VISTAS USUARIO (Template)
@@ -36,6 +37,9 @@ urlpatterns = [
     # Préstamos pendientes (expedientes en estado EXP_PENDIENTE_PRESTAMO)
     path('api/entregar-pendientes/', views.entregar_pendientes_api, name='s_exp_entregar_pendientes_api'),
     path('api/cancelar-pendientes/', views.cancelar_pendientes_api, name='s_exp_cancelar_pendientes_api'),
+    # Recuperación de urgencia (solo Admisión)
+    path('api/expedientes-recuperables/', views.expedientes_recuperables_api, name='s_exp_expedientes_recuperables_api'),
+    path('api/recuperar-expedientes/', views.recuperar_expedientes_api, name='s_exp_recuperar_expedientes_api'),
     path('api/prestamos-devolucion/', views.prestamos_para_devolucion_api, name='s_exp_prestamos_devolucion_api'),
     path('api/procesar-devolucion/', views.procesar_devolucion_api, name='s_exp_procesar_devolucion_api'),
     path('api/reportes-data/', views.reportes_data_api, name='s_exp_reportes_data_api'),
@@ -67,4 +71,5 @@ urlpatterns = [
          name='s_exp_historial_prestamos_expediente_api'),
     path('api/notificado-listo/', views.marcar_notificacion_leida_api, name='s_exp_notificado_listo_api'),
     path('api/vencimiento-leido/', views.marcar_vencimiento_leido_api, name='s_exp_vencimiento_leido_api'),
+    path('api/recuperacion-leida/', views.marcar_recuperacion_leida_api, name='s_exp_recuperacion_leida_api'),
 ]

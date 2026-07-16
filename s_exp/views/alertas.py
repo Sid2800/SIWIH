@@ -201,6 +201,35 @@ def alertas_usuario_api(request):
                 "sticky": True
             })
 
+        # Expedientes RECUPERADOS de urgencia por Admisión.
+        # Admisión exigió un expediente que este usuario tenía prestado y ya se
+        # devolvió a la fuerza. Se le avisa para que sepa que ya no lo tiene.
+        # La alerta es sticky y se repite hasta que la lea (recuperacion_leida),
+        # porque es información que no puede pasar por alto.
+        from s_exp.models import SolicitudExpedienteDetalle
+        recuperados = SolicitudExpedienteDetalle.objects.select_related(
+            'expediente_prestamo__expediente'
+        ).filter(
+            solicitud__usuario=request.user,
+            recuperado_admision=True,
+            recuperacion_leida=False,
+        )
+        for d in recuperados:
+            numero = d.expediente_prestamo.expediente.numero
+            alertas.append({
+                "tipo": "danger",
+                "titulo": "Expediente requerido por Admisión",
+                "mensaje": (
+                    f"El expediente #{numero} de su solicitud #{d.solicitud_id} fue "
+                    f"requerido de URGENCIA por Admisión y ya fue devuelto al archivo. "
+                    f"Motivo: {d.motivo_recuperacion or '—'}"
+                ),
+                "solicitud_id": d.solicitud_id,
+                "detalle_id": d.id,
+                "sticky": True,
+                "tipo_alerta": "recuperacion",
+            })
+
         # Solicitudes rechazadas recientes
         solicitudes_rechazadas = SolicitudPrestamo.objects.filter(
             usuario=request.user,
@@ -250,6 +279,42 @@ def marcar_notificacion_leida_api(request):
         return JsonResponse({"error": "Solicitud no encontrada"}, status=404)
     except Exception as e:
         log_error(f"Error en marcar_notificacion_leida_api: {e}", app=LogApp.S_EXP)
+        return JsonResponse({"error": "Error interno"}, status=500)
+
+
+@csrf_exempt
+@require_POST
+def marcar_recuperacion_leida_api(request):
+    """
+    Marca como leído el aviso de que Admisión recuperó un expediente de urgencia.
+
+    Solo puede marcarlo el dueño de la solicitud (filtro por solicitud__usuario),
+    para que un usuario no pueda silenciar el aviso de otro.
+    """
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "No autenticado"}, status=401)
+
+    try:
+        import json
+        from s_exp.models import SolicitudExpedienteDetalle
+        body = json.loads(request.body)
+        detalle_id = body.get('detalle_id')
+
+        if not detalle_id:
+            return JsonResponse({"error": "Falta ID de detalle"}, status=400)
+
+        detalle = SolicitudExpedienteDetalle.objects.get(
+            id=detalle_id, solicitud__usuario=request.user
+        )
+        detalle.recuperacion_leida = True
+        detalle.save(update_fields=['recuperacion_leida'])
+
+        return JsonResponse({"success": True})
+
+    except SolicitudExpedienteDetalle.DoesNotExist:
+        return JsonResponse({"error": "Expediente no encontrado"}, status=404)
+    except Exception as e:
+        log_error(f"Error en marcar_recuperacion_leida_api: {e}", app=LogApp.S_EXP)
         return JsonResponse({"error": "Error interno"}, status=500)
 
 

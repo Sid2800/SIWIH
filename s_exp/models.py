@@ -529,6 +529,27 @@ class SolicitudExpedienteDetalle(models.Model):
         blank=True,
         verbose_name='Fecha y hora en que se devolvió este expediente'
     )
+    # ---- Recuperación de URGENCIA por Admisión ----
+    # Admisión puede exigir un expediente prestado por una emergencia. Esa
+    # acción se salta el flujo normal: el expediente se devuelve de inmediato
+    # (fecha_devolucion queda sellada como en cualquier devolución) sin pasar
+    # por la auditoría del usuario que lo tenía.
+    # Se marca aparte para poder distinguir una devolución normal de una
+    # recuperación forzada, y para avisar al usuario que lo tenía.
+    recuperado_admision = models.BooleanField(
+        default=False,
+        verbose_name='Recuperado de urgencia por Admisión'
+    )
+    motivo_recuperacion = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name='Motivo/observaciones de la recuperación de urgencia'
+    )
+    # La alerta al usuario que lo tenía se muestra hasta que la lee.
+    recuperacion_leida = models.BooleanField(
+        default=False,
+        verbose_name='El usuario ya vio el aviso de la recuperación'
+    )
 
     class Meta:
         db_table = 's_exp_solicituddetalle'
