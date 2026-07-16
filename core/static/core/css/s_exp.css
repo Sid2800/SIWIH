@@ -3012,3 +3012,44 @@ body.darkmode .sexp-sugerir-tiempo {
 .sexp-sticky-btn i {
     font-size: 1.5rem !important;
 }
+
+
+/* ============================================================
+   Recuperación de expedientes de urgencia (solo Admisión)
+   Ítems de la doble lista. Reusa .listbox/.contendorLista de la
+   Recepción SDGI; aquí solo se define el contenido de cada <li>.
+   ============================================================ */
+.sexp-recup-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.6rem 0.8rem;
+    border-bottom: 1px dashed var(--colorLinea);
+    cursor: pointer;
+    list-style: none;
+}
+.sexp-recup-item:hover { background-color: rgba(0, 139, 139, 0.08); }
+/* Marcado (click) — se moverá con las flechas */
+.sexp-recup-item--sel {
+    background-color: rgba(0, 139, 139, 0.18);
+    border-left: 3px solid var(--colorBoton);
+}
+.sexp-recup-l1 {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    font-size: 1.4rem;
+}
+.sexp-recup-l2 {
+    font-size: 1.2rem;
+    opacity: 0.85;
+    line-height: 1.4;
+}
+.sexp-recup-vacio {
+    list-style: none;
+    padding: 1.2rem;
+    text-align: center;
+    opacity: 0.55;
+    font-size: 1.4rem;
+}
