@@ -3036,6 +3036,13 @@ body.darkmode .sexp-sugerir-tiempo {
     /* .listbox usa 1.7rem: demasiado para varios datos en línea. */
     font-size: 1.25rem;
     line-height: 1.7;
+    /* CLAVE: las columnas suman más que el ancho del panel, así que el
+       contenido desbordaba el <li>. Un fondo solo pinta el ancho del elemento,
+       por lo que el hover/selección se cortaban a media fila. Con max-content
+       el <li> crece hasta abarcar todas sus columnas y el resaltado cubre la
+       fila completa; min-width:100% evita que se encoja si sobra espacio. */
+    min-width: max-content;
+    box-sizing: border-box;
 }
 
 /* Columnas: anchos fijos para que las filas se lean alineadas entre sí. */
@@ -3046,7 +3053,7 @@ body.darkmode .sexp-sugerir-tiempo {
 }
 .sexp-recup-c--exp  { width: 7rem;  font-weight: 700; }
 .sexp-recup-c--id   { width: 12rem; font-weight: 600; }
-.sexp-recup-c--nom  { flex: 1 1 auto; min-width: 12rem; }
+.sexp-recup-c--nom  { width: 19rem; }
 .sexp-recup-c--sol  { width: 5.5rem; }
 .sexp-recup-c--per  { width: 14rem; font-weight: 600; }
 .sexp-recup-c--area { width: 13rem; }
@@ -3082,6 +3089,12 @@ body.darkmode .sexp-sugerir-tiempo {
 @media (max-width: 60rem) {
     .contenedorListaRecepcion .listbox { height: 26rem; }
 }
+
+/* El listado desplaza en horizontal: las filas son más anchas que el panel. */
+.contenedorListaRecepcion .listbox { overflow-x: auto; }
+/* .listbox li:hover trae border-radius, que con la fila desplazada recorta el
+   fondo en los bordes. En estas filas el resaltado va de lado a lado. */
+.listbox li.sexp-recup-item:hover { border-radius: 0; }
 
 /* ============================================================
    Modal de confirmación de la recuperación
