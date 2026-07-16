@@ -697,6 +697,8 @@ Usa colores del sistema (colorBoton, colorContendor, etc.)
     text-align: left;
 }
 
+/* Mismo criterio que .sexp-auditoria-help: NADA de display:flex, o cada
+   <strong> del texto se vuelve flex item y la frase se parte en columnas. */
 .sexp-revision-help {
     margin: 0 0 1rem 0;
     padding: 0.7rem 0.9rem;
@@ -705,16 +707,16 @@ Usa colores del sistema (colorBoton, colorContendor, etc.)
     border-radius: 0.6rem;
     font-size: 1.4rem !important;
     color: var(--colorTablacelda);
-    display: flex;
-    align-items: flex-start;
-    gap: 0.5rem;
+    display: block;
+    text-align: left;
+    line-height: 1.5;
 }
 
 .sexp-revision-help i {
     color: var(--colorBoton);
     font-size: 1.5rem;
-    margin-top: 0.1rem;
-    flex: 0 0 auto;
+    margin-right: 0.5rem;
+    vertical-align: -0.15rem;
 }
 
 /* Grid 3 cols (PC), 2 cols (tablet), 1 col (móvil) */
@@ -1068,6 +1070,11 @@ Usa colores del sistema (colorBoton, colorContendor, etc.)
    MODAL AUDITORÍA DE DEVOLUCIÓN — Tarjetas en grid responsive
    ============================================================ */
 
+/* Aviso informativo de los modales.
+   IMPORTANTE: NO usar display:flex aquí. Al ser flex, cada <strong>/<span> del
+   texto se convertía en un flex item y la frase se partía en columnas (el texto
+   salía ilegible). Con display:block el texto fluye normal y el icono queda
+   inline al inicio. */
 .sexp-auditoria-help {
     margin: 0 0 1rem 0;
     padding: 0.8rem 1rem;
@@ -1076,15 +1083,16 @@ Usa colores del sistema (colorBoton, colorContendor, etc.)
     border-radius: 0.6rem;
     font-size: 1.5rem !important;
     color: var(--colorTablacelda);
-    display: flex;
-    align-items: flex-start;
-    gap: 0.6rem;
+    display: block;
+    text-align: left;
+    line-height: 1.5;
 }
 
 .sexp-auditoria-help i {
     color: var(--colorBoton);
     font-size: 1.7rem;
-    flex: 0 0 auto;
+    margin-right: 0.6rem;
+    vertical-align: -0.15rem;
 }
 
 /* Grid responsive: 3 cols (PC), 2 (tablet), 1 (móvil) */

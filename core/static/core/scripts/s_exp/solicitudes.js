@@ -266,11 +266,16 @@ function initTabla() {
                             <i class="bi bi-printer"></i> Imprimir
                         </button>`;
 
-                    // Préstamos pendientes: aparecen SIEMPRE que la solicitud tenga
-                    // algún expediente marcado, sin importar el estado del flujo,
-                    // porque siguen pendientes aunque el resto ya se haya entregado.
+                    // Préstamos pendientes: solo tienen sentido DESPUÉS de pulsar
+                    // "Entregar" (antes de eso el pendiente todavía se puede quitar
+                    // desde la Revisión de Entrega). Una vez entregada la solicitud,
+                    // los pendientes siguen visibles en cualquier estado posterior,
+                    // porque permanecen reservados aunque el resto ya se entregó.
+                    const ESTADOS_YA_ENTREGADA = [
+                        'SOL_EN_PRESTAMO', 'SOL_EN_DEVOLUCION', 'SOL_INCOMPLETA', 'SOL_FINALIZADA'
+                    ];
                     const nPendientes = (data.expedientes || []).filter(e => e.prestamo_pendiente).length;
-                    const btnsPendientes = nPendientes ? `
+                    const btnsPendientes = (nPendientes && ESTADOS_YA_ENTREGADA.includes(data.estado_flujo)) ? `
                         <button class="sexp-action-btn sexp-action-btn--entregar-pend"
                                 title="Entregar los ${nPendientes} expediente(s) que quedaron pendientes"
                                 onclick="entregarPendientes(${data.id}, ${nPendientes})">
@@ -309,12 +314,13 @@ function initTabla() {
                                     onclick="marcarListo(${data.id})">
                                 <i class="bi bi-bell"></i> Listo para entregar
                             </button>`;
+                        // Aún no se entrega: los pendientes se gestionan desde la
+                        // propia Revisión de Entrega, no con botones aquí.
                         return `
                             <div class="sexp-action-group">
                                 ${btnImprimir}
                                 ${btnRevisar}
                                 ${btnListo}
-                                ${btnsPendientes}
                             </div>`;
                     }
                     if (data.estado_flujo === 'SOL_LISTO_RECOGER') {
@@ -324,7 +330,6 @@ function initTabla() {
                                 <button class="sexp-action-btn sexp-action-btn--entregar" onclick="entregarPrestamoDesdeGestion(${data.prestamo_id || 0}, ${data.id})">
                                     <i class="bi bi-box-arrow-up-right"></i> Entregar
                                 </button>
-                                ${btnsPendientes}
                             </div>`;
                     }
                     const estadosImprimibles = ['SOL_EN_PRESTAMO', 'SOL_EN_DEVOLUCION', 'SOL_FINALIZADA', 'SOL_INCOMPLETA'];
@@ -914,11 +919,17 @@ function _mostrarModalRevision(id, expedientes) {
             });
 
             // Check "Marcar como préstamo pendiente": resalta la tarjeta en morado.
+            // Al DESMARCARLO se limpia también el comentario, porque ese texto
+            // justificaba el pendiente y ya no aplica.
             document.querySelectorAll('.sexp-revision-pendiente').forEach(chk => {
                 chk.addEventListener('change', function () {
                     const row = document.getElementById('rev-row-' + this.dataset.detalle);
                     if (!row) return;
                     row.classList.toggle('sexp-revision-card--pendiente', this.checked);
+                    if (!this.checked) {
+                        const com = row.querySelector('.sexp-revision-comentario');
+                        if (com) com.value = '';
+                    }
                 });
             });
 
@@ -1168,11 +1179,19 @@ const SexpPendientes = (function () {
 
     const INTERVALO_SEG = 300; // 5 minutos
 
+    // Momento del último aviso. RealtimeSExp.reanudar() vuelve a ejecutar el
+    // chequeo EN CUANTO la pestaña recupera visibilidad, así que sin este
+    // control el modal salía apenas se volvía a la pestaña. Con esto el aviso
+    // respeta siempre los 5 minutos, sin importar qué dispare el chequeo.
+    let ultimaAlerta = 0;
+
     /** Arma y muestra el modal recordatorio con el detalle por solicitud. */
     function _mostrarAlerta(resp) {
         // No interrumpir si el admin ya tiene otro modal abierto (p. ej. la
         // revisión de entrega): se le recordará en el siguiente ciclo.
         if (Swal.isVisible()) return;
+        // Respetar el intervalo real entre avisos.
+        if (Date.now() - ultimaAlerta < INTERVALO_SEG * 1000) return;
 
         const filas = (resp.data || []).map(function (s) {
             const exps = (s.expedientes || []).map(e => `#${e.numero}`).join(', ');
@@ -1186,23 +1205,25 @@ const SexpPendientes = (function () {
                 </div>`;
         }).join('');
 
+        ultimaAlerta = Date.now();
         Swal.fire({
             title: 'Préstamos pendientes sin resolver',
+            width: '90%',
             html: `
-                <div class="sexp-exp-info-popup">
+                <div class="sexp-revision-modal">
                     <p class="sexp-auditoria-help">
                         <i class="bi bi-exclamation-triangle"></i>
-                        Hay <strong>${resp.total}</strong> expediente(s) marcados como
+                        <span>Hay <strong>${resp.total}</strong> expediente(s) marcados como
                         <strong>préstamo pendiente</strong>. Siguen reservados (no disponibles).
                         Use <strong>Entregar pendientes</strong> o <strong>Cancelar pendientes</strong>
-                        en la solicitud correspondiente.
+                        en la solicitud correspondiente.</span>
                     </p>
-                    ${filas}
+                    <div class="sexp-exp-info-popup">${filas}</div>
                 </div>`,
             icon: 'warning',
             confirmButtonText: '<i class="bi bi-check-circle-fill"></i> Entendido',
             customClass: {
-                popup: 'contenedor-modal',
+                popup: 'contenedor-modal sexp-modal-grande',
                 title: 'contener-modal-titulo',
                 confirmButton: 'contener-modal-boton-confirmar',
             },
@@ -1230,6 +1251,10 @@ const SexpPendientes = (function () {
 
     /** Registra la revisión periódica (5 min). */
     function iniciar() {
+        // Arrancar el contador ahora: así el primer aviso nunca sale antes de
+        // los 5 minutos, ni siquiera si el usuario cambia de pestaña y vuelve
+        // (lo que hace que RealtimeSExp ejecute el chequeo de inmediato).
+        ultimaAlerta = Date.now();
         if (window.RealtimeSExp) {
             RealtimeSExp.registrar('pendientes-prestamo', revisarAhora, INTERVALO_SEG);
         }
