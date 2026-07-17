@@ -3284,3 +3284,44 @@ body.darkmode .sexp-sugerir-tiempo {
     align-items: stretch;
     justify-content: flex-start;
 }
+
+/* ============================================================
+   Modales "Entregar / Cancelar pendientes" — lista seleccionable
+   Cada fila: checkbox + expediente + paciente, y (solo cancelar)
+   un comentario obligatorio por expediente debajo.
+   ============================================================ */
+.sexp-pend-lista {
+    text-align: left;
+    max-height: 55vh;
+    overflow-y: auto;
+    padding: 0.2rem;
+}
+.sexp-pend-row {
+    padding: 0.6rem 0.8rem;
+    border: 1px solid var(--colorLinea);
+    border-radius: 0.5rem;
+    margin-bottom: 0.6rem;
+    background-color: var(--blanco);
+}
+.sexp-pend-row:last-child { margin-bottom: 0; }
+.sexp-pend-cab {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+}
+.sexp-pend-pac {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+.sexp-pend-id { font-weight: 700; font-size: 1.4rem; }
+.sexp-pend-nom { font-size: 1.25rem; opacity: 0.85; }
+.sexp-pend-coment {
+    width: 100%;
+    margin-top: 0.6rem;
+    padding: 0.5rem 0.7rem;
+    font-size: 1.35rem;
+    border: 1px solid var(--colorLinea);
+    border-radius: 0.4rem;
+}
+.sexp-pend-coment:disabled { background-color: rgba(0, 0, 0, 0.05); cursor: not-allowed; }

@@ -192,17 +192,22 @@ function initTabla() {
                     const ESTADOS_YA_ENTREGADA = [
                         'SOL_EN_PRESTAMO', 'SOL_EN_DEVOLUCION', 'SOL_INCOMPLETA', 'SOL_FINALIZADA'
                     ];
-                    const nPendientes = (data.expedientes || []).filter(e => e.prestamo_pendiente).length;
+                    // Se guardan los pendientes de esta solicitud para que los
+                    // modales de entregar/cancelar puedan listarlos y dejar
+                    // seleccionar cuáles, sin volver a consultar al servidor.
+                    const _pendientes = (data.expedientes || []).filter(e => e.prestamo_pendiente);
+                    (window.__sexpPendientes = window.__sexpPendientes || {})[data.id] = _pendientes;
+                    const nPendientes = _pendientes.length;
                     const btnsPendientes = (nPendientes && ESTADOS_YA_ENTREGADA.includes(data.estado_flujo)) ? `
                         <button class="sexp-action-btn sexp-action-btn--entregar-pend"
                                 title="Entregar los ${nPendientes} expediente(s) que quedaron pendientes"
-                                onclick="entregarPendientes(${data.id}, ${nPendientes})">
+                                onclick="entregarPendientes(${data.id})">
                             <i class="bi bi-box-arrow-up-right"></i> Entregar pendientes (${nPendientes})
                         </button>
                         <button class="sexp-action-btn sexp-action-btn--cancelar-pend"
                                 title="Cancelar los pendientes: los expedientes vuelven a estar disponibles"
-                                onclick="cancelarPendientes(${data.id}, ${nPendientes})">
-                            <i class="bi bi-x-octagon"></i> Cancelar pendientes
+                                onclick="cancelarPendientes(${data.id})">
+                            <i class="bi bi-x-octagon"></i> Cancelar pendientes (${nPendientes})
                         </button>` : '';
 
                     if (data.estado_flujo === 'SOL_APROBADA_ORGANIZANDO') {
@@ -1006,30 +1011,61 @@ function entregarPrestamoDesdeGestion(prestamoId, solicitudId) {
 
 /**
  * Cuerpo común de "Entregar pendientes" / "Cancelar pendientes".
- * Ambas confirman con el mismo modal y solo cambian textos y endpoint, por eso
- * comparten esta función (reusa las clases de modal ya existentes del módulo).
  *
- * @param {Object} cfg - {url, titulo, html, confirmText, icon, okMsg, solicitudId,
- *                        requiereComentario}
- *   requiereComentario: muestra un campo de motivo OBLIGATORIO. Se usa al
- *   cancelar, porque hay que justificar por qué finalmente no se presta (es un
- *   motivo distinto del que explicaba por qué había quedado pendiente).
+ * Ambos modales listan los expedientes pendientes de la solicitud y dejan
+ * SELECCIONAR con checkbox cuáles se procesan; comparten cuerpo porque solo
+ * difieren en textos, endpoint y en que cancelar pide un comentario POR
+ * expediente. La lista sale de window.__sexpPendientes (guardada al renderizar
+ * la tabla), sin otra consulta al servidor.
+ *
+ * @param {Object} cfg - {url, solicitudId, titulo, ayuda, icon, confirmText,
+ *                        okMsg, conComentario, marcadoPorDefecto}
+ *   conComentario     : cancelar -> cada expediente lleva su motivo obligatorio.
+ *   marcadoPorDefecto : entregar arranca todo marcado (caso común); cancelar
+ *                       arranca desmarcado, para elegir a conciencia qué NO se
+ *                       presta (acción destructiva).
  */
 function _resolverPendientes(cfg) {
-    const campoComentario = cfg.requiereComentario ? `
-        <div class="sexp-revision-card-comentario" style="margin-top:1.2rem;text-align:left;">
-            <label class="sexp-revision-card-label" for="sexp-pend-coment">
-                Motivo de la cancelación (obligatorio):
-            </label>
-            <input type="text" id="sexp-pend-coment" class="sexp-modal-input" maxlength="200"
-                   placeholder="Explique por qué se cancela el préstamo pendiente">
-        </div>` : '';
+    const pendientes = (window.__sexpPendientes || {})[cfg.solicitudId] || [];
+    if (!pendientes.length) {
+        toastr.info('No hay expedientes pendientes en esta solicitud.');
+        return;
+    }
+
+    const sanitize = (t) => (t || '').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    const chk = cfg.marcadoPorDefecto ? ' checked' : '';
+    const comDis = cfg.marcadoPorDefecto ? '' : ' disabled';  // el comentario sigue al check
+
+    const filas = pendientes.map(e => {
+        const comentario = cfg.conComentario ? `
+            <input type="text" class="sexp-pend-coment" data-detalle="${e.detalle_id}" maxlength="200"
+                   placeholder="Motivo de la cancelación (obligatorio)"${comDis}>` : '';
+        return `
+        <div class="sexp-pend-row" id="pend-row-${e.detalle_id}">
+            <div class="sexp-pend-cab">
+                <label class="sexp-exp-dec-check" title="Seleccionar este expediente">
+                    <input type="checkbox" class="sexp-pend-chk" data-detalle="${e.detalle_id}"${chk}>
+                    <span class="sexp-exp-dec-checkmark"></span>
+                </label>
+                <span class="sexp-exp-tag">#${e.numero}</span>
+                <div class="sexp-pend-pac">
+                    <span class="sexp-pend-id">${sanitize(e.paciente_identidad) || 'S/ID'}</span>
+                    <span class="sexp-pend-nom">${sanitize(e.paciente_nombre) || 'N/A'}</span>
+                </div>
+            </div>
+            ${comentario}
+        </div>`;
+    }).join('');
 
     Swal.fire({
         title: cfg.titulo,
-        html: cfg.html + campoComentario,
+        width: '52rem',
+        html: `
+            <div class="sexp-revision-modal">
+                <p class="sexp-auditoria-help"><i class="bi bi-info-circle"></i> <span>${cfg.ayuda}</span></p>
+                <div class="sexp-pend-lista">${filas}</div>
+            </div>`,
         icon: cfg.icon || 'question',
-        width: '46rem',
         showCancelButton: true,
         confirmButtonText: cfg.confirmText,
         cancelButtonText: '<i class="bi bi-x-circle-fill"></i> Cancelar',
@@ -1042,30 +1078,55 @@ function _resolverPendientes(cfg) {
         didOpen: () => {
             const actionsContainer = document.querySelector('.swal2-actions');
             if (actionsContainer) actionsContainer.classList.add('contener-modal-contenedor-botones');
+            // El comentario sigue al check: si el expediente no se procesa, su
+            // motivo se deshabilita y limpia (no aplica).
+            if (cfg.conComentario) {
+                document.querySelectorAll('.sexp-pend-chk').forEach(c => {
+                    c.addEventListener('change', function () {
+                        const com = document.querySelector(`.sexp-pend-coment[data-detalle="${this.dataset.detalle}"]`);
+                        if (!com) return;
+                        com.disabled = !this.checked;
+                        if (!this.checked) com.value = '';
+                    });
+                });
+            }
         },
-        preConfirm: cfg.requiereComentario ? () => {
-            const v = (document.getElementById('sexp-pend-coment').value || '').trim();
-            if (!v) {
-                Swal.showValidationMessage('Debe justificar la cancelación con un comentario.');
+        preConfirm: () => {
+            const seleccion = Array.from(document.querySelectorAll('.sexp-pend-chk:checked'))
+                .map(c => parseInt(c.dataset.detalle, 10));
+            if (!seleccion.length) {
+                Swal.showValidationMessage('Seleccione al menos un expediente.');
                 return false;
             }
-            return v;
-        } : undefined
+            const payload = { solicitud_id: cfg.solicitudId, detalle_ids: seleccion };
+            if (cfg.conComentario) {
+                const comentarios = {};
+                const faltan = [];
+                seleccion.forEach(id => {
+                    const com = document.querySelector(`.sexp-pend-coment[data-detalle="${id}"]`);
+                    const v = ((com && com.value) || '').trim();
+                    if (!v) faltan.push(id);
+                    comentarios[id] = v;
+                });
+                if (faltan.length) {
+                    Swal.showValidationMessage('Cada expediente seleccionado necesita un comentario.');
+                    return false;
+                }
+                payload.comentarios = comentarios;
+            }
+            return payload;
+        }
     }).then(function (result) {
         if (!result.isConfirmed) return;
-        // Solo la cancelación envía comentario (result.value viene del preConfirm).
-        const comentario = cfg.requiereComentario ? (result.value || '') : '';
         $.ajax({
             url: cfg.url,
             method: 'POST',
             headers: { 'X-CSRFToken': window.CSRF_TOKEN },
             contentType: 'application/json',
-            data: JSON.stringify({ solicitud_id: cfg.solicitudId, comentario: comentario }),
+            data: JSON.stringify(result.value),
             success: function (resp) {
                 if (resp.success) {
                     toastr.success(cfg.okMsg.replace('{n}', resp.resueltos));
-                    // La tabla se recarga sola; NO se re-chequean los pendientes aquí
-                    // para no reabrir el modal recordatorio justo después de actuar.
                     if (typeof tablaSolicitudes !== 'undefined') tablaSolicitudes.ajax.reload(null, false);
                 }
             },
@@ -1077,33 +1138,34 @@ function _resolverPendientes(cfg) {
     });
 }
 
-/** Entrega los expedientes que quedaron pendientes (pasan a EXP_PRESTADO). */
-function entregarPendientes(solicitudId, cantidad) {
+/** Entrega los expedientes pendientes seleccionados (pasan a EXP_PRESTADO). */
+function entregarPendientes(solicitudId) {
     _resolverPendientes({
         url: window.urls.s_exp_entregar_pendientes_api,
         solicitudId: solicitudId,
         titulo: '¿Entregar pendientes?',
-        html: `Se entregarán <strong>${cantidad}</strong> expediente(s) que quedaron pendientes de la solicitud <strong>#${solicitudId}</strong>. Pasarán a estar prestados y se moverán a la unidad del solicitante.`,
-        confirmText: '<i class="bi bi-check-circle-fill"></i> Sí, entregar',
-        okMsg: '{n} préstamo(s) pendiente(s) entregado(s).',
+        ayuda: 'Marque los expedientes que va a <strong>entregar</strong>. Pasarán a estar prestados y se moverán a la unidad del solicitante.',
+        confirmText: '<i class="bi bi-check-circle-fill"></i> Entregar seleccionados',
+        okMsg: '{n} expediente(s) entregado(s).',
+        marcadoPorDefecto: true,   // entregar todos es lo común
     });
 }
 
 /**
- * Cancela los pendientes: los expedientes vuelven a estar disponibles.
- * Pide un motivo OBLIGATORIO: es la justificación de por qué finalmente no se
- * presta, distinta del comentario que explicaba por qué quedó pendiente. Ese
- * motivo queda como "NO prestado" en la solicitud y sale en el PDF/historial.
+ * Cancela los pendientes seleccionados: vuelven a estar disponibles y quedan
+ * como NO prestados. Cada expediente lleva su motivo (obligatorio), distinto
+ * del comentario que explicaba por qué había quedado pendiente.
  */
-function cancelarPendientes(solicitudId, cantidad) {
+function cancelarPendientes(solicitudId) {
     _resolverPendientes({
         url: window.urls.s_exp_cancelar_pendientes_api,
         solicitudId: solicitudId,
         titulo: '¿Cancelar pendientes?',
-        html: `Se cancelarán <strong>${cantidad}</strong> préstamo(s) pendiente(s) de la solicitud <strong>#${solicitudId}</strong>.<br><br>Los expedientes quedarán <strong>disponibles</strong> de nuevo y se registrarán como <strong>NO prestados</strong> en la solicitud.`,
+        ayuda: 'Marque los expedientes a <strong>cancelar</strong> y escriba el motivo de cada uno. Volverán a estar <strong>disponibles</strong> y se registrarán como <strong>NO prestados</strong>.',
         icon: 'warning',
-        confirmText: '<i class="bi bi-x-octagon-fill"></i> Sí, cancelar',
-        okMsg: '{n} préstamo(s) pendiente(s) cancelado(s).',
-        requiereComentario: true,
+        confirmText: '<i class="bi bi-x-octagon-fill"></i> Cancelar seleccionados',
+        okMsg: '{n} expediente(s) cancelado(s).',
+        conComentario: true,
+        marcadoPorDefecto: false,  // acción destructiva: elegir a conciencia
     });
 }

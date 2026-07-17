@@ -276,18 +276,21 @@ def _resolver_pendientes(request, accion):
         return JsonResponse({"error": "Datos inválidos"}, status=400)
 
     solicitud_id = body.get('solicitud_id')
-    # Opcional: lista de detalle_id concretos. Si no viene, se resuelven todos
-    # los pendientes de la solicitud.
+    # Expedientes SELECCIONADOS en el modal (obligatorio). Si por compatibilidad
+    # no viniera, se resuelven todos los pendientes de la solicitud.
     detalle_ids = body.get('detalle_ids') or None
-    # Justificación de la CANCELACIÓN. Es un comentario NUEVO y distinto de
-    # detalle.comentario_pendiente: aquel explicaba por qué el expediente quedó
-    # pendiente; este explica por qué finalmente NO se presta. Por eso es
-    # obligatorio al cancelar (al entregar no aplica: el pendiente se cumple).
-    comentario = (body.get('comentario') or '').strip()
-    if accion == 'cancelar' and not comentario:
-        return JsonResponse(
-            {"error": "Debe justificar la cancelación con un comentario."}, status=400
-        )
+    # Cancelación: justificación POR expediente { detalle_id: texto }. Es un
+    # comentario NUEVO y distinto de detalle.comentario_pendiente: aquel explicaba
+    # por qué el expediente quedó pendiente; este explica por qué finalmente NO se
+    # presta. Cada expediente cancelado se justifica aparte (no un único motivo).
+    comentarios = body.get('comentarios') or {}
+
+    def _coment(det_id):
+        # Las claves de un JSON llegan como string; se prueba ambas por robustez.
+        v = comentarios.get(str(det_id))
+        if v is None:
+            v = comentarios.get(det_id)
+        return (v or '').strip()
 
     from django.db import transaction
     from s_exp.models import SolicitudPrestamo
@@ -306,6 +309,19 @@ def _resolver_pendientes(request, accion):
     pendientes = list(qs)
     if not pendientes:
         return JsonResponse({"error": "No hay préstamos pendientes por resolver"}, status=400)
+
+    # Al cancelar, CADA expediente seleccionado debe llevar su justificación.
+    # Se valida antes de tocar nada (aún fuera de la transacción).
+    if accion == 'cancelar':
+        sin_comentario = [d for d in pendientes if not _coment(d.id)]
+        if sin_comentario:
+            faltan = ', '.join(
+                f'#{d.expediente_prestamo.expediente.numero}' for d in sin_comentario
+            )
+            return JsonResponse(
+                {"error": f"Cada expediente a cancelar necesita un comentario. Falta: {faltan}"},
+                status=400,
+            )
 
     # Para 'entregar' se necesita la ubicación destino (unidad del solicitante),
     # se resuelve UNA sola vez fuera del loop para no repetir consultas.
@@ -350,16 +366,18 @@ def _resolver_pendientes(request, accion):
             else:
                 # Se cancela: el expediente vuelve a estar disponible y el detalle
                 # queda como NO prestado, con la JUSTIFICACIÓN de la cancelación
-                # (no con el comentario del pendiente) para el PDF/historial.
+                # (la de ESTE expediente, no el comentario del pendiente) para el
+                # PDF/historial.
+                comentario_d = _coment(d.id)
                 ep.save()
                 d.aprobado = False
-                d.motivo_rechazo_individual = comentario
+                d.motivo_rechazo_individual = comentario_d
                 # En la bitácora se conservan AMBOS motivos: por qué había quedado
                 # pendiente y por qué se canceló. Así no se pierde el contexto al
                 # limpiar comentario_pendiente más abajo.
                 motivo_previo = d.comentario_pendiente or '—'
                 observacion = (
-                    f"Préstamo pendiente cancelado: {comentario} "
+                    f"Préstamo pendiente cancelado: {comentario_d} "
                     f"(quedó pendiente por: {motivo_previo})"
                 )
 
@@ -382,8 +400,8 @@ def _resolver_pendientes(request, accion):
         'PRESTAMO_PENDIENTE_ENTREGADO' if accion == 'entregar' else 'PRESTAMO_PENDIENTE_CANCELADO',
         f'{len(pendientes)} préstamo(s) pendiente(s) '
         f'{"entregado(s)" if accion == "entregar" else "cancelado(s)"} '
-        f'en la solicitud #{solicitud.id}.'
-        + (f' Motivo: {comentario}' if accion == 'cancelar' else ''),
+        f'en la solicitud #{solicitud.id}. '
+        f'Expedientes: {", ".join("#" + str(d.expediente_prestamo.expediente.numero) for d in pendientes)}.',
         'SolicitudPrestamo', solicitud.id
     )
     return JsonResponse({"success": True, "resueltos": len(pendientes)})
