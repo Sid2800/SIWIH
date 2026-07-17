@@ -52,7 +52,6 @@ from ._permisos import (
 )
 from ._sesion import (
     _camas_mapeadas_sesion,
-    _cerrar_sesiones_mapeo_sin_sesion_django,
     _guardar_scope_sesion,
     _obtener_sesion_mapeo_activa,
     _obtener_salas_ids_sesion,
@@ -81,9 +80,6 @@ def iniciar_mapeo(request):
     """Inicia una sesion de mapeo para el usuario actual."""
     if not _tiene_permiso_mapear(request.user):
         return JsonResponse({"ok": False, "error": "Acceso denegado."}, status=403)
-
-    # [2026-06-22] Depura sesiones huérfanas cuando la sesión Django del usuario ya expiró.
-    _cerrar_sesiones_mapeo_sin_sesion_django()
 
     # [2026-06-11] El inicio de sesión se controla por MAPEO_CAMAS_MAPEAR_*.
     # Las restricciones de intentos se aplican durante movimientos/edición de camas.
@@ -224,8 +220,6 @@ def estado_mapeo(request):
     """Devuelve la sesion de mapeo activa y camas ya procesadas para restaurar UI."""
     if not _tiene_permiso_mapear(request.user):
         return JsonResponse({"ok": False, "error": "Acceso denegado."}, status=403)
-
-    _cerrar_sesiones_mapeo_sin_sesion_django()
 
     sesion = _obtener_sesion_mapeo_activa(request.user)
     if not sesion:

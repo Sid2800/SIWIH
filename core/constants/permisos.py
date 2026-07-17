@@ -338,20 +338,31 @@ S_EXP_SOLICITANTE_UNIDADES = [
 # -----------------------------
 
 # [2026-06-22] Acceso de solo visualización al template del mapa de camas.
-MAPEO_CAMAS_VISUALIZACION_ROLES = ["admin", "digitador", "visitante", "directivo"]
+# Este permiso permite abrir el mapa y consultar su estado, pero no iniciar
+# una sesion de mapeo ni modificar camas.
+MAPEO_CAMAS_VISUALIZACION_ROLES = ["admin", "visitante", "directivo", "digitador"]
 MAPEO_CAMAS_VISUALIZACION_UNIDADES = ["ADMI", 'ENF']
 
-# [2026-05-18] Acceso para entrar y ejecutar flujo de mapeo.
+# [2026-05-18] Acceso para entrar y ejecutar el flujo de mapeo.
+# Habilita iniciar una sesion, consultar/restaurar su estado activo, procesar
+# acciones dentro de esa sesion y finalizarla o cancelarla segun corresponda.
+# No equivale a permiso de cambios manuales fuera del flujo de mapeo.
 MAPEO_CAMAS_MAPEAR_ROLES = ["admin", "digitador",]
 MAPEO_CAMAS_MAPEAR_UNIDADES = ["ADMI"]
 
 # [2026-05-18] Acceso para cambios manuales en el mapa (edición directa).
+# Se usa para actualizar una cama o mover un paciente sin tener una sesion de
+# mapeo activa. Es el permiso de edicion directa del mapa.
 MAPEO_CAMAS_CAMBIOS_ROLES = ["digitador" ]
-MAPEO_CAMAS_CAMBIOS_UNIDADES = ["ADMI","SALA"]
+MAPEO_CAMAS_CAMBIOS_UNIDADES = ["ENF"]
 
-# [2026-06-11] Ajuste operativo: el limite de intentos aplica.
+# [2026-06-11] Ajuste operativo: este permiso no abre una capacidad nueva,
+# sino que limita el permiso de cambios manuales en salas con control por
+# ventana de intentos. En la practica, habilita los mismos cambios que
+# MAPEO_CAMAS_CAMBIOS_* pero solo hasta el maximo permitido por servicio/sala.
+#No se recomieda colocar este permiso a un usuario que tenga Camas Mapear activado. ya que lo limita tambien. movimiento. 
 MAPEO_CAMAS_INTENTOS_CAMBIO_ROLES = ["digitador"]
-MAPEO_CAMAS_INTENTOS_CAMBIO_UNIDADES = ["ADMI","SALA"]
+MAPEO_CAMAS_INTENTOS_CAMBIO_UNIDADES = ["ENF"]
 
 # Acceso de auditoría (historiales, detalle de historial)
 # [2026-05-11] Visitante habilitado para visualizar templates de historial.

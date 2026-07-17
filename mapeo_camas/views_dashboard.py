@@ -5,6 +5,7 @@ from datetime import timedelta
 from collections import defaultdict
 
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import OuterRef, Subquery
 from django.http import HttpResponse
 from django.shortcuts import redirect
@@ -17,11 +18,6 @@ from openpyxl.utils import get_column_letter
 
 from core.utils.utilidades_fechas import hora_local_iso
 from core.services.reporte.EXCEL.reporte_service_excel import ServiceExcel
-from core.constants.permisos import (
-    MAPEO_CAMAS_VISUALIZACION_ROLES,
-    MAPEO_CAMAS_VISUALIZACION_UNIDADES,
-)
-from core.mixins import UnidadRolRequiredMixin
 from servicio.models import Cama
 
 from mapeo_camas.models import (
@@ -543,22 +539,14 @@ def _generar_excel_ocupacion(desde, hasta, filas, username):
 # =============================================================================
 # [2026-05-28] Dashboard de KPIs hospitalarios en tiempo real
 # =============================================================================
-class DashboardMapeoCamasView(UnidadRolRequiredMixin, TemplateView):
+class DashboardMapeoCamasView(LoginRequiredMixin, TemplateView):
     """[2026-05-28] Dashboard operativo de KPIs y gráficas en tiempo real."""
     template_name = "mapeo_camas/dashboard/dashboard.html"
-    # [2026-06-22 AUDIT] Se mantiene el mixin en la vista, pero el acceso real
-    # al dashboard es el criterio especial superusuario/global sin permiso extra.
-    required_roles = MAPEO_CAMAS_VISUALIZACION_ROLES
-    required_unidades = MAPEO_CAMAS_VISUALIZACION_UNIDADES
 
     def dispatch(self, request, *args, **kwargs):
-        # [2026-06-23] super() primero para que LoginRequiredMixin redirija a login si no autenticado
-        respuesta_mixin = super().dispatch(request, *args, **kwargs)
-        if not request.user.is_authenticated:
-            return respuesta_mixin
         if not _tiene_permiso_dashboard(request.user):
             return redirect("acceso_denegado")
-        return respuesta_mixin
+        return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

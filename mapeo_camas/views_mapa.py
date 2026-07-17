@@ -80,7 +80,6 @@ from ._permisos import (
     _validar_mapeo_no_iniciado,
 )
 from ._sesion import (
-    _cerrar_sesiones_mapeo_sin_sesion_django,
     _obtener_sesion_mapeo_activa,
     _obtener_salas_ids_sesion,
     _obtener_servicios_ids_sesion,
@@ -262,7 +261,6 @@ class MapeoCamasMapaView(UnidadRolRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         es_rol_intentos_restringido = _es_rol_intentos_restringido(self.request.user)
-        _cerrar_sesiones_mapeo_sin_sesion_django()
         context["titulo"] = "Mapa de Camas"
         context["subtitulo"] = "Asignacion por paciente y estado de cama"
         # [2026-05-26 FEATURE] Avisar de mapeos ajenos en progreso.
@@ -319,8 +317,6 @@ def mapa_camas_data(request):
     # [2026-06-22] Data de lectura del mapa usa permiso de visualización.
     if not _tiene_permiso_visualizacion_mapa(request.user):
         return JsonResponse({"ok": False, "error": "Acceso denegado."}, status=403)
-
-    _cerrar_sesiones_mapeo_sin_sesion_django()
 
     sesion_activa = _obtener_sesion_mapeo_activa(request.user)
     servicios_ids_sesion = _obtener_servicios_ids_sesion(sesion_activa)

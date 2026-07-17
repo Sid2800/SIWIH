@@ -3,17 +3,13 @@
 historial por cama y movimientos)."""
 
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import JsonResponse
 from django.shortcuts import redirect
 from django.views.decorators.http import require_GET
 from django.views.generic import TemplateView
 
-from core.constants.permisos import (
-    MAPEO_CAMAS_VISUALIZACION_ROLES,
-    MAPEO_CAMAS_VISUALIZACION_UNIDADES,
-)
 from core.constants.mapeo_camas_constants import DETALLE_PAGE_SIZE_DEFAULT, DETALLE_PAGE_SIZE_MAX
-from core.mixins import UnidadRolRequiredMixin
 from core.services.mapeo_camas_service import MapeoCamasService
 from core.utils.utilidades_fechas import parse_fecha_filtro_dia
 
@@ -29,21 +25,13 @@ __all__ = [
 ]
 
 
-class MapeoCamasHistorialView(UnidadRolRequiredMixin, TemplateView):
+class MapeoCamasHistorialView(LoginRequiredMixin, TemplateView):
     template_name = "mapeo_camas/historiales.html"
-    # [2026-06-22 AUDIT] Se mantiene el mixin en la vista, pero el acceso real
-    # a historiales es el criterio especial superusuario/global sin permiso extra.
-    required_roles = MAPEO_CAMAS_VISUALIZACION_ROLES
-    required_unidades = MAPEO_CAMAS_VISUALIZACION_UNIDADES
 
     def dispatch(self, request, *args, **kwargs):
-        # [2026-06-23] super() primero para que LoginRequiredMixin redirija a login si no autenticado
-        respuesta_mixin = super().dispatch(request, *args, **kwargs)
-        if not request.user.is_authenticated:
-            return respuesta_mixin
         if not _tiene_permiso_historiales(request.user):
             return redirect("acceso_denegado")
-        return respuesta_mixin
+        return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -52,21 +40,13 @@ class MapeoCamasHistorialView(UnidadRolRequiredMixin, TemplateView):
         return context
 
 
-class MapeoCamasHistorialDetalleView(UnidadRolRequiredMixin, TemplateView):
+class MapeoCamasHistorialDetalleView(LoginRequiredMixin, TemplateView):
     template_name = "mapeo_camas/historiales_detalle.html"
-    # [2026-06-22 AUDIT] Se mantiene el mixin en la vista, pero el acceso real
-    # a historiales es el criterio especial superusuario/global sin permiso extra.
-    required_roles = MAPEO_CAMAS_VISUALIZACION_ROLES
-    required_unidades = MAPEO_CAMAS_VISUALIZACION_UNIDADES
 
     def dispatch(self, request, *args, **kwargs):
-        # [2026-06-23] super() primero para que LoginRequiredMixin redirija a login si no autenticado
-        respuesta_mixin = super().dispatch(request, *args, **kwargs)
-        if not request.user.is_authenticated:
-            return respuesta_mixin
         if not _tiene_permiso_historiales(request.user):
             return redirect("acceso_denegado")
-        return respuesta_mixin
+        return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
