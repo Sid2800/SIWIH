@@ -2,6 +2,9 @@
 BUSCAR_ARCHIVOS = "/api_images/buscar/"
 BUSCAR_IMAGENES_USUARIO = "/api_images/buscar_imagenes_usuarios/"
 SUBIR_IMAGEN = "/api_images/subir_imagen/"
+# Endpoints exclusivos para las fotografias asociadas al inventario de equipos.
+SUBIR_IMAGEN_DISPOSITIVO = "/api_images/equipos/subir/"
+BUSCAR_IMAGENES_DISPOSITIVO = "/api_images/equipos/{dispositivo_id}/imagenes/"
 
 
 SUBIR_IMAGEN_USUARIO = "/api_images/subir_imagen_usuario/"

@@ -1,5 +1,15 @@
 from core.services.server_image.auth_service import traer_server_token, ImageServerAuthError
-from core.constants.image_server_enpoints import BUSCAR_ARCHIVOS, BUSCAR_IMAGENES_USUARIO,  SUBIR_IMAGEN,SUBIR_IMAGEN_USUARIO, DESACTIVAR_IMAGEN, DESACTIVAR_IMAGEN_BATCH, MIGRAR_IMAGENES_EXTERNO_INTERNO
+from core.constants.image_server_enpoints import (
+    BUSCAR_ARCHIVOS,
+    BUSCAR_IMAGENES_DISPOSITIVO,
+    BUSCAR_IMAGENES_USUARIO,
+    DESACTIVAR_IMAGEN,
+    DESACTIVAR_IMAGEN_BATCH,
+    MIGRAR_IMAGENES_EXTERNO_INTERNO,
+    SUBIR_IMAGEN,
+    SUBIR_IMAGEN_DISPOSITIVO,
+    SUBIR_IMAGEN_USUARIO,
+)
 from core.constants.media_constants  import AppValida, OrigenValido, TipoPaciente
 from django.conf import settings
 import json
@@ -455,3 +465,110 @@ class RequestService:
         
         except Exception:
             raise
+    @staticmethod
+    def _validar_dispositivo_id(dispositivo_id):
+        """Normaliza y protege el identificador enviado al servidor de imagenes."""
+        try:
+            dispositivo_id = int(dispositivo_id)
+        except (TypeError, ValueError):
+            raise ValueError("dispositivo_id debe ser un entero positivo")
+
+        if dispositivo_id <= 0:
+            raise ValueError("dispositivo_id debe ser un entero positivo")
+
+        return dispositivo_id
+
+    @staticmethod
+    def subir_imagen_dispositivo(peticion_dict):
+        """Envia una fotografia WebP de un equipo usando el JWT del backend."""
+        peticion = SimpleNamespace(**peticion_dict)
+        dispositivo_id = RequestService._validar_dispositivo_id(
+            getattr(peticion, "dispositivo_id", None)
+        )
+        archivo = getattr(peticion, "archivo", None)
+        tipo_imagen = getattr(peticion, "tipo_imagen", "")
+
+        if not archivo or not tipo_imagen:
+            raise ValueError("archivo y tipo_imagen son requeridos")
+
+        content_type = getattr(archivo, "content_type", "")
+        nombre_archivo = getattr(archivo, "name", "")
+        if content_type != "image/webp" or not nombre_archivo.lower().endswith(".webp"):
+            raise ValueError("El servidor de imagenes solo acepta archivos WebP")
+
+        url = f"{settings.IMAGE_SERVER_URL}{SUBIR_IMAGEN_DISPOSITIVO}"
+        token = traer_server_token()
+        headers = {"Authorization": f"Bearer {token}"}
+        files = {
+            "archivo": (nombre_archivo, archivo, content_type),
+        }
+        data = {
+            "dispositivo_id": dispositivo_id,
+            "tipo_imagen": tipo_imagen,
+            "usuario_snapshot": json.dumps({
+                "id": getattr(peticion, "usuario_id", None),
+                "nombre": getattr(peticion, "usuario_nombre", ""),
+                "sistema": "SIWI-HOSPITAL",
+            }),
+        }
+
+        try:
+            response = requests.post(
+                url,
+                headers=headers,
+                data=data,
+                files=files,
+                timeout=20,
+            )
+        except requests.exceptions.RequestException as exc:
+            raise RuntimeError(
+                f"Error conexion al subir imagen de equipo: {exc}"
+            ) from exc
+
+        try:
+            response_json = response.json()
+        except ValueError:
+            response_json = {"error": response.text[:500]}
+
+        if response.status_code >= 400:
+            raise RuntimeError(
+                "Error al subir imagen de equipo "
+                f"status={response.status_code} detalle={response_json}"
+            )
+
+        return {"ok": True, "data": response_json}
+
+    @staticmethod
+    def consultar_imagenes_dispositivo(dispositivo_id):
+        """Consulta las fotografias registradas para un equipo en SIWIH Images."""
+        dispositivo_id = RequestService._validar_dispositivo_id(dispositivo_id)
+        ruta = BUSCAR_IMAGENES_DISPOSITIVO.format(
+            dispositivo_id=dispositivo_id
+        )
+        url = f"{settings.IMAGE_SERVER_URL}{ruta}"
+        token = traer_server_token()
+        headers = {"Authorization": f"Bearer {token}"}
+
+        try:
+            response = requests.get(
+                url,
+                headers=headers,
+                timeout=10,
+            )
+        except requests.exceptions.RequestException as exc:
+            raise RuntimeError(
+                f"Error conexion al consultar imagenes de equipo: {exc}"
+            ) from exc
+
+        try:
+            response_json = response.json()
+        except ValueError:
+            response_json = {"error": response.text[:500]}
+
+        if response.status_code >= 400:
+            raise RuntimeError(
+                "Error al consultar imagenes de equipo "
+                f"status={response.status_code} detalle={response_json}"
+            )
+
+        return {"ok": True, "data": response_json}

@@ -409,3 +409,71 @@ class MediaService:
             raise EvaluacionDominioError(
                 "No se pudieron migrar las imágenes del paciente externo."
             )
+
+    @staticmethod
+    def subir_imagen_dispositivo(
+        dispositivo_id,
+        archivo,
+        tipo_imagen,
+        usuario,
+    ):
+        """Construye el snapshot del usuario y delega la subida HTTP."""
+        if not archivo or not usuario:
+            return {
+                "ok": False,
+                "error": "Archivo o usuario no proporcionado",
+            }
+
+        payload = {
+            "dispositivo_id": dispositivo_id,
+            "archivo": archivo,
+            "tipo_imagen": tipo_imagen,
+            "usuario_id": usuario.id,
+            "usuario_nombre": construir_nombre_dinamico(
+                usuario,
+                ["first_name", "last_name"],
+            ),
+        }
+
+        try:
+            resultado = RequestService.subir_imagen_dispositivo(payload)
+            imagen = resultado.get("data", {}).get("imagen")
+            if not imagen:
+                raise RuntimeError(
+                    "El servidor de imagenes no devolvio la imagen creada"
+                )
+
+            return {"ok": True, "imagen": imagen}
+        except Exception as exc:
+            log_error(
+                "[FALLO_SUBIDA_EQUIPO] "
+                f"dispositivo_id={dispositivo_id} detalle={str(exc)}",
+                app=LogApp.MEDIA,
+            )
+            return {"ok": False, "error": str(exc)}
+
+    @staticmethod
+    def obtener_imagenes_dispositivo(dispositivo_id):
+        """Obtiene imagenes y convierte sus rutas relativas en URLs utilizables."""
+        try:
+            resultado = RequestService.consultar_imagenes_dispositivo(
+                dispositivo_id
+            )
+            imagenes = resultado.get("data", {}).get("imagenes", [])
+
+            for imagen in imagenes:
+                for campo in ("url", "miniatura"):
+                    valor = imagen.get(campo)
+                    if valor and valor.startswith("/"):
+                        imagen[campo] = (
+                            f"{settings.IMAGE_SERVER_URL}{valor}"
+                        )
+
+            return imagenes, False
+        except Exception as exc:
+            log_error(
+                "[FALLO_MEDIA_EQUIPO] "
+                f"dispositivo_id={dispositivo_id} detalle={str(exc)}",
+                app=LogApp.MEDIA,
+            )
+            return [], True
