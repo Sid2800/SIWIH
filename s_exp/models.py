@@ -52,6 +52,36 @@ class CatalogoCodigoMixin(models.Model):
         return cls._cache_id[codigo]
 
     @classmethod
+    def ids_de(cls, codigos):
+        """
+        Devuelve la lista de ids ENTEROS de varios códigos (cacheado).
+
+        Pensado para filtros `campo_id__in=[...]` en vez de
+        `campo__codigo__in=[...]`: este último obliga a un JOIN contra el
+        catálogo y a comparar texto en cada fila; con los ids el filtro es un IN
+        sobre la FK (entero, indexado) y no toca el catálogo.
+        """
+        return [cls.id_de(c) for c in codigos]
+
+    @classmethod
+    def id_de_seguro(cls, codigo):
+        """
+        Como id_de(), pero devuelve None si el código no existe en vez de lanzar.
+
+        Se usa con valores que vienen del USUARIO (p. ej. el filtro de estado de
+        una pantalla): con id_de() un valor inválido reventaría en 500, mientras
+        que el filtro por texto simplemente no encontraba nada. Con None el
+        llamador decide (normalmente devolver vacío), conservando ese
+        comportamiento sin exponer un error.
+        """
+        if not codigo:
+            return None
+        try:
+            return cls.id_de(codigo)
+        except cls.DoesNotExist:
+            return None
+
+    @classmethod
     def codigo_de(cls, id_):
         """Devuelve el CÓDIGO (texto) a partir de un id, sin query (cacheado)."""
         if not id_:

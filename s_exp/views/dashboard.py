@@ -13,7 +13,10 @@ from django.views.decorators.http import require_GET
 
 from django.shortcuts import redirect
 
-from s_exp.models import MotivoSolicitud, ExpedientePrestamo, SolicitudPrestamo, Prestamo
+from s_exp.models import (
+    MotivoSolicitud, ExpedientePrestamo, SolicitudPrestamo, Prestamo,
+    EstadoSolicitud, EstadoPrestamo, EstadoExpedienteFisico,
+)
 from expediente.models import Expediente
 
 
@@ -92,25 +95,25 @@ def dashboard_stats_api(request):
         total = Expediente.objects.count()
 
         # Expedientes con préstamo activo
-        prestados = ExpedientePrestamo.objects.filter(estado__codigo='EXP_PRESTADO').count()
+        prestados = ExpedientePrestamo.objects.filter(estado_id=EstadoExpedienteFisico.id_de('EXP_PRESTADO')).count()
         disponibles = total - prestados
 
-        solicitudes_pendientes = SolicitudPrestamo.objects.filter(estado_flujo__codigo='SOL_PENDIENTE').count()
+        solicitudes_pendientes = SolicitudPrestamo.objects.filter(estado_flujo_id=EstadoSolicitud.id_de('SOL_PENDIENTE')).count()
 
         ahora = timezone.now()
-        prestamos_activos = Prestamo.objects.filter(estado__codigo='Entregado').count()
+        prestamos_activos = Prestamo.objects.filter(estado_id=EstadoPrestamo.id_de('Entregado')).count()
         prestamos_vencidos = Prestamo.objects.filter(
-            estado__codigo='Entregado',
+            estado_id=EstadoPrestamo.id_de('Entregado'),
             fecha_limite__lt=ahora
         ).count()
 
         # Próximos a vencer (más del 90% de tiempo usado)
         proximos_vencer = 0
-        for p in Prestamo.objects.filter(estado__codigo='Entregado', fecha_limite__gte=ahora):
+        for p in Prestamo.objects.filter(estado_id=EstadoPrestamo.id_de('Entregado'), fecha_limite__gte=ahora):
             if p.porcentaje_tiempo_usado >= 90:
                 proximos_vencer += 1
 
-        devoluciones_parciales = Prestamo.objects.filter(estado__codigo='DevolucionParcial').count()
+        devoluciones_parciales = Prestamo.objects.filter(estado_id=EstadoPrestamo.id_de('DevolucionParcial')).count()
 
         return JsonResponse({
             "total_expedientes": total,

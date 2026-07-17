@@ -12,7 +12,10 @@ from django.views.decorators.http import require_GET
 
 from django.db.models import Count, Q
 
-from s_exp.models import SolicitudPrestamo, ExpedienteEstadoLog
+from s_exp.models import (
+    SolicitudPrestamo, ExpedienteEstadoLog,
+    EstadoSolicitud, EstadoPrestamo,
+)
 
 
 from .comunes import (
@@ -53,7 +56,13 @@ def historial_solicitudes_api(request):
 
         if estado_filtro:
             # estado_filtro es el CÓDIGO de texto que envía el frontend.
-            qs = qs.filter(estado_flujo__codigo=estado_filtro)
+            # estado_filtro es el CÓDIGO que envían los botones del front.
+            # Se traduce a id (id_de_seguro devuelve None si no existe) para
+            # filtrar por la FK entera en vez de hacer JOIN y comparar texto.
+            # Si el código no existe, no se devuelve nada: mismo resultado que
+            # antes con un valor invalido, pero sin lanzar error.
+            _id_estado = EstadoSolicitud.id_de_seguro(estado_filtro)
+            qs = qs.filter(estado_flujo_id=_id_estado) if _id_estado else qs.none()
 
         if search_value:
             qs = qs.filter(
@@ -76,9 +85,16 @@ def historial_solicitudes_api(request):
             # Eventos resumen (incompleta, devuelto fuera de tiempo).
             # Comparamos por id usando id_de() (cacheado, sin query extra), ya
             # que estado_flujo_id/estado_id son enteros (PK de los catálogos).
-            from s_exp.models import EstadoSolicitud, EstadoPrestamo
             evento = None
-            prestamo = s.prestamos.first()
+            # BUG preexistente (desde abr-2026): la relacion Prestamo->Solicitud es
+            # OneToOne con related_name='prestamo'; 's.prestamos' no existe y esta
+            # vista devolvia 500 silencioso (el except lo tragaba). El acceso al
+            # OneToOne inverso lanza DoesNotExist si no hay prestamo, por eso el
+            # getattr contra None via try/except.
+            try:
+                prestamo = s.prestamo
+            except Exception:
+                prestamo = None
             if s.estado_flujo_id == EstadoSolicitud.id_de('SOL_INCOMPLETA'):
                 faltantes = s.detalles.filter(devuelto=False).count()
                 evento = f"⚠️ Incompleta: {faltantes} expediente(s) sin devolver"
@@ -150,9 +166,12 @@ def historial_solicitud_detalle_api(request, solicitud_id):
             "observacion": l.observacion or "",
         } for l in logs]
 
-        prestamo = s.prestamos.first()
+        # Mismo BUG preexistente que arriba: related_name es 'prestamo' (OneToOne).
+        try:
+            prestamo = s.prestamo
+        except Exception:
+            prestamo = None
         # estado del prestamo: traducir id->codigo para el frontend.
-        from s_exp.models import EstadoPrestamo
         return JsonResponse({"data": {
             "id": s.id,
             "usuario": DatosSolicitud.usuario_username(s),

@@ -43,8 +43,8 @@ def prestamos_para_devolucion_api(request):
     try:
         # Mostrar solicitudes marcadas para devolución O con devoluciones incompletas pendientes
         qs = Prestamo.objects.select_related('solicitud__usuario').filter(
-            solicitud__estado_flujo__codigo='SOL_EN_DEVOLUCION',
-            estado__codigo__in=['Entregado', 'Vencido', 'DevolucionParcial']
+            solicitud__estado_flujo_id=EstadoSolicitud.id_de('SOL_EN_DEVOLUCION'),
+            estado_id__in=EstadoPrestamo.ids_de(['Entregado', 'Vencido', 'DevolucionParcial'])
         ).order_by('fecha_limite')
 
         # Importamos los servicios — acceso unificado a datos del detalle
@@ -158,7 +158,7 @@ def solicitar_devolucion_api(request):
         solicitud = SolicitudPrestamo.objects.get(
             id=solicitud_id,
             usuario=request.user,
-            estado_flujo__codigo__in=['SOL_EN_PRESTAMO', 'SOL_INCOMPLETA']
+            estado_flujo_id__in=EstadoSolicitud.ids_de(['SOL_EN_PRESTAMO', 'SOL_INCOMPLETA'])
         )
 
         with transaction.atomic():

@@ -53,12 +53,17 @@ def prestamos_activos_api(request):
         qs = Prestamo.objects.select_related(
             'solicitud__usuario', 'solicitud__motivo', 'solicitud__servicio_unidad'
         ).filter(
-            estado__codigo__in=['Activo', 'Entregado', 'Vencido', 'DevolucionParcial', 'DevueltoVencido']
+            estado_id__in=EstadoPrestamo.ids_de(['Activo', 'Entregado', 'Vencido', 'DevolucionParcial', 'DevueltoVencido'])
         )
 
         if estado_filtro:
-            # estado_filtro es el CÓDIGO de texto que envían los botones del front.
-            qs = qs.filter(estado__codigo=estado_filtro)
+            # estado_filtro es el CÓDIGO que envían los botones del front.
+            # Se traduce a id (id_de_seguro devuelve None si no existe) para
+            # filtrar por la FK entera en vez de hacer JOIN y comparar texto.
+            # Si el código no existe, no se devuelve nada: mismo resultado que
+            # antes con un valor invalido, pero sin lanzar error.
+            _id_estado = EstadoPrestamo.id_de_seguro(estado_filtro)
+            qs = qs.filter(estado_id=_id_estado) if _id_estado else qs.none()
 
         if search_value:
             qs = qs.filter(
@@ -69,7 +74,7 @@ def prestamos_activos_api(request):
             )
 
         total_records = Prestamo.objects.filter(
-            estado__codigo__in=['Activo', 'Entregado', 'Vencido', 'DevolucionParcial', 'DevueltoVencido']
+            estado_id__in=EstadoPrestamo.ids_de(['Activo', 'Entregado', 'Vencido', 'DevolucionParcial', 'DevueltoVencido'])
         ).count()
         filtered_records = qs.count()
 
@@ -138,7 +143,7 @@ def marcar_entregado_api(request):
     prestamo_id = body.get('prestamo_id')
 
     try:
-        prestamo = Prestamo.objects.get(id=prestamo_id, estado__codigo='Activo')
+        prestamo = Prestamo.objects.get(id=prestamo_id, estado_id=EstadoPrestamo.id_de('Activo'))
         if prestamo.solicitud.estado_flujo_id != EstadoSolicitud.id_de('SOL_LISTO_RECOGER'):
              return JsonResponse({"error": "La solicitud debe estar marcada como 'Listo para recoger' antes de entregar."}, status=400)
     except Prestamo.DoesNotExist:

@@ -16,7 +16,11 @@ from django.views.decorators.csrf import csrf_protect
 from django.db import transaction
 from django.db.models import Count, Q
 
-from s_exp.models import MotivoSolicitud, ExpedientePrestamo, SolicitudPrestamo, SolicitudExpedienteDetalle, Prestamo, ExpedienteEstadoLog
+from s_exp.models import (
+    MotivoSolicitud, ExpedientePrestamo, SolicitudPrestamo,
+    SolicitudExpedienteDetalle, Prestamo, ExpedienteEstadoLog,
+    EstadoSolicitud, EstadoExpedienteFisico,
+)
 from expediente.models import Expediente, PacienteAsignacion
 
 #sid
@@ -68,7 +72,13 @@ def listar_solicitudes_api(request):
         ).annotate(cant_expedientes=Count('detalles'))
 
         if estado_filtro:
-            qs = qs.filter(estado_flujo__codigo=estado_filtro)
+            # estado_filtro es el CÓDIGO que envían los botones del front.
+            # Se traduce a id (id_de_seguro devuelve None si no existe) para
+            # filtrar por la FK entera en vez de hacer JOIN y comparar texto.
+            # Si el código no existe, no se devuelve nada: mismo resultado que
+            # antes con un valor invalido, pero sin lanzar error.
+            _id_estado = EstadoSolicitud.id_de_seguro(estado_filtro)
+            qs = qs.filter(estado_flujo_id=_id_estado) if _id_estado else qs.none()
 
         if search_value:
             qs = qs.filter(
@@ -177,7 +187,7 @@ def aprobar_solicitud_api(request):
         }
 
     try:
-        solicitud = SolicitudPrestamo.objects.get(id=solicitud_id, estado_flujo__codigo='SOL_PENDIENTE')
+        solicitud = SolicitudPrestamo.objects.get(id=solicitud_id, estado_flujo_id=EstadoSolicitud.id_de('SOL_PENDIENTE'))
     except SolicitudPrestamo.DoesNotExist:
         return JsonResponse({"error": "Solicitud no encontrada o ya procesada"}, status=404)
 
@@ -312,7 +322,7 @@ def expedientes_revision_api(request, solicitud_id):
 
     try:
         solicitud = SolicitudPrestamo.objects.get(
-            id=solicitud_id, estado_flujo__codigo='SOL_APROBADA_ORGANIZANDO'
+            id=solicitud_id, estado_flujo_id=EstadoSolicitud.id_de('SOL_APROBADA_ORGANIZANDO')
         )
     except SolicitudPrestamo.DoesNotExist:
         return JsonResponse({"error": "Solicitud no encontrada o no está en revisión"}, status=404)
@@ -344,7 +354,7 @@ def expedientes_solicitud_api(request, solicitud_id):
         return JsonResponse({"error": "Sin permisos"}, status=403)
 
     try:
-        solicitud = SolicitudPrestamo.objects.get(id=solicitud_id, estado_flujo__codigo='SOL_PENDIENTE')
+        solicitud = SolicitudPrestamo.objects.get(id=solicitud_id, estado_flujo_id=EstadoSolicitud.id_de('SOL_PENDIENTE'))
     except SolicitudPrestamo.DoesNotExist:
         return JsonResponse({"error": "Solicitud no encontrada o ya procesada"}, status=404)
 
@@ -434,7 +444,7 @@ def revisar_entrega_api(request):
 
     try:
         solicitud = SolicitudPrestamo.objects.get(
-            id=solicitud_id, estado_flujo__codigo='SOL_APROBADA_ORGANIZANDO'
+            id=solicitud_id, estado_flujo_id=EstadoSolicitud.id_de('SOL_APROBADA_ORGANIZANDO')
         )
     except SolicitudPrestamo.DoesNotExist:
         return JsonResponse({"error": "Solicitud no encontrada o no está en revisión"}, status=404)
@@ -561,7 +571,7 @@ def marcar_listo_recojer_api(request):
         body = json.loads(request.body)
         solicitud_id = body.get('solicitud_id')
 
-        solicitud = SolicitudPrestamo.objects.get(id=solicitud_id, estado_flujo__codigo='SOL_APROBADA_ORGANIZANDO')
+        solicitud = SolicitudPrestamo.objects.get(id=solicitud_id, estado_flujo_id=EstadoSolicitud.id_de('SOL_APROBADA_ORGANIZANDO'))
         # Validar que al menos un expediente siga aprobado
         if solicitud.detalles.filter(aprobado=True).count() == 0:
             return JsonResponse({"error": "No hay expedientes aprobados para entregar"}, status=400)
@@ -610,7 +620,7 @@ def rechazar_solicitud_api(request):
         return JsonResponse({"error": "El motivo de rechazo es obligatorio"}, status=400)
 
     try:
-        solicitud = SolicitudPrestamo.objects.get(id=solicitud_id, estado_flujo__codigo='SOL_PENDIENTE')
+        solicitud = SolicitudPrestamo.objects.get(id=solicitud_id, estado_flujo_id=EstadoSolicitud.id_de('SOL_PENDIENTE'))
     except SolicitudPrestamo.DoesNotExist:
         return JsonResponse({"error": "Solicitud no encontrada o ya procesada"}, status=404)
 
@@ -713,12 +723,12 @@ def crear_solicitud_api(request):
 
         # Verificar que existan y no estén prestados o en proceso
         prestados = set(
-            ExpedientePrestamo.objects.filter(estado__codigo='EXP_PRESTADO')
+            ExpedientePrestamo.objects.filter(estado_id=EstadoExpedienteFisico.id_de('EXP_PRESTADO'))
             .values_list('expediente_id', flat=True)
         )
         en_proceso = set(
             SolicitudExpedienteDetalle.objects.filter(
-                solicitud__estado_flujo__codigo__in=['SOL_PENDIENTE', 'SOL_APROBADA_ORGANIZANDO'],
+                solicitud__estado_flujo_id__in=EstadoSolicitud.ids_de(['SOL_PENDIENTE', 'SOL_APROBADA_ORGANIZANDO']),
                 aprobado=True,
             ).values_list('expediente_prestamo__expediente_id', flat=True)
         )

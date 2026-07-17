@@ -11,7 +11,10 @@ from django.views.decorators.http import require_GET
 
 from django.db.models import Q
 
-from s_exp.models import ExpedientePrestamo, SolicitudExpedienteDetalle
+from s_exp.models import (
+    ExpedientePrestamo, SolicitudExpedienteDetalle,
+    EstadoSolicitud, EstadoExpedienteFisico,
+)
 from expediente.models import Expediente, PacienteAsignacion
 from paciente.models import Paciente
 
@@ -55,14 +58,17 @@ def buscar_expedientes_api(request):
 
         # IDs de expedientes no disponibles (Cualquier estado que no sea disponible)
         expedientes_no_disponibles = set(
-            ExpedientePrestamo.objects.exclude(estado__codigo='EXP_DISPONIBLE')
+            ExpedientePrestamo.objects.exclude(estado_id=EstadoExpedienteFisico.id_de('EXP_DISPONIBLE'))
             .values_list('expediente_id', flat=True)
         )
         # También las solicitudes activas que podrían no haber actualizado el estado físico aún.
         # IMPORTANTE: solo cuentan los detalles APROBADOS — los rechazados ya no apartan al expediente.
         en_proceso = set(
             SolicitudExpedienteDetalle.objects.filter(
-                solicitud__estado_flujo__codigo__in=['SOL_PENDIENTE', 'SOL_APROBADA_ORGANIZANDO', 'SOL_LISTO_RECOGER', 'SOL_EN_PRESTAMO', 'SOL_EN_DEVOLUCION', 'SOL_INCOMPLETA'],
+                solicitud__estado_flujo_id__in=EstadoSolicitud.ids_de([
+                    'SOL_PENDIENTE', 'SOL_APROBADA_ORGANIZANDO', 'SOL_LISTO_RECOGER',
+                    'SOL_EN_PRESTAMO', 'SOL_EN_DEVOLUCION', 'SOL_INCOMPLETA',
+                ]),
                 devuelto=False,
                 aprobado=True,
             ).values_list('expediente_prestamo__expediente_id', flat=True)
