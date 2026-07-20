@@ -324,6 +324,7 @@ S_EXP_SOLICITANTE_UNIDADES = [
    "EST",   # Estadística
    "GCL",   #gestion clinica / medicos 
    "TS",    #trabajo social 
+   "RRHH",
 
 ]
 # remapeir todo los usaurios visitante admision a sus repectivos unidades 
