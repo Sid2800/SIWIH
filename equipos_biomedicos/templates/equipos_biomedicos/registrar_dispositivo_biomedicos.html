@@ -1,4 +1,4 @@
-{% extends 'core/base.html' %}
+{% extends 'core/base_media.html' %}
 
 {% block title %}{{ titulo_pagina|default:"Registrar equipo" }}{% endblock title %}
 
@@ -19,7 +19,7 @@
         <div class="tituloFormulario-subrallado"></div>
     </div>
     {# Este template se reutiliza para registrar y editar. Los textos/URLs vienen desde views.py. #}
-    <form class="biomedicos-registro" method="post" autocomplete="off">
+    <form class="biomedicos-registro" method="post" enctype="multipart/form-data" autocomplete="off">
         {% csrf_token %}
 
         {% if form.non_field_errors %}
@@ -182,31 +182,65 @@
             </div>
         </section>
 
-        {# Fotos queda reservado para una etapa futura; aun no guarda archivos. #}
+        {# En registro se exige una foto GENERAL. El editor compartido de core
+           convierte camara/JPG/PNG a WebP antes de enviar el formulario. #}
         <section class="biomedicos-registro__seccion">
             <h3 class="biomedicos-registro__titulo">
                 <i class="bi bi-camera"></i>
                 Fotos del equipo
             </h3>
 
-            <div class="biomedicos-registro__campos biomedicos-registro__campos--dos">
+            {% if dispositivo %}
+                <p class="biomedicos-registro__foto-ayuda">
+                    Las fotografías del equipo se conservarán sin reemplazo y se
+                    administrarán desde su ficha.
+                </p>
+            {% else %}
                 <div class="biomedicos-registro__campo">
-                    <label>Foto principal</label>
-                    <div class="biomedicos-registro__foto controles_clic_desactivados texto_desactivados">
-                        <i class="bi bi-cloud-arrow-up"></i>
-                        <strong>Seleccionar imagen principal</strong>
-                        <small>Formatos permitidos: JPG, PNG</small>
+                    <label for="foto_general_dispositivo">Foto general *</label>
+                    {{ form.foto_general }}
+                    <input type="file"
+                           id="foto_general_camara"
+                           accept="image/*"
+                           capture="environment"
+                           hidden>
+
+                    <div class="biomedicos-registro__foto biomedicos-registro__foto--activa"
+                         id="foto_general_selector"
+                         role="button"
+                         tabindex="0"
+                         aria-label="Seleccionar foto general del equipo">
+                        <img class="biomedicos-registro__foto-preview"
+                             id="foto_general_preview"
+                             alt="Vista previa de la foto general"
+                             hidden>
+                        <div id="foto_general_contenido">
+                            <i class="bi bi-cloud-arrow-up"></i>
+                            <strong>Agregar foto general</strong>
+                            <small>JPG, PNG o WebP; se convertirá a WebP</small>
+                        </div>
                     </div>
-                </div>
-                <div class="biomedicos-registro__campo">
-                    <label>Fotos adicionales</label>
-                    <div class="biomedicos-registro__foto controles_clic_desactivados texto_desactivados">
-                        <i class="bi bi-plus-circle"></i>
-                        <strong>Agregar fotos</strong>
-                        <small>Disponible en la siguiente etapa</small>
+
+                    <div class="biomedicos-registro__foto-botones">
+                        <button type="button"
+                                class="biomedicos-registro__foto-boton"
+                                id="seleccionar_foto_general">
+                            <i class="bi bi-image"></i>
+                            Seleccionar archivo
+                        </button>
+                        <button type="button"
+                                class="biomedicos-registro__foto-boton"
+                                id="capturar_foto_general">
+                            <i class="bi bi-camera-fill"></i>
+                            Tomar foto
+                        </button>
                     </div>
+                    <small class="biomedicos-registro__foto-ayuda" id="foto_general_estado">
+                        Se guardará como la imagen GENERAL del equipo.
+                    </small>
+                    {{ form.foto_general.errors }}
                 </div>
-            </div>
+            {% endif %}
         </section>
 
         <div class="biomedicos-registro__acciones">
@@ -234,9 +268,107 @@
 </div>
 {% endblock content %}
 
-{% block extra_js %}
+{% block media_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    // El archivo que realmente se envia siempre es el WebP producido por el
+    // editor compartido; el input de camara solo sirve como fuente temporal.
+    const fotoGeneral = document.getElementById('foto_general_dispositivo');
+    const fotoCamara = document.getElementById('foto_general_camara');
+    const selectorFoto = document.getElementById('foto_general_selector');
+    const seleccionarFoto = document.getElementById('seleccionar_foto_general');
+    const capturarFoto = document.getElementById('capturar_foto_general');
+    const previewFoto = document.getElementById('foto_general_preview');
+    const contenidoFoto = document.getElementById('foto_general_contenido');
+    const estadoFoto = document.getElementById('foto_general_estado');
+    let previewUrl = null;
+
+    function mostrarErrorFoto(mensaje) {
+        if (window.toastr) {
+            toastr.error(mensaje);
+        } else {
+            window.alert(mensaje);
+        }
+    }
+
+    function actualizarPreview(archivo) {
+        if (previewUrl) {
+            AdjuntarImagenHelper.quitarUrlPreview(previewUrl);
+        }
+
+        previewUrl = AdjuntarImagenHelper.crearUrlPreview(archivo);
+        previewFoto.src = previewUrl;
+        previewFoto.hidden = false;
+        contenidoFoto.hidden = true;
+        estadoFoto.textContent = 'Foto lista en formato WebP.';
+    }
+
+    async function prepararFoto(inputOrigen) {
+        const archivoOriginal = inputOrigen.files[0];
+        inputOrigen.value = '';
+
+        if (!archivoOriginal) {
+            return;
+        }
+
+        const validacion = AdjuntarImagenHelper.validarArchivo(archivoOriginal);
+        if (!validacion.valido) {
+            mostrarErrorFoto(validacion.error);
+            return;
+        }
+
+        const archivoWebp = await ImageEditor.open(
+            archivoOriginal,
+            {
+                titulo: 'Foto general del equipo',
+                subtitulo: 'Ajuste el encuadre antes de continuar'
+            }
+        );
+
+        if (!archivoWebp) {
+            return;
+        }
+
+        if (typeof DataTransfer === 'undefined') {
+            mostrarErrorFoto('Este navegador no permite preparar la foto.');
+            return;
+        }
+
+        const transferencia = new DataTransfer();
+        transferencia.items.add(archivoWebp);
+        fotoGeneral.files = transferencia.files;
+        actualizarPreview(archivoWebp);
+    }
+
+    if (fotoGeneral && fotoCamara) {
+        seleccionarFoto.addEventListener('click', function () {
+            fotoGeneral.click();
+        });
+        capturarFoto.addEventListener('click', function () {
+            fotoCamara.click();
+        });
+        selectorFoto.addEventListener('click', function () {
+            fotoGeneral.click();
+        });
+        selectorFoto.addEventListener('keydown', function (evento) {
+            if (evento.key === 'Enter' || evento.key === ' ') {
+                evento.preventDefault();
+                fotoGeneral.click();
+            }
+        });
+        fotoGeneral.addEventListener('change', function () {
+            prepararFoto(fotoGeneral);
+        });
+        fotoCamara.addEventListener('change', function () {
+            prepararFoto(fotoCamara);
+        });
+        window.addEventListener('beforeunload', function () {
+            if (previewUrl) {
+                AdjuntarImagenHelper.quitarUrlPreview(previewUrl);
+            }
+        });
+    }
+
     // Muestra solo el selector de area que corresponde al tipo elegido.
     const tipoArea = document.getElementById('tipo_area_dispositivo');
     const campoClinica = document.getElementById('campo_area_clinica');
@@ -301,4 +433,4 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 </script>
-{% endblock extra_js %}
+{% endblock media_js %}

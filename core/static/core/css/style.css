@@ -5141,6 +5141,59 @@ a.biomedicos-submenu__opcion:hover {
    margin-top: .4rem;
 }
 
+.biomedicos-registro__foto--activa {
+   cursor: pointer;
+   overflow: hidden;
+   transition: border-color .2s ease, background-color .2s ease;
+}
+
+.biomedicos-registro__foto--activa:hover,
+.biomedicos-registro__foto--activa:focus-visible {
+   background-color: var(--colorMenuHover);
+   border-color: var(--negro);
+   outline: none;
+}
+
+.biomedicos-registro__foto-preview {
+   border-radius: .8rem;
+   display: block;
+   max-height: 24rem;
+   max-width: 100%;
+   object-fit: contain;
+}
+
+.biomedicos-registro__foto-botones {
+   display: flex;
+   flex-wrap: wrap;
+   gap: .8rem;
+   margin-top: .8rem;
+}
+
+.biomedicos-registro__foto-boton {
+   align-items: center;
+   background-color: var(--blanco);
+   border: .1rem solid var(--colorTablaceldaBorde);
+   border-radius: .6rem;
+   color: var(--negro);
+   cursor: pointer;
+   display: inline-flex;
+   font-size: 1.25rem;
+   gap: .6rem;
+   justify-content: center;
+   min-height: 3.6rem;
+   padding: .6rem 1rem;
+}
+
+.biomedicos-registro__foto-boton:hover {
+   background-color: var(--colorMenuHover);
+}
+
+.biomedicos-registro__foto-ayuda {
+   color: var(--colorTextoMenu);
+   font-size: 1.2rem;
+   margin: .3rem 0 0;
+}
+
 .biomedicos-registro__acciones {
    align-items: center;
    display: flex;
@@ -5649,6 +5702,14 @@ table.dataTable tbody td.biomedicos-listado__vacio {
    flex-direction: column;
    gap: 1rem;
    justify-content: center;
+   overflow: hidden;
+}
+
+.biomedicos-detalle__imagen img {
+   display: block;
+   height: 100%;
+   object-fit: contain;
+   width: 100%;
 }
 
 .biomedicos-detalle__imagen i {

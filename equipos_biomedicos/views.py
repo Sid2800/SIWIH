@@ -15,6 +15,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from core.constants.choices_constants import EstadoRegistro
+from core.services.server_image.media_service import MediaService
 from rrhh.models import Empleado
 
 from .forms import BajaDispositivoForm, DispositivoCreateForm
@@ -81,10 +82,16 @@ def inicio(request):
 @registrar_errores_vista("Error al registrar equipo")
 def registrar_dispositivo(request):
     # GET: muestra formulario vacio.
-    # POST valido: crea el equipo y su asignacion inicial en una transaccion.
-    form = DispositivoCreateForm(request.POST or None)
+    # POST valido: crea equipo, asignacion y foto GENERAL. Si SIWIH Images no
+    # confirma la foto, la transaccion local se revierte y no queda un equipo
+    # incompleto en el inventario.
+    form = DispositivoCreateForm(
+        request.POST or None,
+        request.FILES or None,
+    )
 
     if request.method == "POST" and form.is_valid():
+        registro_completo = False
         with transaction.atomic():
             dispositivo = form.save(commit=False)
             dispositivo.creado_por = request.user
@@ -98,11 +105,40 @@ def registrar_dispositivo(request):
                 "Asignación inicial del equipo.",
             )
 
-        messages.success(
-            request,
-            f"Equipo {dispositivo.codigo} registrado correctamente.",
-        )
-        return redirect("detalle_dispositivo_biomedicos", dispositivo_id=dispositivo.id)
+            foto_general = form.cleaned_data["foto_general"]
+            foto_general.seek(0)
+            resultado_media = MediaService.subir_imagen_dispositivo(
+                dispositivo_id=dispositivo.id,
+                archivo=foto_general,
+                tipo_imagen="GENERAL",
+                usuario=request.user,
+            )
+
+            if resultado_media.get("ok"):
+                registro_completo = True
+            else:
+                # El error tecnico ya queda en el log de MediaService. Al
+                # usuario se le muestra un mensaje estable sin datos internos.
+                transaction.set_rollback(True)
+                form.add_error(
+                    "foto_general",
+                    "No se pudo guardar la foto. Intente nuevamente.",
+                )
+
+        if registro_completo:
+            messages.success(
+                request,
+                f"Equipo {dispositivo.codigo} registrado correctamente.",
+            )
+            return redirect(
+                "detalle_dispositivo_biomedicos",
+                dispositivo_id=dispositivo.id,
+            )
+
+        # La instancia conserva su PK en memoria aunque la base haya hecho
+        # rollback; se restablece para que el formulario siga siendo de alta.
+        dispositivo.pk = None
+        dispositivo._state.adding = True
 
     return render(
         request,
@@ -468,6 +504,18 @@ def detalle_dispositivo(request, dispositivo_id):
     )
     asignacion_actual = _obtener_asignacion_actual(dispositivo)
     baja_dispositivo = _obtener_baja_dispositivo(dispositivo)
+    # La ficha sigue disponible aunque el servidor de imagenes no responda.
+    imagenes_dispositivo, media_server_offline = (
+        MediaService.obtener_imagenes_dispositivo(dispositivo.id)
+    )
+    imagen_general = next(
+        (
+            imagen
+            for imagen in imagenes_dispositivo
+            if imagen.get("tipo_imagen") == "GENERAL"
+        ),
+        None,
+    )
     estado_css = {
         EstadoDispositivo.OPERATIVO: "biomedicos-estado--operativo",
         EstadoDispositivo.EN_MANTENIMIENTO: "biomedicos-estado--media",
@@ -488,6 +536,8 @@ def detalle_dispositivo(request, dispositivo_id):
             "dispositivo": dispositivo,
             "asignacion_actual": asignacion_actual,
             "baja_dispositivo": baja_dispositivo,
+            "imagen_general": imagen_general,
+            "media_server_offline": media_server_offline,
             "estado_css": estado_css.get(dispositivo.estado, ""),
             "criticidad_css": criticidad_css.get(dispositivo.criticidad, ""),
         }
@@ -521,6 +571,7 @@ def editar_dispositivo(request, dispositivo_id):
     asignacion_actual = _obtener_asignacion_actual(dispositivo)
     form = DispositivoCreateForm(
         request.POST or None,
+        request.FILES or None,
         instance=dispositivo,
         asignacion_actual=asignacion_actual,
     )

@@ -1,8 +1,12 @@
 from datetime import date, timedelta
+from io import BytesIO
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from PIL import Image
 
 from core.constants.choices_constants import EstadoRegistro, TipoUnidad
 from rrhh.models import Empleado
@@ -98,6 +102,30 @@ class EquiposBiomedicosViewsTests(TestCase):
 
     def setUp(self):
         self.client.force_login(self.usuario)
+        # Las pruebas del modulo no dependen de que el servidor externo este
+        # encendido; cada caso controla explicitamente su respuesta.
+        self.subir_imagen_mock = patch(
+            "equipos_biomedicos.views.MediaService.subir_imagen_dispositivo",
+            return_value={
+                "ok": True,
+                "imagen": {"uuid": "uuid-imagen-prueba"},
+            },
+        ).start()
+        self.obtener_imagenes_mock = patch(
+            "equipos_biomedicos.views.MediaService.obtener_imagenes_dispositivo",
+            return_value=([], False),
+        ).start()
+        self.addCleanup(patch.stopall)
+
+    @staticmethod
+    def _foto_general_webp():
+        contenido = BytesIO()
+        Image.new("RGB", (20, 20), "white").save(contenido, "WEBP")
+        return SimpleUploadedFile(
+            "equipo.webp",
+            contenido.getvalue(),
+            content_type="image/webp",
+        )
 
     def _datos_formulario_dispositivo(self, **sobrescribir):
         # Payload reutilizable para POST de registro/edicion.
@@ -122,6 +150,7 @@ class EquiposBiomedicosViewsTests(TestCase):
             "area_clinica": self.area_clinica.id,
             "unidad_no_clinica": "",
             "responsable": self.responsable_original.id,
+            "foto_general": self._foto_general_webp(),
         }
         datos.update(sobrescribir)
         return datos
@@ -147,6 +176,60 @@ class EquiposBiomedicosViewsTests(TestCase):
         )
 
         self.assertEqual(respuesta.status_code, 404)
+
+    def test_detalle_muestra_foto_general_del_equipo(self):
+        url_imagen = "http://imagenes.test/media/EQUIPOS/general.webp"
+        self.obtener_imagenes_mock.return_value = (
+            [
+                {
+                    "tipo_imagen": "GENERAL",
+                    "url": url_imagen,
+                    "miniatura": "http://imagenes.test/media/EQUIPOS/thumb.webp",
+                }
+            ],
+            False,
+        )
+
+        respuesta = self.client.get(
+            reverse(
+                "detalle_dispositivo_biomedicos",
+                args=[self.dispositivo.id],
+            )
+        )
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertContains(respuesta, f'src="{url_imagen}"')
+        self.assertContains(
+            respuesta,
+            f'alt="Foto general del equipo {self.dispositivo.codigo}"',
+        )
+        self.assertNotContains(respuesta, "Sin fotografía")
+        self.obtener_imagenes_mock.assert_called_once_with(self.dispositivo.id)
+
+    def test_detalle_sin_imagen_muestra_marcador(self):
+        respuesta = self.client.get(
+            reverse(
+                "detalle_dispositivo_biomedicos",
+                args=[self.dispositivo.id],
+            )
+        )
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertContains(respuesta, "Sin fotografía")
+
+    def test_detalle_abre_si_servidor_de_imagenes_no_responde(self):
+        self.obtener_imagenes_mock.return_value = ([], True)
+
+        respuesta = self.client.get(
+            reverse(
+                "detalle_dispositivo_biomedicos",
+                args=[self.dispositivo.id],
+            )
+        )
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertContains(respuesta, "Fotografía no disponible")
+        self.assertNotContains(respuesta, "Sin fotografía")
 
     def test_registro_crea_dispositivo_y_asignacion_inicial(self):
         # Registrar equipo debe crear Dispositivo y AsignacionDispositivo activa.
@@ -174,6 +257,64 @@ class EquiposBiomedicosViewsTests(TestCase):
         self.assertEqual(asignacion.area_clinica, self.area_clinica)
         self.assertEqual(asignacion.responsable, self.responsable_original)
         self.assertEqual(asignacion.creado_por, self.usuario)
+        self.subir_imagen_mock.assert_called_once()
+        argumentos = self.subir_imagen_mock.call_args.kwargs
+        self.assertEqual(argumentos["dispositivo_id"], dispositivo.id)
+        self.assertEqual(argumentos["tipo_imagen"], "GENERAL")
+        self.assertEqual(argumentos["usuario"], self.usuario)
+
+    def test_registro_exige_foto_general(self):
+        datos = self._datos_formulario_dispositivo(
+            numero_serie="SERIE-SIN-FOTO",
+        )
+        datos.pop("foto_general")
+
+        respuesta = self.client.post(
+            reverse('registrar_dispositivo_biomedicos'),
+            datos,
+        )
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertFormError(
+            respuesta.context["form"],
+            "foto_general",
+            "Debe agregar una foto general del equipo.",
+        )
+        self.assertFalse(
+            Dispositivo.objects.filter(numero_serie="SERIE-SIN-FOTO").exists()
+        )
+        self.subir_imagen_mock.assert_not_called()
+
+    def test_registro_revierte_datos_si_falla_servidor_imagenes(self):
+        self.subir_imagen_mock.return_value = {
+            "ok": False,
+            "error": "Servidor no disponible",
+        }
+
+        respuesta = self.client.post(
+            reverse('registrar_dispositivo_biomedicos'),
+            self._datos_formulario_dispositivo(
+                numero_serie="SERIE-FALLO-IMAGEN",
+            ),
+        )
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertFormError(
+            respuesta.context["form"],
+            "foto_general",
+            "No se pudo guardar la foto. Intente nuevamente.",
+        )
+        self.assertFalse(
+            Dispositivo.objects.filter(
+                numero_serie="SERIE-FALLO-IMAGEN"
+            ).exists()
+        )
+        self.assertEqual(
+            AsignacionDispositivo.objects.filter(
+                dispositivo__numero_serie="SERIE-FALLO-IMAGEN"
+            ).count(),
+            0,
+        )
 
     def test_area_gestora_no_permite_indefinido(self):
         area = AreaGestora(nombre="INDEFINIDO")

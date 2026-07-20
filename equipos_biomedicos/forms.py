@@ -4,6 +4,7 @@ from django import forms
 from django.db.models import Q
 
 from core.constants.choices_constants import EstadoRegistro
+from core.validators.image_validator import validar_imagen_basica
 from rrhh.models import Empleado
 from servicio.models import Area_atencion, Unidad
 
@@ -136,6 +137,19 @@ class DispositivoCreateForm(forms.ModelForm):
             attrs={
                 "class": "formularioCampo-select",
                 "id": "frecuencia_dispositivo",
+            }
+        ),
+    )
+    # La imagen vive en SIWIH Images, por eso es un campo auxiliar y no forma
+    # parte del modelo Dispositivo de la base principal.
+    foto_general = forms.ImageField(
+        required=False,
+        validators=[validar_imagen_basica],
+        widget=forms.FileInput(
+            attrs={
+                "accept": "image/jpeg,image/png,image/webp",
+                "id": "foto_general_dispositivo",
+                "hidden": True,
             }
         ),
     )
@@ -394,6 +408,23 @@ class DispositivoCreateForm(forms.ModelForm):
     def clean_numero_serie(self):
         # Una cadena vacia se guarda como NULL para permitir varios equipos sin serie.
         return (self.cleaned_data.get("numero_serie") or "").strip() or None
+
+    def clean_foto_general(self):
+        # Los equipos nuevos requieren una foto GENERAL. En edicion no se exige
+        # porque las imagenes existentes se administran en SIWIH Images.
+        archivo = self.cleaned_data.get("foto_general")
+
+        if not self.instance.pk and not archivo:
+            raise forms.ValidationError(
+                "Debe agregar una foto general del equipo."
+            )
+
+        if archivo and not archivo.name.lower().endswith(".webp"):
+            raise forms.ValidationError(
+                "La foto debe convertirse a formato WebP antes de guardarse."
+            )
+
+        return archivo
 
     def clean_inventario_bienes_nacionales(self):
         return normalizar_inventario_bienes_nacionales(
