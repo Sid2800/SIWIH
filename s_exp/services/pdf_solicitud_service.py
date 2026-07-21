@@ -370,11 +370,36 @@ def generar_pdf_solicitud(solicitud, admin_actual=None):
     ]
 
     filas = [cabeceras]
+
+    # Se importa aquí (antes del orden) porque la clave de ordenamiento usa el
+    # servicio para leer la identidad.
+    from s_exp.services.datos_solicitud import DatosDetalleSolicitud
+
     # Optimizamos joins: traemos expediente_prestamo + expediente + paciente
     # de un solo, evita N+1 queries dentro del loop.
     detalles_list = list(solicitud.detalles.select_related(
         'expediente_prestamo__expediente', 'paciente'
-    ).order_by('id'))
+    ))
+
+    def _clave_identidad(detalle):
+        """
+        Clave de orden por IDENTIDAD del paciente (descendente).
+
+        Se ordena en Python y no con order_by('-paciente__dni') a propósito: así
+        se usa EXACTAMENTE el mismo valor que se imprime en la columna (el que
+        devuelve el servicio), incluyendo el caso de un detalle sin paciente, que
+        en la tabla sale vacío pero en la BD es NULL y ordenaría distinto.
+
+        La clave es (tiene_identidad, valor_numérico, texto):
+          - El DNI es numérico: se compara por su VALOR, no como texto, para que
+            el orden no dependa del largo de la cadena.
+          - Si no es numérico, cae al texto.
+          - Con reverse=True, los que no tienen identidad quedan al final.
+        """
+        dni = (DatosDetalleSolicitud.paciente_dni(detalle) or '').strip()
+        return (1 if dni else 0, int(dni) if dni.isdigit() else 0, dni)
+
+    detalles_list.sort(key=_clave_identidad, reverse=True)
 
     # Estado del flujo: si la solicitud está finalizada/incompleta/etc., los comentarios
     # de devolución y rechazo individual ya tienen sentido y deben imprimirse.
@@ -390,8 +415,6 @@ def generar_pdf_solicitud(solicitud, admin_actual=None):
 
     # Filas que NO se prestaron — para resaltar en rojo pastel
     filas_no_prestadas = []  # índices de fila (1-based porque cabecera es fila 0)
-
-    from s_exp.services.datos_solicitud import DatosDetalleSolicitud
 
     # Agregar filas de detalles.
     # IMPORTANTE: número de expediente, identidad y nombre del paciente se
