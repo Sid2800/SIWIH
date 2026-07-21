@@ -182,20 +182,15 @@
             </div>
         </section>
 
-        {# En registro se exige una foto GENERAL. El editor compartido de core
-           convierte camara/JPG/PNG a WebP antes de enviar el formulario. #}
-        <section class="biomedicos-registro__seccion">
-            <h3 class="biomedicos-registro__titulo">
-                <i class="bi bi-camera"></i>
-                Fotos del equipo
-            </h3>
+        {% if not dispositivo %}
+            {# En registro solo se exige GENERAL. Las demas categorias se
+               agregan despues desde la edicion del equipo. #}
+            <section class="biomedicos-registro__seccion">
+                <h3 class="biomedicos-registro__titulo">
+                    <i class="bi bi-camera"></i>
+                    Fotos del equipo
+                </h3>
 
-            {% if dispositivo %}
-                <p class="biomedicos-registro__foto-ayuda">
-                    Las fotografías del equipo se conservarán sin reemplazo y se
-                    administrarán desde su ficha.
-                </p>
-            {% else %}
                 <div class="biomedicos-registro__campo">
                     <label for="foto_general_dispositivo">Foto general *</label>
                     {{ form.foto_general }}
@@ -240,8 +235,8 @@
                     </small>
                     {{ form.foto_general.errors }}
                 </div>
-            {% endif %}
-        </section>
+            </section>
+        {% endif %}
 
         <div class="biomedicos-registro__acciones">
             {# En edicion views.py envia url_baja; en registro no aparece este boton. #}
@@ -265,22 +260,171 @@
             </div>
         </div>
     </form>
+
+    {% if dispositivo %}
+        {# La carga de fotos es independiente del formulario de datos porque
+           SIWIH Images es un servicio separado. #}
+        <section class="biomedicos-imagenes biomedicos-imagenes--edicion"
+                 data-titulo-galeria="{{ dispositivo.codigo }}">
+            <div class="biomedicos-imagenes__encabezado">
+                <div>
+                    <h3><i class="bi bi-images"></i> Fotografías del equipo</h3>
+                    <p>Las fotografías existentes se conservan y no se reemplazan.</p>
+                </div>
+                <span class="biomedicos-imagenes__contador">
+                    {{ cantidad_imagenes }} de 6
+                </span>
+            </div>
+
+            {% if media_server_offline %}
+                <div class="biomedicos-imagenes__aviso biomedicos-imagenes__aviso--error">
+                    <i class="bi bi-cloud-slash"></i>
+                    El servidor de imágenes no está disponible. Los datos del equipo
+                    pueden editarse normalmente.
+                </div>
+            {% else %}
+                <div class="biomedicos-imagenes__galeria">
+                    {% for slot in imagenes_slots %}
+                        <article class="biomedicos-imagenes__tarjeta{% if slot.imagen %} biomedicos-imagenes__tarjeta--registrada{% endif %}">
+                            {% if slot.imagen %}
+                                <button type="button"
+                                        class="biomedicos-imagenes__vista biomedicos-imagenes__abrir"
+                                        data-imagen-url="{{ slot.imagen.url }}"
+                                        data-imagen-etiqueta="{{ slot.etiqueta }}">
+                                    <img src="{{ slot.imagen.miniatura|default:slot.imagen.url }}"
+                                         data-imagen-completa="{{ slot.imagen.url }}"
+                                         alt="Fotografía {{ slot.etiqueta|lower }} de {{ dispositivo.codigo }}">
+                                </button>
+                                <span class="biomedicos-imagenes__estado biomedicos-imagenes__estado--registrada">
+                                    <i class="bi bi-check-circle-fill"></i> Registrada
+                                </span>
+                            {% else %}
+                                <div class="biomedicos-imagenes__vista biomedicos-imagenes__vista--vacia">
+                                    <i class="{{ slot.icono }}"></i>
+                                    <span>Pendiente</span>
+                                </div>
+                                <span class="biomedicos-imagenes__estado">Sin fotografía</span>
+                            {% endif %}
+                            <strong>{{ slot.etiqueta }}</strong>
+                        </article>
+                    {% endfor %}
+                </div>
+
+                {% if tipos_imagen_disponibles %}
+                    <form class="biomedicos-imagenes__carga"
+                          method="post"
+                          enctype="multipart/form-data"
+                          action="{{ url_agregar_imagen }}">
+                        {% csrf_token %}
+                        <div class="biomedicos-registro__campo">
+                            <label for="tipo_imagen_dispositivo">Tipo de fotografía *</label>
+                            {{ imagen_form.tipo_imagen }}
+                        </div>
+
+                        <div class="biomedicos-registro__campo biomedicos-imagenes__selector-campo">
+                            <label for="imagen_archivo_dispositivo">Nueva fotografía *</label>
+                            {{ imagen_form.archivo }}
+                            <input type="file"
+                                   id="imagen_camara_dispositivo"
+                                   accept="image/*"
+                                   capture="environment"
+                                   hidden>
+
+                            <div class="biomedicos-registro__foto biomedicos-registro__foto--activa"
+                                 id="imagen_selector_dispositivo"
+                                 role="button"
+                                 tabindex="0"
+                                 aria-label="Seleccionar nueva fotografía del equipo">
+                                <img class="biomedicos-registro__foto-preview"
+                                     id="imagen_preview_dispositivo"
+                                     alt="Vista previa de la nueva fotografía"
+                                     hidden>
+                                <div id="imagen_contenido_dispositivo">
+                                    <i class="bi bi-cloud-arrow-up"></i>
+                                    <strong>Agregar fotografía</strong>
+                                    <small>JPG, PNG o WebP; se convertirá a WebP</small>
+                                </div>
+                            </div>
+
+                            <div class="biomedicos-registro__foto-botones">
+                                <button type="button"
+                                        class="biomedicos-registro__foto-boton"
+                                        id="seleccionar_imagen_dispositivo">
+                                    <i class="bi bi-image"></i>
+                                    Seleccionar archivo
+                                </button>
+                                <button type="button"
+                                        class="biomedicos-registro__foto-boton"
+                                        id="capturar_imagen_dispositivo">
+                                    <i class="bi bi-camera-fill"></i>
+                                    Tomar foto
+                                </button>
+                            </div>
+                            <small class="biomedicos-registro__foto-ayuda"
+                                   id="imagen_estado_dispositivo">
+                                Seleccione una categoría y prepare la fotografía.
+                            </small>
+                        </div>
+
+                        <button class="formularioBotones-boton biomedicos-imagenes__guardar"
+                                id="guardar_imagen_dispositivo"
+                                type="submit"
+                                disabled>
+                            <i class="bi bi-cloud-arrow-up"></i>
+                            Agregar fotografía
+                        </button>
+                    </form>
+                {% else %}
+                    <div class="biomedicos-imagenes__aviso biomedicos-imagenes__aviso--completo">
+                        <i class="bi bi-check-circle-fill"></i>
+                        El equipo ya tiene las seis fotografías permitidas.
+                    </div>
+                {% endif %}
+            {% endif %}
+        </section>
+    {% endif %}
 </div>
 {% endblock content %}
 
 {% block media_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    // El archivo que realmente se envia siempre es el WebP producido por el
-    // editor compartido; el input de camara solo sirve como fuente temporal.
-    const fotoGeneral = document.getElementById('foto_general_dispositivo');
-    const fotoCamara = document.getElementById('foto_general_camara');
-    const selectorFoto = document.getElementById('foto_general_selector');
-    const seleccionarFoto = document.getElementById('seleccionar_foto_general');
-    const capturarFoto = document.getElementById('capturar_foto_general');
-    const previewFoto = document.getElementById('foto_general_preview');
-    const contenidoFoto = document.getElementById('foto_general_contenido');
-    const estadoFoto = document.getElementById('foto_general_estado');
+    // Registro y edicion comparten el mismo editor. Solo cambia el input que
+    // recibira el WebP y el formulario que finalmente lo envia.
+    const fotoEquipo = (
+        document.getElementById('foto_general_dispositivo')
+        || document.getElementById('imagen_archivo_dispositivo')
+    );
+    const fotoCamara = (
+        document.getElementById('foto_general_camara')
+        || document.getElementById('imagen_camara_dispositivo')
+    );
+    const selectorFoto = (
+        document.getElementById('foto_general_selector')
+        || document.getElementById('imagen_selector_dispositivo')
+    );
+    const seleccionarFoto = (
+        document.getElementById('seleccionar_foto_general')
+        || document.getElementById('seleccionar_imagen_dispositivo')
+    );
+    const capturarFoto = (
+        document.getElementById('capturar_foto_general')
+        || document.getElementById('capturar_imagen_dispositivo')
+    );
+    const previewFoto = (
+        document.getElementById('foto_general_preview')
+        || document.getElementById('imagen_preview_dispositivo')
+    );
+    const contenidoFoto = (
+        document.getElementById('foto_general_contenido')
+        || document.getElementById('imagen_contenido_dispositivo')
+    );
+    const estadoFoto = (
+        document.getElementById('foto_general_estado')
+        || document.getElementById('imagen_estado_dispositivo')
+    );
+    const tipoImagen = document.getElementById('tipo_imagen_dispositivo');
+    const guardarImagen = document.getElementById('guardar_imagen_dispositivo');
     let previewUrl = null;
 
     function mostrarErrorFoto(mensaje) {
@@ -301,6 +445,16 @@ document.addEventListener('DOMContentLoaded', function () {
         previewFoto.hidden = false;
         contenidoFoto.hidden = true;
         estadoFoto.textContent = 'Foto lista en formato WebP.';
+        if (guardarImagen) {
+            guardarImagen.disabled = false;
+        }
+    }
+
+    function obtenerEtiquetaFoto() {
+        if (!tipoImagen || tipoImagen.selectedIndex < 0) {
+            return 'general';
+        }
+        return tipoImagen.options[tipoImagen.selectedIndex].text.toLowerCase();
     }
 
     async function prepararFoto(inputOrigen) {
@@ -320,7 +474,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const archivoWebp = await ImageEditor.open(
             archivoOriginal,
             {
-                titulo: 'Foto general del equipo',
+                titulo: `Foto ${obtenerEtiquetaFoto()} del equipo`,
                 subtitulo: 'Ajuste el encuadre antes de continuar'
             }
         );
@@ -336,28 +490,34 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const transferencia = new DataTransfer();
         transferencia.items.add(archivoWebp);
-        fotoGeneral.files = transferencia.files;
+        fotoEquipo.files = transferencia.files;
         actualizarPreview(archivoWebp);
     }
 
-    if (fotoGeneral && fotoCamara) {
+    if (
+        fotoEquipo
+        && fotoCamara
+        && selectorFoto
+        && seleccionarFoto
+        && capturarFoto
+    ) {
         seleccionarFoto.addEventListener('click', function () {
-            fotoGeneral.click();
+            fotoEquipo.click();
         });
         capturarFoto.addEventListener('click', function () {
             fotoCamara.click();
         });
         selectorFoto.addEventListener('click', function () {
-            fotoGeneral.click();
+            fotoEquipo.click();
         });
         selectorFoto.addEventListener('keydown', function (evento) {
             if (evento.key === 'Enter' || evento.key === ' ') {
                 evento.preventDefault();
-                fotoGeneral.click();
+                fotoEquipo.click();
             }
         });
-        fotoGeneral.addEventListener('change', function () {
-            prepararFoto(fotoGeneral);
+        fotoEquipo.addEventListener('change', function () {
+            prepararFoto(fotoEquipo);
         });
         fotoCamara.addEventListener('change', function () {
             prepararFoto(fotoCamara);
@@ -368,6 +528,43 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     }
+
+    // Las miniaturas existentes abren el visor compartido de SIWIH Images.
+    const botonesGaleria = Array.from(
+        document.querySelectorAll('.biomedicos-imagenes__abrir')
+    );
+    if (botonesGaleria.length && typeof ImageViewer !== 'undefined') {
+        const urlsGaleria = botonesGaleria.map(function (boton) {
+            return boton.dataset.imagenUrl;
+        });
+        const etiquetasGaleria = botonesGaleria.map(function (boton) {
+            return boton.dataset.imagenEtiqueta;
+        });
+        const contenedorGaleria = document.querySelector('[data-titulo-galeria]');
+        const tituloGaleria = contenedorGaleria
+            ? contenedorGaleria.dataset.tituloGaleria
+            : 'Fotografías del equipo';
+
+        botonesGaleria.forEach(function (boton, indice) {
+            boton.addEventListener('click', function () {
+                ImageViewer.open(
+                    urlsGaleria,
+                    indice,
+                    tituloGaleria,
+                    etiquetasGaleria
+                );
+            });
+        });
+    }
+
+    document.querySelectorAll('img[data-imagen-completa]').forEach(function (imagen) {
+        imagen.addEventListener('error', function () {
+            const completa = imagen.dataset.imagenCompleta;
+            if (completa && imagen.src !== completa) {
+                imagen.src = completa;
+            }
+        }, { once: true });
+    });
 
     // Muestra solo el selector de area que corresponde al tipo elegido.
     const tipoArea = document.getElementById('tipo_area_dispositivo');

@@ -13,12 +13,18 @@ from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.views.decorators.http import require_POST
 
 from core.constants.choices_constants import EstadoRegistro
 from core.services.server_image.media_service import MediaService
 from rrhh.models import Empleado
 
-from .forms import BajaDispositivoForm, DispositivoCreateForm
+from .forms import (
+    BajaDispositivoForm,
+    DispositivoCreateForm,
+    ImagenDispositivoForm,
+    TIPOS_IMAGEN_DISPOSITIVO,
+)
 from .models import (
     AreaGestora,
     AsignacionDispositivo,
@@ -34,6 +40,14 @@ from .models import (
 
 logger = logging.getLogger("siwi")
 LOG_EXTRA = {"app": "equipos_biomedicos"}
+ICONOS_TIPO_IMAGEN = {
+    "GENERAL": "bi bi-camera",
+    "INVENTARIO": "bi bi-upc-scan",
+    "PLACA_SERIE": "bi bi-card-text",
+    "ESTADO_FISICO": "bi bi-shield-check",
+    "ACCESORIOS": "bi bi-plug",
+    "OTRA": "bi bi-image",
+}
 
 
 def _registrar_error_vista(mensaje, request, **contexto):
@@ -488,6 +502,43 @@ def listado_dispositivos(request):
     )
 
 
+def _obtener_contexto_imagenes_dispositivo(dispositivo_id):
+    # Ordena la respuesta remota según las seis categorías acordadas. La base
+    # principal conserva solo el id del equipo; no duplica rutas de archivos.
+    imagenes, media_server_offline = (
+        MediaService.obtener_imagenes_dispositivo(dispositivo_id)
+    )
+    imagenes_por_tipo = {
+        imagen.get("tipo_imagen"): imagen
+        for imagen in imagenes
+        if imagen.get("tipo_imagen")
+    }
+    imagenes_slots = [
+        {
+            "tipo": tipo,
+            "etiqueta": etiqueta,
+            "icono": ICONOS_TIPO_IMAGEN[tipo],
+            "imagen": imagenes_por_tipo.get(tipo),
+        }
+        for tipo, etiqueta in TIPOS_IMAGEN_DISPOSITIVO
+    ]
+    tipos_ocupados = {
+        slot["tipo"] for slot in imagenes_slots if slot["imagen"]
+    }
+
+    return {
+        "imagen_general": imagenes_por_tipo.get("GENERAL"),
+        "imagenes_slots": imagenes_slots,
+        "cantidad_imagenes": len(tipos_ocupados),
+        "tipos_imagen_ocupados": tipos_ocupados,
+        "tipos_imagen_disponibles": (
+            not media_server_offline
+            and len(tipos_ocupados) < len(TIPOS_IMAGEN_DISPOSITIVO)
+        ),
+        "media_server_offline": media_server_offline,
+    }
+
+
 @registrar_errores_vista("Error al abrir detalle de equipo")
 def detalle_dispositivo(request, dispositivo_id):
     # Ficha solo lectura del equipo. El id llega desde la URL.
@@ -505,17 +556,7 @@ def detalle_dispositivo(request, dispositivo_id):
     asignacion_actual = _obtener_asignacion_actual(dispositivo)
     baja_dispositivo = _obtener_baja_dispositivo(dispositivo)
     # La ficha sigue disponible aunque el servidor de imagenes no responda.
-    imagenes_dispositivo, media_server_offline = (
-        MediaService.obtener_imagenes_dispositivo(dispositivo.id)
-    )
-    imagen_general = next(
-        (
-            imagen
-            for imagen in imagenes_dispositivo
-            if imagen.get("tipo_imagen") == "GENERAL"
-        ),
-        None,
-    )
+    contexto_imagenes = _obtener_contexto_imagenes_dispositivo(dispositivo.id)
     estado_css = {
         EstadoDispositivo.OPERATIVO: "biomedicos-estado--operativo",
         EstadoDispositivo.EN_MANTENIMIENTO: "biomedicos-estado--media",
@@ -536,10 +577,9 @@ def detalle_dispositivo(request, dispositivo_id):
             "dispositivo": dispositivo,
             "asignacion_actual": asignacion_actual,
             "baja_dispositivo": baja_dispositivo,
-            "imagen_general": imagen_general,
-            "media_server_offline": media_server_offline,
             "estado_css": estado_css.get(dispositivo.estado, ""),
             "criticidad_css": criticidad_css.get(dispositivo.criticidad, ""),
+            **contexto_imagenes,
         }
     )
 
@@ -595,6 +635,11 @@ def editar_dispositivo(request, dispositivo_id):
         )
         return redirect("detalle_dispositivo_biomedicos", dispositivo_id=dispositivo.id)
 
+    contexto_imagenes = _obtener_contexto_imagenes_dispositivo(dispositivo.id)
+    imagen_form = ImagenDispositivoForm(
+        tipos_ocupados=contexto_imagenes["tipos_imagen_ocupados"],
+    )
+
     return render(
         request,
         "equipos_biomedicos/registrar_dispositivo_biomedicos.html",
@@ -615,8 +660,84 @@ def editar_dispositivo(request, dispositivo_id):
             ),
             "estado_label": "Estado *",
             "texto_regresar": "Detalle del equipo",
+            "imagen_form": imagen_form,
+            "url_agregar_imagen": reverse(
+                "agregar_imagen_dispositivo_biomedicos",
+                kwargs={"dispositivo_id": dispositivo.id},
+            ),
+            **contexto_imagenes,
         },
     )
+
+
+@registrar_errores_vista("Error al agregar fotografía de equipo")
+@require_POST
+def agregar_imagen_dispositivo(request, dispositivo_id):
+    # La fotografía se envía por separado para que un fallo de SIWIH Images no
+    # deshaga ni mezcle cambios del formulario de datos del equipo.
+    dispositivo = get_object_or_404(Dispositivo, pk=dispositivo_id)
+    url_edicion = reverse(
+        "editar_dispositivo_biomedicos",
+        kwargs={"dispositivo_id": dispositivo.id},
+    )
+
+    if (
+        _obtener_baja_dispositivo(dispositivo)
+        or dispositivo.estado == EstadoDispositivo.DADO_DE_BAJA
+    ):
+        messages.warning(
+            request,
+            "El equipo dado de baja no admite nuevas fotografías.",
+        )
+        return redirect("detalle_dispositivo_biomedicos", dispositivo_id=dispositivo.id)
+
+    contexto_imagenes = _obtener_contexto_imagenes_dispositivo(dispositivo.id)
+    if contexto_imagenes["media_server_offline"]:
+        messages.error(
+            request,
+            "El servidor de imágenes no está disponible. Intente nuevamente.",
+        )
+        return redirect(url_edicion)
+
+    if not contexto_imagenes["tipos_imagen_disponibles"]:
+        messages.info(request, "El equipo ya tiene sus seis fotografías.")
+        return redirect(url_edicion)
+
+    form = ImagenDispositivoForm(
+        request.POST,
+        request.FILES,
+        tipos_ocupados=contexto_imagenes["tipos_imagen_ocupados"],
+    )
+    if not form.is_valid():
+        primer_error = next(
+            (
+                str(error)
+                for errores in form.errors.values()
+                for error in errores
+            ),
+            "Revise la fotografía seleccionada.",
+        )
+        messages.error(request, primer_error)
+        return redirect(url_edicion)
+
+    archivo = form.cleaned_data["archivo"]
+    archivo.seek(0)
+    resultado_media = MediaService.subir_imagen_dispositivo(
+        dispositivo_id=dispositivo.id,
+        archivo=archivo,
+        tipo_imagen=form.cleaned_data["tipo_imagen"],
+        usuario=request.user,
+    )
+
+    if resultado_media.get("ok"):
+        messages.success(request, "Fotografía agregada correctamente.")
+    else:
+        messages.error(
+            request,
+            "No se pudo guardar la fotografía. Intente nuevamente.",
+        )
+
+    return redirect(url_edicion)
 
 
 @registrar_errores_vista("Error al dar de baja equipo")

@@ -24,6 +24,16 @@ from .models import (
 )
 
 
+TIPOS_IMAGEN_DISPOSITIVO = (
+    ("GENERAL", "General"),
+    ("INVENTARIO", "Inventario"),
+    ("PLACA_SERIE", "Placa o serie"),
+    ("ESTADO_FISICO", "Estado físico"),
+    ("ACCESORIOS", "Accesorios"),
+    ("OTRA", "Otra"),
+)
+
+
 # Personaliza la etiqueta visible del select de empleados.
 # Select2 usa este texto cuando ya hay un responsable seleccionado.
 class EmpleadoChoiceField(forms.ModelChoiceField):
@@ -68,6 +78,59 @@ class BajaDispositivoForm(forms.ModelForm):
         if not motivo:
             raise forms.ValidationError("Debe ingresar el motivo de baja.")
         return motivo
+
+
+class ImagenDispositivoForm(forms.Form):
+    # Las imágenes viven en SIWIH Images. Este formulario solo valida el
+    # contrato HTTP y limita la selección a categorías que aún no existen.
+    tipo_imagen = forms.ChoiceField(
+        choices=TIPOS_IMAGEN_DISPOSITIVO,
+        label="Tipo de fotografía",
+        widget=forms.Select(
+            attrs={
+                "class": "formularioCampo-select",
+                "id": "tipo_imagen_dispositivo",
+            }
+        ),
+    )
+    archivo = forms.ImageField(
+        validators=[validar_imagen_basica],
+        widget=forms.FileInput(
+            attrs={
+                "accept": "image/jpeg,image/png,image/webp",
+                "id": "imagen_archivo_dispositivo",
+                "hidden": True,
+            }
+        ),
+    )
+
+    def __init__(self, *args, tipos_ocupados=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        tipos_ocupados = set(tipos_ocupados or [])
+        disponibles = [
+            opcion
+            for opcion in TIPOS_IMAGEN_DISPOSITIVO
+            if opcion[0] not in tipos_ocupados
+        ]
+
+        # SIWIH Images exige GENERAL como primera fotografía de un equipo.
+        if not tipos_ocupados:
+            disponibles = [
+                opcion for opcion in disponibles if opcion[0] == "GENERAL"
+            ]
+
+        self.fields["tipo_imagen"].choices = disponibles
+
+    def clean_archivo(self):
+        archivo = self.cleaned_data["archivo"]
+        if (
+            archivo.content_type != "image/webp"
+            or not archivo.name.lower().endswith(".webp")
+        ):
+            raise forms.ValidationError(
+                "La fotografía debe convertirse a formato WebP antes de guardarse."
+            )
+        return archivo
 
 
 class DispositivoCreateForm(forms.ModelForm):

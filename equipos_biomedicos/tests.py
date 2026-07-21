@@ -203,7 +203,7 @@ class EquiposBiomedicosViewsTests(TestCase):
             respuesta,
             f'alt="Foto general del equipo {self.dispositivo.codigo}"',
         )
-        self.assertNotContains(respuesta, "Sin fotografía")
+        self.assertContains(respuesta, "1 de 6")
         self.obtener_imagenes_mock.assert_called_once_with(self.dispositivo.id)
 
     def test_detalle_sin_imagen_muestra_marcador(self):
@@ -230,6 +230,40 @@ class EquiposBiomedicosViewsTests(TestCase):
         self.assertEqual(respuesta.status_code, 200)
         self.assertContains(respuesta, "Fotografía no disponible")
         self.assertNotContains(respuesta, "Sin fotografía")
+
+    def test_detalle_muestra_galeria_y_categorias_pendientes(self):
+        self.obtener_imagenes_mock.return_value = (
+            [
+                {
+                    "tipo_imagen": "GENERAL",
+                    "url": "http://imagenes.test/media/general.webp",
+                    "miniatura": "http://imagenes.test/media/thumb-general.webp",
+                },
+                {
+                    "tipo_imagen": "INVENTARIO",
+                    "url": "http://imagenes.test/media/inventario.webp",
+                    "miniatura": "http://imagenes.test/media/thumb-inventario.webp",
+                },
+            ],
+            False,
+        )
+
+        respuesta = self.client.get(
+            reverse(
+                "detalle_dispositivo_biomedicos",
+                args=[self.dispositivo.id],
+            )
+        )
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertContains(respuesta, "Fotografías del equipo")
+        self.assertContains(respuesta, "2 de 6")
+        self.assertContains(
+            respuesta,
+            'data-imagen-url="http://imagenes.test/media/inventario.webp"',
+        )
+        self.assertContains(respuesta, "Placa o serie")
+        self.assertContains(respuesta, "Sin fotografía")
 
     def test_registro_crea_dispositivo_y_asignacion_inicial(self):
         # Registrar equipo debe crear Dispositivo y AsignacionDispositivo activa.
@@ -377,6 +411,107 @@ class EquiposBiomedicosViewsTests(TestCase):
         self.assertContains(respuesta, "Editar equipo")
         self.assertContains(respuesta, "Dar de baja")
         self.assertContains(respuesta, self.dispositivo.codigo)
+
+    def test_edicion_muestra_fotos_existentes_y_solo_tipos_faltantes(self):
+        self.obtener_imagenes_mock.return_value = (
+            [
+                {
+                    "tipo_imagen": "GENERAL",
+                    "url": "http://imagenes.test/media/general.webp",
+                    "miniatura": "http://imagenes.test/media/thumb-general.webp",
+                }
+            ],
+            False,
+        )
+
+        respuesta = self.client.get(
+            reverse('editar_dispositivo_biomedicos', args=[self.dispositivo.id])
+        )
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertContains(respuesta, "Fotografías del equipo")
+        self.assertContains(respuesta, "1 de 6")
+        self.assertContains(
+            respuesta,
+            '<option value="INVENTARIO">Inventario</option>',
+            html=True,
+        )
+        self.assertNotContains(
+            respuesta,
+            '<option value="GENERAL">General</option>',
+            html=True,
+        )
+
+    def test_agregar_fotografia_faltante_no_modifica_datos_del_equipo(self):
+        self.obtener_imagenes_mock.return_value = (
+            [{"tipo_imagen": "GENERAL", "url": "general.webp"}],
+            False,
+        )
+        numero_serie_original = self.dispositivo.numero_serie
+
+        respuesta = self.client.post(
+            reverse(
+                "agregar_imagen_dispositivo_biomedicos",
+                args=[self.dispositivo.id],
+            ),
+            {
+                "tipo_imagen": "INVENTARIO",
+                "archivo": self._foto_general_webp(),
+            },
+        )
+
+        self.assertRedirects(
+            respuesta,
+            reverse(
+                "editar_dispositivo_biomedicos",
+                args=[self.dispositivo.id],
+            ),
+            fetch_redirect_response=False,
+        )
+        self.dispositivo.refresh_from_db()
+        self.assertEqual(self.dispositivo.numero_serie, numero_serie_original)
+        self.subir_imagen_mock.assert_called_once()
+        argumentos = self.subir_imagen_mock.call_args.kwargs
+        self.assertEqual(argumentos["dispositivo_id"], self.dispositivo.id)
+        self.assertEqual(argumentos["tipo_imagen"], "INVENTARIO")
+        self.assertEqual(argumentos["usuario"], self.usuario)
+
+    def test_agregar_fotografia_rechaza_tipo_ya_registrado(self):
+        self.obtener_imagenes_mock.return_value = (
+            [{"tipo_imagen": "GENERAL", "url": "general.webp"}],
+            False,
+        )
+
+        respuesta = self.client.post(
+            reverse(
+                "agregar_imagen_dispositivo_biomedicos",
+                args=[self.dispositivo.id],
+            ),
+            {
+                "tipo_imagen": "GENERAL",
+                "archivo": self._foto_general_webp(),
+            },
+        )
+
+        self.assertEqual(respuesta.status_code, 302)
+        self.subir_imagen_mock.assert_not_called()
+
+    def test_agregar_fotografia_se_bloquea_si_servidor_no_responde(self):
+        self.obtener_imagenes_mock.return_value = ([], True)
+
+        respuesta = self.client.post(
+            reverse(
+                "agregar_imagen_dispositivo_biomedicos",
+                args=[self.dispositivo.id],
+            ),
+            {
+                "tipo_imagen": "GENERAL",
+                "archivo": self._foto_general_webp(),
+            },
+        )
+
+        self.assertEqual(respuesta.status_code, 302)
+        self.subir_imagen_mock.assert_not_called()
 
     def test_detalle_no_muestra_acciones_de_edicion_o_baja(self):
         respuesta = self.client.get(

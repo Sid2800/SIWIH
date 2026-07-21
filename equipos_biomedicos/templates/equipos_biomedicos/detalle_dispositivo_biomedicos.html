@@ -1,4 +1,4 @@
-{% extends 'core/base.html' %}
+{% extends 'core/base_media.html' %}
 
 {% block title %}Detalle del equipo{% endblock title %}
 
@@ -71,6 +71,55 @@
                 Listado de equipos
             </a>
         </div>
+    </section>
+
+    {# La ficha muestra las seis categorias sin afirmar que faltan cuando el
+       servidor remoto no esta disponible. #}
+    <section class="biomedicos-imagenes biomedicos-imagenes--detalle"
+             data-titulo-galeria="{{ dispositivo.codigo }}">
+        <div class="biomedicos-imagenes__encabezado">
+            <div>
+                <h3><i class="bi bi-images"></i> Fotografías del equipo</h3>
+                <p>Seleccione una miniatura para ampliar la fotografía.</p>
+            </div>
+            <span class="biomedicos-imagenes__contador">
+                {{ cantidad_imagenes }} de 6
+            </span>
+        </div>
+
+        {% if media_server_offline %}
+            <div class="biomedicos-imagenes__aviso biomedicos-imagenes__aviso--error">
+                <i class="bi bi-cloud-slash"></i>
+                No se pudieron consultar las fotografías en este momento.
+            </div>
+        {% else %}
+            <div class="biomedicos-imagenes__galeria">
+                {% for slot in imagenes_slots %}
+                    <article class="biomedicos-imagenes__tarjeta{% if slot.imagen %} biomedicos-imagenes__tarjeta--registrada{% endif %}">
+                        {% if slot.imagen %}
+                            <button type="button"
+                                    class="biomedicos-imagenes__vista biomedicos-imagenes__abrir"
+                                    data-imagen-url="{{ slot.imagen.url }}"
+                                    data-imagen-etiqueta="{{ slot.etiqueta }}">
+                                <img src="{{ slot.imagen.miniatura|default:slot.imagen.url }}"
+                                     data-imagen-completa="{{ slot.imagen.url }}"
+                                     alt="Fotografía {{ slot.etiqueta|lower }} de {{ dispositivo.codigo }}">
+                            </button>
+                            <span class="biomedicos-imagenes__estado biomedicos-imagenes__estado--registrada">
+                                <i class="bi bi-check-circle-fill"></i> Registrada
+                            </span>
+                        {% else %}
+                            <div class="biomedicos-imagenes__vista biomedicos-imagenes__vista--vacia">
+                                <i class="{{ slot.icono }}"></i>
+                                <span>Pendiente</span>
+                            </div>
+                            <span class="biomedicos-imagenes__estado">Sin fotografía</span>
+                        {% endif %}
+                        <strong>{{ slot.etiqueta }}</strong>
+                    </article>
+                {% endfor %}
+            </div>
+        {% endif %}
     </section>
 
     <div class="biomedicos-detalle__contenido">
@@ -219,3 +268,47 @@
     </div>
 </div>
 {% endblock content %}
+
+{% block media_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const botonesGaleria = Array.from(
+        document.querySelectorAll('.biomedicos-imagenes__abrir')
+    );
+
+    if (botonesGaleria.length && typeof ImageViewer !== 'undefined') {
+        const urlsGaleria = botonesGaleria.map(function (boton) {
+            return boton.dataset.imagenUrl;
+        });
+        const etiquetasGaleria = botonesGaleria.map(function (boton) {
+            return boton.dataset.imagenEtiqueta;
+        });
+        const contenedorGaleria = document.querySelector('[data-titulo-galeria]');
+        const tituloGaleria = contenedorGaleria
+            ? contenedorGaleria.dataset.tituloGaleria
+            : 'Fotografías del equipo';
+
+        botonesGaleria.forEach(function (boton, indice) {
+            boton.addEventListener('click', function () {
+                ImageViewer.open(
+                    urlsGaleria,
+                    indice,
+                    tituloGaleria,
+                    etiquetasGaleria
+                );
+            });
+        });
+    }
+
+    // Si una miniatura no existe, se intenta mostrar el archivo completo.
+    document.querySelectorAll('img[data-imagen-completa]').forEach(function (imagen) {
+        imagen.addEventListener('error', function () {
+            const completa = imagen.dataset.imagenCompleta;
+            if (completa && imagen.src !== completa) {
+                imagen.src = completa;
+            }
+        }, { once: true });
+    });
+});
+</script>
+{% endblock media_js %}

@@ -26,6 +26,11 @@ urlpatterns = [
         name='editar_dispositivo_biomedicos'
     ),
     path(
+        'dispositivos/<int:dispositivo_id>/imagenes/agregar/',
+        views.agregar_imagen_dispositivo,
+        name='agregar_imagen_dispositivo_biomedicos'
+    ),
+    path(
         'dispositivos/<int:dispositivo_id>/dar-baja/',
         views.dar_baja_dispositivo,
         name='dar_baja_dispositivo_biomedicos'
