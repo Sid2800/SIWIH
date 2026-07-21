@@ -383,23 +383,25 @@ def generar_pdf_solicitud(solicitud, admin_actual=None):
 
     def _clave_identidad(detalle):
         """
-        Clave de orden por IDENTIDAD del paciente (descendente).
+        Clave de orden por IDENTIDAD del paciente (ASCENDENTE).
 
-        Se ordena en Python y no con order_by('-paciente__dni') a propósito: así
+        Se ordena en Python y no con order_by('paciente__dni') a propósito: así
         se usa EXACTAMENTE el mismo valor que se imprime en la columna (el que
         devuelve el servicio), incluyendo el caso de un detalle sin paciente, que
         en la tabla sale vacío pero en la BD es NULL y ordenaría distinto.
 
-        La clave es (tiene_identidad, valor_numérico, texto):
+        La clave es (sin_identidad, valor_numérico, texto):
+          - sin_identidad va PRIMERO en la tupla y vale 1 cuando no hay DNI, de
+            modo que en orden ascendente esos registros quedan AL FINAL (no al
+            principio, que es lo que pasaría ordenando solo por el DNI vacío).
           - El DNI es numérico: se compara por su VALOR, no como texto, para que
             el orden no dependa del largo de la cadena.
           - Si no es numérico, cae al texto.
-          - Con reverse=True, los que no tienen identidad quedan al final.
         """
         dni = (DatosDetalleSolicitud.paciente_dni(detalle) or '').strip()
-        return (1 if dni else 0, int(dni) if dni.isdigit() else 0, dni)
+        return (0 if dni else 1, int(dni) if dni.isdigit() else 0, dni)
 
-    detalles_list.sort(key=_clave_identidad, reverse=True)
+    detalles_list.sort(key=_clave_identidad)
 
     # Estado del flujo: si la solicitud está finalizada/incompleta/etc., los comentarios
     # de devolución y rechazo individual ya tienen sentido y deben imprimirse.
