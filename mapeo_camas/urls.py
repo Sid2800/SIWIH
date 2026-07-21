@@ -23,6 +23,7 @@ urlpatterns = [
     path("api/cancelar-mapeo/", views.cancelar_mapeo, name="mapeo_camas_cancelar_mapeo"),
     path("api/mapa-camas/", views.mapa_camas_data, name="mapeo_camas_data"),
     path("api/buscar-pacientes/", views.buscar_pacientes_mapa, name="mapeo_camas_buscar_pacientes"),
+    path("api/validar-apertura-modal/", views.validar_apertura_modal_mapa, name="mapeo_camas_validar_apertura_modal"),
     path("api/actualizar-cama/", views.actualizar_cama_mapa, name="mapeo_camas_actualizar_cama"),
     path("api/camas-disponibles/", views.camas_disponibles_mapa, name="mapeo_camas_camas_disponibles"),
     path("api/mover-paciente/", views.mover_paciente_cama, name="mapeo_camas_mover_paciente"),

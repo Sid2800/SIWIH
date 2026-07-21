@@ -134,7 +134,17 @@ def _meta_ultima_actualizacion(historial):
         }
 
     def _clasificar_origen(observacion_codigo, ingreso_id=None):
-        codigo = (observacion_codigo or "").strip().upper()
+        # Verificar coincidencias exactas ANTES de convertir a mayúsculas
+        obs_strip = (observacion_codigo or "").strip()
+        if obs_strip == "Movimiento de paciente entre camas (mapa)":
+            return "CAMBIO_SALA"  # Inter-servicio: CUENTA en límite
+        if obs_strip == "Movimiento de paciente entre camas (mapa detalle)":
+            return "MAPEO"  # Intra-servicio: NO cuenta en límite
+        if obs_strip == "Cambio manual desde mapa":
+            return "CAMBIO_SALA"  # Cambio de estado desde modal
+        
+        # Pattern matching para otros tipos (ahora en mayúsculas)
+        codigo = obs_strip.upper()
         if "SALA" in codigo or "TRASLADO" in codigo:
             return "CAMBIO_SALA"
         if "MAPEO" in codigo or "MAPA" in codigo:

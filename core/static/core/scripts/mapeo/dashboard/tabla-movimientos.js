@@ -1,5 +1,5 @@
 /* =========================================================================
-  Tabla últimos ingresos (datos de mapeo)
+  Tabla últimos movimientos (datos de mapeo)
   Fecha: 2026-05-28
   ========================================================================= */
 (function (global) {
@@ -20,13 +20,21 @@
     tbodyId = elId;
   }
 
+  function formatoCama(m) {
+    const origen = m && m.cama_origen ? String(m.cama_origen) : "";
+    const destino = m && m.cama_destino ? String(m.cama_destino) : "";
+    if (origen && destino) return origen + " -> " + destino;
+    return destino || origen || "-";
+  }
+
   function update(data) {
     const tbody = document.getElementById(tbodyId);
     if (!tbody) return;
     const items = (data && data.items) || [];
     if (!items.length) {
+      // [2026-07-10] Mensaje coherente con el card activo de movimientos.
       tbody.innerHTML =
-        '<tr><td colspan="6" class="dash-muted" style="text-align:center;padding:1rem;">Sin ingresos recientes</td></tr>';
+        '<tr><td colspan="6" class="dash-muted" style="text-align:center;padding:1rem;">Sin movimientos recientes</td></tr>';
       return;
     }
     tbody.innerHTML = items
@@ -34,8 +42,8 @@
         (m) => `
         <tr>
           <td>${escapeHtml(m.fecha)}</td>
-          <td>${escapeHtml(m.tipo)}</td>
-          <td>${escapeHtml(m.cama_destino || m.cama_origen || "—")}</td>
+          <td>${escapeHtml(m.tipo || "MOVIMIENTO")}</td>
+          <td>${escapeHtml(formatoCama(m))}</td>
           <td>${escapeHtml(m.paciente || "—")}</td>
           <td>${escapeHtml(m.servicio || "—")}</td>
           <td>${escapeHtml(m.usuario || "—")}</td>
