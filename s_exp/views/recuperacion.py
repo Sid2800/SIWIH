@@ -43,19 +43,19 @@ from core.utils.utilidades_logging import log_info, log_warning, log_error
 from core.constants.domain_constants import LogApp
 
 
-# Estados de solicitud que se consideran ACTIVOS: el expediente está fuera del
-# archivo o en proceso, por lo que puede requerirse de urgencia. Se excluyen las
-# finalizadas/rechazadas (ahí ya no hay nada que recuperar).
-ESTADOS_ACTIVOS = [
-    'SOL_APROBADA_ORGANIZANDO',
-    'SOL_LISTO_RECOGER',
+# Estados de solicitud POSTERIORES a la entrega: son los únicos en los que el
+# expediente ya salió del archivo y, por tanto, hay algo que exigir.
+# Se excluyen a propósito SOL_APROBADA_ORGANIZANDO y SOL_LISTO_RECOGER: ahí el
+# expediente está APARTADO (reservado) pero sigue físicamente en el archivo, así
+# que no tiene sentido "recuperarlo" de nadie.
+ESTADOS_ENTREGADA = [
     'SOL_EN_PRESTAMO',
     'SOL_EN_DEVOLUCION',
     'SOL_INCOMPLETA',
 ]
 
 
-def _ids_estados_activos():
+def _ids_estados_entregada():
     """
     Traduce los códigos de arriba a sus ids ENTEROS.
 
@@ -65,13 +65,34 @@ def _ids_estados_activos():
     EstadoSolicitud.id_de() cachea el mapeo código->id, así que la resolución no
     cuesta consultas extra.
     """
-    return [EstadoSolicitud.id_de(codigo) for codigo in ESTADOS_ACTIVOS]
+    return [EstadoSolicitud.id_de(codigo) for codigo in ESTADOS_ENTREGADA]
+
+
+def _filtros_recuperable():
+    """
+    Condiciones que debe cumplir un expediente para poder exigirse.
+
+    El criterio decisivo es el ESTADO FÍSICO = EXP_PRESTADO: solo se recupera lo
+    que de verdad está entregado (fuera del archivo). Eso deja fuera por sí solo
+    lo APARTADO y lo PENDIENTE DE PRÉSTAMO, que nunca salieron. El estado de la
+    solicitud se mantiene como filtro adicional de coherencia.
+    """
+    return {
+        'solicitud__estado_flujo_id__in': _ids_estados_entregada(),
+        'expediente_prestamo__estado_id': EstadoExpedienteFisico.id_de('EXP_PRESTADO'),
+        'aprobado': True,      # solo lo que sí se prestó
+        'devuelto': False,     # lo ya devuelto no se recupera
+    }
 
 
 @require_GET
 def expedientes_recuperables_api(request):
     """
-    Lista los expedientes de solicitudes ACTIVAS que se pueden exigir.
+    Lista los expedientes ENTREGADOS que se pueden exigir.
+
+    Solo aparecen los que están físicamente fuera del archivo (EXP_PRESTADO).
+    Los apartados/reservados y los pendientes de entrega quedan fuera: siguen en
+    el archivo, así que no hay nada que recuperarle a nadie.
 
     Solo devuelve los datos que necesita la pantalla: número de solicitud,
     expediente, identidad, nombre, fecha de solicitud, fecha de entrega, a quién
@@ -89,10 +110,7 @@ def expedientes_recuperables_api(request):
             'solicitud__usuario', 'solicitud__servicio_unidad', 'solicitud__estado_flujo',
             'expediente_prestamo__expediente', 'paciente',
         ).filter(
-            solicitud__estado_flujo_id__in=_ids_estados_activos(),
-            aprobado=True,        # solo lo que sí se prestó
-            devuelto=False,       # lo ya devuelto no se recupera
-            prestamo_pendiente=False,  # aún no se entregó: no está fuera del archivo
+            **_filtros_recuperable()
         ).order_by('-solicitud__fecha_creacion')
 
         data = []
@@ -155,9 +173,9 @@ def recuperar_expedientes_api(request):
                 'solicitud', 'expediente_prestamo__expediente'
             ).filter(
                 id__in=detalle_ids,
-                aprobado=True,
-                devuelto=False,
-                solicitud__estado_flujo_id__in=_ids_estados_activos(),
+                # Mismas condiciones que el listado: se revalida en el POST para
+                # que no se pueda recuperar algo que ya no está entregado.
+                **_filtros_recuperable()
             )
         )
         if not detalles:
