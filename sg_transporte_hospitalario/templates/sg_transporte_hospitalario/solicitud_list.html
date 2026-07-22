@@ -1,0 +1,155 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Bandeja de Solicitudes{% endblock title %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'core/css/sg_transporte_hospitalario/dashboard/dashboard.css' %}">
+{% endblock extra_css %}
+
+{% block content %}
+<div class="contenedor2 dataTables_wrapper">
+    <div class="tituloFormulario sexp-margin-bottom-15">
+        <div class="tituloFormulario-texto">
+            <i class="bi bi-list-check"></i>
+            <h2 class="sin-margen">Solicitud - Bandeja de administración</h2>
+        </div>
+        <div class="tituloFormulario-subrallado"></div>
+    </div>
+
+    <div class="sexp-filtros sexp-flex-between">
+        <div class="sexp-flex-gap-1">
+            <a href="{% url 'sg_transporte_hospitalario_solicitud_nueva' %}" class="btn btn-primary">
+                <i class="bi bi-plus-circle"></i> Nueva solicitud
+            </a>
+            <a href="{% url 'sg_transporte_hospitalario_dashboard' %}?tab=solicitud" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Volver al módulo
+            </a>
+        </div>
+      <div class="sexp-flex-gap-1">
+        <select id="sl-criterio" class="formularioCampo-select">
+          <option value="0">Numero</option>
+          <option value="2">Area solicitante</option>
+          <option value="3">Tipo solicitud</option>
+          <option value="4">Prioridad</option>
+          <option value="5">Estado</option>
+        </select>
+        <input id="sl-busqueda" type="text" class="formularioCampo-text" placeholder="Busqueda">
+        <a id="sl-buscar" class="formularioBotones-boton"><i class="bi bi-search"></i><span>Buscar</span></a>
+        <a id="sl-limpiar" class="formularioBotones-boton"><i class="bi bi-eraser"></i><span>Limpiar</span></a>
+      </div>
+        <div class="sexp-flex-gap-1">
+            <button class="sexp-filtro-btn active" data-estado="">Todas</button>
+            {% for code, label in estados %}
+            <button class="sexp-filtro-btn" data-estado="{{ code }}">{{ label }}</button>
+            {% endfor %}
+        </div>
+    </div>
+
+    <table id="tabla_solicitudes_th" class="dataTable stripe hover row-border" style="width:100%">
+        <thead>
+            <tr>
+                <th>Número de solicitud</th>
+                <th>Fecha</th>
+                <th>Área solicitante</th>
+                <th>Tipo de solicitud</th>
+                <th>Prioridad</th>
+                <th>Proceso</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+            <tbody>
+              {% for s in solicitudes_activas %}
+              <tr>
+                <td>{{ s.numero_solicitud }}</td>
+                <td>{{ s.fecha_solicitud|date:"d/m/Y H:i" }}</td>
+                <td>{{ s.punto_solicitud }}</td>
+                <td>{{ s.tipo_solicitud.nombre }}</td>
+                <td>{{ s.prioridad.nombre }}</td>
+                <td><span class="th-badge">{{ s.estado }}</span></td>
+                <td>
+                  <div class="d-flex gap-2">
+                    <a href="{% url 'sg_transporte_hospitalario_solicitud_ver' s.pk %}" class="btn btn-sm btn-outline-dark"><i class="bi bi-eye"></i> Ver</a>
+                    {% if s.puede_editar %}
+                    <a href="{% url 'sg_transporte_hospitalario_solicitud_editar' s.pk %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i> Editar</a>
+                    {% else %}
+                    <button type="button" class="btn btn-sm btn-outline-secondary" disabled><i class="bi bi-lock"></i> Editar</button>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="7">No hay solicitudes activas registradas.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+    </table>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+(function () {
+  const $ = window.jQuery;
+  if (!$ || !$.fn.DataTable) return;
+
+  const tabla = $("#tabla_solicitudes_th").DataTable({
+    order: [[1, "desc"]],
+    language: {
+      url: "{% static 'core/datatables/es-ES.json' %}"
+    }
+  });
+
+  function aplicarBusqueda() {
+    const criterio = Number(document.getElementById("sl-criterio")?.value || 0);
+    const valor = (document.getElementById("sl-busqueda")?.value || "").trim();
+    tabla.search("");
+    tabla.columns().search("");
+    tabla.column(criterio).search(valor).draw();
+  }
+
+  function limpiarBusqueda() {
+    const criterio = document.getElementById("sl-criterio");
+    const busqueda = document.getElementById("sl-busqueda");
+    if (criterio) criterio.value = "0";
+    if (busqueda) busqueda.value = "";
+    document.querySelectorAll(".sexp-filtro-btn").forEach(function (x) { x.classList.remove("active"); });
+    const btnTodas = document.querySelector('.sexp-filtro-btn[data-estado=""]');
+    if (btnTodas) btnTodas.classList.add("active");
+    tabla.search("");
+    tabla.columns().search("");
+    tabla.order([[1, "desc"]]);
+    tabla.page("first").draw();
+  }
+
+  const btnBuscar = document.getElementById("sl-buscar");
+  const btnLimpiar = document.getElementById("sl-limpiar");
+  const inputBusqueda = document.getElementById("sl-busqueda");
+
+  if (btnBuscar) {
+    btnBuscar.addEventListener("click", aplicarBusqueda);
+  }
+  if (btnLimpiar) {
+    btnLimpiar.addEventListener("click", limpiarBusqueda);
+  }
+  if (inputBusqueda) {
+    inputBusqueda.addEventListener("keydown", function (event) {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        aplicarBusqueda();
+      }
+    });
+  }
+
+  document.querySelectorAll(".sexp-filtro-btn").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      document.querySelectorAll(".sexp-filtro-btn").forEach(function (x) { x.classList.remove("active"); });
+      btn.classList.add("active");
+      const estadoFiltro = btn.dataset.estado || "";
+      tabla.column(5).search(estadoFiltro).draw();
+    });
+  });
+})();
+</script>
+{% endblock extra_js %}

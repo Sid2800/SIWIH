@@ -1,0 +1,149 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}{{ titulo }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'core/css/sg_transporte_hospitalario/dashboard/dashboard.css' %}">
+{% endblock extra_css %}
+
+{% block content %}
+<div class="contenedor2 th-shell">
+  <section class="th-tabs" aria-label="Navegación del proceso de transporte hospitalario">
+    <ul class="th-tabs__list">
+      {% for tab in tabs %}
+      <li>
+        <a class="th-tab {% if active_tab == tab.key %}is-active{% endif %}" href="{{ tabs_url_base }}?tab={{ tab.key }}">
+          <i class="bi {{ tab.icon }}"></i>
+          <span>{{ tab.label }}</span>
+        </a>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <section class="th-workspace" aria-label="Área principal de trabajo">
+    {% if active_tab == 'solicitud' %}
+    <div class="th-workspace__hero">
+      <div>
+        <h3>Solicitudes</h3>
+        <p>Bandeja de solicitudes activas de transporte hospitalario.</p>
+      </div>
+      <div class="th-pill">
+        <i class="bi bi-list-ul"></i>
+        Solicitudes activas
+      </div>
+    </div>
+
+    <div class="th-grid">
+      <article class="th-card th-span-12">
+        <h4 class="th-card__title"><i class="bi bi-list-ul"></i> Solicitudes activas</h4>
+        <div class="th-toolbar">
+          <div class="th-toolbar__group">
+            <a href="{% url 'sg_transporte_hospitalario_solicitud_nueva' %}" class="th-btn th-btn--primary">
+              <i class="bi bi-plus-circle"></i>
+              Nueva solicitud
+            </a>
+          </div>
+          <div class="th-toolbar__group">
+            <select id="th-solicitud-criterio" class="formularioCampo-select">
+              <option value="0">Numero</option>
+              <option value="2">Area solicitante</option>
+              <option value="3">Tipo solicitud</option>
+              <option value="4">Prioridad</option>
+              <option value="5">Estado</option>
+            </select>
+            <input type="text" id="th-solicitud-busqueda" class="formularioCampo-text" placeholder="Busqueda">
+            <a id="th-solicitud-buscar" class="formularioBotones-boton">
+              <i class="bi bi-search"></i><span>Buscar</span>
+            </a>
+            <a id="th-solicitud-limpiar" class="formularioBotones-boton">
+              <i class="bi bi-eraser"></i><span>Limpiar</span>
+            </a>
+          </div>
+          <div class="th-toolbar__group">
+            <select id="th-filtro-estado" class="th-input">
+              <option value="">Todos los estados</option>
+              {% for code, label in filtro_estados %}
+              <option value="{{ code }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+            <select id="th-filtro-area" class="th-input">
+              <option value="">Todas las áreas</option>
+              {% for area in filtro_areas %}
+              <option value="{{ area }}">{{ area }}</option>
+              {% endfor %}
+            </select>
+            <select id="th-filtro-tipo" class="th-input">
+              <option value="">Todos los tipos</option>
+              {% for tipo in filtro_tipos %}
+              <option value="{{ tipo }}">{{ tipo }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="th-table-wrap">
+          <table class="th-table" id="th-solicitudes-activas-table">
+            <thead>
+              <tr>
+                <th>Número solicitud</th>
+                <th>Fecha</th>
+                <th>Área solicitante</th>
+                <th>Tipo solicitud</th>
+                <th>Prioridad</th>
+                <th>Estado</th>
+                <th>Acción</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for s in solicitudes_activas %}
+              <tr>
+                <td>{{ s.numero_solicitud }}</td>
+                <td>{{ s.fecha_solicitud|date:"d/m/Y H:i" }}</td>
+                <td>{{ s.punto_solicitud }}</td>
+                <td>{{ s.tipo_solicitud.nombre }}</td>
+                <td>{{ s.prioridad.nombre }}</td>
+                <td><span class="th-badge">{{ s.estado }}</span></td>
+                <td>
+                  <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+                    <a href="{% url 'sg_transporte_hospitalario_solicitud_ver' s.pk %}" class="th-btn th-btn--ghost">Ver</a>
+                    {% if s.puede_editar %}
+                    <a href="{% url 'sg_transporte_hospitalario_solicitud_editar' s.pk %}" class="th-btn th-btn--ghost">Editar</a>
+                    {% else %}
+                    <button type="button" class="th-btn th-btn--ghost" disabled>Editar</button>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </article>
+    </div>
+    {% else %}
+    <div class="th-workspace__box">
+      <strong>Sección no disponible</strong>
+    </div>
+    {% endif %}
+  </section>
+
+  <section class="th-actions" aria-label="Barra inferior de acciones">
+    {% if active_tab == 'solicitud' %}
+    
+    {% else %}
+    
+    {% endif %}
+  </section>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+  window.sgTransporteHospitalarioDashboard = {
+    activeTab: "{{ active_tab }}",
+    emptyTable: "No hay solicitudes activas registradas."
+  };
+</script>
+<script src="{% static 'core/scripts/sg_transporte_hospitalario/dashboard/dashboard.js' %}"></script>
+{% endblock extra_js %}

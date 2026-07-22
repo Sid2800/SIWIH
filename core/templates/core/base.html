@@ -182,6 +182,13 @@
                </a>
             </li>
 
+            <li>
+               <a href="{% url 'sg_transporte_hospitalario_dashboard' %}" class="bn-navegacion__enlace" title="Servicio General">
+                  <i class="bi bi-building-gear bn-navegacion-enlace__logo"></i>
+                  <span class="bn-navegacion-enlace__texto">Servicio General</span>
+               </a>
+            </li>
+
             {% if request.user|tiene_rol:"ADMIN:ADMI" %}
 
             <li>

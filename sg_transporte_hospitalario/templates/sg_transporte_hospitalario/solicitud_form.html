@@ -1,0 +1,166 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}{{ titulo_form }}{% endblock title %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'core/css/sg_transporte_hospitalario/dashboard/dashboard.css' %}">
+<link rel="stylesheet" href="{% static 'core/css/sg_transporte_hospitalario/solicitud/solicitud.css' %}">
+{% endblock extra_css %}
+
+{% block content %}
+<div class="th-container"
+    data-modo="{{ modo }}"
+    data-tipo-pacientes-id="{{ tipo_pacientes_id|default:'' }}"
+    data-destinos-info='{{ destinos_info_json|escape }}'
+    data-puntos-info='{{ puntos_info_json|escape }}'
+    data-url-buscar-pacientes="{% url 'sg_transporte_hospitalario_buscar_pacientes' %}"
+    data-url-buscar-empleados="{% url 'sg_transporte_hospitalario_buscar_empleados' %}"
+    data-url-cancelar="{% url 'sg_transporte_hospitalario_dashboard' %}?tab=solicitud">
+    <section class="th-workspace" aria-label="Área principal de trabajo">
+        <form method="post" id="solicitud-form" action="{{ form_action }}" novalidate>
+            {% csrf_token %}
+            {{ form.area_solicitante }}
+            <input type="hidden" name="pacientes_json" id="id_pacientes_json" value='{{ pacientes_payload|default:"[]"|escape }}'>
+            <input type="hidden" name="empleados_json" id="id_empleados_json" value='{{ personal_payload|default:"[]"|escape }}'>
+
+            {% if form.non_field_errors %}
+            <div class="th-form-error">{{ form.non_field_errors|join:", " }}</div>
+            {% endif %}
+
+        <div class="th-workspace__hero">
+            <div>
+                <h3>Solicitud</h3>
+                <p>Registro inicial de una necesidad de traslado hospitalario.</p>
+            </div>
+            <div class="th-pill">
+                <i class="bi bi-layout-text-window-reverse"></i>
+                Sección activa: Solicitud
+            </div>
+        </div>
+
+        <div class="th-grid">
+            <article class="th-card th-span-6">
+                <h4 class="th-card__title"><i class="bi bi-info-circle"></i> Información general</h4>
+                <div class="th-field-grid">
+                    <div class="th-field"><label>Número solicitud</label><div class="value">Se genera al guardar</div></div>
+                    <div class="th-field{% if form.fecha_solicitud.errors %} th-field--error{% endif %}"><label>Fecha solicitud</label>{{ form.fecha_solicitud }}{% if form.fecha_solicitud.errors %}<div class="th-field-errors">{{ form.fecha_solicitud.errors|join:", " }}</div>{% endif %}</div>
+                    <div class="th-field"><label>Área solicitante</label><div class="value" id="th-area-solicitante"></div></div>
+                    <div class="th-field{% if form.punto_solicitud.errors %} th-field--error{% endif %}"><label>Punto solicitud</label>{{ form.punto_solicitud }}{% if form.punto_solicitud.errors %}<div class="th-field-errors">{{ form.punto_solicitud.errors|join:", " }}</div>{% endif %}</div>
+                    <div class="th-field{% if form.tipo_solicitud.errors %} th-field--error{% endif %}"><label>Tipo solicitud</label>{{ form.tipo_solicitud }}{% if form.tipo_solicitud.errors %}<div class="th-field-errors">{{ form.tipo_solicitud.errors|join:", " }}</div>{% endif %}</div>
+                    <div class="th-field{% if form.prioridad.errors %} th-field--error{% endif %}"><label>Prioridad</label>{{ form.prioridad }}{% if form.prioridad.errors %}<div class="th-field-errors">{{ form.prioridad.errors|join:", " }}</div>{% endif %}</div>
+                    <div class="th-field th-field--wide">
+                        <label>Empleado solicitante</label>
+                        <div class="th-context-info" id="th-empleado-solicitante-info">
+                            <div class="th-context-info__title">{{ solicitante_info.nombre }}</div>
+                            <div class="th-context-info__line"><strong>Unidad:</strong> {{ solicitante_info.nombre_corto }}</div>
+                            <div class="th-context-info__line">{{ solicitante_info.unidad }}</div>
+                        </div>
+                    </div>
+                </div>
+            </article>
+
+            <article class="th-card th-span-6">
+                <h4 class="th-card__title"><i class="bi bi-signpost-split"></i> Información del traslado</h4>
+                <div class="th-field-grid">
+                    <div class="th-field{% if form.lugar_salida.errors %} th-field--error{% endif %}"><label>Lugar salida</label>{{ form.lugar_salida }}{% if form.lugar_salida.errors %}<div class="th-field-errors">{{ form.lugar_salida.errors|join:", " }}</div>{% endif %}</div>
+                    <div class="th-field{% if form.lugar_destino.errors %} th-field--error{% endif %}"><label>Lugar destino</label>{{ form.lugar_destino }}{% if form.lugar_destino.errors %}<div class="th-field-errors">{{ form.lugar_destino.errors|join:", " }}</div>{% endif %}</div>
+                    <div class="th-field th-field--wide{% if form.motivo.errors %} th-field--error{% endif %}"><label>Motivo viaje</label>{{ form.motivo }}{% if form.motivo.errors %}<div class="th-field-errors">{{ form.motivo.errors|join:", " }}</div>{% endif %}</div>
+                    <div class="th-field th-field--wide{% if form.observaciones.errors %} th-field--error{% endif %}"><label>Observaciones</label>{{ form.observaciones }}{% if form.observaciones.errors %}<div class="th-field-errors">{{ form.observaciones.errors|join:", " }}</div>{% endif %}</div>
+                </div>
+            </article>
+
+            <article class="th-card th-span-12">
+                <h4 class="th-card__title"><i class="bi bi-people"></i> Pacientes</h4>
+                {% if modo != 'ver' %}
+                <div class="th-search" id="th-pacientes-search">
+                    <select id="th-criterio-paciente" class="formularioCampo-select">
+                        <option value="nombre">Nombre</option>
+                        <option value="identidad">Identidad</option>
+                    </select>
+                    <input class="th-input" type="text" id="th-buscar-paciente" placeholder="Buscar paciente por nombre" />
+                    <button type="button" id="th-btn-buscar-paciente" class="th-btn th-btn--ghost" data-loading-text="Buscando..."><i class="bi bi-search"></i> Buscar</button>
+                    <button type="button" id="th-btn-limpiar-paciente" class="th-btn th-btn--ghost"><i class="bi bi-eraser"></i> Limpiar</button>
+                </div>
+                {% endif %}
+
+                <p class="th-subtitle">Resultados</p>
+                <div class="th-table-wrap">
+                    <table class="th-table">
+                        <thead>
+                            <tr>
+                                <th>Nombre</th>
+                                <th>Expediente</th>
+                                <th>Ingreso</th>
+                                <th>Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="th-pacientes-resultados"></tbody>
+                    </table>
+                </div>
+
+                <p class="th-subtitle">Pacientes seleccionados</p>
+                <div class="th-table-wrap">
+                    <table class="th-table">
+                        <thead>
+                            <tr>
+                                <th>Nombre</th>
+                                <th>Expediente</th>
+                                <th>Ingreso</th>
+                                <th>Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="th-pacientes-seleccionados"></tbody>
+                    </table>
+                </div>
+            </article>
+
+            <article class="th-card th-span-12">
+                <h4 class="th-card__title"><i class="bi bi-person-badge"></i> Personal solicitado</h4>
+                {% if modo != 'ver' %}
+                <div class="th-search">
+                    <select id="th-criterio-empleado" class="formularioCampo-select">
+                        <option value="nombre">Nombre</option>
+                        <option value="identidad">Identidad</option>
+                    </select>
+                    <select id="th-buscar-empleado-select" class="formularioCampo-select"></select>
+                    <button type="button" id="th-btn-limpiar-empleado" class="th-btn th-btn--ghost"><i class="bi bi-eraser"></i> Limpiar</button>
+                </div>
+                {% endif %}
+
+                <p class="th-subtitle">Personal seleccionado</p>
+                <div class="th-table-wrap">
+                    <table class="th-table">
+                        <thead>
+                            <tr>
+                                <th>Nombre</th>
+                                <th>Cargo</th>
+                                <th>Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="th-empleados-seleccionados"></tbody>
+                    </table>
+                </div>
+            </article>
+        </div>
+        </form>
+
+        <section class="th-actions" aria-label="Barra inferior de acciones">
+            {% if modo != 'ver' %}
+            <button type="submit" form="solicitud-form" class="th-action-btn is-primary">
+                <i class="bi bi-send-check"></i>
+                Enviar solicitud
+            </button>
+            {% endif %}
+            <button type="button" class="th-action-btn" id="th-btn-cancelar-solicitud">
+                <i class="bi bi-arrow-left-circle"></i>
+                Volver
+            </button>
+        </section>
+    </section>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script src="{% static 'core/scripts/sg_transporte_hospitalario/solicitud/solicitud.js' %}"></script>
+{% endblock extra_js %}

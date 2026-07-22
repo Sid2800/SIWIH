@@ -1,0 +1,61 @@
+/* Estilos de la bandeja/formulario de solicitudes de SG Transporte Hospitalario. */
+
+.th-context-info {
+	display: grid;
+	gap: 0.35rem;
+}
+
+.th-context-info__title {
+	color: var(--negro);
+	font-family: var(--fuenteTablaTitulo);
+	font-size: 1.65rem;
+	font-weight: 700;
+}
+
+.th-context-info__line {
+	color: #475569;
+	font-family: var(--fuenteTablaCuerpo);
+	font-size: 1.45rem;
+}
+
+.th-context-info__line strong {
+	color: #334155;
+	font-weight: 700;
+}
+
+.th-field--error {
+	border-color: #bd362f;
+	box-shadow: 0 0 0 0.2rem rgba(189, 54, 47, 0.08);
+}
+
+.th-field--error .th-input,
+.th-field--error .formularioCampo-select,
+.th-field--error .ts-control {
+	border-color: #bd362f !important;
+}
+
+.th-field-errors {
+	margin-top: 0.35rem;
+	color: #bd362f;
+	font-family: var(--fuenteTablaCuerpo);
+	font-size: 1.25rem;
+	font-weight: 700;
+}
+
+.th-btn.is-loading {
+	opacity: 0.85;
+	pointer-events: none;
+}
+
+.th-btn.is-loading i {
+	animation: th-spin 0.9s linear infinite;
+}
+
+@keyframes th-spin {
+	from {
+		transform: rotate(0deg);
+	}
+	to {
+		transform: rotate(360deg);
+	}
+}

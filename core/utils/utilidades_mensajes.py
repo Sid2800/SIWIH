@@ -1,6 +1,21 @@
 from django.contrib import messages
 
 
+def mostrar_mensaje(request, tipo, mensaje):
+    """Muestra mensajes reutilizando el sistema central de alertas del core."""
+    # 2026-07-22: centralizar alertas para reutilizar el mismo flujo del core.
+    if tipo == "success":
+        messages.success(request, mensaje)
+    elif tipo == "error":
+        messages.error(request, mensaje)
+    elif tipo == "warning":
+        messages.warning(request, mensaje)
+    elif tipo == "info":
+        messages.info(request, mensaje)
+    else:
+        messages.info(request, mensaje)
+
+
 def mostrar_resultado_media(request, media_result, etiqueta="imagen"):
     """
     Muestra mensajes de éxito y advertencia

@@ -62,6 +62,7 @@ INSTALLED_APPS = [
     'usuario',
     's_exp',
     'mapeo_camas',
+    'sg_transporte_hospitalario',
     'rrhh'
 ]
 
