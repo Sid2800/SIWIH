@@ -9,11 +9,11 @@ from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Prefetch, Q
-from django.http import Http404, JsonResponse
+from django.http import Http404, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_http_methods, require_POST
 
 from core.constants.choices_constants import EstadoRegistro
 from core.services.server_image.media_service import MediaService
@@ -34,8 +34,10 @@ from .models import (
     EstadoDispositivo,
     MarcaDispositivo,
     ModeloDispositivo,
+    OrdenTrabajoBajaDispositivo,
     TipoDispositivo,
 )
+from .services.ficha_baja_pdf_service import FichaBajaPdfService
 
 
 logger = logging.getLogger("siwi")
@@ -186,6 +188,29 @@ def _obtener_baja_dispositivo(dispositivo):
         return dispositivo.baja
     except BajaDispositivo.DoesNotExist:
         return None
+
+
+def _obtener_orden_trabajo_baja(dispositivo):
+    try:
+        return dispositivo.orden_trabajo_baja
+    except OrdenTrabajoBajaDispositivo.DoesNotExist:
+        return None
+
+
+def _obtener_o_crear_orden_trabajo_baja(dispositivo, usuario):
+    # Bloquear la fila del equipo serializa dos intentos simultáneos y evita
+    # que ambos técnicos reserven una orden diferente.
+    with transaction.atomic():
+        dispositivo_bloqueado = (
+            Dispositivo.objects
+            .select_for_update()
+            .get(pk=dispositivo.pk)
+        )
+        orden, _ = OrdenTrabajoBajaDispositivo.objects.get_or_create(
+            dispositivo=dispositivo_bloqueado,
+            defaults={"creado_por": usuario},
+        )
+    return orden
 
 
 def _crear_asignacion_dispositivo(dispositivo, form, usuario, observaciones):
@@ -550,13 +575,23 @@ def detalle_dispositivo(request, dispositivo_id):
             "area_gestora",
             "color",
             "baja__registrado_por",
+            "orden_trabajo_baja__creado_por",
         ),
         pk=dispositivo_id,
     )
     asignacion_actual = _obtener_asignacion_actual(dispositivo)
     baja_dispositivo = _obtener_baja_dispositivo(dispositivo)
+    orden_trabajo_baja = _obtener_orden_trabajo_baja(dispositivo)
     # La ficha sigue disponible aunque el servidor de imagenes no responda.
     contexto_imagenes = _obtener_contexto_imagenes_dispositivo(dispositivo.id)
+    ficha_baja_firmada = None
+    ficha_baja_server_offline = False
+    if baja_dispositivo:
+        # La constancia legal se consulta aparte de las seis fotos del equipo.
+        (
+            ficha_baja_firmada,
+            ficha_baja_server_offline,
+        ) = MediaService.obtener_ficha_baja_dispositivo(dispositivo.id)
     estado_css = {
         EstadoDispositivo.OPERATIVO: "biomedicos-estado--operativo",
         EstadoDispositivo.EN_MANTENIMIENTO: "biomedicos-estado--media",
@@ -577,6 +612,9 @@ def detalle_dispositivo(request, dispositivo_id):
             "dispositivo": dispositivo,
             "asignacion_actual": asignacion_actual,
             "baja_dispositivo": baja_dispositivo,
+            "orden_trabajo_baja": orden_trabajo_baja,
+            "ficha_baja_firmada": ficha_baja_firmada,
+            "ficha_baja_server_offline": ficha_baja_server_offline,
             "estado_css": estado_css.get(dispositivo.estado, ""),
             "criticidad_css": criticidad_css.get(dispositivo.criticidad, ""),
             **contexto_imagenes,
@@ -650,10 +688,6 @@ def editar_dispositivo(request, dispositivo_id):
             "titulo_formulario": "Editar equipo",
             "icono_formulario": "bi bi-pencil-square",
             "texto_boton_guardar": "Actualizar equipo",
-            "url_baja": reverse(
-                "dar_baja_dispositivo_biomedicos",
-                kwargs={"dispositivo_id": dispositivo.id},
-            ),
             "url_regresar": reverse(
                 "detalle_dispositivo_biomedicos",
                 kwargs={"dispositivo_id": dispositivo.id},
@@ -740,10 +774,10 @@ def agregar_imagen_dispositivo(request, dispositivo_id):
     return redirect(url_edicion)
 
 
-@registrar_errores_vista("Error al dar de baja equipo")
-def dar_baja_dispositivo(request, dispositivo_id):
-    # Crea BajaDispositivo y marca el equipo como DADO_DE_BAJA.
-    # No elimina la ficha, por eso QR y detalle siguen funcionando.
+@registrar_errores_vista("Error en tramite de baja de equipo")
+def tramite_baja_dispositivo(request, dispositivo_id):
+    # No existe un estado pendiente. La baja se crea solamente cuando el
+    # servidor de imagenes confirma que recibio la ficha firmada.
     dispositivo = get_object_or_404(
         Dispositivo.objects.select_related(
             "tipo",
@@ -754,6 +788,7 @@ def dar_baja_dispositivo(request, dispositivo_id):
         ),
         pk=dispositivo_id,
     )
+    orden_trabajo_baja = _obtener_orden_trabajo_baja(dispositivo)
 
     if _obtener_baja_dispositivo(dispositivo):
         messages.warning(request, "Este equipo ya tiene un registro de baja.")
@@ -761,31 +796,72 @@ def dar_baja_dispositivo(request, dispositivo_id):
 
     form = BajaDispositivoForm(
         request.POST or None,
+        request.FILES or None,
         initial={"fecha_baja": timezone.localdate()},
     )
 
-    if request.method == "POST" and form.is_valid():
-        with transaction.atomic():
-            baja = form.save(commit=False)
-            baja.dispositivo = dispositivo
-            baja.registrado_por = request.user
-            baja.save()
-
-            Dispositivo.objects.filter(pk=dispositivo.pk).update(
-                estado=EstadoDispositivo.DADO_DE_BAJA,
-                modificado_por=request.user,
-                fecha_modificado=timezone.now(),
-            )
-
-        messages.success(
-            request,
-            f"Equipo {dispositivo.codigo} dado de baja correctamente.",
+    formulario_valido = request.method == "POST" and form.is_valid()
+    if formulario_valido and not orden_trabajo_baja:
+        form.add_error(
+            None,
+            "Primero debe generar la ficha PDF para reservar el número "
+            "de orden de trabajo.",
         )
-        return redirect("detalle_dispositivo_biomedicos", dispositivo_id=dispositivo.id)
+        formulario_valido = False
+
+    if formulario_valido:
+        resultado_ficha = MediaService.subir_ficha_baja_dispositivo(
+            dispositivo.id,
+            form.cleaned_data["ficha_firmada"],
+            request.user,
+        )
+        ficha = resultado_ficha.get("ficha") or {}
+        ficha_uuid = ficha.get("uuid")
+
+        if not resultado_ficha.get("ok") or not ficha_uuid:
+            form.add_error(
+                "ficha_firmada",
+                "No se pudo guardar la ficha firmada. "
+                "El equipo no fue dado de baja.",
+            )
+        else:
+            # La escritura local se agrupa para que el historial y el estado
+            # nunca queden separados dentro de la base principal.
+            with transaction.atomic():
+                dispositivo_bloqueado = (
+                    Dispositivo.objects
+                    .select_for_update()
+                    .get(pk=dispositivo.pk)
+                )
+                baja = form.save(commit=False)
+                baja.dispositivo = dispositivo_bloqueado
+                baja.registrado_por = request.user
+                baja.ficha_firmada_uuid = ficha_uuid
+                baja.save()
+
+                # Algunos equipos historicos no tienen todos los campos que
+                # hoy exige Dispositivo.full_clean(). Actualizar solo estas
+                # columnas permite cerrar su baja sin revalidar toda la ficha.
+                Dispositivo.objects.filter(
+                    pk=dispositivo_bloqueado.pk
+                ).update(
+                    estado=EstadoDispositivo.DADO_DE_BAJA,
+                    modificado_por=request.user,
+                    fecha_modificado=timezone.now(),
+                )
+
+            messages.success(
+                request,
+                f"Equipo {dispositivo.codigo} dado de baja correctamente.",
+            )
+            return redirect(
+                "detalle_dispositivo_biomedicos",
+                dispositivo_id=dispositivo.id,
+            )
 
     return render(
         request,
-        "equipos_biomedicos/dar_baja_dispositivo_biomedicos.html",
+        "equipos_biomedicos/tramite_baja_dispositivo_biomedicos.html",
         {
             "form": form,
             "dispositivo": dispositivo,
@@ -793,7 +869,74 @@ def dar_baja_dispositivo(request, dispositivo_id):
                 "detalle_dispositivo_biomedicos",
                 kwargs={"dispositivo_id": dispositivo.id},
             ),
+            "url_ficha_baja": reverse(
+                "ficha_baja_dispositivo_biomedicos",
+                kwargs={"dispositivo_id": dispositivo.id},
+            ),
+            "orden_trabajo_baja": orden_trabajo_baja,
         },
+    )
+
+
+@registrar_errores_vista("Error al generar ficha de baja de equipo")
+@require_http_methods(["GET", "POST"])
+def ficha_baja_dispositivo_pdf(request, dispositivo_id):
+    # La ficha es una previsualizacion: no crea BajaDispositivo ni modifica el
+    # estado. Si la baja ya existe, reutiliza sus datos guardados.
+    dispositivo = get_object_or_404(
+        Dispositivo.objects.select_related(
+            "tipo",
+            "marca",
+            "modelo",
+            "area_gestora",
+            "color",
+            "baja",
+            "baja__responsable_peticion",
+            "orden_trabajo_baja",
+        ),
+        pk=dispositivo_id,
+    )
+    baja_dispositivo = _obtener_baja_dispositivo(dispositivo)
+
+    if baja_dispositivo:
+        fecha_baja = baja_dispositivo.fecha_baja
+        motivo = baja_dispositivo.motivo
+        responsable_peticion = baja_dispositivo.responsable_peticion
+        habitacion_estancia = baja_dispositivo.habitacion_estancia
+    elif request.method == "POST":
+        # El PDF se genera antes de tener la fotografia firmada.
+        form = BajaDispositivoForm(request.POST, requiere_ficha=False)
+        if not form.is_valid():
+            return HttpResponseBadRequest(
+                "Complete la fecha, el responsable y el motivo para generar "
+                "la ficha."
+            )
+        fecha_baja = form.cleaned_data["fecha_baja"]
+        motivo = form.cleaned_data["motivo"]
+        responsable_peticion = form.cleaned_data["responsable_peticion"]
+        habitacion_estancia = form.cleaned_data["habitacion_estancia"]
+    else:
+        fecha_baja = timezone.localdate()
+        motivo = ""
+        responsable_peticion = None
+        habitacion_estancia = ""
+
+    # La orden se crea solamente cuando los datos necesarios para la ficha
+    # son válidos. Las siguientes impresiones recuperan esta misma fila.
+    orden_trabajo = _obtener_o_crear_orden_trabajo_baja(
+        dispositivo,
+        request.user,
+    )
+
+    return FichaBajaPdfService.generar(
+        dispositivo=dispositivo,
+        asignacion=_obtener_asignacion_actual(dispositivo),
+        usuario=request.user,
+        fecha_baja=fecha_baja,
+        motivo=motivo,
+        responsable_peticion=responsable_peticion,
+        habitacion_estancia=habitacion_estancia,
+        numero_orden_trabajo=orden_trabajo.numero_orden,
     )
 
 

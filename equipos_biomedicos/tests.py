@@ -22,9 +22,11 @@ from .models import (
     EstadoDispositivo,
     MarcaDispositivo,
     ModeloDispositivo,
+    OrdenTrabajoBajaDispositivo,
     TipoDispositivo,
     TipoTecnologiaDispositivo,
 )
+from .services.ficha_baja_pdf_service import FichaBajaPdfService
 
 
 class EquiposBiomedicosViewsTests(TestCase):
@@ -37,6 +39,10 @@ class EquiposBiomedicosViewsTests(TestCase):
         cls.usuario = get_user_model().objects.create_user(
             username='usuario_biomedicos',
             password='clave-prueba'
+        )
+        cls.usuario_secundario = get_user_model().objects.create_user(
+            username="usuario_biomedicos_2",
+            password="clave-prueba-2",
         )
         cls.tipo = TipoDispositivo.objects.create(nombre="MONITOR")
         cls.marca = MarcaDispositivo.objects.create(nombre="MINDRAY")
@@ -115,6 +121,19 @@ class EquiposBiomedicosViewsTests(TestCase):
             "equipos_biomedicos.views.MediaService.obtener_imagenes_dispositivo",
             return_value=([], False),
         ).start()
+        self.subir_ficha_baja_mock = patch(
+            "equipos_biomedicos.views.MediaService.subir_ficha_baja_dispositivo",
+            return_value={
+                "ok": True,
+                "ficha": {
+                    "uuid": "11111111-1111-4111-8111-111111111111",
+                },
+            },
+        ).start()
+        self.obtener_ficha_baja_mock = patch(
+            "equipos_biomedicos.views.MediaService.obtener_ficha_baja_dispositivo",
+            return_value=(None, False),
+        ).start()
         self.addCleanup(patch.stopall)
 
     @staticmethod
@@ -126,6 +145,13 @@ class EquiposBiomedicosViewsTests(TestCase):
             contenido.getvalue(),
             content_type="image/webp",
         )
+
+    def _reservar_orden_trabajo(self, usuario=None):
+        orden, _ = OrdenTrabajoBajaDispositivo.objects.get_or_create(
+            dispositivo=self.dispositivo,
+            defaults={"creado_por": usuario or self.usuario},
+        )
+        return orden
 
     def _datos_formulario_dispositivo(self, **sobrescribir):
         # Payload reutilizable para POST de registro/edicion.
@@ -169,6 +195,39 @@ class EquiposBiomedicosViewsTests(TestCase):
                 respuesta = self.client.get(reverse(nombre_ruta))
 
                 self.assertEqual(respuesta.status_code, 200)
+
+    def test_vistas_de_imagenes_cargan_herramientas_multimedia(self):
+        # Estos helpers crean el modal de recorte y el visor compartido. Si una
+        # plantilla reemplaza extra_js, los botones de imagen quedan inactivos.
+        rutas = [
+            reverse("registrar_dispositivo_biomedicos"),
+            reverse(
+                "detalle_dispositivo_biomedicos",
+                args=[self.dispositivo.id],
+            ),
+            reverse(
+                "tramite_baja_dispositivo_biomedicos",
+                args=[self.dispositivo.id],
+            ),
+        ]
+
+        for ruta in rutas:
+            with self.subTest(ruta=ruta):
+                respuesta = self.client.get(ruta)
+
+                self.assertEqual(respuesta.status_code, 200)
+                self.assertContains(
+                    respuesta,
+                    "core/vendor/cropper/cropper.min.js",
+                )
+                self.assertContains(
+                    respuesta,
+                    "core/scripts/media/editorImageHelper.js",
+                )
+                self.assertContains(
+                    respuesta,
+                    "core/scripts/media/visorImageHelper.js",
+                )
 
     def test_detalle_inexistente_responde_404(self):
         respuesta = self.client.get(
@@ -409,7 +468,7 @@ class EquiposBiomedicosViewsTests(TestCase):
 
         self.assertEqual(respuesta.status_code, 200)
         self.assertContains(respuesta, "Editar equipo")
-        self.assertContains(respuesta, "Dar de baja")
+        self.assertNotContains(respuesta, "Trámite de baja")
         self.assertContains(respuesta, self.dispositivo.codigo)
 
     def test_edicion_muestra_fotos_existentes_y_solo_tipos_faltantes(self):
@@ -523,7 +582,7 @@ class EquiposBiomedicosViewsTests(TestCase):
             respuesta,
             reverse('editar_dispositivo_biomedicos', args=[self.dispositivo.id]),
         )
-        self.assertNotContains(respuesta, "Dar de baja")
+        self.assertNotContains(respuesta, "Trámite de baja")
         self.assertContains(respuesta, "Ver / Imprimir QR")
 
     def test_edicion_actualiza_dispositivo_y_asignacion(self):
@@ -624,12 +683,145 @@ class EquiposBiomedicosViewsTests(TestCase):
 
     def test_usuario_autenticado_puede_abrir_baja(self):
         respuesta = self.client.get(
-            reverse('dar_baja_dispositivo_biomedicos', args=[self.dispositivo.id])
+            reverse(
+                'tramite_baja_dispositivo_biomedicos',
+                args=[self.dispositivo.id],
+            )
         )
 
         self.assertEqual(respuesta.status_code, 200)
-        self.assertContains(respuesta, "Dar de baja")
+        self.assertContains(respuesta, "Trámite de baja")
         self.assertContains(respuesta, self.dispositivo.codigo)
+        self.assertContains(respuesta, "Generar ficha PDF")
+        self.assertContains(respuesta, "Confirmar baja definitiva")
+        self.assertContains(respuesta, "Responsable de la petición")
+        self.assertContains(respuesta, 'id="responsable_peticion_baja"')
+        self.assertContains(
+            respuesta,
+            reverse("buscar_empleados_biomedicos"),
+        )
+        self.assertContains(respuesta, "Habitación / Estancia")
+        self.assertNotContains(
+            respuesta,
+            "Comentario del responsable de mantenimiento",
+        )
+
+    def test_listado_y_busqueda_muestran_tramite_en_hamburguesa(self):
+        url_tramite = reverse(
+            "tramite_baja_dispositivo_biomedicos",
+            args=[self.dispositivo.id],
+        )
+
+        respuesta_listado = self.client.get(
+            reverse("listado_dispositivos_biomedicos")
+        )
+        respuesta_busqueda = self.client.get(
+            reverse("buscar_dispositivo_biomedicos"),
+            {"q": self.dispositivo.codigo},
+        )
+
+        self.assertContains(respuesta_listado, url_tramite)
+        self.assertContains(respuesta_listado, "Trámite de baja")
+        self.assertContains(respuesta_busqueda, url_tramite)
+
+    def test_ficha_baja_pdf_no_registra_baja_ni_cambia_estado(self):
+        respuesta = self.client.post(
+            reverse(
+                'ficha_baja_dispositivo_biomedicos',
+                args=[self.dispositivo.id],
+            ),
+            {
+                "fecha_baja": date.today().isoformat(),
+                "responsable_peticion": self.responsable_nuevo.id,
+                "habitacion_estancia": "Observación 2",
+                "motivo": "Daño irreversible para previsualizar.",
+            },
+        )
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(respuesta["Content-Type"], "application/pdf")
+        self.assertIn("inline;", respuesta["Content-Disposition"])
+        self.assertTrue(respuesta.content.startswith(b"%PDF"))
+        self.assertFalse(
+            BajaDispositivo.objects.filter(dispositivo=self.dispositivo).exists()
+        )
+        orden = OrdenTrabajoBajaDispositivo.objects.get(
+            dispositivo=self.dispositivo
+        )
+        self.assertEqual(orden.creado_por, self.usuario)
+        self.assertEqual(
+            orden.numero_orden,
+            f"OT-{orden.fecha_creado.year}-{orden.id:05d}",
+        )
+
+        self.dispositivo.refresh_from_db()
+        self.assertEqual(
+            self.dispositivo.estado,
+            EstadoDispositivo.OPERATIVO,
+        )
+
+    def test_otro_usuario_reutiliza_la_orden_del_mismo_equipo(self):
+        url_ficha = reverse(
+            "ficha_baja_dispositivo_biomedicos",
+            args=[self.dispositivo.id],
+        )
+        datos_ficha = {
+            "fecha_baja": date.today().isoformat(),
+            "responsable_peticion": self.responsable_nuevo.id,
+            "habitacion_estancia": "Observación 2",
+            "motivo": "Daño irreversible para previsualizar.",
+        }
+
+        self.client.post(url_ficha, datos_ficha)
+        orden_original = OrdenTrabajoBajaDispositivo.objects.get(
+            dispositivo=self.dispositivo
+        )
+        numero_original = orden_original.numero_orden
+
+        self.client.force_login(self.usuario_secundario)
+        respuesta = self.client.post(url_ficha, datos_ficha)
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(
+            OrdenTrabajoBajaDispositivo.objects.filter(
+                dispositivo=self.dispositivo
+            ).count(),
+            1,
+        )
+        orden_original.refresh_from_db()
+        self.assertEqual(orden_original.numero_orden, numero_original)
+        self.assertEqual(orden_original.creado_por, self.usuario)
+
+    def test_ficha_baja_pdf_rechaza_datos_invalidos(self):
+        respuesta = self.client.post(
+            reverse(
+                'ficha_baja_dispositivo_biomedicos',
+                args=[self.dispositivo.id],
+            ),
+            {
+                "fecha_baja": date.today().isoformat(),
+                "responsable_peticion": self.responsable_nuevo.id,
+                "habitacion_estancia": "",
+                "motivo": "",
+            },
+        )
+
+        self.assertEqual(respuesta.status_code, 400)
+        self.assertFalse(
+            BajaDispositivo.objects.filter(dispositivo=self.dispositivo).exists()
+        )
+
+    def test_codigo_inventario_pdf_usa_solo_numero_de_ficha(self):
+        Dispositivo.objects.filter(pk=self.dispositivo.pk).update(
+            inventario_bienes_nacionales="BN-001",
+            inventario_numero_ficha="FICHA-001",
+        )
+        self.dispositivo.refresh_from_db()
+
+        self.assertEqual(
+            FichaBajaPdfService._codigo_inventario(self.dispositivo),
+            "FICHA-001",
+        )
 
     @override_settings(EQUIPOS_QR_BASE_URL="http://192.168.0.102:8000")
     def test_qr_usa_url_base_configurada(self):
@@ -647,11 +839,18 @@ class EquiposBiomedicosViewsTests(TestCase):
 
     def test_baja_crea_registro_y_cambia_estado_del_dispositivo(self):
         # Dar de baja crea historial y cambia el estado sin eliminar la ficha.
+        orden = self._reservar_orden_trabajo()
         respuesta = self.client.post(
-            reverse('dar_baja_dispositivo_biomedicos', args=[self.dispositivo.id]),
+            reverse(
+                'tramite_baja_dispositivo_biomedicos',
+                args=[self.dispositivo.id],
+            ),
             {
                 "fecha_baja": date.today().isoformat(),
+                "responsable_peticion": self.responsable_nuevo.id,
+                "habitacion_estancia": "Observación 2",
                 "motivo": "Equipo retirado de uso por daño irreversible.",
+                "ficha_firmada": self._foto_general_webp(),
             },
         )
 
@@ -665,19 +864,132 @@ class EquiposBiomedicosViewsTests(TestCase):
 
         self.assertEqual(self.dispositivo.estado, EstadoDispositivo.DADO_DE_BAJA)
         self.assertEqual(baja.motivo, "Equipo retirado de uso por daño irreversible.")
+        self.assertEqual(
+            baja.responsable_peticion,
+            self.responsable_nuevo,
+        )
+        self.assertEqual(baja.habitacion_estancia, "Observación 2")
+        self.assertEqual(
+            str(baja.ficha_firmada_uuid),
+            "11111111-1111-4111-8111-111111111111",
+        )
         self.assertEqual(baja.registrado_por, self.usuario)
+        self.assertEqual(
+            self.dispositivo.orden_trabajo_baja,
+            orden,
+        )
+        self.subir_ficha_baja_mock.assert_called_once()
+
+    def test_baja_exige_generar_primero_la_orden_de_trabajo(self):
+        respuesta = self.client.post(
+            reverse(
+                "tramite_baja_dispositivo_biomedicos",
+                args=[self.dispositivo.id],
+            ),
+            {
+                "fecha_baja": date.today().isoformat(),
+                "responsable_peticion": self.responsable_nuevo.id,
+                "habitacion_estancia": "",
+                "motivo": "Equipo retirado de uso.",
+                "ficha_firmada": self._foto_general_webp(),
+            },
+        )
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertContains(
+            respuesta,
+            "Primero debe generar la ficha PDF",
+        )
+        self.subir_ficha_baja_mock.assert_not_called()
+        self.assertFalse(
+            BajaDispositivo.objects.filter(
+                dispositivo=self.dispositivo
+            ).exists()
+        )
+
+    def test_baja_exige_ficha_firmada(self):
+        respuesta = self.client.post(
+            reverse(
+                "tramite_baja_dispositivo_biomedicos",
+                args=[self.dispositivo.id],
+            ),
+            {
+                "fecha_baja": date.today().isoformat(),
+                "responsable_peticion": self.responsable_nuevo.id,
+                "habitacion_estancia": "",
+                "motivo": "Equipo retirado de uso.",
+            },
+        )
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertContains(respuesta, "Este campo es obligatorio")
+        self.subir_ficha_baja_mock.assert_not_called()
+        self.assertFalse(
+            BajaDispositivo.objects.filter(
+                dispositivo=self.dispositivo
+            ).exists()
+        )
+        self.dispositivo.refresh_from_db()
+        self.assertEqual(
+            self.dispositivo.estado,
+            EstadoDispositivo.OPERATIVO,
+        )
+
+    def test_fallo_subiendo_ficha_no_da_de_baja_el_equipo(self):
+        self._reservar_orden_trabajo()
+        self.subir_ficha_baja_mock.return_value = {
+            "ok": False,
+            "error": "Servidor no disponible",
+        }
+
+        respuesta = self.client.post(
+            reverse(
+                "tramite_baja_dispositivo_biomedicos",
+                args=[self.dispositivo.id],
+            ),
+            {
+                "fecha_baja": date.today().isoformat(),
+                "responsable_peticion": self.responsable_nuevo.id,
+                "habitacion_estancia": "",
+                "motivo": "Equipo retirado de uso.",
+                "ficha_firmada": self._foto_general_webp(),
+            },
+        )
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertContains(
+            respuesta,
+            "El equipo no fue dado de baja",
+        )
+        self.assertFalse(
+            BajaDispositivo.objects.filter(
+                dispositivo=self.dispositivo
+            ).exists()
+        )
+        self.dispositivo.refresh_from_db()
+        self.assertEqual(
+            self.dispositivo.estado,
+            EstadoDispositivo.OPERATIVO,
+        )
 
     def test_baja_permite_dispositivo_con_datos_incompletos(self):
+        self._reservar_orden_trabajo()
         Dispositivo.objects.filter(pk=self.dispositivo.pk).update(
             tipo_tecnologia=None,
             numero_serie=None,
         )
 
         respuesta = self.client.post(
-            reverse('dar_baja_dispositivo_biomedicos', args=[self.dispositivo.id]),
+            reverse(
+                'tramite_baja_dispositivo_biomedicos',
+                args=[self.dispositivo.id],
+            ),
             {
                 "fecha_baja": date.today().isoformat(),
+                "responsable_peticion": self.responsable_nuevo.id,
+                "habitacion_estancia": "",
                 "motivo": "Equipo viejo sin todos los datos técnicos.",
+                "ficha_firmada": self._foto_general_webp(),
             },
         )
 
@@ -714,6 +1026,51 @@ class EquiposBiomedicosViewsTests(TestCase):
             reverse('detalle_dispositivo_biomedicos', args=[self.dispositivo.id]),
         )
 
+    def test_detalle_de_baja_muestra_ficha_firmada(self):
+        orden = self._reservar_orden_trabajo()
+        BajaDispositivo.objects.create(
+            dispositivo=self.dispositivo,
+            fecha_baja=date.today(),
+            motivo="Equipo retirado de inventario.",
+            responsable_peticion=self.responsable_nuevo,
+            habitacion_estancia="Sala 2",
+            ficha_firmada_uuid=(
+                "22222222-2222-4222-8222-222222222222"
+            ),
+            registrado_por=self.usuario,
+        )
+        self.dispositivo.estado = EstadoDispositivo.DADO_DE_BAJA
+        self.dispositivo.save(update_fields=["estado"])
+        self.obtener_ficha_baja_mock.return_value = (
+            {
+                "uuid": "22222222-2222-4222-8222-222222222222",
+                "url": "http://imagenes.test/media/ficha.webp",
+            },
+            False,
+        )
+
+        respuesta = self.client.get(
+            reverse(
+                "detalle_dispositivo_biomedicos",
+                args=[self.dispositivo.id],
+            )
+        )
+
+        self.assertContains(respuesta, self.responsable_nuevo.nombre_completo)
+        self.assertContains(respuesta, "Sala 2")
+        self.assertContains(respuesta, orden.numero_orden)
+        self.assertContains(respuesta, "Ver ficha firmada")
+        self.assertContains(respuesta, "bi-file-earmark-check-fill")
+        self.assertContains(respuesta, "bi-box-arrow-up-right")
+        self.assertContains(
+            respuesta,
+            "http://imagenes.test/media/ficha.webp",
+        )
+        self.assertNotContains(
+            respuesta,
+            "No fue posible recuperar la ficha firmada",
+        )
+
     def test_baja_no_se_duplica(self):
         BajaDispositivo.objects.create(
             dispositivo=self.dispositivo,
@@ -723,7 +1080,10 @@ class EquiposBiomedicosViewsTests(TestCase):
         )
 
         respuesta = self.client.post(
-            reverse('dar_baja_dispositivo_biomedicos', args=[self.dispositivo.id]),
+            reverse(
+                'tramite_baja_dispositivo_biomedicos',
+                args=[self.dispositivo.id],
+            ),
             {
                 "fecha_baja": date.today().isoformat(),
                 "motivo": "Segundo intento de baja.",

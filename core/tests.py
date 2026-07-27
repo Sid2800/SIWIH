@@ -115,6 +115,76 @@ class RequestServiceEquiposTests(SimpleTestCase):
             timeout=10,
         )
 
+    @patch(
+        "core.services.server_image.request_service.requests.post"
+    )
+    @patch(
+        "core.services.server_image.request_service.traer_server_token",
+        return_value="jwt-prueba",
+    )
+    def test_subir_ficha_baja_envia_webp_y_jwt(
+        self,
+        mock_token,
+        mock_post,
+    ):
+        respuesta = Mock(status_code=201, text="")
+        respuesta.json.return_value = {
+            "ficha": {"uuid": "uuid-ficha", "dispositivo_id": 19}
+        }
+        mock_post.return_value = respuesta
+        archivo = self.crear_webp()
+
+        resultado = RequestService.subir_ficha_baja_dispositivo({
+            "dispositivo_id": 19,
+            "archivo": archivo,
+            "usuario_id": 3,
+            "usuario_nombre": "Tecnico Prueba",
+        })
+
+        self.assertTrue(resultado["ok"])
+        mock_token.assert_called_once_with()
+        url, = mock_post.call_args.args
+        opciones = mock_post.call_args.kwargs
+        self.assertEqual(
+            url,
+            "http://imagenes.test/api_images/equipos/bajas/subir/",
+        )
+        self.assertEqual(
+            opciones["headers"]["Authorization"],
+            "Bearer jwt-prueba",
+        )
+        self.assertEqual(opciones["data"]["dispositivo_id"], 19)
+        self.assertEqual(opciones["files"]["archivo"][2], "image/webp")
+
+    @patch(
+        "core.services.server_image.request_service.requests.get"
+    )
+    @patch(
+        "core.services.server_image.request_service.traer_server_token",
+        return_value="jwt-prueba",
+    )
+    def test_consultar_ficha_baja_usa_ruta_del_equipo(
+        self,
+        mock_token,
+        mock_get,
+    ):
+        respuesta = Mock(status_code=200, text="")
+        respuesta.json.return_value = {
+            "dispositivo_id": 19,
+            "ficha": None,
+        }
+        mock_get.return_value = respuesta
+
+        resultado = RequestService.consultar_ficha_baja_dispositivo(19)
+
+        self.assertTrue(resultado["ok"])
+        mock_token.assert_called_once_with()
+        mock_get.assert_called_once_with(
+            "http://imagenes.test/api_images/equipos/19/baja/ficha/",
+            headers={"Authorization": "Bearer jwt-prueba"},
+            timeout=10,
+        )
+
 
 @override_settings(IMAGE_SERVER_URL="http://imagenes.test")
 class MediaServiceEquiposTests(SimpleTestCase):
@@ -177,4 +247,64 @@ class MediaServiceEquiposTests(SimpleTestCase):
         self.assertEqual(
             imagenes[0]["miniatura"],
             "http://imagenes.test/media/EQUIPOS/thumb_equipo.webp",
+        )
+
+    @patch.object(RequestService, "subir_ficha_baja_dispositivo")
+    def test_subir_ficha_baja_devuelve_constancia(
+        self,
+        mock_subir,
+    ):
+        mock_subir.return_value = {
+            "ok": True,
+            "data": {
+                "ficha": {"uuid": "uuid-ficha", "dispositivo_id": 19}
+            },
+        }
+        usuario = SimpleNamespace(
+            id=3,
+            first_name="Tecnico",
+            last_name="Prueba",
+        )
+        archivo = SimpleUploadedFile(
+            "ficha.webp",
+            b"contenido-webp",
+            content_type="image/webp",
+        )
+
+        resultado = MediaService.subir_ficha_baja_dispositivo(
+            19,
+            archivo,
+            usuario,
+        )
+
+        self.assertTrue(resultado["ok"])
+        self.assertEqual(resultado["ficha"]["dispositivo_id"], 19)
+
+    @patch.object(RequestService, "consultar_ficha_baja_dispositivo")
+    def test_obtener_ficha_baja_construye_urls_absolutas(
+        self,
+        mock_consultar,
+    ):
+        mock_consultar.return_value = {
+            "ok": True,
+            "data": {
+                "ficha": {
+                    "url": "/media/EQUIPOS/BAJAS/ficha.webp",
+                    "miniatura": "/media/EQUIPOS/BAJAS/thumb_ficha.webp",
+                }
+            },
+        }
+
+        ficha, servidor_inactivo = (
+            MediaService.obtener_ficha_baja_dispositivo(19)
+        )
+
+        self.assertFalse(servidor_inactivo)
+        self.assertEqual(
+            ficha["url"],
+            "http://imagenes.test/media/EQUIPOS/BAJAS/ficha.webp",
+        )
+        self.assertEqual(
+            ficha["miniatura"],
+            "http://imagenes.test/media/EQUIPOS/BAJAS/thumb_ficha.webp",
         )

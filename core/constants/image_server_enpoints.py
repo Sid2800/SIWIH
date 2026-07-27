@@ -5,6 +5,11 @@ SUBIR_IMAGEN = "/api_images/subir_imagen/"
 # Endpoints exclusivos para las fotografias asociadas al inventario de equipos.
 SUBIR_IMAGEN_DISPOSITIVO = "/api_images/equipos/subir/"
 BUSCAR_IMAGENES_DISPOSITIVO = "/api_images/equipos/{dispositivo_id}/imagenes/"
+# La ficha firmada es una constancia legal separada de las seis fotografias.
+SUBIR_FICHA_BAJA_DISPOSITIVO = "/api_images/equipos/bajas/subir/"
+BUSCAR_FICHA_BAJA_DISPOSITIVO = (
+    "/api_images/equipos/{dispositivo_id}/baja/ficha/"
+)
 
 
 SUBIR_IMAGEN_USUARIO = "/api_images/subir_imagen_usuario/"

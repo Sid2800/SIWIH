@@ -125,20 +125,65 @@
     <div class="biomedicos-detalle__contenido">
         {# Si existe BajaDispositivo, se muestra como cierre administrativo del equipo. #}
         {% if baja_dispositivo %}
-            <section class="biomedicos-baja__resumen">
-                <div class="biomedicos-baja__resumen-icono">
-                    <i class="bi bi-exclamation-octagon"></i>
-                </div>
-                <div>
-                    <h3>Equipo dado de baja</h3>
-                    <dl>
+            <section class="biomedicos-baja__resumen"
+                     aria-labelledby="titulo-resumen-baja">
+                <header class="biomedicos-baja__resumen-cabecera">
+                    <div class="biomedicos-baja__resumen-icono">
+                        <i class="bi bi-archive-fill"></i>
+                    </div>
+                    <div class="biomedicos-baja__resumen-titulos">
+                        <span class="biomedicos-baja__resumen-etiqueta">
+                            <i class="bi bi-shield-check"></i>
+                            Baja definitiva
+                        </span>
+                        <h3 id="titulo-resumen-baja">Equipo dado de baja</h3>
+                        <p>
+                            El cierre administrativo y su documentación quedaron
+                            registrados en SIWIH.
+                        </p>
+                    </div>
+
+                    {% if ficha_baja_firmada %}
+                        <a class="biomedicos-baja__ficha"
+                           href="{{ ficha_baja_firmada.url }}"
+                           target="_blank"
+                           rel="noopener"
+                           aria-label="Abrir ficha firmada de baja">
+                            <span class="biomedicos-baja__ficha-icono">
+                                <i class="bi bi-file-earmark-check-fill"></i>
+                            </span>
+                            <span class="biomedicos-baja__ficha-texto">
+                                <strong>Ver ficha firmada</strong>
+                                <small>Abrir constancia</small>
+                            </span>
+                            <i class="bi bi-box-arrow-up-right"></i>
+                        </a>
+                    {% endif %}
+                </header>
+
+                <div class="biomedicos-baja__resumen-cuerpo">
+                    <dl class="biomedicos-baja__resumen-datos">
                         <div>
                             <dt>Fecha de baja</dt>
                             <dd>{{ baja_dispositivo.fecha_baja|date:"d/m/Y" }}</dd>
                         </div>
+                        {% if orden_trabajo_baja %}
+                            <div>
+                                <dt>Número de orden de trabajo</dt>
+                                <dd>{{ orden_trabajo_baja.numero_orden }}</dd>
+                            </div>
+                        {% endif %}
                         <div>
-                            <dt>Motivo</dt>
-                            <dd>{{ baja_dispositivo.motivo }}</dd>
+                            <dt>Responsable de la petición</dt>
+                            <dd>
+                                {{ baja_dispositivo.responsable_peticion|default:"INDEFINIDO" }}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt>Habitación / Estancia</dt>
+                            <dd>
+                                {{ baja_dispositivo.habitacion_estancia|default:"INDEFINIDO" }}
+                            </dd>
                         </div>
                         <div>
                             <dt>Registrado por</dt>
@@ -148,7 +193,26 @@
                             <dt>Fecha de registro</dt>
                             <dd>{{ baja_dispositivo.fecha_registro|date:"d/m/Y H:i" }}</dd>
                         </div>
+                        <div class="biomedicos-baja__resumen-motivo">
+                            <dt>Motivo de baja</dt>
+                            <dd>{{ baja_dispositivo.motivo }}</dd>
+                        </div>
                     </dl>
+
+                    {% if not ficha_baja_firmada %}
+                        {% if ficha_baja_server_offline %}
+                            <p class="biomedicos-baja__ficha-aviso">
+                                <i class="bi bi-cloud-slash"></i>
+                                La ficha está registrada, pero el servidor de
+                                imágenes no está disponible en este momento.
+                            </p>
+                        {% elif baja_dispositivo.ficha_firmada_uuid %}
+                            <p class="biomedicos-baja__ficha-aviso">
+                                <i class="bi bi-file-earmark-x"></i>
+                                No fue posible recuperar la ficha firmada.
+                            </p>
+                        {% endif %}
+                    {% endif %}
                 </div>
             </section>
         {% endif %}

@@ -116,10 +116,17 @@
                                                 <i class="bi bi-qr-code"></i>
                                                 <span>Ver / Imprimir QR</span>
                                             </a>
-                                            <a href="{% url 'editar_dispositivo_biomedicos' dispositivo.id %}">
-                                                <i class="bi bi-pencil"></i>
-                                                <span>Editar equipo</span>
-                                            </a>
+                                            {% if dispositivo.estado != 4 %}
+                                                <a href="{% url 'editar_dispositivo_biomedicos' dispositivo.id %}">
+                                                    <i class="bi bi-pencil"></i>
+                                                    <span>Editar equipo</span>
+                                                </a>
+                                                {# Mantiene las mismas acciones que el listado general. #}
+                                                <a href="{% url 'tramite_baja_dispositivo_biomedicos' dispositivo.id %}">
+                                                    <i class="bi bi-file-earmark-check"></i>
+                                                    <span>Trámite de baja</span>
+                                                </a>
+                                            {% endif %}
                                         </div>
                                     </details>
                                 </td>

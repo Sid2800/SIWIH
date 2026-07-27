@@ -417,6 +417,39 @@ class Dispositivo(models.Model):
         return f"{self.codigo} - {self.nombre}"
 
 
+class OrdenTrabajoBajaDispositivo(models.Model):
+    # La orden se reserva al generar la ficha por primera vez. La relación
+    # OneToOne garantiza que otros usuarios reutilicen el mismo consecutivo.
+    dispositivo = models.OneToOneField(
+        Dispositivo,
+        on_delete=models.PROTECT,
+        related_name="orden_trabajo_baja",
+    )
+    creado_por = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="ordenes_trabajo_baja_dispositivos_creadas",
+    )
+    fecha_creado = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "equipo_orden_trabajo_baja"
+        verbose_name = "Orden de trabajo para baja"
+        verbose_name_plural = "Órdenes de trabajo para baja"
+        ordering = ["-fecha_creado"]
+
+    @property
+    def numero_orden(self):
+        # El año pertenece a la emisión original; una reimpresión futura no
+        # cambia el identificador administrativo.
+        if not self.pk or not self.fecha_creado:
+            return "SIN ASIGNAR"
+        return f"OT-{self.fecha_creado.year}-{self.pk:05d}"
+
+    def __str__(self):
+        return f"{self.numero_orden} - {self.dispositivo.codigo}"
+
+
 class BajaDispositivo(models.Model):
     # Registro administrativo de baja. Es OneToOne porque un equipo solo debe
     # tener una baja final, parecida a un cierre de expediente.
@@ -427,6 +460,28 @@ class BajaDispositivo(models.Model):
     )
     fecha_baja = models.DateField(verbose_name="Fecha de baja")
     motivo = models.CharField(max_length=255, verbose_name="Motivo de baja")
+    responsable_peticion = models.ForeignKey(
+        Empleado,
+        on_delete=models.PROTECT,
+        related_name="bajas_dispositivos_biomedicos_solicitadas",
+        null=True,
+        blank=True,
+        verbose_name="Responsable de la petición",
+    )
+    habitacion_estancia = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        verbose_name="Habitación o estancia",
+    )
+    # El archivo fisico vive en SIWIH Images. La base principal conserva solo
+    # el UUID necesario para auditar y recuperar la constancia firmada.
+    ficha_firmada_uuid = models.UUIDField(
+        null=True,
+        blank=True,
+        unique=True,
+        verbose_name="UUID de la ficha firmada",
+    )
     registrado_por = models.ForeignKey(
         User,
         on_delete=models.PROTECT,

@@ -239,14 +239,6 @@
         {% endif %}
 
         <div class="biomedicos-registro__acciones">
-            {# En edicion views.py envia url_baja; en registro no aparece este boton. #}
-            {% if url_baja %}
-                <a class="formularioBotones-boton biomedicos-registro__boton biomedicos-baja__boton"
-                   href="{{ url_baja }}">
-                    <i class="bi bi-exclamation-octagon"></i>
-                    Dar de baja
-                </a>
-            {% endif %}
             <div class="biomedicos-registro__acciones-principales">
                 <button class="formularioBotones-boton biomedicos-registro__boton" type="submit">
                     <i class="bi bi-floppy"></i>

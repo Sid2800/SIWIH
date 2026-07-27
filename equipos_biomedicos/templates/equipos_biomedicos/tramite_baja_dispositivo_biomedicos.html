@@ -1,0 +1,332 @@
+{% extends 'core/base_media.html' %}
+{# Vista temporal del trámite; no crea estados ni solicitudes pendientes. #}
+
+{% block title %}Trámite de baja de equipo{% endblock title %}
+
+{% block content %}
+<div class="contenedor2 biomedicos-pagina biomedicos-pagina--detalle">
+    <div class="tituloFormulario">
+        <div class="biomedicos-encabezado-superior">
+            <div class="tituloFormulario-texto">
+                <i class="bi bi-file-earmark-check"></i>
+                <div>
+                    <h2 class="sin-margen">Trámite de baja</h2>
+                    <p class="biomedicos-baja__subtitulo">
+                        Preparar la documentación del equipo {{ dispositivo.codigo }}.
+                    </p>
+                </div>
+            </div>
+            <a class="biomedicos-volver biomedicos-volver--inline biomedicos-encabezado-volver"
+               href="{{ url_regresar }}">
+                <i class="bi bi-arrow-left"></i>
+                Detalle del equipo
+            </a>
+        </div>
+        <div class="tituloFormulario-subrallado"></div>
+    </div>
+
+    {# Generar el PDF o salir de esta pantalla no modifica el inventario. #}
+    <section class="biomedicos-baja__advertencia" role="status">
+        <i class="bi bi-info-circle"></i>
+        <div>
+            <strong>Primero genere e imprima la ficha para obtener las firmas.</strong>
+            <p>
+                El equipo seguirá activo hasta que adjunte la ficha firmada y
+                pulse “Confirmar baja definitiva”.
+            </p>
+        </div>
+    </section>
+
+    {# La ficha se guarda en SIWIH Images antes de crear la baja local. #}
+    <form class="biomedicos-registro biomedicos-baja__formulario"
+          method="post"
+          enctype="multipart/form-data"
+          autocomplete="off">
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+            <div class="biomedicos-registro__errores biomedicos-registro__errores--general">
+                {{ form.non_field_errors }}
+            </div>
+        {% endif %}
+
+        <section class="biomedicos-registro__seccion">
+            <h3 class="biomedicos-registro__titulo">
+                <i class="bi bi-file-earmark-text"></i>
+                Información para la ficha
+            </h3>
+
+            <div class="biomedicos-registro__campos biomedicos-registro__campos--dos">
+                <div class="biomedicos-registro__campo">
+                    <label for="fecha_baja_dispositivo">Fecha de baja *</label>
+                    {{ form.fecha_baja }}
+                    {{ form.fecha_baja.errors }}
+                </div>
+
+                <div class="biomedicos-registro__campo">
+                    <label for="responsable_peticion_baja">
+                        Responsable de la petición *
+                    </label>
+                    {{ form.responsable_peticion }}
+                    {{ form.responsable_peticion.errors }}
+                </div>
+
+                <div class="biomedicos-registro__campo">
+                    <label for="habitacion_estancia_baja">
+                        Habitación / Estancia
+                    </label>
+                    {{ form.habitacion_estancia }}
+                    {{ form.habitacion_estancia.errors }}
+                </div>
+
+                {% if orden_trabajo_baja %}
+                    <div class="biomedicos-registro__campo">
+                        <label for="numero_orden_trabajo_baja">
+                            Número de orden de trabajo
+                        </label>
+                        <input class="formularioCampo-text"
+                               id="numero_orden_trabajo_baja"
+                               type="text"
+                               value="{{ orden_trabajo_baja.numero_orden }}"
+                               readonly>
+                    </div>
+                {% endif %}
+
+                <div class="biomedicos-registro__campo biomedicos-registro__campo--completo">
+                    <label for="motivo_baja_dispositivo">Motivo de baja *</label>
+                    {{ form.motivo }}
+                    {{ form.motivo.errors }}
+                </div>
+
+            </div>
+        </section>
+
+        <section class="biomedicos-registro__seccion">
+            <h3 class="biomedicos-registro__titulo">
+                <i class="bi bi-camera"></i>
+                Constancia firmada
+            </h3>
+
+            <div class="biomedicos-registro__campo">
+                <label for="ficha_firmada_dispositivo">
+                    Fotografía o escaneo de la ficha firmada *
+                </label>
+                {{ form.ficha_firmada }}
+                <input type="file"
+                       id="ficha_firmada_camara"
+                       accept="image/*"
+                       capture="environment"
+                       hidden>
+
+                <div class="biomedicos-registro__foto biomedicos-registro__foto--activa"
+                     id="ficha_firmada_selector"
+                     role="button"
+                     tabindex="0"
+                     aria-label="Seleccionar ficha de baja firmada">
+                    <img class="biomedicos-registro__foto-preview"
+                         id="ficha_firmada_preview"
+                         alt="Vista previa de la ficha de baja firmada"
+                         hidden>
+                    <div id="ficha_firmada_contenido">
+                        <i class="bi bi-file-earmark-arrow-up"></i>
+                        <strong>Agregar ficha firmada</strong>
+                        <small>JPG, PNG o WebP; se preparará como WebP</small>
+                    </div>
+                </div>
+
+                <div class="biomedicos-registro__foto-botones">
+                    <button type="button"
+                            class="biomedicos-registro__foto-boton"
+                            id="seleccionar_ficha_firmada">
+                        <i class="bi bi-image"></i>
+                        Seleccionar archivo
+                    </button>
+                    <button type="button"
+                            class="biomedicos-registro__foto-boton"
+                            id="capturar_ficha_firmada">
+                        <i class="bi bi-camera-fill"></i>
+                        Tomar foto
+                    </button>
+                </div>
+                <small class="biomedicos-registro__foto-ayuda"
+                       id="ficha_firmada_estado">
+                    Asegúrese de que las firmas y el contenido sean legibles.
+                </small>
+                {{ form.ficha_firmada.errors }}
+            </div>
+        </section>
+
+        <div class="biomedicos-registro__acciones">
+            <button class="formularioBotones-boton biomedicos-registro__boton biomedicos-registro__boton--secundario"
+                    type="submit"
+                    formaction="{{ url_ficha_baja }}"
+                    formmethod="post"
+                    formtarget="_blank"
+                    formnovalidate>
+                <i class="bi bi-file-earmark-pdf"></i>
+                Generar ficha PDF
+            </button>
+            <button class="formularioBotones-boton biomedicos-registro__boton biomedicos-baja__boton"
+                    type="submit">
+                <i class="bi bi-check2-circle"></i>
+                Confirmar baja definitiva
+            </button>
+            <a class="formularioBotones-boton biomedicos-registro__boton biomedicos-registro__boton--secundario"
+               href="{{ url_regresar }}">
+                <i class="bi bi-arrow-left"></i>
+                Cancelar
+            </a>
+        </div>
+    </form>
+</div>
+{% endblock content %}
+
+{% block media_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // El editor compartido recorta la captura y entrega el WebP que acepta
+    // SIWIH Images. El archivo original nunca se envía al servidor.
+    const fichaFirmada = document.getElementById('ficha_firmada_dispositivo');
+    const fichaCamara = document.getElementById('ficha_firmada_camara');
+    const selectorFicha = document.getElementById('ficha_firmada_selector');
+    const seleccionarFicha = document.getElementById('seleccionar_ficha_firmada');
+    const capturarFicha = document.getElementById('capturar_ficha_firmada');
+    const previewFicha = document.getElementById('ficha_firmada_preview');
+    const contenidoFicha = document.getElementById('ficha_firmada_contenido');
+    const estadoFicha = document.getElementById('ficha_firmada_estado');
+    let previewUrl = null;
+
+    function mostrarError(mensaje) {
+        if (window.toastr) {
+            toastr.error(mensaje);
+        } else {
+            window.alert(mensaje);
+        }
+    }
+
+    function actualizarPreview(archivo) {
+        if (previewUrl) {
+            AdjuntarImagenHelper.quitarUrlPreview(previewUrl);
+        }
+
+        previewUrl = AdjuntarImagenHelper.crearUrlPreview(archivo);
+        previewFicha.src = previewUrl;
+        previewFicha.hidden = false;
+        contenidoFicha.hidden = true;
+        estadoFicha.textContent = 'Ficha lista en formato WebP.';
+    }
+
+    async function prepararFicha(inputOrigen) {
+        const archivoOriginal = inputOrigen.files[0];
+        inputOrigen.value = '';
+
+        if (!archivoOriginal) {
+            return;
+        }
+
+        const validacion = AdjuntarImagenHelper.validarArchivo(archivoOriginal);
+        if (!validacion.valido) {
+            mostrarError(validacion.error);
+            return;
+        }
+
+        const archivoWebp = await ImageEditor.open(
+            archivoOriginal,
+            {
+                titulo: 'Ficha firmada de baja',
+                subtitulo: 'Ajuste el encuadre para que firmas y texto sean legibles'
+            }
+        );
+
+        if (!archivoWebp) {
+            return;
+        }
+
+        if (typeof DataTransfer === 'undefined') {
+            mostrarError('Este navegador no permite preparar la ficha.');
+            return;
+        }
+
+        const transferencia = new DataTransfer();
+        transferencia.items.add(archivoWebp);
+        fichaFirmada.files = transferencia.files;
+        actualizarPreview(archivoWebp);
+    }
+
+    if (
+        fichaFirmada
+        && fichaCamara
+        && selectorFicha
+        && seleccionarFicha
+        && capturarFicha
+    ) {
+        seleccionarFicha.addEventListener('click', function () {
+            fichaFirmada.click();
+        });
+        capturarFicha.addEventListener('click', function () {
+            fichaCamara.click();
+        });
+        selectorFicha.addEventListener('click', function () {
+            fichaFirmada.click();
+        });
+        selectorFicha.addEventListener('keydown', function (evento) {
+            if (evento.key === 'Enter' || evento.key === ' ') {
+                evento.preventDefault();
+                fichaFirmada.click();
+            }
+        });
+        fichaFirmada.addEventListener('change', function () {
+            prepararFicha(fichaFirmada);
+        });
+        fichaCamara.addEventListener('change', function () {
+            prepararFicha(fichaCamara);
+        });
+        window.addEventListener('beforeunload', function () {
+            if (previewUrl) {
+                AdjuntarImagenHelper.quitarUrlPreview(previewUrl);
+            }
+        });
+    }
+
+    // Reutiliza el mismo buscador remoto del empleado a cargo. Así el
+    // formulario no carga toda la tabla de RR. HH. en el HTML.
+    const responsablePeticionSelect = $('#responsable_peticion_baja');
+
+    if (
+        responsablePeticionSelect.length
+        && responsablePeticionSelect.select2
+    ) {
+        responsablePeticionSelect.select2({
+            width: '100%',
+            placeholder: 'Buscar por ID, DNI o nombre',
+            minimumInputLength: 1,
+            ajax: {
+                url: "{% url 'buscar_empleados_biomedicos' %}",
+                dataType: 'json',
+                delay: 250,
+                data: function (params) {
+                    return {
+                        q: params.term || ''
+                    };
+                },
+                processResults: function (data) {
+                    return data;
+                },
+                cache: true
+            },
+            language: {
+                inputTooShort: function () {
+                    return 'Escriba el ID, DNI o nombre del empleado';
+                },
+                noResults: function () {
+                    return 'No se encontraron empleados';
+                },
+                searching: function () {
+                    return 'Buscando...';
+                }
+            }
+        });
+    }
+});
+</script>
+{% endblock media_js %}

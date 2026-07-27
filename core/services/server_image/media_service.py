@@ -477,3 +477,63 @@ class MediaService:
                 app=LogApp.MEDIA,
             )
             return [], True
+
+    @staticmethod
+    def subir_ficha_baja_dispositivo(dispositivo_id, archivo, usuario):
+        """Envia la constancia firmada y devuelve los datos confirmados."""
+        if not archivo or not usuario:
+            return {
+                "ok": False,
+                "error": "Archivo o usuario no proporcionado",
+            }
+
+        payload = {
+            "dispositivo_id": dispositivo_id,
+            "archivo": archivo,
+            "usuario_id": usuario.id,
+            "usuario_nombre": construir_nombre_dinamico(
+                usuario,
+                ["first_name", "last_name"],
+            ),
+        }
+
+        try:
+            resultado = RequestService.subir_ficha_baja_dispositivo(payload)
+            ficha = resultado.get("data", {}).get("ficha")
+            if not ficha:
+                raise RuntimeError(
+                    "El servidor de imagenes no devolvio la ficha creada"
+                )
+
+            return {"ok": True, "ficha": ficha}
+        except Exception as exc:
+            log_error(
+                "[FALLO_SUBIDA_FICHA_BAJA] "
+                f"dispositivo_id={dispositivo_id} detalle={str(exc)}",
+                app=LogApp.MEDIA,
+            )
+            return {"ok": False, "error": str(exc)}
+
+    @staticmethod
+    def obtener_ficha_baja_dispositivo(dispositivo_id):
+        """Obtiene la constancia firmada sin impedir que cargue el detalle."""
+        try:
+            resultado = RequestService.consultar_ficha_baja_dispositivo(
+                dispositivo_id
+            )
+            ficha = resultado.get("data", {}).get("ficha")
+
+            if ficha:
+                for campo in ("url", "miniatura"):
+                    valor = ficha.get(campo)
+                    if valor and valor.startswith("/"):
+                        ficha[campo] = f"{settings.IMAGE_SERVER_URL}{valor}"
+
+            return ficha, False
+        except Exception as exc:
+            log_error(
+                "[FALLO_MEDIA_FICHA_BAJA] "
+                f"dispositivo_id={dispositivo_id} detalle={str(exc)}",
+                app=LogApp.MEDIA,
+            )
+            return None, True

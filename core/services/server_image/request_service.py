@@ -1,12 +1,14 @@
 from core.services.server_image.auth_service import traer_server_token, ImageServerAuthError
 from core.constants.image_server_enpoints import (
     BUSCAR_ARCHIVOS,
+    BUSCAR_FICHA_BAJA_DISPOSITIVO,
     BUSCAR_IMAGENES_DISPOSITIVO,
     BUSCAR_IMAGENES_USUARIO,
     DESACTIVAR_IMAGEN,
     DESACTIVAR_IMAGEN_BATCH,
     MIGRAR_IMAGENES_EXTERNO_INTERNO,
     SUBIR_IMAGEN,
+    SUBIR_FICHA_BAJA_DISPOSITIVO,
     SUBIR_IMAGEN_DISPOSITIVO,
     SUBIR_IMAGEN_USUARIO,
 )
@@ -568,6 +570,104 @@ class RequestService:
         if response.status_code >= 400:
             raise RuntimeError(
                 "Error al consultar imagenes de equipo "
+                f"status={response.status_code} detalle={response_json}"
+            )
+
+        return {"ok": True, "data": response_json}
+
+    @staticmethod
+    def subir_ficha_baja_dispositivo(peticion_dict):
+        """Envia la constancia firmada sin ocupar un tipo de foto del equipo."""
+        peticion = SimpleNamespace(**peticion_dict)
+        dispositivo_id = RequestService._validar_dispositivo_id(
+            getattr(peticion, "dispositivo_id", None)
+        )
+        archivo = getattr(peticion, "archivo", None)
+
+        if not archivo:
+            raise ValueError("archivo es requerido")
+
+        content_type = getattr(archivo, "content_type", "")
+        nombre_archivo = getattr(archivo, "name", "")
+        if (
+            content_type != "image/webp"
+            or not nombre_archivo.lower().endswith(".webp")
+        ):
+            raise ValueError(
+                "El servidor de imagenes solo acepta archivos WebP"
+            )
+
+        url = f"{settings.IMAGE_SERVER_URL}{SUBIR_FICHA_BAJA_DISPOSITIVO}"
+        token = traer_server_token()
+        headers = {"Authorization": f"Bearer {token}"}
+        files = {
+            "archivo": (nombre_archivo, archivo, content_type),
+        }
+        data = {
+            "dispositivo_id": dispositivo_id,
+            "usuario_snapshot": json.dumps({
+                "id": getattr(peticion, "usuario_id", None),
+                "nombre": getattr(peticion, "usuario_nombre", ""),
+                "sistema": "SIWI-HOSPITAL",
+            }),
+        }
+
+        try:
+            response = requests.post(
+                url,
+                headers=headers,
+                data=data,
+                files=files,
+                timeout=20,
+            )
+        except requests.exceptions.RequestException as exc:
+            raise RuntimeError(
+                f"Error conexion al subir ficha de baja: {exc}"
+            ) from exc
+
+        try:
+            response_json = response.json()
+        except ValueError:
+            response_json = {"error": response.text[:500]}
+
+        if response.status_code >= 400:
+            raise RuntimeError(
+                "Error al subir ficha de baja "
+                f"status={response.status_code} detalle={response_json}"
+            )
+
+        return {"ok": True, "data": response_json}
+
+    @staticmethod
+    def consultar_ficha_baja_dispositivo(dispositivo_id):
+        """Consulta la unica constancia firmada asociada al equipo."""
+        dispositivo_id = RequestService._validar_dispositivo_id(dispositivo_id)
+        ruta = BUSCAR_FICHA_BAJA_DISPOSITIVO.format(
+            dispositivo_id=dispositivo_id
+        )
+        url = f"{settings.IMAGE_SERVER_URL}{ruta}"
+        token = traer_server_token()
+        headers = {"Authorization": f"Bearer {token}"}
+
+        try:
+            response = requests.get(
+                url,
+                headers=headers,
+                timeout=10,
+            )
+        except requests.exceptions.RequestException as exc:
+            raise RuntimeError(
+                f"Error conexion al consultar ficha de baja: {exc}"
+            ) from exc
+
+        try:
+            response_json = response.json()
+        except ValueError:
+            response_json = {"error": response.text[:500]}
+
+        if response.status_code >= 400:
+            raise RuntimeError(
+                "Error al consultar ficha de baja "
                 f"status={response.status_code} detalle={response_json}"
             )
 

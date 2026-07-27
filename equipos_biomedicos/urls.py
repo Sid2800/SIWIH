@@ -31,9 +31,14 @@ urlpatterns = [
         name='agregar_imagen_dispositivo_biomedicos'
     ),
     path(
-        'dispositivos/<int:dispositivo_id>/dar-baja/',
-        views.dar_baja_dispositivo,
-        name='dar_baja_dispositivo_biomedicos'
+        'dispositivos/<int:dispositivo_id>/tramite-baja/',
+        views.tramite_baja_dispositivo,
+        name='tramite_baja_dispositivo_biomedicos'
+    ),
+    path(
+        'dispositivos/<int:dispositivo_id>/tramite-baja/ficha/',
+        views.ficha_baja_dispositivo_pdf,
+        name='ficha_baja_dispositivo_biomedicos'
     ),
     path(
         'dispositivos/<int:dispositivo_id>/qr/',

@@ -42,11 +42,41 @@ class EmpleadoChoiceField(forms.ModelChoiceField):
 
 
 class BajaDispositivoForm(forms.ModelForm):
-    # Formulario corto para crear el registro de baja administrativa.
-    # La vista se encarga despues de cambiar el estado del equipo a DADO_DE_BAJA.
+    responsable_peticion = EmpleadoChoiceField(
+        queryset=Empleado.objects.none(),
+        required=True,
+        label="Responsable de la petición",
+        widget=forms.Select(
+            attrs={
+                "class": "formularioCampo-select",
+                "id": "responsable_peticion_baja",
+                "data-placeholder": "Buscar por ID, DNI o nombre",
+            }
+        ),
+    )
+    # La fotografia firmada no pertenece a la base principal; el formulario la
+    # valida para que la vista pueda enviarla a SIWIH Images antes de confirmar.
+    ficha_firmada = forms.ImageField(
+        required=True,
+        validators=[validar_imagen_basica],
+        label="Ficha firmada",
+        widget=forms.FileInput(
+            attrs={
+                "accept": "image/jpeg,image/png,image/webp",
+                "id": "ficha_firmada_dispositivo",
+                "hidden": True,
+            }
+        ),
+    )
+
     class Meta:
         model = BajaDispositivo
-        fields = ["fecha_baja", "motivo"]
+        fields = [
+            "fecha_baja",
+            "responsable_peticion",
+            "habitacion_estancia",
+            "motivo",
+        ]
         widgets = {
             "fecha_baja": forms.DateInput(
                 attrs={
@@ -57,6 +87,14 @@ class BajaDispositivoForm(forms.ModelForm):
                 },
                 format="%Y-%m-%d",
             ),
+            "habitacion_estancia": forms.TextInput(
+                attrs={
+                    "class": "formularioCampo-text",
+                    "id": "habitacion_estancia_baja",
+                    "maxlength": 100,
+                    "placeholder": "Ej. Habitación 3 o estancia de emergencia",
+                }
+            ),
             "motivo": forms.Textarea(
                 attrs={
                     "class": "formularioCampo-text no-resize",
@@ -66,6 +104,38 @@ class BajaDispositivoForm(forms.ModelForm):
                 }
             ),
         }
+
+    def __init__(self, *args, requiere_ficha=True, **kwargs):
+        super().__init__(*args, **kwargs)
+        # La previsualizacion PDF usa los textos, pero se genera antes de que
+        # exista la fotografia firmada.
+        self.fields["ficha_firmada"].required = requiere_ficha
+
+        responsable_id = None
+        if self.is_bound:
+            responsable_id = self.data.get(
+                self.add_prefix("responsable_peticion")
+            )
+        else:
+            responsable_id = (
+                self.initial.get("responsable_peticion")
+                or getattr(self.instance, "responsable_peticion_id", None)
+            )
+
+        # Mantiene el formulario ligero: Select2 busca por AJAX y el queryset
+        # solo incorpora al empleado elegido cuando se envían los datos.
+        if responsable_id and str(responsable_id).isdigit():
+            filtro_responsable = Q(pk=responsable_id)
+            if self.is_bound:
+                filtro_responsable &= Q(estado=EstadoRegistro.ACTIVO)
+
+            self.fields["responsable_peticion"].queryset = (
+                Empleado.objects.filter(filtro_responsable)
+            )
+
+        self.fields[
+            "responsable_peticion"
+        ].empty_label = "Buscar responsable de la petición"
 
     def clean_fecha_baja(self):
         fecha_baja = self.cleaned_data["fecha_baja"]
@@ -78,6 +148,25 @@ class BajaDispositivoForm(forms.ModelForm):
         if not motivo:
             raise forms.ValidationError("Debe ingresar el motivo de baja.")
         return motivo
+
+    def clean_habitacion_estancia(self):
+        return (
+            self.cleaned_data.get("habitacion_estancia") or ""
+        ).strip()
+
+    def clean_ficha_firmada(self):
+        archivo = self.cleaned_data.get("ficha_firmada")
+        if not archivo:
+            return archivo
+
+        if (
+            archivo.content_type != "image/webp"
+            or not archivo.name.lower().endswith(".webp")
+        ):
+            raise forms.ValidationError(
+                "La ficha debe prepararse en formato WebP antes de guardarse."
+            )
+        return archivo
 
 
 class ImagenDispositivoForm(forms.Form):
