@@ -1989,6 +1989,22 @@ body.darkmode .sexp-entregar-faltantes-btn:hover {
 .sexp-filtro-btn--export       { background: #22c55e; color: #fff; }
 .sexp-filtro-btn--export:hover { opacity: 0.85; }
 
+/* Botones de exportar bloqueados hasta que se elijan las fechas */
+.sexp-filtro-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    filter: grayscale(35%);
+}
+.sexp-filtro-btn:disabled:hover { opacity: 0.45; }
+
+/* Empuja el grupo "Tipo de Reporte" y los botones de exportar a la derecha,
+   para que queden juntos y separados de los filtros de fecha. */
+.sexp-filtro-grupo--export { margin-left: auto; }
+@media (max-width: 900px) {
+    /* En pantallas chicas no se empuja: fluye debajo de los demás filtros. */
+    .sexp-filtro-grupo--export { margin-left: 0; }
+}
+
 .sexp-reportes-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
