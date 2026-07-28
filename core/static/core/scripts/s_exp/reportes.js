@@ -194,26 +194,24 @@ function getRangoTexto() {
     return `Período: ${inicio} al ${fin}`;
 }
 
+/**
+ * Arma la URL de descarga (Excel o PDF) con el rango de fechas y el TIPO de
+ * reporte elegido en el combobox. Ambas exportaciones comparten los mismos
+ * parámetros; solo cambia el endpoint.
+ */
+function _urlExportacion(urlBase) {
+    const url = new URL(urlBase, window.location.origin);
+    url.searchParams.append('fecha_inicio', $('#filtro-fecha-inicio').val());
+    url.searchParams.append('fecha_fin', $('#filtro-fecha-fin').val());
+    // tipo: 'solicitudes' (por defecto) o 'expedientes'.
+    url.searchParams.append('tipo', $('#filtro-tipo-reporte').val() || 'solicitudes');
+    return url.toString();
+}
+
 function exportarExcel() {
-    const fechaInicio = $('#filtro-fecha-inicio').val();
-    const fechaFin = $('#filtro-fecha-fin').val();
-
-    // Llamar API para descargar Excel
-    const url = new URL(window.urls.s_exp_exportar_excel, window.location.origin);
-    url.searchParams.append('fecha_inicio', fechaInicio);
-    url.searchParams.append('fecha_fin', fechaFin);
-
-    window.location.href = url.toString();
+    window.location.href = _urlExportacion(window.urls.s_exp_exportar_excel);
 }
 
 function exportarPDF() {
-    const fechaInicio = $('#filtro-fecha-inicio').val();
-    const fechaFin = $('#filtro-fecha-fin').val();
-
-    // Llamar API para descargar PDF
-    const url = new URL(window.urls.s_exp_exportar_pdf, window.location.origin);
-    url.searchParams.append('fecha_inicio', fechaInicio);
-    url.searchParams.append('fecha_fin', fechaFin);
-
-    window.location.href = url.toString();
+    window.location.href = _urlExportacion(window.urls.s_exp_exportar_pdf);
 }
