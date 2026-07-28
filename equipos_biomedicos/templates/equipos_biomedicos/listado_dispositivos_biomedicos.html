@@ -23,6 +23,20 @@
         </div>
 
         <div class="biomedicos-listado__acciones-superior">
+            <div class="biomedicos-listado__busqueda">
+                <div class="biomedicos-listado__campo-icono">
+                    <i class="bi bi-search"></i>
+                    <input class="formularioCampo-text"
+                           id="buscar_listado_dispositivo"
+                           name="q"
+                           type="search"
+                           value="{{ filtros.q }}"
+                           placeholder="Buscar por código interno, tipo, marca o color"
+                           aria-label="Buscar equipos"
+                           form="biomedicos-listado-filtros">
+                </div>
+            </div>
+
             <a class="formularioBotones-boton biomedicos-listado__registrar"
                href="{% url 'registrar_dispositivo_biomedicos' %}">
                 <i class="bi bi-plus-lg"></i>
@@ -32,19 +46,7 @@
     </div>
 
     {# Filtros GET: views.py lee estos parametros y devuelve la tabla paginada. #}
-    <form class="biomedicos-listado__controles" method="get">
-        <div class="biomedicos-listado__busqueda">
-            <div class="biomedicos-listado__campo-icono">
-                <i class="bi bi-search"></i>
-                <input class="formularioCampo-text"
-                       id="buscar_listado_dispositivo"
-                       name="q"
-                       type="search"
-                       value="{{ filtros.q }}"
-                       placeholder="Buscar por código interno, serie, tipo, marca, modelo o área">
-            </div>
-        </div>
-
+    <form class="biomedicos-listado__controles" id="biomedicos-listado-filtros" method="get">
         <div class="biomedicos-listado__filtros">
             <div class="biomedicos-listado__filtro">
                 <div class="biomedicos-listado__campo-icono">

@@ -50,7 +50,7 @@ class BajaDispositivoForm(forms.ModelForm):
             attrs={
                 "class": "formularioCampo-select",
                 "id": "responsable_peticion_baja",
-                "data-placeholder": "Buscar por ID, DNI o nombre",
+                "data-placeholder": "Buscar por DNI o nombre",
             }
         ),
     )
@@ -110,6 +110,15 @@ class BajaDispositivoForm(forms.ModelForm):
         # La previsualizacion PDF usa los textos, pero se genera antes de que
         # exista la fotografia firmada.
         self.fields["ficha_firmada"].required = requiere_ficha
+
+        # El input real va oculto porque la interfaz es la zona de arrastre.
+        # Un control required + hidden no se puede enfocar, asi que el
+        # navegador cancela el envio sin poder mostrar el mensaje y el boton
+        # parece muerto. La obligatoriedad se mantiene en el servidor y el
+        # template avisa desde su propio JS antes de enviar.
+        self.fields["ficha_firmada"].widget.use_required_attribute = (
+            lambda initial: False
+        )
 
         responsable_id = None
         if self.is_bound:
@@ -275,7 +284,7 @@ class DispositivoCreateForm(forms.ModelForm):
             attrs={
                 "class": "formularioCampo-select",
                 "id": "responsable_dispositivo",
-                "data-placeholder": "Buscar por ID, DNI o nombre",
+                "data-placeholder": "Buscar por DNI o nombre",
             }
         ),
     )
@@ -367,7 +376,7 @@ class DispositivoCreateForm(forms.ModelForm):
                 attrs={
                     "class": "formularioCampo-text",
                     "id": "serie_dispositivo",
-                    "placeholder": "Opcional; se mostrará como Indefinido",
+                    "placeholder": "Opcional",
                 }
             ),
             "inventario_bienes_nacionales": forms.TextInput(
@@ -418,7 +427,7 @@ class DispositivoCreateForm(forms.ModelForm):
                     "id": "costo_dispositivo",
                     "min": 0,
                     "step": "0.01",
-                    "placeholder": "Ingrese el costo (opcional)",
+                    "placeholder": "Ingrese el costo",
                 }
             ),
             "observaciones": forms.Textarea(
@@ -426,7 +435,7 @@ class DispositivoCreateForm(forms.ModelForm):
                     "class": "formularioCampo-text no-resize",
                     "id": "observaciones_dispositivo",
                     "rows": 4,
-                    "placeholder": "Ingrese observaciones adicionales (opcional)",
+                    "placeholder": "Ingrese observaciones",
                 }
             ),
         }
@@ -484,16 +493,19 @@ class DispositivoCreateForm(forms.ModelForm):
 
         self.fields["tipo"].queryset = TipoDispositivo.objects.filter(filtro_tipo)
         self.fields["tipo"].empty_label = "Seleccione el tipo de equipo"
+        # Estos tres campos viven en el bloque "Datos adicionales (opcional)"
+        # del template, asi que el placeholder solo necesita decir que pasa al
+        # dejarlos vacios: el modelo los resuelve al catalogo INDEFINIDO.
         self.fields["marca"].queryset = MarcaDispositivo.objects.filter(filtro_marca)
-        self.fields["marca"].empty_label = "Marca / INDEFINIDO"
+        self.fields["marca"].empty_label = "Sin especificar"
         self.fields["modelo"].queryset = ModeloDispositivo.objects.filter(filtro_modelo)
-        self.fields["modelo"].empty_label = "Modelo / INDEFINIDO"
+        self.fields["modelo"].empty_label = "Sin especificar"
         self.fields["area_gestora"].queryset = AreaGestora.objects.filter(
             filtro_area_gestora
         ).exclude(nombre="INDEFINIDO")
         self.fields["area_gestora"].empty_label = "Seleccione el area gestora"
         self.fields["color"].queryset = ColorDispositivo.objects.filter(filtro_color)
-        self.fields["color"].empty_label = "Color / INDEFINIDO"
+        self.fields["color"].empty_label = "Sin especificar"
         self.fields["tipo_tecnologia"].choices = [
             ("", "Seleccione el tipo de tecnología"),
             *TipoTecnologiaDispositivo.choices,

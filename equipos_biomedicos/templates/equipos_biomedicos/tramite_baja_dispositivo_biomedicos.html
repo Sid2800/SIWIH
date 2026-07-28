@@ -25,14 +25,23 @@
         <div class="tituloFormulario-subrallado"></div>
     </div>
 
-    {# Generar el PDF o salir de esta pantalla no modifica el inventario. #}
+    {% comment %}
+       El tramite se resuelve en una sola pantalla: el tecnico llena los datos,
+       genera la ficha en otra pestaña, recoge las firmas y adjunta la
+       constancia sin salir de aqui. Por eso no se bloquea nada; el formulario
+       conserva los datos mientras el PDF se abre aparte. Generar el PDF o
+       salir de esta pantalla no modifica el inventario.
+    {% endcomment %}
     <section class="biomedicos-baja__advertencia" role="status">
         <i class="bi bi-info-circle"></i>
         <div>
-            <strong>Primero genere e imprima la ficha para obtener las firmas.</strong>
+            <strong>Genere la ficha, recoja las firmas y adjúntela aquí mismo.</strong>
             <p>
                 El equipo seguirá activo hasta que adjunte la ficha firmada y
                 pulse “Confirmar baja definitiva”.
+                {% if orden_trabajo_baja %}
+                    Ficha generada: {{ orden_trabajo_baja.numero_orden }}.
+                {% endif %}
             </p>
         </div>
     </section>
@@ -78,19 +87,6 @@
                     {{ form.habitacion_estancia }}
                     {{ form.habitacion_estancia.errors }}
                 </div>
-
-                {% if orden_trabajo_baja %}
-                    <div class="biomedicos-registro__campo">
-                        <label for="numero_orden_trabajo_baja">
-                            Número de orden de trabajo
-                        </label>
-                        <input class="formularioCampo-text"
-                               id="numero_orden_trabajo_baja"
-                               type="text"
-                               value="{{ orden_trabajo_baja.numero_orden }}"
-                               readonly>
-                    </div>
-                {% endif %}
 
                 <div class="biomedicos-registro__campo biomedicos-registro__campo--completo">
                     <label for="motivo_baja_dispositivo">Motivo de baja *</label>
@@ -156,26 +152,38 @@
             </div>
         </section>
 
+        {% comment %}
+           Ambas acciones estan siempre disponibles: el tecnico decide el orden.
+           Se leen de izquierda a derecha segun avanza el tramite (salir,
+           generar la ficha, confirmar) y la confirmacion pide un si explicito
+           por ser irreversible.
+        {% endcomment %}
         <div class="biomedicos-registro__acciones">
-            <button class="formularioBotones-boton biomedicos-registro__boton biomedicos-registro__boton--secundario"
-                    type="submit"
-                    formaction="{{ url_ficha_baja }}"
-                    formmethod="post"
-                    formtarget="_blank"
-                    formnovalidate>
-                <i class="bi bi-file-earmark-pdf"></i>
-                Generar ficha PDF
-            </button>
-            <button class="formularioBotones-boton biomedicos-registro__boton biomedicos-baja__boton"
-                    type="submit">
-                <i class="bi bi-check2-circle"></i>
-                Confirmar baja definitiva
-            </button>
             <a class="formularioBotones-boton biomedicos-registro__boton biomedicos-registro__boton--secundario"
                href="{{ url_regresar }}">
                 <i class="bi bi-arrow-left"></i>
                 Cancelar
             </a>
+
+            <div class="biomedicos-registro__acciones-principales">
+                <button class="formularioBotones-boton biomedicos-registro__boton biomedicos-registro__boton--secundario"
+                        id="generar_ficha_pdf"
+                        type="submit"
+                        formaction="{{ url_ficha_baja }}"
+                        formmethod="post"
+                        formtarget="_blank"
+                        formnovalidate>
+                    <i class="bi bi-file-earmark-pdf"></i>
+                    {% if orden_trabajo_baja %}Regenerar ficha{% else %}Generar ficha PDF{% endif %}
+                </button>
+
+                <button class="formularioBotones-boton biomedicos-registro__boton biomedicos-baja__boton"
+                        id="confirmar_baja_dispositivo"
+                        type="submit">
+                    <i class="bi bi-check2-circle"></i>
+                    Confirmar baja definitiva
+                </button>
+            </div>
         </div>
     </form>
 </div>
@@ -194,6 +202,14 @@ document.addEventListener('DOMContentLoaded', function () {
     const previewFicha = document.getElementById('ficha_firmada_preview');
     const contenidoFicha = document.getElementById('ficha_firmada_contenido');
     const estadoFicha = document.getElementById('ficha_firmada_estado');
+    // Botones y campos del tramite. Varios existen solo en una de las dos
+    // etapas, por eso todo el codigo que los usa comprueba antes que esten.
+    const formularioBaja = document.querySelector('.biomedicos-baja__formulario');
+    const botonGenerar = document.getElementById('generar_ficha_pdf');
+    const botonConfirmar = document.getElementById('confirmar_baja_dispositivo');
+    const campoFecha = document.getElementById('fecha_baja_dispositivo');
+    const campoResponsable = document.getElementById('responsable_peticion_baja');
+    const campoMotivo = document.getElementById('motivo_baja_dispositivo');
     let previewUrl = null;
 
     function mostrarError(mensaje) {
@@ -288,6 +304,103 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    // La ficha necesita estos tres datos. Sin validarlos aqui el POST llega
+    // incompleto y, como el boton abre pestaña nueva, el 400 del servidor
+    // quedaba como texto suelto en una pestaña en blanco.
+    function datosFichaFaltantes() {
+        const faltantes = [];
+
+        if (campoFecha && !campoFecha.value) {
+            faltantes.push({ campo: campoFecha, etiqueta: 'la fecha de baja' });
+        }
+        if (campoResponsable && !campoResponsable.value) {
+            faltantes.push({
+                campo: campoResponsable,
+                etiqueta: 'el responsable de la petición'
+            });
+        }
+        if (campoMotivo && !campoMotivo.value.trim()) {
+            faltantes.push({ campo: campoMotivo, etiqueta: 'el motivo de baja' });
+        }
+
+        return faltantes;
+    }
+
+    function enfocarCampo(campo) {
+        // El responsable es un select2: abrir su buscador es mas util que
+        // enfocar el select original, que esta oculto.
+        if (campo === campoResponsable && window.jQuery && $(campo).data('select2')) {
+            $(campo).select2('open');
+            return;
+        }
+        campo.focus();
+    }
+
+    if (botonGenerar) {
+        botonGenerar.addEventListener('click', function (evento) {
+            const faltantes = datosFichaFaltantes();
+
+            if (!faltantes.length) {
+                return;
+            }
+
+            evento.preventDefault();
+            mostrarError(
+                'Complete '
+                + faltantes.map(function (dato) { return dato.etiqueta; }).join(', ')
+                + ' antes de generar la ficha.'
+            );
+            enfocarCampo(faltantes[0].campo);
+        });
+    }
+
+    // La baja es irreversible: crea el registro, deja el equipo en estado dado
+    // de baja y bloquea su edicion de forma permanente. Por eso se confirma
+    // nombrando el equipo concreto antes de enviar.
+    if (formularioBaja && botonConfirmar) {
+        let bajaConfirmada = false;
+
+        formularioBaja.addEventListener('submit', async function (evento) {
+            // "Regenerar ficha" envia este mismo formulario con su formaction
+            // propio; solo se intercepta la confirmacion de la baja.
+            if (evento.submitter !== botonConfirmar || bajaConfirmada) {
+                return;
+            }
+
+            evento.preventDefault();
+
+            // El input del archivo va oculto, asi que el navegador no puede
+            // senalarlo por su cuenta: se avisa aqui para que el boton nunca
+            // parezca muerto.
+            if (fichaFirmada && !fichaFirmada.files.length) {
+                mostrarError(
+                    'Adjunte la constancia firmada antes de confirmar la baja.'
+                );
+                if (selectorFicha) {
+                    selectorFicha.focus();
+                }
+                return;
+            }
+
+            const aceptado = await confirmarAccion(
+                'Confirmar baja definitiva',
+                'El equipo <strong>{{ dispositivo.codigo }}</strong> quedará dado de '
+                + 'baja de forma permanente: no podrá editarse ni volver a '
+                + 'asignarse. Esta acción no se puede deshacer.',
+                'Sí, dar de baja',
+                'Cancelar'
+            );
+
+            if (!aceptado) {
+                return;
+            }
+
+            bajaConfirmada = true;
+            formularioBaja.requestSubmit(botonConfirmar);
+            botonConfirmar.disabled = true;
+        });
+    }
+
     // Reutiliza el mismo buscador remoto del empleado a cargo. Así el
     // formulario no carga toda la tabla de RR. HH. en el HTML.
     const responsablePeticionSelect = $('#responsable_peticion_baja');
@@ -298,7 +411,7 @@ document.addEventListener('DOMContentLoaded', function () {
     ) {
         responsablePeticionSelect.select2({
             width: '100%',
-            placeholder: 'Buscar por ID, DNI o nombre',
+            placeholder: 'Buscar por DNI o nombre',
             minimumInputLength: 1,
             ajax: {
                 url: "{% url 'buscar_empleados_biomedicos' %}",
@@ -316,7 +429,7 @@ document.addEventListener('DOMContentLoaded', function () {
             },
             language: {
                 inputTooShort: function () {
-                    return 'Escriba el ID, DNI o nombre del empleado';
+                    return 'Escriba el DNI o nombre del empleado';
                 },
                 noResults: function () {
                     return 'No se encontraron empleados';

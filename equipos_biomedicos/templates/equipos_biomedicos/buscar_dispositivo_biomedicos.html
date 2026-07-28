@@ -20,40 +20,51 @@
         <div class="tituloFormulario-subrallado"></div>
     </div>
     <section class="biomedicos-busqueda">
-        <div>
-            <p class="biomedicos-etiqueta">Consulta rápida</p>
-            <h3>¿Qué equipo deseas encontrar?</h3>
-            <p>Busca por código interno, inventarios, número de serie, tipo, marca o modelo.</p>
-        </div>
-
         <form class="biomedicos-busqueda__formulario" method="get">
-            <label for="id_busqueda_dispositivo">Datos del equipo</label>
-            <div class="biomedicos-busqueda__campo">
-                <i class="bi bi-search"></i>
+            <label class="biomedicos-busqueda__titulo" for="id_busqueda_dispositivo">
+                Búsqueda rápida de equipo
+            </label>
+
+            <div class="biomedicos-busqueda__barra">
+                <i class="bi bi-search" aria-hidden="true"></i>
                 <input
                     class="formularioCampo-text"
                     id="id_busqueda_dispositivo"
                     name="q"
                     type="search"
                     value="{{ consulta }}"
-                    placeholder="Ej. DISP-00001, F/212300, monitor, serie o modelo"
+                    placeholder="Buscar por código interno, tipo, marca o color"
                     autocomplete="off"
                 >
-                <div class="biomedicos-listado__campo-icono biomedicos-busqueda__gestoria">
-                    <i class="bi bi-diagram-3"></i>
-                    <select class="formularioCampo-select" id="buscar_area_gestora" name="area_gestora">
-                        <option value="">Todas las gestorías</option>
-                        {% for area_gestora in area_gestora_choices %}
-                            <option value="{{ area_gestora.id }}" {% if filtros.area_gestora == area_gestora.id|stringformat:"s" %}selected{% endif %}>
-                                {{ area_gestora.nombre }}
-                            </option>
-                        {% endfor %}
-                    </select>
-                </div>
                 <button class="formularioBotones-boton biomedicos-busqueda__boton" type="submit">
                     <i class="bi bi-search"></i>
-                    Buscar
+                    <span>Buscar</span>
                 </button>
+            </div>
+
+            <div class="biomedicos-busqueda__inferior">
+                <p class="biomedicos-busqueda__ayuda">
+                    {% if consulta or filtros.area_gestora %}
+                        Los resultados de la consulta se muestran debajo.
+                    {% else %}
+                        Los resultados aparecerán aquí.
+                    {% endif %}
+                </p>
+
+                <div class="biomedicos-busqueda__filtro">
+                    <label for="buscar_area_gestora">Filtrar por:</label>
+                    <div class="biomedicos-listado__campo-icono biomedicos-busqueda__gestoria">
+                        <i class="bi bi-diagram-3"></i>
+                        <select class="formularioCampo-select" id="buscar_area_gestora" name="area_gestora">
+                            <option value="">Todas las gestorías</option>
+                            {% for area_gestora in area_gestora_choices %}
+                                <option value="{{ area_gestora.id }}" {% if filtros.area_gestora == area_gestora.id|stringformat:"s" %}selected{% endif %}>
+                                    {{ area_gestora.nombre }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
             </div>
         </form>
     </section>
@@ -137,7 +148,7 @@
                             <td class="biomedicos-listado__vacio" colspan="8">
                                 <i class="bi bi-inbox"></i>
                                 <strong>Sin resultados para “{{ consulta }}”</strong>
-                                <span>Prueba buscar por código, inventario, serie, tipo, marca o modelo.</span>
+                                <span>Prueba buscar por código interno, tipo, marca o color.</span>
                             </td>
                         </tr>
                     {% endfor %}
@@ -181,12 +192,6 @@
                 </div>
             {% endif %}
         </footer>
-    {% else %}
-        <div class="biomedicos-vacio centrar">
-            <i class="bi bi-upc-scan"></i>
-            <h3>Ingresa los datos del equipo</h3>
-            <p>Los resultados aparecerán en este espacio.</p>
-        </div>
     {% endif %}
 </div>
 {% endblock content %}

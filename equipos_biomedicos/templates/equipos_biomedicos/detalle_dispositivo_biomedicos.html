@@ -65,22 +65,14 @@
                 <i class="bi bi-calendar-plus"></i>
                 Registrar mantenimiento
             </button>
-            <a class="formularioBotones-boton biomedicos-detalle__boton biomedicos-detalle__boton--secundario"
-               href="{% url 'listado_dispositivos_biomedicos' %}">
-                <i class="bi bi-arrow-left"></i>
-                Listado de equipos
-            </a>
         </div>
     </section>
 
-    {# La ficha muestra las seis categorias sin afirmar que faltan cuando el
-       servidor remoto no esta disponible. #}
     <section class="biomedicos-imagenes biomedicos-imagenes--detalle"
              data-titulo-galeria="{{ dispositivo.codigo }}">
         <div class="biomedicos-imagenes__encabezado">
             <div>
                 <h3><i class="bi bi-images"></i> Fotografías del equipo</h3>
-                <p>Seleccione una miniatura para ampliar la fotografía.</p>
             </div>
             <span class="biomedicos-imagenes__contador">
                 {{ cantidad_imagenes }} de 6

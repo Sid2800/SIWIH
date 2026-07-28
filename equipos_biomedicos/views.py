@@ -331,20 +331,18 @@ def _obtener_dispositivos_base():
 
 
 def _aplicar_busqueda_dispositivos(dispositivos, consulta):
-    # Busqueda flexible: tipo, marca, modelo, serie, inventarios o id numerico.
+    # Busqueda base por identificadores y catalogos principales.
     if not consulta:
         return dispositivos
 
     filtro_busqueda = (
         Q(tipo__nombre__icontains=consulta)
         | Q(marca__nombre__icontains=consulta)
-        | Q(modelo__nombre__icontains=consulta)
-        | Q(area_gestora__nombre__icontains=consulta)
         | Q(color__nombre__icontains=consulta)
-        | Q(numero_serie__icontains=consulta)
         | Q(inventario_bienes_nacionales__icontains=consulta)
         | Q(inventario_numero_ficha__icontains=consulta)
     )
+
     codigo_numerico = "".join(caracter for caracter in consulta if caracter.isdigit())
 
     if codigo_numerico:
@@ -688,12 +686,9 @@ def editar_dispositivo(request, dispositivo_id):
             "titulo_formulario": "Editar equipo",
             "icono_formulario": "bi bi-pencil-square",
             "texto_boton_guardar": "Actualizar equipo",
-            "url_regresar": reverse(
-                "detalle_dispositivo_biomedicos",
-                kwargs={"dispositivo_id": dispositivo.id},
-            ),
+            "url_regresar": reverse("listado_dispositivos_biomedicos"),
             "estado_label": "Estado *",
-            "texto_regresar": "Detalle del equipo",
+            "texto_regresar": "Listado de equipos",
             "imagen_form": imagen_form,
             "url_agregar_imagen": reverse(
                 "agregar_imagen_dispositivo_biomedicos",
@@ -907,9 +902,23 @@ def ficha_baja_dispositivo_pdf(request, dispositivo_id):
         # El PDF se genera antes de tener la fotografia firmada.
         form = BajaDispositivoForm(request.POST, requiere_ficha=False)
         if not form.is_valid():
+            # El boton de la ficha abre pestaña nueva, asi que una respuesta de
+            # texto plano dejaba una pestaña en blanco con la cadena cruda. El
+            # formulario ya valida en cliente; esto es solo la red de seguridad.
             return HttpResponseBadRequest(
-                "Complete la fecha, el responsable y el motivo para generar "
-                "la ficha."
+                "<!doctype html><html lang='es'><head><meta charset='utf-8'>"
+                "<title>Datos incompletos</title></head>"
+                "<body style='font-family:system-ui,sans-serif;padding:2.5rem;"
+                "line-height:1.6;color:#7f1d1d'>"
+                "<h1 style='font-size:1.25rem;margin:0 0 .75rem'>"
+                "Faltan datos para generar la ficha</h1>"
+                "<p style='margin:0 0 .5rem;color:#333'>Complete la fecha de "
+                "baja, el responsable de la petición y el motivo antes de "
+                "generar la ficha.</p>"
+                "<p style='margin:0;color:#333'>Puede cerrar esta pestaña y "
+                "volver al trámite.</p>"
+                "</body></html>",
+                content_type="text/html; charset=utf-8",
             )
         fecha_baja = form.cleaned_data["fecha_baja"]
         motivo = form.cleaned_data["motivo"]
@@ -921,12 +930,17 @@ def ficha_baja_dispositivo_pdf(request, dispositivo_id):
         responsable_peticion = None
         habitacion_estancia = ""
 
-    # La orden se crea solamente cuando los datos necesarios para la ficha
-    # son válidos. Las siguientes impresiones recuperan esta misma fila.
-    orden_trabajo = _obtener_o_crear_orden_trabajo_baja(
-        dispositivo,
-        request.user,
-    )
+    # Solo reservan correlativo el POST con datos validos (el usuario esta
+    # generando la ficha de verdad) y la reimpresion de una baja ya registrada.
+    # Un GET es previsualizacion en blanco: abrir la URL a mano, un crawler o
+    # el preview de un enlace no deben quemar un numero de orden.
+    if baja_dispositivo or request.method == "POST":
+        orden_trabajo = _obtener_o_crear_orden_trabajo_baja(
+            dispositivo,
+            request.user,
+        )
+    else:
+        orden_trabajo = _obtener_orden_trabajo_baja(dispositivo)
 
     return FichaBajaPdfService.generar(
         dispositivo=dispositivo,
@@ -936,7 +950,9 @@ def ficha_baja_dispositivo_pdf(request, dispositivo_id):
         motivo=motivo,
         responsable_peticion=responsable_peticion,
         habitacion_estancia=habitacion_estancia,
-        numero_orden_trabajo=orden_trabajo.numero_orden,
+        numero_orden_trabajo=(
+            orden_trabajo.numero_orden if orden_trabajo else "SIN ASIGNAR"
+        ),
     )
 
 
@@ -1069,15 +1085,14 @@ def buscar_empleados(request):
 
         )
 
-        if termino.isdigit():
-            filtro |= Q(pk=int(termino))
-
         empleados = empleados.filter(filtro)
 
     resultados = [
         {
+            # Select2 necesita la PK como valor interno, pero no se muestra ni
+            # se utiliza como criterio de búsqueda.
             "id": empleado.id,
-            "text": f"{empleado.id} | {empleado.dni} - {empleado.nombre_completo}",
+            "text": f"{empleado.dni} - {empleado.nombre_completo}",
         }
         for empleado in empleados.order_by(
             "primer_nombre",

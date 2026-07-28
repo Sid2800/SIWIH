@@ -196,6 +196,22 @@ class EquiposBiomedicosViewsTests(TestCase):
 
                 self.assertEqual(respuesta.status_code, 200)
 
+    def test_inicio_solo_muestra_opciones_del_inventario(self):
+        respuesta = self.client.get(reverse("inicio_biomedicos"))
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertContains(respuesta, "Registrar equipo")
+        self.assertContains(respuesta, "Listado de equipos")
+        self.assertContains(respuesta, "Buscar equipo")
+        self.assertEqual(
+            respuesta.content.decode().count(
+                '<section class="biomedicos-submenu">'
+            ),
+            1,
+        )
+        self.assertNotContains(respuesta, "Registrar mantenimiento")
+        self.assertNotContains(respuesta, "Reporte de inventario")
+
     def test_vistas_de_imagenes_cargan_herramientas_multimedia(self):
         # Estos helpers crean el modal de recorte y el visor compartido. Si una
         # plantilla reemplaza extra_js, los botones de imagen quedan inactivos.
@@ -228,6 +244,53 @@ class EquiposBiomedicosViewsTests(TestCase):
                     respuesta,
                     "core/scripts/media/visorImageHelper.js",
                 )
+
+    def test_busqueda_empleados_solo_consulta_dni_y_nombre(self):
+        url = reverse("buscar_empleados_biomedicos")
+
+        respuesta_dni = self.client.get(
+            url,
+            {"q": self.responsable_original.dni},
+        )
+        respuesta_nombre = self.client.get(url, {"q": "Ana Lopez"})
+
+        self.assertEqual(respuesta_dni.status_code, 200)
+        self.assertEqual(respuesta_nombre.status_code, 200)
+        self.assertEqual(
+            respuesta_dni.json()["results"][0],
+            {
+                "id": self.responsable_original.id,
+                "text": (
+                    f"{self.responsable_original.dni} - "
+                    f"{self.responsable_original.nombre_completo}"
+                ),
+            },
+        )
+        self.assertIn(
+            self.responsable_original.id,
+            [
+                resultado["id"]
+                for resultado in respuesta_nombre.json()["results"]
+            ],
+        )
+
+        empleado_solo_por_id = Empleado.objects.create(
+            dni="9999999999999",
+            primer_nombre="Zoe",
+            primer_apellido="Prueba",
+            estado=EstadoRegistro.ACTIVO,
+            creado_por=self.usuario,
+            modificado_por=self.usuario,
+        )
+        respuesta_id = self.client.get(url, {"q": str(empleado_solo_por_id.id)})
+
+        self.assertNotIn(
+            empleado_solo_por_id.id,
+            [
+                resultado["id"]
+                for resultado in respuesta_id.json()["results"]
+            ],
+        )
 
     def test_detalle_inexistente_responde_404(self):
         respuesta = self.client.get(
@@ -1118,6 +1181,61 @@ class EquiposBiomedicosViewsTests(TestCase):
 
         self.assertNotContains(respuesta_default, self.dispositivo.codigo)
         self.assertContains(respuesta_filtrada, self.dispositivo.codigo)
+
+    def test_buscador_listado_excluye_serie_modelo_y_area_gestora(self):
+        url = reverse("listado_dispositivos_biomedicos")
+
+        for consulta in (
+            self.dispositivo.numero_serie,
+            self.modelo.nombre,
+            self.area_gestora.nombre,
+        ):
+            with self.subTest(consulta=consulta):
+                respuesta = self.client.get(url, {"q": consulta})
+
+                self.assertEqual(respuesta.status_code, 200)
+                self.assertNotContains(respuesta, self.dispositivo.codigo)
+
+    def test_buscador_listado_mantiene_campos_principales(self):
+        url = reverse("listado_dispositivos_biomedicos")
+
+        for consulta in (
+            self.dispositivo.codigo,
+            self.tipo.nombre,
+            self.marca.nombre,
+            self.color.nombre,
+        ):
+            with self.subTest(consulta=consulta):
+                respuesta = self.client.get(url, {"q": consulta})
+
+                self.assertEqual(respuesta.status_code, 200)
+                self.assertContains(respuesta, self.dispositivo.codigo)
+
+    def test_busqueda_equipo_usa_los_mismos_campos_que_el_listado(self):
+        url = reverse("buscar_dispositivo_biomedicos")
+
+        for consulta in (
+            self.dispositivo.numero_serie,
+            self.modelo.nombre,
+            self.area_gestora.nombre,
+        ):
+            with self.subTest(campo_excluido=consulta):
+                respuesta = self.client.get(url, {"q": consulta})
+
+                self.assertEqual(respuesta.status_code, 200)
+                self.assertNotContains(respuesta, self.dispositivo.codigo)
+
+        for consulta in (
+            self.dispositivo.codigo,
+            self.tipo.nombre,
+            self.marca.nombre,
+            self.color.nombre,
+        ):
+            with self.subTest(campo_permitido=consulta):
+                respuesta = self.client.get(url, {"q": consulta})
+
+                self.assertEqual(respuesta.status_code, 200)
+                self.assertContains(respuesta, self.dispositivo.codigo)
 
     def test_busqueda_conserva_la_consulta(self):
         respuesta = self.client.get(

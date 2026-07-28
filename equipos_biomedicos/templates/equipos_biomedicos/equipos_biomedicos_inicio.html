@@ -14,10 +14,10 @@
     </div>
 
     <p class="biomedicos-descripcion">
-        Selecciona una opción para gestionar los equipos del hospital.
+        Gestiona el registro y la consulta del inventario de equipos del hospital.
     </p>
 
-    {# Acceso directo a la busqueda, camara no se implemetara!!!!!!. #}
+    {# Acceso directo a la búsqueda general del inventario. #}
     <div class="biomedicos-acciones-rapidas">
         <a class="formularioBotones-boton biomedicos-accion-rapida"
             href="{% url 'buscar_dispositivo_biomedicos' %}">
@@ -26,7 +26,7 @@
         </a>
     </div>
 
-    {# Submenus internos del modulo Las opciones desactivadas son etapas futuras. #}
+    {# El módulo se limita actualmente a la gestión del inventario de equipos. #}
     <div class="biomedicos-submenus">
         <section class="biomedicos-submenu">
             <header class="biomedicos-submenu__encabezado">
@@ -35,8 +35,6 @@
                 </span>
                 <h3>INVENTARIO</h3>
             </header>
-                {# Redirigiendo a la página de registro de dispositivos biomedicos. #}
-
 
             <div class="biomedicos-submenu__opciones">
                 <a class="biomedicos-submenu__opcion"
@@ -53,75 +51,6 @@
                 </a>
             </div>
         </section>
-
-        <section class="biomedicos-submenu">
-            <header class="biomedicos-submenu__encabezado">
-                <span class="biomedicos-submenu__icono">
-                    <i class="bi bi-tools"></i>
-                </span>
-                <h3>MANTENIMIENTO</h3>
-            </header>
-
-            <div class="biomedicos-submenu__opciones">
-                <span class="biomedicos-submenu__opcion controles_clic_desactivados texto_desactivados">
-                    <i class="bi bi-plus-square"></i>
-                    <span>Registrar mantenimiento</span>
-                </span>
-                <span class="biomedicos-submenu__opcion controles_clic_desactivados texto_desactivados">
-                    <i class="bi bi-calendar3"></i>
-                    <span>Programar mantenimiento</span>
-                </span>
-                <span class="biomedicos-submenu__opcion controles_clic_desactivados texto_desactivados">
-                    <i class="bi bi-clock"></i>
-                    <span>Mantenimientos pendientes</span>
-                </span>
-                <span class="biomedicos-submenu__opcion controles_clic_desactivados texto_desactivados">
-                    <i class="bi bi-file-earmark-text"></i>
-                    <span>Historial de mantenimiento</span>
-                </span>
-                <span class="biomedicos-submenu__opcion controles_clic_desactivados texto_desactivados">
-                    <i class="bi bi-bell"></i>
-                    <span>Alertas y vencimientos</span>
-                </span>
-            </div>
-        </section>
-
-        <section class="biomedicos-submenu">
-            <header class="biomedicos-submenu__encabezado">
-                <span class="biomedicos-submenu__icono">
-                    <i class="bi bi-bar-chart-line"></i>
-                </span>
-                <h3>REPORTES</h3>
-            </header>
-
-            <div class="biomedicos-submenu__opciones">
-                <span class="biomedicos-submenu__opcion controles_clic_desactivados texto_desactivados">
-                    <i class="bi bi-file-earmark-bar-graph"></i>
-                    <span>Reporte de inventario</span>
-                </span>
-                <span class="biomedicos-submenu__opcion controles_clic_desactivados texto_desactivados">
-                    <i class="bi bi-file-earmark-medical"></i>
-                    <span>Reporte de mantenimiento</span>
-                </span>
-                <span class="biomedicos-submenu__opcion controles_clic_desactivados texto_desactivados">
-                    <i class="bi bi-exclamation-triangle"></i>
-                    <span>Reporte de fallas</span>
-                </span>
-                <span class="biomedicos-submenu__opcion controles_clic_desactivados texto_desactivados">
-                    <i class="bi bi-currency-dollar"></i>
-                    <span>Reporte de costos</span>
-                </span>
-                <span class="biomedicos-submenu__opcion controles_clic_desactivados texto_desactivados">
-                    <i class="bi bi-shield-check"></i>
-                    <span>Garantías por vencer</span>
-                </span>
-            </div>
-        </section>
     </div>
-
-    <p class="biomedicos-ayuda">
-        <i class="bi bi-info-circle"></i>
-        MODULO EN DESARROLLO Y ABIERTOS A CAMBIOS.........................
-    </p>
 </div>
 {% endblock content %}

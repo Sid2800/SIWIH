@@ -42,7 +42,7 @@ const UnidadClinicaLoader = (function () {
          select.innerHTML = '';
 
          // placeholder
-         select.appendChild(new Option("SELECCIONE UBICACIÓN", ""));
+         select.appendChild(new Option("SELECCIONE UBICACIÓN", "")); 
 
          if (Array.isArray(data) && data.length > 0) {
 

@@ -2,8 +2,8 @@
 
 ## Eliminacion definitiva de equipos
 
-- Implementar una accion administrativa distinta de "dar de baja".
-- Reservarla para registros duplicados, pruebas o errores de captura.
+
+
 - Mostrarla solo a administradores con un permiso especifico.
 - Solicitar confirmacion y motivo obligatorio.
 - Impedir la eliminacion si el equipo tiene mantenimientos u otro historial que deba conservarse.
