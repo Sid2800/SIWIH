@@ -115,17 +115,17 @@ function renderKPIs(r) {
 function renderAreas(data) {
     let html = '';
     (data || []).forEach(function (a) {
-        html += `<tr><td>${a.area_destino || 'Sin especificar'}</td><td><strong>${a.total}</strong></td></tr>`;
+        html += `<tr><td>${a.area_destino || 'Sin especificar'}</td><td><strong>${a.total}</strong></td><td><strong>${a.expedientes}</strong></td></tr>`;
     });
-    $('#tbody-areas').html(html || '<tr><td colspan="2" style="opacity:0.5;">Sin datos</td></tr>');
+    $('#tbody-areas').html(html || '<tr><td colspan="3" style="opacity:0.5;">Sin datos</td></tr>');
 }
 
 function renderMotivos(data) {
     let html = '';
     (data || []).forEach(function (m) {
-        html += `<tr><td>${m.nombre || 'Sin especificar'}</td><td><strong>${m.total}</strong></td></tr>`;
+        html += `<tr><td>${m.nombre || 'Sin especificar'}</td><td><strong>${m.total}</strong></td><td><strong>${m.expedientes}</strong></td></tr>`;
     });
-    $('#tbody-motivos').html(html || '<tr><td colspan="2" style="opacity:0.5;">Sin datos</td></tr>');
+    $('#tbody-motivos').html(html || '<tr><td colspan="3" style="opacity:0.5;">Sin datos</td></tr>');
 }
 
 function renderExpedientesTop(data) {

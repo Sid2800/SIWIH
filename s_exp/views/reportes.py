@@ -102,18 +102,24 @@ def reportes_data_api(request):
         # La unidad ahora es relacional (servicio_unidad FK). Agrupamos por el
         # nombre de la unidad consultado en vivo, en lugar del antiguo texto
         # area_destino (eliminado en el refactor relacional).
+        # 'total' = nº de solicitudes; 'expedientes' = nº de expedientes pedidos
+        # (detalles). Al agrupar y unir con 'detalles', cada solicitud aparece una
+        # vez por cada expediente, por eso el conteo de solicitudes va con
+        # distinct=True (si no, quedaría inflado); el de detalles sí es directo.
         demanda_area = list(
             qs_solicitudes.values(
                 area_destino=F('servicio_unidad__nombre_unidad')
             ).annotate(
-                total=Count('id')
+                total=Count('id', distinct=True),
+                expedientes=Count('detalles')
             ).order_by('-total')
         )
 
         # --- MOTIVOS DE USO ---
         motivos = list(
             qs_solicitudes.values(nombre=F('motivo__nombre')).annotate(
-                total=Count('id')
+                total=Count('id', distinct=True),
+                expedientes=Count('detalles')
             ).order_by('-total')[:10]
         )
 
