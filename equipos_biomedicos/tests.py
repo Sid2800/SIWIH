@@ -328,6 +328,46 @@ class EquiposBiomedicosViewsTests(TestCase):
         self.assertContains(respuesta, "1 de 6")
         self.obtener_imagenes_mock.assert_called_once_with(self.dispositivo.id)
 
+    @patch(
+        "core.views.RequestService.obtener_archivo_media_equipo",
+        return_value={
+            "contenido": b"foto-equipo",
+            "content_type": "image/webp",
+            "etag": '"foto-general"',
+        },
+    )
+    def test_proxy_media_equipo_sirve_imagen_con_sesion(
+        self,
+        mock_obtener_archivo,
+    ):
+        respuesta = self.client.get(
+            reverse(
+                "media_equipo_proxy",
+                kwargs={"ruta_archivo": "2026/07/general.webp"},
+            )
+        )
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(respuesta.content, b"foto-equipo")
+        self.assertEqual(respuesta["Content-Type"], "image/webp")
+        self.assertEqual(respuesta["ETag"], '"foto-general"')
+        self.assertEqual(respuesta["Cache-Control"], "private, max-age=300")
+        mock_obtener_archivo.assert_called_once_with(
+            "EQUIPOS/2026/07/general.webp"
+        )
+
+    def test_proxy_media_equipo_exige_inicio_de_sesion(self):
+        self.client.logout()
+        url = reverse(
+            "media_equipo_proxy",
+            kwargs={"ruta_archivo": "2026/07/general.webp"},
+        )
+
+        respuesta = self.client.get(url)
+
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertTrue(respuesta["Location"].startswith("/login/?next="))
+
     def test_detalle_sin_imagen_muestra_marcador(self):
         respuesta = self.client.get(
             reverse(

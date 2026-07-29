@@ -23,6 +23,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 IMAGE_SERVER_URL = os.getenv("IMAGE_SERVER_URL")
 IMAGE_SERVER_USER = os.getenv("IMAGE_SERVER_USER")
 IMAGE_SERVER_PASSWORD = os.getenv("IMAGE_SERVER_PASSWORD")
+EQUIPOS_QR_BASE_URL = os.getenv("EQUIPOS_QR_BASE_URL", "")
 
 
 
@@ -35,7 +36,19 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True if os.getenv("DEBUG", "0") == "1" else False
 
-ALLOWED_HOSTS = ['SIWIH', '127.0.0.1', '192.168.88.8', '192.168.88.28', '192.168.88.173', '100.84.35.113']
+# En desarrollo la IP puede cambiar entre redes. El script de demostracion
+# define ALLOWED_HOSTS sin obligar a guardar una IP temporal en el repositorio.
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.getenv(
+        "ALLOWED_HOSTS",
+        (
+            "SIWIH,localhost,127.0.0.1,"
+            "192.168.88.8,192.168.88.28,192.168.88.173,100.84.35.113"
+        ),
+    ).split(",")
+    if host.strip()
+]
 
 # Application definition
 

@@ -116,6 +116,51 @@ class RequestServiceEquiposTests(SimpleTestCase):
         )
 
     @patch(
+        "core.services.server_image.request_service.requests.get"
+    )
+    @patch(
+        "core.services.server_image.request_service.traer_server_token",
+        return_value="jwt-prueba",
+    )
+    def test_obtener_archivo_media_equipo_descarga_con_jwt(
+        self,
+        mock_token,
+        mock_get,
+    ):
+        respuesta = Mock(
+            status_code=200,
+            content=b"imagen-webp",
+            headers={
+                "Content-Type": "image/webp",
+                "ETag": '"equipo-19"',
+            },
+        )
+        mock_get.return_value = respuesta
+
+        resultado = RequestService.obtener_archivo_media_equipo(
+            "EQUIPOS/2026/07/equipo 19.webp"
+        )
+
+        self.assertEqual(resultado["contenido"], b"imagen-webp")
+        self.assertEqual(resultado["content_type"], "image/webp")
+        self.assertEqual(resultado["etag"], '"equipo-19"')
+        mock_token.assert_called_once_with()
+        mock_get.assert_called_once_with(
+            "http://imagenes.test/media/EQUIPOS/2026/07/equipo%2019.webp",
+            headers={"Authorization": "Bearer jwt-prueba"},
+            timeout=10,
+        )
+
+    def test_obtener_archivo_media_equipo_rechaza_recorrido_directorios(self):
+        with self.assertRaisesMessage(
+            ValueError,
+            "Ruta de imagen de equipo no valida",
+        ):
+            RequestService.obtener_archivo_media_equipo(
+                "EQUIPOS/../USUARIOS/avatar.webp"
+            )
+
+    @patch(
         "core.services.server_image.request_service.requests.post"
     )
     @patch(
@@ -221,7 +266,7 @@ class MediaServiceEquiposTests(SimpleTestCase):
         self.assertEqual(resultado["imagen"]["dispositivo_id"], 19)
 
     @patch.object(RequestService, "consultar_imagenes_dispositivo")
-    def test_obtener_imagenes_dispositivo_construye_urls_absolutas(
+    def test_obtener_imagenes_dispositivo_construye_urls_del_siwih_actual(
         self,
         mock_consultar,
     ):
@@ -242,11 +287,11 @@ class MediaServiceEquiposTests(SimpleTestCase):
         self.assertFalse(servidor_inactivo)
         self.assertEqual(
             imagenes[0]["url"],
-            "http://imagenes.test/media/EQUIPOS/equipo.webp",
+            "/media/equipos/equipo.webp",
         )
         self.assertEqual(
             imagenes[0]["miniatura"],
-            "http://imagenes.test/media/EQUIPOS/thumb_equipo.webp",
+            "/media/equipos/thumb_equipo.webp",
         )
 
     @patch.object(RequestService, "subir_ficha_baja_dispositivo")
@@ -281,7 +326,7 @@ class MediaServiceEquiposTests(SimpleTestCase):
         self.assertEqual(resultado["ficha"]["dispositivo_id"], 19)
 
     @patch.object(RequestService, "consultar_ficha_baja_dispositivo")
-    def test_obtener_ficha_baja_construye_urls_absolutas(
+    def test_obtener_ficha_baja_construye_urls_del_siwih_actual(
         self,
         mock_consultar,
     ):
@@ -302,9 +347,9 @@ class MediaServiceEquiposTests(SimpleTestCase):
         self.assertFalse(servidor_inactivo)
         self.assertEqual(
             ficha["url"],
-            "http://imagenes.test/media/EQUIPOS/BAJAS/ficha.webp",
+            "/media/equipos/BAJAS/ficha.webp",
         )
         self.assertEqual(
             ficha["miniatura"],
-            "http://imagenes.test/media/EQUIPOS/BAJAS/thumb_ficha.webp",
+            "/media/equipos/BAJAS/thumb_ficha.webp",
         )

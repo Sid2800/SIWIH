@@ -1,13 +1,16 @@
 from django.shortcuts import render
 from django.views.generic.base import TemplateView
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import LoginView
 from core.forms import CustomLoginForm
 from core.mixins import UnidadRolRequiredMixin
 from django.urls import reverse_lazy, reverse
 from django.shortcuts import get_object_or_404, redirect
+from django.http import Http404, HttpResponse
 from core.constants import permisos
 from core.services.usuario_service import UsuarioService
 from core.services.server_image.media_service import MediaService
+from core.services.server_image.request_service import RequestService
 
 # Create your views here.
 class HomePageView(TemplateView):
@@ -50,4 +53,31 @@ class CustomLoginView(LoginView):
       self.request.session["url_imagen_usuario"] = url
 
 
-      return super().form_valid(form)   
+      return super().form_valid(form)
+
+
+@login_required
+def media_equipo_proxy(request, ruta_archivo):
+   """Sirve fotos de equipos usando la sesion y el host del SIWIH principal."""
+   try:
+      archivo = RequestService.obtener_archivo_media_equipo(
+         f"EQUIPOS/{ruta_archivo}"
+      )
+   except ValueError as exc:
+      raise Http404("Imagen de equipo no valida") from exc
+   except RuntimeError:
+      # El navegador recibe un estado temporal sin revelar la direccion ni
+      # detalles internos del servidor de imagenes.
+      return HttpResponse(status=503)
+
+   response = HttpResponse(
+      archivo["contenido"],
+      content_type=archivo["content_type"],
+   )
+   response["Cache-Control"] = "private, max-age=300"
+   response["X-Content-Type-Options"] = "nosniff"
+
+   if archivo.get("etag"):
+      response["ETag"] = archivo["etag"]
+
+   return response

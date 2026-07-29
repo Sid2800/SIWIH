@@ -15,7 +15,9 @@ from core.constants.image_server_enpoints import (
 from core.constants.media_constants  import AppValida, OrigenValido, TipoPaciente
 from django.conf import settings
 import json
+from pathlib import PurePosixPath
 from types import SimpleNamespace
+from urllib.parse import quote
 import requests
 from core.constants.domain_constants import LogApp
 from core.utils.utilidades_logging import *
@@ -479,6 +481,54 @@ class RequestService:
             raise ValueError("dispositivo_id debe ser un entero positivo")
 
         return dispositivo_id
+
+    @staticmethod
+    def obtener_archivo_media_equipo(ruta_archivo):
+        """Descarga una foto de EQUIPOS para servirla desde SIWIH principal."""
+        ruta = str(ruta_archivo or "").replace("\\", "/").lstrip("/")
+        partes = PurePosixPath(ruta).parts
+
+        # El proxy solo puede consultar archivos de equipos. Esta validacion
+        # evita usar la ruta para recorrer directorios o leer otros modulos.
+        if (
+            len(partes) < 2
+            or partes[0] != "EQUIPOS"
+            or any(parte in {"", ".", ".."} for parte in partes)
+        ):
+            raise ValueError("Ruta de imagen de equipo no valida")
+
+        ruta_codificada = quote("/".join(partes), safe="/")
+        url = (
+            f"{settings.IMAGE_SERVER_URL.rstrip('/')}"
+            f"/media/{ruta_codificada}"
+        )
+        token = traer_server_token()
+
+        try:
+            response = requests.get(
+                url,
+                headers={"Authorization": f"Bearer {token}"},
+                timeout=10,
+            )
+        except requests.exceptions.RequestException as exc:
+            raise RuntimeError(
+                f"Error conexion al descargar imagen de equipo: {exc}"
+            ) from exc
+
+        if response.status_code >= 400:
+            raise RuntimeError(
+                "Error al descargar imagen de equipo "
+                f"status={response.status_code}"
+            )
+
+        return {
+            "contenido": response.content,
+            "content_type": response.headers.get(
+                "Content-Type",
+                "application/octet-stream",
+            ),
+            "etag": response.headers.get("ETag"),
+        }
 
     @staticmethod
     def subir_imagen_dispositivo(peticion_dict):

@@ -7,12 +7,31 @@ from django.core.exceptions import ValidationError
 from core.exceptions import EvaluacionDominioError
 from core.validators.main_validator import validar_entero_positivo
 from django.conf import settings
+from django.urls import reverse
+from urllib.parse import urlsplit
 from core.constants.domain_constants import LogApp
 from core.utils.utilidades_logging import *
 
 
 
 class MediaService:
+
+    @staticmethod
+    def _construir_url_proxy_equipo(valor):
+        """Convierte una ruta de Images en una URL relativa del SIWIH actual."""
+        if not valor:
+            return valor
+
+        ruta = urlsplit(valor).path
+        prefijo = "/media/EQUIPOS/"
+        if not ruta.startswith(prefijo):
+            return valor
+
+        ruta_archivo = ruta[len(prefijo):]
+        return reverse(
+            "media_equipo_proxy",
+            kwargs={"ruta_archivo": ruta_archivo},
+        )
 
     @staticmethod
     def _obtener_nombre_estudio(id_estudio):
@@ -464,10 +483,9 @@ class MediaService:
             for imagen in imagenes:
                 for campo in ("url", "miniatura"):
                     valor = imagen.get(campo)
-                    if valor and valor.startswith("/"):
-                        imagen[campo] = (
-                            f"{settings.IMAGE_SERVER_URL}{valor}"
-                        )
+                    imagen[campo] = (
+                        MediaService._construir_url_proxy_equipo(valor)
+                    )
 
             return imagenes, False
         except Exception as exc:
@@ -526,8 +544,9 @@ class MediaService:
             if ficha:
                 for campo in ("url", "miniatura"):
                     valor = ficha.get(campo)
-                    if valor and valor.startswith("/"):
-                        ficha[campo] = f"{settings.IMAGE_SERVER_URL}{valor}"
+                    ficha[campo] = (
+                        MediaService._construir_url_proxy_equipo(valor)
+                    )
 
             return ficha, False
         except Exception as exc:
