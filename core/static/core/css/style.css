@@ -4850,15 +4850,6 @@ a.equipos-submenu__opcion:hover {
    white-space: nowrap;
 }
 
-.equipos-etiqueta {
-   color: var(--colorTextoMenu);
-   font-size: 1.3rem;
-   font-weight: 700;
-   letter-spacing: .12rem;
-   margin-bottom: .5rem;
-   text-transform: uppercase;
-}
-
 .equipos-busqueda {
    background-color: var(--blanco);
    border: .1rem solid var(--colorLinea);
@@ -4961,29 +4952,6 @@ a.equipos-submenu__opcion:hover {
 .equipos-busqueda__boton i {
    font-size: 2rem;
    padding-top: 0;
-}
-
-.equipos-vacio {
-   align-items: center;
-   border: .2rem dashed var(--colorLinea);
-   border-radius: 1.5rem;
-   color: var(--colorTextoMenu);
-   display: flex;
-   flex-direction: column;
-   justify-content: center;
-   min-height: 24rem;
-   padding: 3rem;
-}
-
-.equipos-vacio i {
-   font-size: 5rem;
-   margin-bottom: 1rem;
-}
-
-.equipos-vacio h3 {
-   color: var(--negro);
-   font-size: 2rem;
-   margin-bottom: .5rem;
 }
 
 @media (max-width: 650px) {
@@ -5988,12 +5956,6 @@ table.dataTable tbody td.equipos-listado__vacio {
    padding: .8rem 1rem;
    text-transform: none;
    width: auto;
-}
-
-.equipos-detalle__boton--secundario {
-   background-color: var(--blanco);
-   border: .1rem solid var(--colorTablaceldaBorde);
-   color: var(--negro);
 }
 
 .equipos-baja__boton {
