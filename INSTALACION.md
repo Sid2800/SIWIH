@@ -53,8 +53,8 @@ python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-Incluye: Django 5.2, mysqlclient, reportlab, openpyxl, pillow, pyodbc,
-python-dotenv, gunicorn, etc.
+Incluye: Django 5.2, mysqlclient, reportlab, openpyxl, Pillow, pyodbc,
+python-dotenv, requests, qrcode y gunicorn, entre otras dependencias.
 
 > Si falla **mysqlclient**: usa Python 64-bit (instala el wheel solo).
 > Si falla **pyodbc**: instala el ODBC Driver de SQL Server (paso 1).
@@ -69,7 +69,8 @@ El `.env` **no viene en el repo** (está en `.gitignore`). Créalo en la raíz
 ```env
 SECRET_KEY=pon-una-clave-larga-y-secreta
 DEBUG=0
-ENVIRONMENT=local
+ENVIRONMENT=development
+ALLOWED_HOSTS=localhost,127.0.0.1
 
 # Base de datos principal (MySQL) — IMPRESCINDIBLE
 DB_DEFAULT_NAME=nombre_bd
@@ -98,14 +99,25 @@ DB_BITLESP_HOST=
 DB_BITLESP_PORT=1433
 
 # Servidor de imágenes
-IMAGE_SERVER_URL=
+IMAGE_SERVER_URL=http://127.0.0.1:8001
 IMAGE_SERVER_USER=
 IMAGE_SERVER_PASSWORD=
+
+# URL pública usada al generar los QR de equipos
+EQUIPOS_QR_BASE_URL=
 ```
 
 - **Mínimo para arrancar:** `SECRET_KEY` + el bloque `DB_DEFAULT_*`.
 - **`DEBUG=0`** en producción (deja `1` solo para desarrollo local).
-- Si tu host/IP no está en `ALLOWED_HOSTS` (en `SIWI/settings.py`), agrégalo.
+- Usa `ENVIRONMENT=development` en desarrollo. En producción utiliza un valor
+  distinto, por ejemplo `production`, para que Django emplee `STATIC_ROOT`.
+- Agrega a `ALLOWED_HOSTS` los nombres o IP desde los que se accederá a SIWIH,
+  separados por comas. No es necesario modificar `SIWI/settings.py`.
+- `IMAGE_SERVER_URL`, `IMAGE_SERVER_USER` e `IMAGE_SERVER_PASSWORD` son
+  obligatorios para consultar y cargar fotografías de equipos.
+- En producción, `EQUIPOS_QR_BASE_URL` debe contener la dirección estable de
+  SIWIH, por ejemplo `https://siwih.hospital.local`. En desarrollo puede quedar
+  vacío y el sistema utilizará la dirección de la solicitud actual.
 
 ---
 
@@ -133,25 +145,6 @@ Esto deja listo **automáticamente, sin scripts SQL**:
   acción y de objeto, y los **16 motivos** (migración `s_exp/0002_datos_iniciales`).
 - `expediente_ubicacion` poblado desde las unidades de servicio (migración
   `expediente/0009`).
-
-### Actualización desde `equipos_biomedicos`
-
-Este paso se ejecuta **una sola vez** únicamente en bases existentes que ya
-tenían instalado el módulo con el nombre interno `equipos_biomedicos`.
-Debe realizarse antes del `migrate` general:
-
-```bat
-python manage.py migrar_app_equipos --dry-run
-python manage.py migrar_app_equipos
-python manage.py migrate
-```
-
-El comando cambia el nombre de la app en el historial de migraciones y en los
-`ContentType` de Django. No borra ni modifica equipos, asignaciones, bajas,
-órdenes de trabajo, catálogos o imágenes.
-
-En una instalación nueva no hace falta ejecutar este comando; basta con
-`python manage.py migrate`.
 
 ---
 
@@ -201,8 +194,17 @@ SIWIH es un sistema hospitalario modular (Django). Apps principales:
 - **servicio** — catálogo de unidades (clínicas y no clínicas), camas.
 - **mapeo_camas** — mapa y dashboard de ocupación de camas.
 - **rrhh / usuario** — empleados y permisos por unidad (`PerfilUnidad`).
+- **equipos** — inventario, ubicación, responsables, fotografías, QR y proceso
+  administrativo de baja de equipos.
 - **s_exp (Préstamo de Expedientes)** — solicitar, aprobar, entregar, devolver y
   reportar préstamos de expedientes físicos.
+
+### Imágenes de equipos
+
+Las fotografías no se guardan en la base principal de SIWIH. El módulo
+`equipos` envía y consulta las imágenes mediante la API de SIWIH Images,
+utilizando las credenciales `IMAGE_SERVER_*`. La base principal conserva el
+equipo y SIWIH Images relaciona cada fotografía mediante el `dispositivo_id`.
 
 ### Acceso por permisos
 El acceso a cada módulo depende de la **unidad** y **rol** del usuario:
@@ -223,10 +225,21 @@ historial y la bitácora (`LogHistorico`).
 ```bat
 python manage.py check
 python manage.py makemigrations --check --dry-run    # idealmente "No changes detected"
+python manage.py migrate --plan                       # idealmente sin operaciones
+python manage.py showmigrations equipos
+python manage.py test equipos --settings=SIWI.test_settings
 ```
 
-Luego inicia sesión con un usuario **no clínico** (Estadística/Admisión/UAU) y
-prueba el flujo completo de s_exp: solicitar → aprobar → entregar → devolver.
+Para validar Equipos, inicia sesión y prueba:
+
+1. Abrir `/equipos/`.
+2. Registrar un equipo con fotografía general.
+3. Consultarlo en el listado y abrir su detalle.
+4. Editar sus datos y agregar fotografías adicionales.
+5. Generar y abrir su QR.
+
+Para validar s_exp, inicia sesión con un usuario **no clínico**
+(Estadística/Admisión/UAU) y prueba solicitar → aprobar → entregar → devolver.
 
 ---
 
@@ -235,7 +248,8 @@ prueba el flujo completo de s_exp: solicitar → aprobar → entregar → devolv
 | Síntoma | Causa / solución |
 |---------|------------------|
 | No aparece "Préstamos Exp." | El empleado no está vinculado a la cuenta (`rrhh_empleado.usuario`) o no es unidad no clínica. |
-| Error `ALLOWED_HOSTS` | Agrega tu IP/host en `SIWI/settings.py`. |
+| Error `ALLOWED_HOSTS` | Agrega la IP o el nombre del servidor a `ALLOWED_HOSTS` en `.env` y reinicia SIWIH. |
 | `mysqlclient`/`pyodbc` no instala | Ver notas del paso 4. |
 | `expediente_ubicacion` vacío | Corre `python manage.py poblar_ubicaciones` (requiere unidades de `servicio`). |
+| Equipos indica que el servidor de imágenes no está disponible | Verifica `IMAGE_SERVER_URL`, las credenciales, que SIWIH Images esté activo y que exista conectividad entre ambos servidores. |
 | El venv "no se reconoce" | Actívalo: `venv\Scripts\activate`. |

@@ -32,10 +32,6 @@ urlpatterns = [
     path('mapeo-camas/', include('mapeo_camas.urls')),
     path('clinico/',include('clinico.urls')),
     path('s_exp/',include('s_exp.urls')),
-    # La ruta anterior se conserva para que los QR y marcadores existentes
-    # sigan resolviendo. Al declarar /equipos/ al final, reverse() genera la
-    # ruta nueva como direccion canonica.
-    path('equipos-biomedicos/', include('equipos.urls')),
     path('equipos/', include('equipos.urls')),
     path('admin/', admin.site.urls),
 ]

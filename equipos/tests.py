@@ -1,13 +1,9 @@
 from datetime import date, timedelta
-from io import BytesIO, StringIO
+from io import BytesIO
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
-from django.contrib.contenttypes.models import ContentType
-from django.core.management import call_command
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.db import connection
-from django.db.migrations.recorder import MigrationRecorder
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from PIL import Image
@@ -200,7 +196,7 @@ class EquiposViewsTests(TestCase):
 
                 self.assertEqual(respuesta.status_code, 200)
 
-    def test_url_equipos_es_canonica_y_la_anterior_sigue_funcionando(self):
+    def test_url_equipos_es_canonica(self):
         self.assertEqual(reverse("inicio_equipos"), "/equipos/")
         self.assertEqual(
             reverse(
@@ -209,13 +205,6 @@ class EquiposViewsTests(TestCase):
             ),
             f"/equipos/dispositivos/{self.dispositivo.id}/",
         )
-
-        respuesta_anterior = self.client.get(
-            f"/equipos-biomedicos/dispositivos/{self.dispositivo.id}/"
-        )
-
-        self.assertEqual(respuesta_anterior.status_code, 200)
-        self.assertContains(respuesta_anterior, self.dispositivo.codigo)
 
     def test_inicio_solo_muestra_opciones_del_inventario(self):
         respuesta = self.client.get(reverse("inicio_equipos"))
@@ -1307,68 +1296,3 @@ class EquiposViewsTests(TestCase):
         self.assertEqual(respuesta.status_code, 200)
         self.assertEqual(respuesta.context['consulta'], 'Monitor EQ-001')
         self.assertContains(respuesta, 'Monitor EQ-001')
-
-
-class MigrarAppEquiposCommandTests(TestCase):
-    databases = {"default"}
-
-    def test_retira_content_type_de_modelo_obsoleto(self):
-        ContentType.objects.create(
-            app_label="equipos",
-            model="prototipo_mantenimiento",
-        )
-
-        salida = StringIO()
-        call_command("migrar_app_equipos", stdout=salida)
-
-        self.assertFalse(
-            ContentType.objects.filter(
-                app_label="equipos",
-                model="prototipo_mantenimiento",
-            ).exists()
-        )
-        self.assertIn(
-            "1 ContentType obsoletos retirados",
-            salida.getvalue(),
-        )
-
-    def test_traslada_metadatos_anteriores_y_es_idempotente(self):
-        migraciones = MigrationRecorder(connection).Migration.objects
-        migraciones_anteriores = migraciones.filter(app="equipos").update(
-            app="equipos_biomedicos"
-        )
-        content_types_anteriores = ContentType.objects.filter(
-            app_label="equipos"
-        ).update(app_label="equipos_biomedicos")
-
-        self.assertGreater(migraciones_anteriores, 0)
-        self.assertGreater(content_types_anteriores, 0)
-
-        salida = StringIO()
-        call_command("migrar_app_equipos", stdout=salida)
-
-        self.assertFalse(
-            migraciones.filter(app="equipos_biomedicos").exists()
-        )
-        self.assertFalse(
-            ContentType.objects.filter(
-                app_label="equipos_biomedicos"
-            ).exists()
-        )
-        self.assertEqual(
-            migraciones.filter(app="equipos").count(),
-            migraciones_anteriores,
-        )
-        self.assertEqual(
-            ContentType.objects.filter(app_label="equipos").count(),
-            content_types_anteriores,
-        )
-        self.assertIn("Transicion completada", salida.getvalue())
-
-        salida_idempotente = StringIO()
-        call_command("migrar_app_equipos", stdout=salida_idempotente)
-
-        self.assertIn(
-            "La app ya esta registrada como equipos",
-            salida_idempotente.getvalue(),
-        )
