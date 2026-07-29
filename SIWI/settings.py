@@ -77,7 +77,7 @@ INSTALLED_APPS = [
     'mapeo_camas',
     'rrhh',
     # Registra el modulo para que Django cargue modelos, admin, migraciones y templates.
-    'equipos_biomedicos',
+    'equipos.apps.EquiposConfig',
 ]
 
 MIDDLEWARE = [

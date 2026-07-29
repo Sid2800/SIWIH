@@ -1,0 +1,62 @@
+{% extends 'core/base.html' %}
+
+{% block title %}QR del equipo{% endblock title %}
+
+{% block content %}
+<div class="contenedor2 equipos-pagina equipos-pagina--ancha equipos-pagina--qr">
+    <div class="tituloFormulario">
+        <div class="equipos-encabezado-superior">
+            <div class="tituloFormulario-texto">
+                <i class="bi bi-qr-code"></i>
+                <h2 class="sin-margen">QR del equipo</h2>
+            </div>
+            <a class="equipos-volver equipos-volver--inline equipos-encabezado-volver"
+               href="{% url 'listado_dispositivos_equipos' %}">
+                <i class="bi bi-arrow-left"></i>
+                Listado de equipos
+            </a>
+        </div>
+        <div class="tituloFormulario-subrallado"></div>
+    </div>
+
+    <div class="equipos-qr-pagina">
+        {# qr_data_uri se genera en views.qr_dispositivo(). #}
+        <section class="equipos-qr" data-qr-url="{{ detalle_url }}">
+            <article class="equipos-qr__tarjeta">
+                <header class="equipos-qr__encabezado">
+                    <h1>{{ dispositivo.tipo }}</h1>
+                    <p>{{ dispositivo.codigo }}</p>
+                </header>
+
+                <div class="equipos-qr__marco">
+                    <img class="equipos-qr__imagen"
+                         src="{{ qr_data_uri }}"
+                         alt="Código QR del equipo {{ dispositivo.codigo }}">
+                </div>
+
+                <button class="formularioBotones-boton equipos-qr__boton"
+                        type="button"
+                        id="imprimir_qr_equipo">
+                    <i class="bi bi-printer"></i>
+                    Imprimir QR
+                </button>
+            </article>
+        </section>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // Imprime la vista actual, con estilos especificos de impresion en el CSS.
+    const botonImprimir = document.getElementById('imprimir_qr_equipo');
+
+    if (botonImprimir) {
+        botonImprimir.addEventListener('click', function () {
+            window.print();
+        });
+    }
+});
+</script>
+{% endblock extra_js %}

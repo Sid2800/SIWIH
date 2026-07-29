@@ -134,6 +134,25 @@ Esto deja listo **automáticamente, sin scripts SQL**:
 - `expediente_ubicacion` poblado desde las unidades de servicio (migración
   `expediente/0009`).
 
+### Actualización desde `equipos_biomedicos`
+
+Este paso se ejecuta **una sola vez** únicamente en bases existentes que ya
+tenían instalado el módulo con el nombre interno `equipos_biomedicos`.
+Debe realizarse antes del `migrate` general:
+
+```bat
+python manage.py migrar_app_equipos --dry-run
+python manage.py migrar_app_equipos
+python manage.py migrate
+```
+
+El comando cambia el nombre de la app en el historial de migraciones y en los
+`ContentType` de Django. No borra ni modifica equipos, asignaciones, bajas,
+órdenes de trabajo, catálogos o imágenes.
+
+En una instalación nueva no hace falta ejecutar este comando; basta con
+`python manage.py migrate`.
+
 ---
 
 ## 8. Datos obligatorios (verificación / re-sync, idempotente)

@@ -1,0 +1,56 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Equipos{% endblock title %}
+
+{% block content %}
+<div class="contenedor2 equipos-pagina">
+    <div class="tituloFormulario">
+        <div class="tituloFormulario-texto">
+            <i class="bi bi-device-hdd"></i>
+            <h2 class="sin-margen">Equipos</h2>
+        </div>
+        <div class="tituloFormulario-subrallado"></div>
+    </div>
+
+    <p class="equipos-descripcion">
+        Gestiona el registro y la consulta del inventario de equipos del hospital.
+    </p>
+
+    {# Acceso directo a la búsqueda general del inventario. #}
+    <div class="equipos-acciones-rapidas">
+        <a class="formularioBotones-boton equipos-accion-rapida"
+            href="{% url 'buscar_dispositivo_equipos' %}">
+            <i class="bi bi-search"></i>
+            <span>Buscar equipo</span>
+        </a>
+    </div>
+
+    {# El módulo se limita actualmente a la gestión del inventario de equipos. #}
+    <div class="equipos-submenus">
+        <section class="equipos-submenu">
+            <header class="equipos-submenu__encabezado">
+                <span class="equipos-submenu__icono">
+                    <i class="bi bi-clipboard2-check"></i>
+                </span>
+                <h3>INVENTARIO</h3>
+            </header>
+
+            <div class="equipos-submenu__opciones">
+                <a class="equipos-submenu__opcion"
+                    href="{% url 'registrar_dispositivo_equipos' %}">
+                    <i class="bi bi-plus-square"></i>
+                    <span>Registrar equipo</span>
+                    <i class="bi bi-chevron-right"></i>
+                </a>
+                <a class="equipos-submenu__opcion"
+                    href="{% url 'listado_dispositivos_equipos' %}">
+                    <i class="bi bi-list-ul"></i>
+                    <span>Listado de equipos</span>
+                    <i class="bi bi-chevron-right"></i>
+                </a>
+            </div>
+        </section>
+    </div>
+</div>
+{% endblock content %}

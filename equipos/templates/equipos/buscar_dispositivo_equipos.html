@@ -1,0 +1,200 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Buscar equipo{% endblock title %}
+
+{% block content %}
+<div class="contenedor2 equipos-pagina equipos-pagina--ancha">
+    <div class="tituloFormulario">
+        <div class="equipos-encabezado-superior">
+            <div class="tituloFormulario-texto">
+                <i class="bi bi-search"></i>
+                <h2 class="sin-margen">Buscar equipo</h2>
+            </div>
+            <a class="equipos-volver equipos-volver--inline equipos-encabezado-volver"
+               href="{% url 'inicio_equipos' %}">
+                <i class="bi bi-arrow-left"></i>
+                Equipos
+            </a>
+        </div>
+        <div class="tituloFormulario-subrallado"></div>
+    </div>
+    <section class="equipos-busqueda">
+        <form class="equipos-busqueda__formulario" method="get">
+            <label class="equipos-busqueda__titulo" for="id_busqueda_dispositivo">
+                Búsqueda rápida de equipo
+            </label>
+
+            <div class="equipos-busqueda__barra">
+                <i class="bi bi-search" aria-hidden="true"></i>
+                <input
+                    class="formularioCampo-text"
+                    id="id_busqueda_dispositivo"
+                    name="q"
+                    type="search"
+                    value="{{ consulta }}"
+                    placeholder="Buscar por código interno, tipo, marca o color"
+                    autocomplete="off"
+                >
+                <button class="formularioBotones-boton equipos-busqueda__boton" type="submit">
+                    <i class="bi bi-search"></i>
+                    <span>Buscar</span>
+                </button>
+            </div>
+
+            <div class="equipos-busqueda__inferior">
+                <p class="equipos-busqueda__ayuda">
+                    {% if consulta or filtros.area_gestora %}
+                        Los resultados de la consulta se muestran debajo.
+                    {% else %}
+                        Los resultados aparecerán aquí.
+                    {% endif %}
+                </p>
+
+                <div class="equipos-busqueda__filtro">
+                    <label for="buscar_area_gestora">Filtrar por:</label>
+                    <div class="equipos-listado__campo-icono equipos-busqueda__gestoria">
+                        <i class="bi bi-diagram-3"></i>
+                        <select class="formularioCampo-select" id="buscar_area_gestora" name="area_gestora">
+                            <option value="">Todas las gestorías</option>
+                            {% for area_gestora in area_gestora_choices %}
+                                <option value="{{ area_gestora.id }}" {% if filtros.area_gestora == area_gestora.id|stringformat:"s" %}selected{% endif %}>
+                                    {{ area_gestora.nombre }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </section>
+
+    {% if consulta or filtros.area_gestora %}
+        <div class="equipos-listado__tabla-contenedor">
+            <table class="dataTable stripe hover row-border equipos-listado__tabla">
+                <thead>
+                    <tr>
+                        <th class="equipos-listado__col-codigo">Código</th>
+                        <th class="equipos-listado__col-tipo">Tipo de equipo</th>
+                        <th class="equipos-listado__col-marca">Marca</th>
+                        <th class="equipos-listado__col-modelo">Modelo</th>
+                        <th class="equipos-listado__col-serie">Número de serie</th>
+                        <th class="equipos-listado__col-area">Área</th>
+                        <th class="equipos-listado__col-estado">Estado</th>
+                        <th class="equipos-listado__col-acciones">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for dispositivo in dispositivos %}
+                        {% with asignacion=dispositivo.asignacion_actual %}
+                            <tr class="equipos-listado__fila equipos-listado__fila--editable"
+                                data-edit-url="{% url 'editar_dispositivo_equipos' dispositivo.id %}"
+                                title="Doble clic para editar {{ dispositivo.codigo }}">
+                                <td class="equipos-listado__col-codigo">
+                                    <a class="equipos-listado__codigo"
+                                    href="{% url 'detalle_dispositivo_equipos' dispositivo.id %}">
+                                        {{ dispositivo.codigo }}
+                                    </a>
+                                </td>
+                                <td class="equipos-listado__col-tipo" title="{{ dispositivo.tipo }}">{{ dispositivo.tipo|truncatechars:18 }}</td>
+                                <td class="equipos-listado__col-marca" title="{{ dispositivo.marca|default:'INDEFINIDO' }}">{{ dispositivo.marca|default:"INDEFINIDO" }}</td>
+                                <td class="equipos-listado__col-modelo" title="{{ dispositivo.modelo|default:'INDEFINIDO' }}">{{ dispositivo.modelo|default:"INDEFINIDO" }}</td>
+                                <td class="equipos-listado__col-serie" title="{{ dispositivo.numero_serie|default:'INDEFINIDO' }}">{{ dispositivo.numero_serie|default:"INDEFINIDO"|truncatechars:18 }}</td>
+                                <td class="equipos-listado__col-area">
+                                    {% if asignacion %}
+                                        <span title="{{ asignacion.ubicacion }}">{{ asignacion.ubicacion|truncatechars:16 }}</span>
+                                    {% else %}
+                                        Sin asignación
+                                    {% endif %}
+                                </td>
+                                <td class="equipos-listado__col-estado">
+                                    <span class="equipos-estado {{ dispositivo.estado_css }}" title="{{ dispositivo.get_estado_display }}" aria-label="{{ dispositivo.get_estado_display }}">
+                                        {{ dispositivo.estado_etiqueta }}
+                                    </span>
+                                </td>
+                                <td class="equipos-listado__col-acciones">
+                                    <details class="equipos-listado__acciones-menu">
+                                        <summary class="equipos-listado__acciones-resumen"
+                                        aria-label="Acciones de {{ dispositivo.codigo }}">
+                                            <i class="bi bi-list"></i>
+                                        </summary>
+                                        <div class="equipos-listado__acciones-panel">
+                                            <a href="{% url 'detalle_dispositivo_equipos' dispositivo.id %}">
+                                                <i class="bi bi-eye"></i>
+                                                <span>Ver detalle</span>
+                                            </a>
+                                            <a href="{% url 'qr_dispositivo_equipos' dispositivo.id %}">
+                                                <i class="bi bi-qr-code"></i>
+                                                <span>Ver / Imprimir QR</span>
+                                            </a>
+                                            {% if dispositivo.estado != 4 %}
+                                                <a href="{% url 'editar_dispositivo_equipos' dispositivo.id %}">
+                                                    <i class="bi bi-pencil"></i>
+                                                    <span>Editar equipo</span>
+                                                </a>
+                                                {# Mantiene las mismas acciones que el listado general. #}
+                                                <a href="{% url 'tramite_baja_dispositivo_equipos' dispositivo.id %}">
+                                                    <i class="bi bi-file-earmark-check"></i>
+                                                    <span>Trámite de baja</span>
+                                                </a>
+                                            {% endif %}
+                                        </div>
+                                    </details>
+                                </td>
+                            </tr>
+                        {% endwith %}
+                    {% empty %}
+                        <tr>
+                            <td class="equipos-listado__vacio" colspan="8">
+                                <i class="bi bi-inbox"></i>
+                                <strong>Sin resultados para “{{ consulta }}”</strong>
+                                <span>Prueba buscar por código interno, tipo, marca o color.</span>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <footer class="equipos-listado__pie">
+            {% if total_dispositivos %}
+                <span>
+                    Mostrando {{ page_obj.start_index }} - {{ page_obj.end_index }}
+                    de {{ total_dispositivos }} equipos encontrados
+                </span>
+            {% else %}
+                <span>Mostrando 0 equipos</span>
+            {% endif %}
+
+            {% if page_obj and page_obj.has_other_pages %}
+                <div class="equipos-listado__paginacion">
+                    {% if page_obj.has_previous %}
+                        <a href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ page_obj.previous_page_number }}">
+                            <i class="bi bi-chevron-left"></i>
+                        </a>
+                    {% endif %}
+
+                    {% for pagina in rango_paginas %}
+                        {% if pagina == page_obj.paginator.ELLIPSIS %}
+                            <span>{{ pagina }}</span>
+                        {% elif pagina == page_obj.number %}
+                            <span class="equipos-listado__pagina-activa">{{ pagina }}</span>
+                        {% else %}
+                            <a href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ pagina }}">{{ pagina }}</a>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if page_obj.has_next %}
+                        <a href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ page_obj.next_page_number }}">
+                            <i class="bi bi-chevron-right"></i>
+                        </a>
+                    {% endif %}
+                </div>
+            {% endif %}
+        </footer>
+    {% endif %}
+</div>
+{% endblock content %}
+{% block extra_js %}
+{% include "equipos/includes/listado_interacciones_js.html" %}
+{% endblock extra_js %}

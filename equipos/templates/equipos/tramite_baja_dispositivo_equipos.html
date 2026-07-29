@@ -1,0 +1,445 @@
+{% extends 'core/base_media.html' %}
+{# Vista temporal del trámite; no crea estados ni solicitudes pendientes. #}
+
+{% block title %}Trámite de baja de equipo{% endblock title %}
+
+{% block content %}
+<div class="contenedor2 equipos-pagina equipos-pagina--detalle">
+    <div class="tituloFormulario">
+        <div class="equipos-encabezado-superior">
+            <div class="tituloFormulario-texto">
+                <i class="bi bi-file-earmark-check"></i>
+                <div>
+                    <h2 class="sin-margen">Trámite de baja</h2>
+                    <p class="equipos-baja__subtitulo">
+                        Preparar la documentación del equipo {{ dispositivo.codigo }}.
+                    </p>
+                </div>
+            </div>
+            <a class="equipos-volver equipos-volver--inline equipos-encabezado-volver"
+               href="{{ url_regresar }}">
+                <i class="bi bi-arrow-left"></i>
+                Detalle del equipo
+            </a>
+        </div>
+        <div class="tituloFormulario-subrallado"></div>
+    </div>
+
+    {% comment %}
+       El tramite se resuelve en una sola pantalla: el tecnico llena los datos,
+       genera la ficha en otra pestaña, recoge las firmas y adjunta la
+       constancia sin salir de aqui. Por eso no se bloquea nada; el formulario
+       conserva los datos mientras el PDF se abre aparte. Generar el PDF o
+       salir de esta pantalla no modifica el inventario.
+    {% endcomment %}
+    <section class="equipos-baja__advertencia" role="status">
+        <i class="bi bi-info-circle"></i>
+        <div>
+            <strong>Genere la ficha, recoja las firmas y adjúntela aquí mismo.</strong>
+            <p>
+                El equipo seguirá activo hasta que adjunte la ficha firmada y
+                pulse “Confirmar baja definitiva”.
+                {% if orden_trabajo_baja %}
+                    Ficha generada: {{ orden_trabajo_baja.numero_orden }}.
+                {% endif %}
+            </p>
+        </div>
+    </section>
+
+    {# La ficha se guarda en SIWIH Images antes de crear la baja local. #}
+    <form class="equipos-registro equipos-baja__formulario"
+          method="post"
+          enctype="multipart/form-data"
+          autocomplete="off">
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+            <div class="equipos-registro__errores equipos-registro__errores--general">
+                {{ form.non_field_errors }}
+            </div>
+        {% endif %}
+
+        <section class="equipos-registro__seccion">
+            <h3 class="equipos-registro__titulo">
+                <i class="bi bi-file-earmark-text"></i>
+                Información para la ficha
+            </h3>
+
+            <div class="equipos-registro__campos equipos-registro__campos--dos">
+                <div class="equipos-registro__campo">
+                    <label for="fecha_baja_dispositivo">Fecha de baja *</label>
+                    {{ form.fecha_baja }}
+                    {{ form.fecha_baja.errors }}
+                </div>
+
+                <div class="equipos-registro__campo">
+                    <label for="responsable_peticion_baja">
+                        Responsable de la petición *
+                    </label>
+                    {{ form.responsable_peticion }}
+                    {{ form.responsable_peticion.errors }}
+                </div>
+
+                <div class="equipos-registro__campo">
+                    <label for="habitacion_estancia_baja">
+                        Habitación / Estancia
+                    </label>
+                    {{ form.habitacion_estancia }}
+                    {{ form.habitacion_estancia.errors }}
+                </div>
+
+                <div class="equipos-registro__campo equipos-registro__campo--completo">
+                    <label for="motivo_baja_dispositivo">Motivo de baja *</label>
+                    {{ form.motivo }}
+                    {{ form.motivo.errors }}
+                </div>
+
+            </div>
+        </section>
+
+        <section class="equipos-registro__seccion">
+            <h3 class="equipos-registro__titulo">
+                <i class="bi bi-camera"></i>
+                Constancia firmada
+            </h3>
+
+            <div class="equipos-registro__campo">
+                <label for="ficha_firmada_dispositivo">
+                    Fotografía o escaneo de la ficha firmada *
+                </label>
+                {{ form.ficha_firmada }}
+                <input type="file"
+                       id="ficha_firmada_camara"
+                       accept="image/*"
+                       capture="environment"
+                       hidden>
+
+                <div class="equipos-registro__foto equipos-registro__foto--activa"
+                     id="ficha_firmada_selector"
+                     role="button"
+                     tabindex="0"
+                     aria-label="Seleccionar ficha de baja firmada">
+                    <img class="equipos-registro__foto-preview"
+                         id="ficha_firmada_preview"
+                         alt="Vista previa de la ficha de baja firmada"
+                         hidden>
+                    <div id="ficha_firmada_contenido">
+                        <i class="bi bi-file-earmark-arrow-up"></i>
+                        <strong>Agregar ficha firmada</strong>
+                        <small>JPG, PNG o WebP; se preparará como WebP</small>
+                    </div>
+                </div>
+
+                <div class="equipos-registro__foto-botones">
+                    <button type="button"
+                            class="equipos-registro__foto-boton"
+                            id="seleccionar_ficha_firmada">
+                        <i class="bi bi-image"></i>
+                        Seleccionar archivo
+                    </button>
+                    <button type="button"
+                            class="equipos-registro__foto-boton"
+                            id="capturar_ficha_firmada">
+                        <i class="bi bi-camera-fill"></i>
+                        Tomar foto
+                    </button>
+                </div>
+                <small class="equipos-registro__foto-ayuda"
+                       id="ficha_firmada_estado">
+                    Asegúrese de que las firmas y el contenido sean legibles.
+                </small>
+                {{ form.ficha_firmada.errors }}
+            </div>
+        </section>
+
+        {% comment %}
+           Ambas acciones estan siempre disponibles: el tecnico decide el orden.
+           Se leen de izquierda a derecha segun avanza el tramite (salir,
+           generar la ficha, confirmar) y la confirmacion pide un si explicito
+           por ser irreversible.
+        {% endcomment %}
+        <div class="equipos-registro__acciones">
+            <a class="formularioBotones-boton equipos-registro__boton equipos-registro__boton--secundario"
+               href="{{ url_regresar }}">
+                <i class="bi bi-arrow-left"></i>
+                Cancelar
+            </a>
+
+            <div class="equipos-registro__acciones-principales">
+                <button class="formularioBotones-boton equipos-registro__boton equipos-registro__boton--secundario"
+                        id="generar_ficha_pdf"
+                        type="submit"
+                        formaction="{{ url_ficha_baja }}"
+                        formmethod="post"
+                        formtarget="_blank"
+                        formnovalidate>
+                    <i class="bi bi-file-earmark-pdf"></i>
+                    {% if orden_trabajo_baja %}Regenerar ficha{% else %}Generar ficha PDF{% endif %}
+                </button>
+
+                <button class="formularioBotones-boton equipos-registro__boton equipos-baja__boton"
+                        id="confirmar_baja_dispositivo"
+                        type="submit">
+                    <i class="bi bi-check2-circle"></i>
+                    Confirmar baja definitiva
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock content %}
+
+{% block media_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // El editor compartido recorta la captura y entrega el WebP que acepta
+    // SIWIH Images. El archivo original nunca se envía al servidor.
+    const fichaFirmada = document.getElementById('ficha_firmada_dispositivo');
+    const fichaCamara = document.getElementById('ficha_firmada_camara');
+    const selectorFicha = document.getElementById('ficha_firmada_selector');
+    const seleccionarFicha = document.getElementById('seleccionar_ficha_firmada');
+    const capturarFicha = document.getElementById('capturar_ficha_firmada');
+    const previewFicha = document.getElementById('ficha_firmada_preview');
+    const contenidoFicha = document.getElementById('ficha_firmada_contenido');
+    const estadoFicha = document.getElementById('ficha_firmada_estado');
+    // Botones y campos del tramite. Varios existen solo en una de las dos
+    // etapas, por eso todo el codigo que los usa comprueba antes que esten.
+    const formularioBaja = document.querySelector('.equipos-baja__formulario');
+    const botonGenerar = document.getElementById('generar_ficha_pdf');
+    const botonConfirmar = document.getElementById('confirmar_baja_dispositivo');
+    const campoFecha = document.getElementById('fecha_baja_dispositivo');
+    const campoResponsable = document.getElementById('responsable_peticion_baja');
+    const campoMotivo = document.getElementById('motivo_baja_dispositivo');
+    let previewUrl = null;
+
+    function mostrarError(mensaje) {
+        if (window.toastr) {
+            toastr.error(mensaje);
+        } else {
+            window.alert(mensaje);
+        }
+    }
+
+    function actualizarPreview(archivo) {
+        if (previewUrl) {
+            AdjuntarImagenHelper.quitarUrlPreview(previewUrl);
+        }
+
+        previewUrl = AdjuntarImagenHelper.crearUrlPreview(archivo);
+        previewFicha.src = previewUrl;
+        previewFicha.hidden = false;
+        contenidoFicha.hidden = true;
+        estadoFicha.textContent = 'Ficha lista en formato WebP.';
+    }
+
+    async function prepararFicha(inputOrigen) {
+        const archivoOriginal = inputOrigen.files[0];
+        inputOrigen.value = '';
+
+        if (!archivoOriginal) {
+            return;
+        }
+
+        const validacion = AdjuntarImagenHelper.validarArchivo(archivoOriginal);
+        if (!validacion.valido) {
+            mostrarError(validacion.error);
+            return;
+        }
+
+        const archivoWebp = await ImageEditor.open(
+            archivoOriginal,
+            {
+                titulo: 'Ficha firmada de baja',
+                subtitulo: 'Ajuste el encuadre para que firmas y texto sean legibles'
+            }
+        );
+
+        if (!archivoWebp) {
+            return;
+        }
+
+        if (typeof DataTransfer === 'undefined') {
+            mostrarError('Este navegador no permite preparar la ficha.');
+            return;
+        }
+
+        const transferencia = new DataTransfer();
+        transferencia.items.add(archivoWebp);
+        fichaFirmada.files = transferencia.files;
+        actualizarPreview(archivoWebp);
+    }
+
+    if (
+        fichaFirmada
+        && fichaCamara
+        && selectorFicha
+        && seleccionarFicha
+        && capturarFicha
+    ) {
+        seleccionarFicha.addEventListener('click', function () {
+            fichaFirmada.click();
+        });
+        capturarFicha.addEventListener('click', function () {
+            fichaCamara.click();
+        });
+        selectorFicha.addEventListener('click', function () {
+            fichaFirmada.click();
+        });
+        selectorFicha.addEventListener('keydown', function (evento) {
+            if (evento.key === 'Enter' || evento.key === ' ') {
+                evento.preventDefault();
+                fichaFirmada.click();
+            }
+        });
+        fichaFirmada.addEventListener('change', function () {
+            prepararFicha(fichaFirmada);
+        });
+        fichaCamara.addEventListener('change', function () {
+            prepararFicha(fichaCamara);
+        });
+        window.addEventListener('beforeunload', function () {
+            if (previewUrl) {
+                AdjuntarImagenHelper.quitarUrlPreview(previewUrl);
+            }
+        });
+    }
+
+    // La ficha necesita estos tres datos. Sin validarlos aqui el POST llega
+    // incompleto y, como el boton abre pestaña nueva, el 400 del servidor
+    // quedaba como texto suelto en una pestaña en blanco.
+    function datosFichaFaltantes() {
+        const faltantes = [];
+
+        if (campoFecha && !campoFecha.value) {
+            faltantes.push({ campo: campoFecha, etiqueta: 'la fecha de baja' });
+        }
+        if (campoResponsable && !campoResponsable.value) {
+            faltantes.push({
+                campo: campoResponsable,
+                etiqueta: 'el responsable de la petición'
+            });
+        }
+        if (campoMotivo && !campoMotivo.value.trim()) {
+            faltantes.push({ campo: campoMotivo, etiqueta: 'el motivo de baja' });
+        }
+
+        return faltantes;
+    }
+
+    function enfocarCampo(campo) {
+        // El responsable es un select2: abrir su buscador es mas util que
+        // enfocar el select original, que esta oculto.
+        if (campo === campoResponsable && window.jQuery && $(campo).data('select2')) {
+            $(campo).select2('open');
+            return;
+        }
+        campo.focus();
+    }
+
+    if (botonGenerar) {
+        botonGenerar.addEventListener('click', function (evento) {
+            const faltantes = datosFichaFaltantes();
+
+            if (!faltantes.length) {
+                return;
+            }
+
+            evento.preventDefault();
+            mostrarError(
+                'Complete '
+                + faltantes.map(function (dato) { return dato.etiqueta; }).join(', ')
+                + ' antes de generar la ficha.'
+            );
+            enfocarCampo(faltantes[0].campo);
+        });
+    }
+
+    // La baja es irreversible: crea el registro, deja el equipo en estado dado
+    // de baja y bloquea su edicion de forma permanente. Por eso se confirma
+    // nombrando el equipo concreto antes de enviar.
+    if (formularioBaja && botonConfirmar) {
+        let bajaConfirmada = false;
+
+        formularioBaja.addEventListener('submit', async function (evento) {
+            // "Regenerar ficha" envia este mismo formulario con su formaction
+            // propio; solo se intercepta la confirmacion de la baja.
+            if (evento.submitter !== botonConfirmar || bajaConfirmada) {
+                return;
+            }
+
+            evento.preventDefault();
+
+            // El input del archivo va oculto, asi que el navegador no puede
+            // senalarlo por su cuenta: se avisa aqui para que el boton nunca
+            // parezca muerto.
+            if (fichaFirmada && !fichaFirmada.files.length) {
+                mostrarError(
+                    'Adjunte la constancia firmada antes de confirmar la baja.'
+                );
+                if (selectorFicha) {
+                    selectorFicha.focus();
+                }
+                return;
+            }
+
+            const aceptado = await confirmarAccion(
+                'Confirmar baja definitiva',
+                'El equipo <strong>{{ dispositivo.codigo }}</strong> quedará dado de '
+                + 'baja de forma permanente: no podrá editarse ni volver a '
+                + 'asignarse. Esta acción no se puede deshacer.',
+                'Sí, dar de baja',
+                'Cancelar'
+            );
+
+            if (!aceptado) {
+                return;
+            }
+
+            bajaConfirmada = true;
+            formularioBaja.requestSubmit(botonConfirmar);
+            botonConfirmar.disabled = true;
+        });
+    }
+
+    // Reutiliza el mismo buscador remoto del empleado a cargo. Así el
+    // formulario no carga toda la tabla de RR. HH. en el HTML.
+    const responsablePeticionSelect = $('#responsable_peticion_baja');
+
+    if (
+        responsablePeticionSelect.length
+        && responsablePeticionSelect.select2
+    ) {
+        responsablePeticionSelect.select2({
+            width: '100%',
+            placeholder: 'Buscar por DNI o nombre',
+            minimumInputLength: 1,
+            ajax: {
+                url: "{% url 'buscar_empleados_equipos' %}",
+                dataType: 'json',
+                delay: 250,
+                data: function (params) {
+                    return {
+                        q: params.term || ''
+                    };
+                },
+                processResults: function (data) {
+                    return data;
+                },
+                cache: true
+            },
+            language: {
+                inputTooShort: function () {
+                    return 'Escriba el DNI o nombre del empleado';
+                },
+                noResults: function () {
+                    return 'No se encontraron empleados';
+                },
+                searching: function () {
+                    return 'Buscando...';
+                }
+            }
+        });
+    }
+});
+</script>
+{% endblock media_js %}
