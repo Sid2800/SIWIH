@@ -4665,7 +4665,7 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
    display: flex;
    position: relative;
    flex-direction: column;
-   gap: 2.5rem;
+   gap: 1.4rem;
 }
 
 .contenedor:has(> .biomedicos-pagina--ancha) {
@@ -5022,7 +5022,7 @@ a.biomedicos-submenu__opcion:hover {
       de 4 quedaba con la mitad inferior vacia. */
    align-items: start;
    display: grid;
-   gap: 1.1rem;
+   gap: .9rem;
    grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
@@ -5045,7 +5045,7 @@ a.biomedicos-submenu__opcion:hover {
    background-color: var(--blanco);
    border: .1rem solid var(--colorLinea);
    border-radius: 1.2rem;
-   padding: 1.3rem 1.4rem;
+   padding: 1rem 1.2rem;
 }
 
 .biomedicos-registro__titulo {
@@ -5054,7 +5054,7 @@ a.biomedicos-submenu__opcion:hover {
    display: flex;
    font-size: 1.45rem;
    gap: .8rem;
-   margin: 0 0 1.2rem;
+   margin: 0 0 .8rem;
 }
 
 .biomedicos-registro__titulo i {
@@ -5333,6 +5333,13 @@ a.biomedicos-submenu__opcion:hover {
    gap: 1rem;
    justify-content: flex-end;
    margin-left: auto;
+}
+
+/* Cuando hay galeria, el boton de guardar queda justo debajo de "Agregar
+   fotografia", que va dentro de la tarjeta y por tanto sangrado por su
+   padding. Este desplazamiento iguala los dos bordes derechos. */
+.biomedicos-registro__acciones--con-galeria {
+   padding-right: 1.8rem;
 }
 
 .biomedicos-registro__boton {
@@ -6922,14 +6929,16 @@ button.biomedicos-imagenes__vista:hover img {
    min-height: 12rem;
 }
 
+/* Mismas medidas que .biomedicos-registro__boton: los dos botones quedan uno
+   debajo del otro y cualquier diferencia de ancho se nota. */
 .biomedicos-imagenes__guardar {
    align-self: end;
    height: auto;
    justify-content: center;
    min-height: 4.2rem;
-   padding: .8rem 1.4rem;
+   padding: .8rem 1.6rem;
    text-transform: none;
-   width: auto;
+   width: 20rem;
 }
 
 .biomedicos-imagenes__guardar:disabled {
@@ -6944,6 +6953,12 @@ button.biomedicos-imagenes__vista:hover img {
 
    .biomedicos-imagenes__guardar {
       width: 100%;
+   }
+
+   /* El boton de la galeria pasa a ancho completo, asi que ya no hay un borde
+      derecho que igualar. */
+   .biomedicos-registro__acciones--con-galeria {
+      padding-right: 0;
    }
 }
 

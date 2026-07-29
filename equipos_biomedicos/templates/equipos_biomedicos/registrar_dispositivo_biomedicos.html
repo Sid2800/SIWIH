@@ -19,7 +19,17 @@
         <div class="tituloFormulario-subrallado"></div>
     </div>
     {# Este template se reutiliza para registrar y editar. Los textos/URLs vienen desde views.py. #}
-    <form class="biomedicos-registro" method="post" enctype="multipart/form-data" autocomplete="off">
+    {% comment %}
+       El id deja que la barra de acciones viva fuera de este formulario y se
+       coloque despues de la galeria, para que el boton de guardar cierre la
+       pagina en vez de partirla a la mitad. La galeria no puede ir dentro
+       porque trae su propio formulario y HTML no permite anidarlos.
+    {% endcomment %}
+    <form class="biomedicos-registro"
+          id="formulario_equipo"
+          method="post"
+          enctype="multipart/form-data"
+          autocomplete="off">
         {% csrf_token %}
 
         {% if form.non_field_errors %}
@@ -261,19 +271,6 @@
             </div>
         </details>
 
-        <div class="biomedicos-registro__acciones">
-            <div class="biomedicos-registro__acciones-principales">
-                <button class="formularioBotones-boton biomedicos-registro__boton" type="submit">
-                    <i class="bi bi-floppy"></i>
-                    {{ texto_boton_guardar|default:"Guardar equipo" }}
-                </button>
-                <a class="formularioBotones-boton biomedicos-registro__boton biomedicos-registro__boton--secundario"
-                   href="{{ url_regresar }}">
-                    <i class="bi bi-arrow-left"></i>
-                    Regresar
-                </a>
-            </div>
-        </div>
     </form>
 
     {% if dispositivo %}
@@ -400,6 +397,22 @@
             {% endif %}
         </section>
     {% endif %}
+
+    {% comment %}
+       Cierra la pagina: el atributo form lo enlaza con el formulario de datos
+       aunque este fuera de el. Para salir esta el enlace del encabezado, que
+       existe en todas las vistas del modulo.
+    {% endcomment %}
+    <div class="biomedicos-registro__acciones{% if dispositivo %} biomedicos-registro__acciones--con-galeria{% endif %}">
+        <div class="biomedicos-registro__acciones-principales">
+            <button class="formularioBotones-boton biomedicos-registro__boton"
+                    type="submit"
+                    form="formulario_equipo">
+                <i class="bi bi-floppy"></i>
+                {{ texto_boton_guardar|default:"Guardar equipo" }}
+            </button>
+        </div>
+    </div>
 </div>
 {% endblock content %}
 
