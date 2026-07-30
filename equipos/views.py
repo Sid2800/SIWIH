@@ -6,9 +6,10 @@ from io import BytesIO
 import qrcode
 from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import Prefetch, Q
+from django.db.models import Count, Prefetch, Q
 from django.http import Http404, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -23,6 +24,8 @@ from .forms import (
     BajaDispositivoForm,
     DispositivoCreateForm,
     ImagenDispositivoForm,
+    MarcaCatalogoForm,
+    ModeloCatalogoForm,
     TIPOS_IMAGEN_DISPOSITIVO,
 )
 from .models import (
@@ -1065,10 +1068,95 @@ def buscar_dispositivo(request):
             ),
         },
     )
+
+
+TAMANO_PAGINA_AUTOCOMPLETADO = 20
+
+
+def _respuesta_select2(pagina):
+    """Formato que Select2 espera para paginar por scroll infinito."""
+    return JsonResponse({
+        "results": pagina["resultados"],
+        "pagination": {"more": pagina["hay_mas"]},
+    })
+
+
+def _paginar_autocompletado(queryset, request, construir):
+    # Select2 envia ?page=N al llegar al final de la lista. Se pide un elemento
+    # de mas para saber si queda otra pagina sin contar el total, que en
+    # catalogos grandes seria una consulta cara e inutil.
+    try:
+        pagina = max(int(request.GET.get("page", 1)), 1)
+    except (TypeError, ValueError):
+        pagina = 1
+
+    inicio = (pagina - 1) * TAMANO_PAGINA_AUTOCOMPLETADO
+    fin = inicio + TAMANO_PAGINA_AUTOCOMPLETADO
+    registros = list(queryset[inicio:fin + 1])
+    hay_mas = len(registros) > TAMANO_PAGINA_AUTOCOMPLETADO
+
+    return {
+        "resultados": [construir(r) for r in registros[:TAMANO_PAGINA_AUTOCOMPLETADO]],
+        "hay_mas": hay_mas,
+    }
+
+
+@login_required
+@registrar_errores_vista("Error al buscar marcas de equipo")
+def buscar_marcas(request):
+    # Alimenta el Select2 de marca. Sin texto devuelve las primeras marcas para
+    # que el usuario pueda abrir y elegir con el raton sin escribir nada.
+    consulta = request.GET.get("q", "").strip()
+    marcas = MarcaDispositivo.objects.filter(activo=True)
+
+    if consulta:
+        marcas = marcas.filter(nombre__icontains=consulta)
+
+    pagina = _paginar_autocompletado(
+        marcas.order_by("nombre"),
+        request,
+        lambda marca: {"id": marca.id, "text": marca.nombre},
+    )
+    return _respuesta_select2(pagina)
+
+
+@login_required
+@registrar_errores_vista("Error al buscar modelos de equipo")
+def buscar_modelos(request):
+    # Solo devuelve modelos activos de la marca pedida. La marca es obligatoria:
+    # sin ella no hay lista que mostrar, y devolver el catalogo entero
+    # permitiria elegir un modelo de otro fabricante.
+    marca_id = (request.GET.get("marca_id") or "").strip()
+
+    if not marca_id.isdigit():
+        return JsonResponse(
+            {"results": [], "pagination": {"more": False},
+             "error": "Debe indicar la marca."},
+            status=400,
+        )
+
+    consulta = request.GET.get("q", "").strip()
+    modelos = ModeloDispositivo.objects.filter(
+        marca_id=int(marca_id),
+        activo=True,
+        marca__activo=True,
+    ).select_related("marca")
+
+    if consulta:
+        modelos = modelos.filter(nombre__icontains=consulta)
+
+    pagina = _paginar_autocompletado(
+        modelos.order_by("nombre"),
+        request,
+        lambda modelo: {"id": modelo.id, "text": modelo.nombre},
+    )
+    return _respuesta_select2(pagina)
+
+
 @registrar_errores_vista("Error al buscar empleados para equipos")
 def buscar_empleados(request):
     # Endpoint AJAX usado por Select2 en el formulario de registro/edicion.
-    # Devuelve JSON con maximo 10 empleados activos.        
+    # Devuelve JSON con maximo 10 empleados activos.
     consulta = request.GET.get("q", "").strip()
     empleados = Empleado.objects.filter(estado=EstadoRegistro.ACTIVO)
 
@@ -1103,3 +1191,141 @@ def buscar_empleados(request):
 
     return JsonResponse({"results": resultados})
 
+
+
+# =====================================================================
+# Catalogo de marcas y modelos
+# ---------------------------------------------------------------------
+# Unico lugar donde se dan de alta marcas y modelos. El formulario de
+# equipos solo permite elegir entre los ya existentes, para que un error
+# de tecleo durante un registro no genere catalogos duplicados.
+# =====================================================================
+
+
+def _marca_seleccionada(request):
+    # La marca elegida viaja por querystring para que la pantalla se pueda
+    # compartir y recargar sin perder el contexto.
+    marca_id = (request.GET.get("marca") or "").strip()
+
+    if not marca_id.isdigit():
+        return None
+
+    return MarcaDispositivo.objects.filter(pk=int(marca_id)).first()
+
+
+def _url_catalogo(marca=None):
+    url = reverse("catalogo_marcas_equipos")
+    return f"{url}?marca={marca.pk}" if marca else url
+
+
+@login_required
+@registrar_errores_vista("Error en catalogo de marcas y modelos")
+def catalogo_marcas_modelos(request):
+    marca = _marca_seleccionada(request)
+
+    # Se muestran activas e inactivas: desactivar no es esconder, y desde aqui
+    # se reactiva. El contador ayuda a detectar marcas vacias.
+    marcas = MarcaDispositivo.objects.annotate(
+        total_modelos=Count("modelos"),
+        total_equipos=Count("dispositivos", distinct=True),
+    ).order_by("-activo", "nombre")
+
+    modelos = []
+    if marca:
+        modelos = (
+            ModeloDispositivo.objects.filter(marca=marca)
+            .annotate(total_equipos=Count("dispositivos"))
+            .select_related("marca")
+            .order_by("-activo", "nombre")
+        )
+
+    return render(
+        request,
+        "equipos/catalogo_marcas_equipos.html",
+        {
+            "marcas": marcas,
+            "marca_seleccionada": marca,
+            "modelos": modelos,
+            "form_marca": MarcaCatalogoForm(),
+            "form_modelo": ModeloCatalogoForm(marca=marca) if marca else None,
+            "url_regresar": reverse("inicio_equipos"),
+        },
+    )
+
+
+@login_required
+@registrar_errores_vista("Error al agregar marca")
+@require_POST
+def agregar_marca_catalogo(request):
+    form = MarcaCatalogoForm(request.POST)
+
+    if not form.is_valid():
+        primer_error = next(
+            (str(e) for errores in form.errors.values() for e in errores),
+            "Revise los datos de la marca.",
+        )
+        messages.error(request, primer_error)
+        return redirect(_url_catalogo())
+
+    marca = form.save()
+    messages.success(request, f"Marca {marca.nombre} agregada correctamente.")
+    # Se deja seleccionada para poder cargarle modelos de inmediato.
+    return redirect(_url_catalogo(marca))
+
+
+@login_required
+@registrar_errores_vista("Error al agregar modelo")
+@require_POST
+def agregar_modelo_catalogo(request, marca_id):
+    marca = get_object_or_404(MarcaDispositivo, pk=marca_id)
+    form = ModeloCatalogoForm(request.POST, marca=marca)
+
+    if not form.is_valid():
+        primer_error = next(
+            (str(e) for errores in form.errors.values() for e in errores),
+            "Revise los datos del modelo.",
+        )
+        messages.error(request, primer_error)
+        return redirect(_url_catalogo(marca))
+
+    modelo = form.save()
+    messages.success(
+        request,
+        f"Modelo {modelo.nombre} agregado a {marca.nombre}.",
+    )
+    return redirect(_url_catalogo(marca))
+
+
+@login_required
+@registrar_errores_vista("Error al cambiar estado de marca")
+@require_POST
+def cambiar_estado_marca(request, marca_id):
+    # No se elimina: una marca puede estar referenciada por equipos y por sus
+    # propios modelos, y borrarla perderia historico. Desactivar la saca de los
+    # selectores sin tocar lo ya registrado.
+    marca = get_object_or_404(MarcaDispositivo, pk=marca_id)
+    marca.activo = not marca.activo
+    marca.save(update_fields=["activo"])
+
+    messages.success(
+        request,
+        f"Marca {marca.nombre} {'reactivada' if marca.activo else 'desactivada'}.",
+    )
+    return redirect(_url_catalogo(marca))
+
+
+@login_required
+@registrar_errores_vista("Error al cambiar estado de modelo")
+@require_POST
+def cambiar_estado_modelo(request, modelo_id):
+    modelo = get_object_or_404(
+        ModeloDispositivo.objects.select_related("marca"), pk=modelo_id
+    )
+    modelo.activo = not modelo.activo
+    modelo.save(update_fields=["activo"])
+
+    messages.success(
+        request,
+        f"Modelo {modelo.nombre} {'reactivado' if modelo.activo else 'desactivado'}.",
+    )
+    return redirect(_url_catalogo(modelo.marca))

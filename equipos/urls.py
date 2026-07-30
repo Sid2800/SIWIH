@@ -55,4 +55,44 @@ urlpatterns = [
         views.buscar_empleados,
         name='buscar_empleados_equipos'
     ),
+
+    # Catalogo de marcas y modelos. Es el unico lugar donde se dan de alta:
+    # el formulario de equipos solo permite elegir entre los existentes.
+    path(
+        'catalogo/marcas/',
+        views.catalogo_marcas_modelos,
+        name='catalogo_marcas_equipos'
+    ),
+    path(
+        'catalogo/marcas/agregar/',
+        views.agregar_marca_catalogo,
+        name='agregar_marca_equipos'
+    ),
+    path(
+        'catalogo/marcas/<int:marca_id>/estado/',
+        views.cambiar_estado_marca,
+        name='cambiar_estado_marca_equipos'
+    ),
+    path(
+        'catalogo/marcas/<int:marca_id>/modelos/agregar/',
+        views.agregar_modelo_catalogo,
+        name='agregar_modelo_equipos'
+    ),
+    path(
+        'catalogo/modelos/<int:modelo_id>/estado/',
+        views.cambiar_estado_modelo,
+        name='cambiar_estado_modelo_equipos'
+    ),
+
+    # Autocompletado de los Select2 dependientes del formulario de equipos.
+    path(
+        'buscar-marcas/',
+        views.buscar_marcas,
+        name='buscar_marcas_equipos'
+    ),
+    path(
+        'buscar-modelos/',
+        views.buscar_modelos,
+        name='buscar_modelos_equipos'
+    ),
 ]

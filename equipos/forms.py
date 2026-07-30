@@ -2,6 +2,7 @@ from datetime import date
 
 from django import forms
 from django.db.models import Q
+from django.urls import reverse
 
 from core.constants.choices_constants import EstadoRegistro
 from core.validators.image_validator import validar_imagen_basica
@@ -21,6 +22,7 @@ from .models import (
     TipoTecnologiaDispositivo,
     normalizar_inventario_bienes_nacionales,
     normalizar_inventario_numero_ficha,
+    normalizar_nombre_catalogo,
 )
 
 
@@ -493,13 +495,44 @@ class DispositivoCreateForm(forms.ModelForm):
 
         self.fields["tipo"].queryset = TipoDispositivo.objects.filter(filtro_tipo)
         self.fields["tipo"].empty_label = "Seleccione el tipo de equipo"
-        # Estos tres campos viven en el bloque "Datos adicionales (opcional)"
-        # del template, asi que el placeholder solo necesita decir que pasa al
-        # dejarlos vacios: el modelo los resuelve al catalogo INDEFINIDO.
+
+        # Marca y modelo se cargan por AJAX, asi que el HTML solo necesita
+        # contener la opcion ya elegida. Cargar los catalogos completos serian
+        # cientos de <option> inutiles en cada carga de pagina.
         self.fields["marca"].queryset = MarcaDispositivo.objects.filter(filtro_marca)
         self.fields["marca"].empty_label = "Sin especificar"
-        self.fields["modelo"].queryset = ModeloDispositivo.objects.filter(filtro_modelo)
-        self.fields["modelo"].empty_label = "Sin especificar"
+
+        # El modelo depende de la marca: su queryset se limita a los modelos de
+        # la marca en juego. Si llega un modelo de otra marca, queda fuera del
+        # queryset y Django lo rechaza. Eso cubre a la vez las dos reglas:
+        # rechazar la combinacion invalida y no conservar un modelo que ya no
+        # corresponde tras cambiar de marca.
+        marca_en_juego = self._resolver_marca_en_juego()
+
+        if marca_en_juego:
+            self.fields["modelo"].queryset = ModeloDispositivo.objects.filter(
+                filtro_modelo, marca_id=marca_en_juego
+            ).select_related("marca")
+        else:
+            self.fields["modelo"].queryset = ModeloDispositivo.objects.none()
+
+        self.fields["modelo"].empty_label = "INDEFINIDO"
+        # Sin esto el rechazo saldria como "Escoja una opcion valida", que no
+        # explica que el problema es la pareja marca-modelo.
+        self.fields["modelo"].error_messages["invalid_choice"] = (
+            "El modelo seleccionado no pertenece a la marca elegida."
+        )
+        self.fields["modelo"].widget.attrs["data-url-modelos"] = reverse(
+            "buscar_modelos_equipos"
+        )
+        self.fields["marca"].widget.attrs["data-url-marcas"] = reverse(
+            "buscar_marcas_equipos"
+        )
+
+        if not marca_en_juego:
+            # Sin marca no hay nada que elegir; el navegador tambien lo bloquea,
+            # pero el atributo deja el estado explicito en el HTML.
+            self.fields["modelo"].widget.attrs["disabled"] = "disabled"
         self.fields["area_gestora"].queryset = AreaGestora.objects.filter(
             filtro_area_gestora
         ).exclude(nombre="INDEFINIDO")
@@ -569,6 +602,22 @@ class DispositivoCreateForm(forms.ModelForm):
         self.fields["unidad_no_clinica"].empty_label = "Seleccione el área no clínica"
         self.fields["responsable"].empty_label = "Buscar empleado a cargo"
 
+    def _resolver_marca_en_juego(self):
+        """Marca vigente para acotar los modelos disponibles.
+
+        En un envio manda lo que llega en el POST, porque el usuario pudo haber
+        cambiado de marca. Al abrir la edicion, la del equipo guardado.
+        """
+        if self.is_bound:
+            valor = self.data.get(self.add_prefix("marca"))
+            return int(valor) if str(valor or "").isdigit() else None
+
+        if self.instance and self.instance.pk and self.instance.marca_id:
+            return self.instance.marca_id
+
+        valor = self.initial.get("marca")
+        return int(valor) if str(valor or "").isdigit() else None
+
     def clean_numero_serie(self):
         # Una cadena vacia se guarda como NULL para permitir varios equipos sin serie.
         return (self.cleaned_data.get("numero_serie") or "").strip() or None
@@ -621,3 +670,111 @@ class DispositivoCreateForm(forms.ModelForm):
             cleaned_data["area_clinica"] = None
 
         return cleaned_data
+
+
+class MarcaCatalogoForm(forms.ModelForm):
+    """Alta de marcas desde la vista de catalogo.
+
+    Las marcas no se crean desde el formulario de equipos: alli solo se eligen.
+    Concentrar el alta en un solo sitio evita que un error de tecleo genere
+    marcas duplicadas mientras alguien registra un aparato con prisa.
+    """
+
+    class Meta:
+        model = MarcaDispositivo
+        fields = ["nombre", "descripcion"]
+        widgets = {
+            "nombre": forms.TextInput(
+                attrs={
+                    "class": "formularioCampo-text",
+                    "id": "nombre_marca_catalogo",
+                    "placeholder": "Ej. PHILIPS",
+                    "maxlength": 100,
+                }
+            ),
+            "descripcion": forms.TextInput(
+                attrs={
+                    "class": "formularioCampo-text",
+                    "id": "descripcion_marca_catalogo",
+                    "placeholder": "Opcional",
+                    "maxlength": 250,
+                }
+            ),
+        }
+
+    def clean_nombre(self):
+        nombre = normalizar_nombre_catalogo(self.cleaned_data.get("nombre"))
+
+        if not nombre:
+            raise forms.ValidationError("Debe ingresar el nombre de la marca.")
+
+        duplicada = MarcaDispositivo.objects.filter(nombre=nombre).exclude(
+            pk=self.instance.pk
+        )
+        if duplicada.exists():
+            raise forms.ValidationError("Ya existe una marca con ese nombre.")
+
+        return nombre
+
+
+class ModeloCatalogoForm(forms.ModelForm):
+    """Alta de modelos dentro de una marca concreta.
+
+    La marca no es un campo del formulario: viene de la marca seleccionada en
+    la pantalla, para que no se pueda crear un modelo bajo otra marca
+    manipulando el POST.
+    """
+
+    class Meta:
+        model = ModeloDispositivo
+        fields = ["nombre", "descripcion"]
+        widgets = {
+            "nombre": forms.TextInput(
+                attrs={
+                    "class": "formularioCampo-text",
+                    "id": "nombre_modelo_catalogo",
+                    "placeholder": "Ej. INTELLIVUE MX450",
+                    "maxlength": 100,
+                }
+            ),
+            "descripcion": forms.TextInput(
+                attrs={
+                    "class": "formularioCampo-text",
+                    "id": "descripcion_modelo_catalogo",
+                    "placeholder": "Opcional",
+                    "maxlength": 250,
+                }
+            ),
+        }
+
+    def __init__(self, *args, marca=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.marca = marca
+        # Se asigna ya en la instancia porque _post_clean() valida el modelo
+        # antes de llegar a save(), y sin marca la validacion fallaria pidiendo
+        # un campo que este formulario no expone.
+        if marca is not None:
+            self.instance.marca = marca
+
+    def clean_nombre(self):
+        nombre = normalizar_nombre_catalogo(self.cleaned_data.get("nombre"))
+
+        if not nombre:
+            raise forms.ValidationError("Debe ingresar el nombre del modelo.")
+
+        if self.marca is None:
+            raise forms.ValidationError("Seleccione primero una marca.")
+
+        # El mismo nombre puede existir en otras marcas; solo se comprueba
+        # dentro de esta. La restriccion de base cubre la carrera entre dos
+        # envios simultaneos.
+        duplicado = ModeloDispositivo.objects.filter(
+            marca=self.marca, nombre=nombre
+        ).exclude(pk=self.instance.pk)
+
+        if duplicado.exists():
+            raise forms.ValidationError(
+                "Esta marca ya tiene un modelo con ese nombre."
+            )
+
+        return nombre

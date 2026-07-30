@@ -6908,7 +6908,135 @@ button.equipos-imagenes__vista:hover img {
    opacity: .55;
 }
 
+/* ---------------------------------------------------------------------
+   Catalogo de marcas y modelos
+   Dos columnas: marcas a la izquierda, modelos de la marca elegida a la
+   derecha. Se apilan en pantallas estrechas.
+   --------------------------------------------------------------------- */
+.equipos-catalogo {
+   align-items: start;
+   display: grid;
+   gap: 1.2rem;
+   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.equipos-catalogo__columna {
+   min-width: 0;
+}
+
+.equipos-catalogo__form {
+   align-items: end;
+   display: grid;
+   gap: 1rem;
+   grid-template-columns: minmax(0, 1fr) auto;
+   margin-bottom: 1.2rem;
+}
+
+.equipos-catalogo__boton {
+   height: auto;
+   min-height: 3.6rem;
+   padding: .6rem 1.4rem;
+   text-transform: none;
+   white-space: nowrap;
+   width: auto;
+}
+
+.equipos-catalogo__lista {
+   border-top: .1rem solid var(--colorLinea);
+   list-style: none;
+   margin: 0;
+   max-height: 46rem;
+   overflow-y: auto;
+   padding: 0;
+}
+
+.equipos-catalogo__item {
+   align-items: center;
+   border-bottom: .1rem solid var(--colorLinea);
+   display: flex;
+   gap: .6rem;
+   justify-content: space-between;
+}
+
+.equipos-catalogo__item:hover {
+   background-color: var(--colorMenuHover);
+}
+
+/* La marca abierta se resalta con una barra lateral, no con color de fondo,
+   para que siga leyendose igual en tema claro y oscuro. */
+.equipos-catalogo__item--activo {
+   border-left: .3rem solid var(--negro);
+}
+
+.equipos-catalogo__item--inactivo .equipos-catalogo__nombre {
+   opacity: .55;
+   text-decoration: line-through;
+}
+
+.equipos-catalogo__enlace {
+   align-items: baseline;
+   color: var(--negro);
+   display: flex;
+   flex: 1 1 auto;
+   flex-wrap: wrap;
+   gap: .2rem 1rem;
+   min-width: 0;
+   padding: .9rem 1rem;
+   text-decoration: none;
+}
+
+.equipos-catalogo__nombre {
+   font-size: 1.35rem;
+   overflow-wrap: anywhere;
+}
+
+.equipos-catalogo__conteo {
+   color: var(--colorTextoMenu);
+   font-size: 1.15rem;
+   margin-left: auto;
+   white-space: nowrap;
+}
+
+.equipos-catalogo__estado {
+   background: none;
+   border: none;
+   color: var(--colorTextoMenu);
+   cursor: pointer;
+   font-size: 1.9rem;
+   line-height: 1;
+   padding: .6rem 1rem;
+}
+
+.equipos-catalogo__estado:hover {
+   color: var(--negro);
+}
+
+.equipos-catalogo__vacio {
+   color: var(--colorTextoMenu);
+   font-size: 1.25rem;
+   line-height: 1.5;
+   padding: 1rem 0;
+}
+
+.equipos-catalogo__aviso {
+   align-items: center;
+   background-color: rgba(220, 53, 69, .12);
+   border: .1rem solid rgba(220, 53, 69, .45);
+   border-radius: .8rem;
+   color: #7f1d1d;
+   display: flex;
+   font-size: 1.2rem;
+   gap: .8rem;
+   line-height: 1.4;
+   margin: 0 0 1.2rem;
+   padding: .9rem 1.1rem;
+}
+
 @media (max-width: 900px) {
+   .equipos-catalogo {
+      grid-template-columns: 1fr;
+   }
+
    .equipos-imagenes__carga {
       grid-template-columns: 1fr;
    }

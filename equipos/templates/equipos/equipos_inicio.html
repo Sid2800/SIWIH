@@ -26,7 +26,11 @@
         </a>
     </div>
 
-    {# El módulo se limita actualmente a la gestión del inventario de equipos. #}
+    {% comment %}
+       El menu separa lo que se hace a diario con los equipos de lo que se
+       configura de vez en cuando. Los catalogos van aparte porque son datos
+       de apoyo: alimentan los selectores del inventario, no son inventario.
+    {% endcomment %}
     <div class="equipos-submenus">
         <section class="equipos-submenu">
             <header class="equipos-submenu__encabezado">
@@ -47,6 +51,24 @@
                     href="{% url 'listado_dispositivos_equipos' %}">
                     <i class="bi bi-list-ul"></i>
                     <span>Listado de equipos</span>
+                    <i class="bi bi-chevron-right"></i>
+                </a>
+            </div>
+        </section>
+
+        <section class="equipos-submenu">
+            <header class="equipos-submenu__encabezado">
+                <span class="equipos-submenu__icono">
+                    <i class="bi bi-tags"></i>
+                </span>
+                <h3>CATÁLOGOS</h3>
+            </header>
+
+            <div class="equipos-submenu__opciones">
+                <a class="equipos-submenu__opcion"
+                    href="{% url 'catalogo_marcas_equipos' %}">
+                    <i class="bi bi-diagram-3"></i>
+                    <span>Marcas y modelos</span>
                     <i class="bi bi-chevron-right"></i>
                 </a>
             </div>

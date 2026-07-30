@@ -1,0 +1,161 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Catálogo de marcas y modelos{% endblock title %}
+
+{% block content %}
+<div class="contenedor2 equipos-pagina equipos-pagina--ancha">
+    <div class="tituloFormulario">
+        <div class="equipos-encabezado-superior">
+            <div class="tituloFormulario-texto">
+                <i class="bi bi-tags"></i>
+                <div>
+                    <h2 class="sin-margen">Catálogo de marcas y modelos</h2>
+                    <p class="equipos-baja__subtitulo">
+                        Cada modelo pertenece a una marca. Aquí se dan de alta;
+                        al registrar un equipo solo se eligen.
+                    </p>
+                </div>
+            </div>
+            <a class="equipos-volver equipos-volver--inline equipos-encabezado-volver"
+               href="{{ url_regresar }}">
+                <i class="bi bi-arrow-left"></i>
+                Equipos
+            </a>
+        </div>
+        <div class="tituloFormulario-subrallado"></div>
+    </div>
+
+    <div class="equipos-catalogo">
+
+        {% comment %}
+           Columna izquierda: alta y listado de marcas. Se muestran activas e
+           inactivas porque desactivar no es esconder; desde aqui se reactiva.
+        {% endcomment %}
+        <section class="equipos-registro__seccion equipos-catalogo__columna">
+            <h3 class="equipos-registro__titulo">
+                <i class="bi bi-bookmark"></i>
+                Marcas
+            </h3>
+
+            <form class="equipos-catalogo__form"
+                  method="post"
+                  action="{% url 'agregar_marca_equipos' %}">
+                {% csrf_token %}
+                <div class="equipos-registro__campo">
+                    <label for="nombre_marca_catalogo">Nueva marca *</label>
+                    {{ form_marca.nombre }}
+                </div>
+                <button class="formularioBotones-boton equipos-catalogo__boton"
+                        type="submit">
+                    <i class="bi bi-plus-lg"></i>
+                    Agregar marca
+                </button>
+            </form>
+
+            <ul class="equipos-catalogo__lista">
+                {% for marca in marcas %}
+                    <li class="equipos-catalogo__item{% if marca_seleccionada and marca.pk == marca_seleccionada.pk %} equipos-catalogo__item--activo{% endif %}{% if not marca.activo %} equipos-catalogo__item--inactivo{% endif %}">
+                        <a class="equipos-catalogo__enlace"
+                           href="{% url 'catalogo_marcas_equipos' %}?marca={{ marca.pk }}">
+                            <span class="equipos-catalogo__nombre">{{ marca.nombre }}</span>
+                            <span class="equipos-catalogo__conteo">
+                                {{ marca.total_modelos }} modelo{{ marca.total_modelos|pluralize }}
+                            </span>
+                        </a>
+                        <form method="post"
+                              action="{% url 'cambiar_estado_marca_equipos' marca.pk %}">
+                            {% csrf_token %}
+                            <button class="equipos-catalogo__estado"
+                                    type="submit"
+                                    title="{% if marca.activo %}Desactivar{% else %}Reactivar{% endif %} {{ marca.nombre }}">
+                                {% if marca.activo %}
+                                    <i class="bi bi-toggle-on"></i>
+                                {% else %}
+                                    <i class="bi bi-toggle-off"></i>
+                                {% endif %}
+                            </button>
+                        </form>
+                    </li>
+                {% empty %}
+                    <li class="equipos-catalogo__vacio">Todavía no hay marcas.</li>
+                {% endfor %}
+            </ul>
+        </section>
+
+        {% comment %}
+           Columna derecha: modelos de la marca elegida. Sin marca seleccionada
+           no se muestra formulario, porque un modelo no puede existir suelto.
+        {% endcomment %}
+        <section class="equipos-registro__seccion equipos-catalogo__columna">
+            <h3 class="equipos-registro__titulo">
+                <i class="bi bi-diagram-3"></i>
+                {% if marca_seleccionada %}
+                    Modelos de {{ marca_seleccionada.nombre }}
+                {% else %}
+                    Modelos
+                {% endif %}
+            </h3>
+
+            {% if marca_seleccionada %}
+                {% if not marca_seleccionada.activo %}
+                    <p class="equipos-catalogo__aviso">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        Esta marca está desactivada: sus modelos no aparecerán al
+                        registrar equipos aunque estén activos.
+                    </p>
+                {% endif %}
+
+                <form class="equipos-catalogo__form"
+                      method="post"
+                      action="{% url 'agregar_modelo_equipos' marca_seleccionada.pk %}">
+                    {% csrf_token %}
+                    <div class="equipos-registro__campo">
+                        <label for="nombre_modelo_catalogo">Nuevo modelo *</label>
+                        {{ form_modelo.nombre }}
+                    </div>
+                    <button class="formularioBotones-boton equipos-catalogo__boton"
+                            type="submit">
+                        <i class="bi bi-plus-lg"></i>
+                        Agregar modelo
+                    </button>
+                </form>
+
+                <ul class="equipos-catalogo__lista">
+                    {% for modelo in modelos %}
+                        <li class="equipos-catalogo__item{% if not modelo.activo %} equipos-catalogo__item--inactivo{% endif %}">
+                            <span class="equipos-catalogo__enlace">
+                                <span class="equipos-catalogo__nombre">{{ modelo.nombre }}</span>
+                                <span class="equipos-catalogo__conteo">
+                                    {{ modelo.total_equipos }} equipo{{ modelo.total_equipos|pluralize }}
+                                </span>
+                            </span>
+                            <form method="post"
+                                  action="{% url 'cambiar_estado_modelo_equipos' modelo.pk %}">
+                                {% csrf_token %}
+                                <button class="equipos-catalogo__estado"
+                                        type="submit"
+                                        title="{% if modelo.activo %}Desactivar{% else %}Reactivar{% endif %} {{ modelo.nombre }}">
+                                    {% if modelo.activo %}
+                                        <i class="bi bi-toggle-on"></i>
+                                    {% else %}
+                                        <i class="bi bi-toggle-off"></i>
+                                    {% endif %}
+                                </button>
+                            </form>
+                        </li>
+                    {% empty %}
+                        <li class="equipos-catalogo__vacio">
+                            Esta marca todavía no tiene modelos.
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p class="equipos-catalogo__vacio">
+                    Seleccione una marca de la izquierda para ver y agregar sus
+                    modelos.
+                </p>
+            {% endif %}
+        </section>
+    </div>
+</div>
+{% endblock content %}

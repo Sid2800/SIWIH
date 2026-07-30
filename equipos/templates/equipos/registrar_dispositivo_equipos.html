@@ -658,6 +658,104 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     }
+
+    // ------------------------------------------------------------------
+    // Marca y modelo: dos Select2 encadenados.
+    // El catalogo tiene cientos de entradas, asi que se cargan por AJAX en
+    // vez de volcarlas en el HTML. No se activa "tags": marcas y modelos
+    // solo nacen desde la vista de catalogo, nunca escribiendo aqui.
+    // ------------------------------------------------------------------
+    const marcaSelect = $('#marca_dispositivo');
+    const modeloSelect = $('#modelo_dispositivo');
+
+    function configurarSelectRemoto(elemento, opciones) {
+        return elemento.select2({
+            width: '100%',
+            allowClear: true,
+            placeholder: opciones.placeholder,
+            ajax: {
+                url: opciones.url,
+                dataType: 'json',
+                delay: 250,
+                data: function (params) {
+                    // page permite el scroll infinito que pagina el servidor.
+                    return $.extend(
+                        { q: params.term || '', page: params.page || 1 },
+                        opciones.extra ? opciones.extra() : {}
+                    );
+                },
+                processResults: function (data) {
+                    return data;
+                },
+                cache: true
+            },
+            language: {
+                noResults: function () {
+                    return opciones.sinResultados;
+                },
+                searching: function () {
+                    return 'Buscando...';
+                }
+            }
+        });
+    }
+
+    function marcaElegida() {
+        const valor = marcaSelect.val();
+        return valor ? String(valor) : '';
+    }
+
+    function refrescarEstadoModelo() {
+        if (!modeloSelect.length) {
+            return;
+        }
+        // Sin marca no hay lista posible: el selector queda bloqueado en vez
+        // de ofrecer un catalogo completo del que se podria elegir mal.
+        const hayMarca = marcaElegida() !== '';
+        modeloSelect.prop('disabled', !hayMarca);
+    }
+
+    if (marcaSelect.length && marcaSelect.select2) {
+        configurarSelectRemoto(marcaSelect, {
+            url: marcaSelect.data('url-marcas'),
+            placeholder: 'Buscar o elegir marca',
+            sinResultados: 'No se encontraron marcas'
+        });
+    }
+
+    if (modeloSelect.length && modeloSelect.select2) {
+        configurarSelectRemoto(modeloSelect, {
+            url: modeloSelect.data('url-modelos'),
+            placeholder: 'Seleccione primero una marca',
+            sinResultados: 'Esta marca no tiene modelos activos',
+            extra: function () {
+                return { marca_id: marcaElegida() };
+            }
+        });
+
+        refrescarEstadoModelo();
+
+        marcaSelect.on('change', function () {
+            // Al cambiar de marca el modelo anterior deja de ser valido, asi
+            // que se limpia siempre: mantenerlo permitiria guardar una pareja
+            // marca-modelo que no existe.
+            modeloSelect.val(null).trigger('change.select2');
+            refrescarEstadoModelo();
+        });
+    }
+
+    // Select2 mide el ancho al arrancar. Dentro de un <details> cerrado los
+    // campos no tienen ancho, asi que se reajustan al desplegarlo.
+    const bloqueOpcionales = document.querySelector('.equipos-registro__opcionales');
+
+    if (bloqueOpcionales) {
+        bloqueOpcionales.addEventListener('toggle', function () {
+            if (bloqueOpcionales.open) {
+                $('#marca_dispositivo, #modelo_dispositivo')
+                    .trigger('change.select2');
+            }
+        });
+    }
 });
 </script>
 {% endblock media_js %}

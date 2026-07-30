@@ -124,7 +124,16 @@ class MarcaDispositivo(models.Model):
 
 
 class ModeloDispositivo(models.Model):
-    nombre = models.CharField(max_length=100, unique=True)
+    # Un modelo pertenece siempre a una marca. El mismo nombre puede repetirse
+    # entre marcas distintas (dos fabricantes pueden llamar igual a su equipo),
+    # pero no dentro de una misma marca.
+    marca = models.ForeignKey(
+        MarcaDispositivo,
+        on_delete=models.PROTECT,
+        related_name="modelos",
+        verbose_name="Marca",
+    )
+    nombre = models.CharField(max_length=100)
     descripcion = models.CharField(max_length=250, blank=True)
     activo = models.BooleanField(default=True, db_index=True)
 
@@ -132,13 +141,40 @@ class ModeloDispositivo(models.Model):
         db_table = "equipo_modelo_dispositivo"
         verbose_name = "Modelo de equipo"
         verbose_name_plural = "Modelos de equipo"
-        ordering = ["nombre"]
+        ordering = ["marca__nombre", "nombre"]
+        constraints = [
+            # La unicidad ya no es global: se limita a cada marca.
+            models.UniqueConstraint(
+                fields=["marca", "nombre"],
+                name="equipo_modelo_unico_por_marca",
+            ),
+        ]
+
+    @property
+    def nombre_completo(self):
+        # Util en admin y mensajes, donde el nombre suelto puede ser ambiguo.
+        return f"{self.marca.nombre} - {self.nombre}"
 
     def clean(self):
         # Misma regla que tipo/marca: nombres limpios y en mayuscula.
         self.nombre = normalizar_nombre_catalogo(self.nombre)
         if not self.nombre:
             raise ValidationError({"nombre": "Debe ingresar el modelo del equipo."})
+
+        if self.marca_id is None:
+            raise ValidationError({"marca": "Debe indicar la marca del modelo."})
+
+        # La restriccion de base cubre el duplicado; esto lo detecta antes para
+        # devolver un mensaje entendible en vez de un IntegrityError.
+        duplicado = ModeloDispositivo.objects.filter(
+            marca_id=self.marca_id,
+            nombre=self.nombre,
+        ).exclude(pk=self.pk)
+
+        if duplicado.exists():
+            raise ValidationError({
+                "nombre": "Esta marca ya tiene un modelo con ese nombre.",
+            })
 
     def save(self, *args, **kwargs):
         self.full_clean()
@@ -340,6 +376,14 @@ class Dispositivo(models.Model):
             return self.tipo.nombre
         return "SIN TIPO"
 
+    @property
+    def modelo_nombre(self):
+        # El modelo puede ser desconocido. En vez de crear una fila de catalogo
+        # para representarlo, se deja en NULL y se muestra asi en pantalla.
+        if self.modelo_id:
+            return self.modelo.nombre
+        return "INDEFINIDO"
+
     def clean(self):
         # Validaciones de negocio antes de guardar.
         # Aqui se normalizan opcionales y se revisan duplicados flexibles.
@@ -347,15 +391,22 @@ class Dispositivo(models.Model):
         self.numero_serie = (self.numero_serie or "").strip() or None
 
         if self.marca_id is None:
-            # Si no se conoce marca/modelo, no guardamos texto vacio:
-            # usamos el catalogo INDEFINIDO.
+            # Si no se conoce la marca no guardamos texto vacio: se usa el
+            # catalogo INDEFINIDO.
             self.marca = obtener_catalogo_indefinido(MarcaDispositivo)
-
-        if self.modelo_id is None:
-            self.modelo = obtener_catalogo_indefinido(ModeloDispositivo)
 
         if self.color_id is None:
             self.color = obtener_catalogo_indefinido(ColorDispositivo)
+
+        # El modelo es opcional porque a veces se desconoce; en ese caso queda
+        # en NULL y la interfaz lo presenta como INDEFINIDO. Pero si viene,
+        # tiene que ser de la marca elegida: no basta con el filtro del
+        # navegador, que un POST directo se salta.
+        if self.modelo_id and self.marca_id:
+            if self.modelo.marca_id != self.marca_id:
+                errores["modelo"] = (
+                    "El modelo seleccionado no pertenece a la marca indicada."
+                )
 
         try:
             self.inventario_bienes_nacionales = (

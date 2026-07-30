@@ -3,6 +3,7 @@ from io import BytesIO
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -26,6 +27,7 @@ from .models import (
     TipoDispositivo,
     TipoTecnologiaDispositivo,
 )
+from .forms import DispositivoCreateForm
 from .services.ficha_baja_pdf_service import FichaBajaPdfService
 
 
@@ -46,7 +48,10 @@ class EquiposViewsTests(TestCase):
         )
         cls.tipo = TipoDispositivo.objects.create(nombre="MONITOR")
         cls.marca = MarcaDispositivo.objects.create(nombre="MINDRAY")
-        cls.modelo = ModeloDispositivo.objects.create(nombre="BENE VIEW")
+        # Un modelo ya no existe suelto: cuelga siempre de su marca.
+        cls.modelo = ModeloDispositivo.objects.create(
+            marca=cls.marca, nombre="BENE VIEW"
+        )
         cls.area_gestora, _ = AreaGestora.objects.get_or_create(nombre="BIOMEDICA")
         cls.color, _ = ColorDispositivo.objects.get_or_create(nombre="BLANCO")
         cls.servicio = Servicio.objects.create(
@@ -188,6 +193,7 @@ class EquiposViewsTests(TestCase):
             'registrar_dispositivo_equipos',
             'listado_dispositivos_equipos',
             'buscar_dispositivo_equipos',
+            'catalogo_marcas_equipos',
         ]
 
         for nombre_ruta in nombres_rutas:
@@ -195,6 +201,13 @@ class EquiposViewsTests(TestCase):
                 respuesta = self.client.get(reverse(nombre_ruta))
 
                 self.assertEqual(respuesta.status_code, 200)
+
+    def test_el_menu_enlaza_al_catalogo_de_marcas(self):
+        # Sin enlace la pantalla existe pero nadie la encuentra.
+        respuesta = self.client.get(reverse('inicio_equipos'))
+
+        self.assertContains(respuesta, reverse('catalogo_marcas_equipos'))
+        self.assertContains(respuesta, 'Marcas y modelos')
 
     def test_url_equipos_es_canonica(self):
         self.assertEqual(reverse("inicio_equipos"), "/equipos/")
@@ -206,18 +219,21 @@ class EquiposViewsTests(TestCase):
             f"/equipos/dispositivos/{self.dispositivo.id}/",
         )
 
-    def test_inicio_solo_muestra_opciones_del_inventario(self):
+    def test_inicio_muestra_inventario_y_catalogos_sin_opciones_inexistentes(self):
+        # El menu tiene dos secciones: lo que se opera a diario y lo que se
+        # configura. Sigue sin anunciar funciones que aun no existen.
         respuesta = self.client.get(reverse("inicio_equipos"))
 
         self.assertEqual(respuesta.status_code, 200)
         self.assertContains(respuesta, "Registrar equipo")
         self.assertContains(respuesta, "Listado de equipos")
         self.assertContains(respuesta, "Buscar equipo")
+        self.assertContains(respuesta, "Marcas y modelos")
         self.assertEqual(
             respuesta.content.decode().count(
                 '<section class="equipos-submenu">'
             ),
-            1,
+            2,
         )
         self.assertNotContains(respuesta, "Registrar mantenimiento")
         self.assertNotContains(respuesta, "Reporte de inventario")
@@ -1296,3 +1312,245 @@ class EquiposViewsTests(TestCase):
         self.assertEqual(respuesta.status_code, 200)
         self.assertEqual(respuesta.context['consulta'], 'Monitor EQ-001')
         self.assertContains(respuesta, 'Monitor EQ-001')
+
+
+    # --- Pareja marca-modelo: se valida en el servidor, no solo en el
+    #     navegador, porque un POST directo se salta el filtro del Select2.
+
+    def test_registro_rechaza_un_modelo_de_otra_marca(self):
+        otra_marca = MarcaDispositivo.objects.create(nombre="PHILIPS")
+        modelo_ajeno = ModeloDispositivo.objects.create(
+            marca=otra_marca, nombre="INTELLIVUE MX450"
+        )
+
+        respuesta = self.client.post(
+            reverse("registrar_dispositivo_equipos"),
+            self._datos_formulario_dispositivo(
+                marca=self.marca.id,
+                modelo=modelo_ajeno.id,
+                numero_serie="SERIE-COMBINACION",
+            ),
+        )
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertFalse(
+            Dispositivo.objects.filter(numero_serie="SERIE-COMBINACION").exists()
+        )
+
+    def test_edicion_rechaza_un_modelo_de_otra_marca(self):
+        otra_marca = MarcaDispositivo.objects.create(nombre="DRAGER")
+        modelo_ajeno = ModeloDispositivo.objects.create(
+            marca=otra_marca, nombre="EVITA V300"
+        )
+        datos = self._datos_formulario_dispositivo(
+            marca=self.marca.id,
+            modelo=modelo_ajeno.id,
+        )
+        datos.pop("foto_general")
+
+        respuesta = self.client.post(
+            reverse("editar_dispositivo_equipos", args=[self.dispositivo.id]),
+            datos,
+        )
+
+        self.dispositivo.refresh_from_db()
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(self.dispositivo.modelo, self.modelo)
+
+    def test_cambiar_de_marca_descarta_el_modelo_incompatible(self):
+        # Al enviar otra marca, el modelo anterior deja de estar entre las
+        # opciones validas: el formulario no lo conserva.
+        otra_marca = MarcaDispositivo.objects.create(nombre="GE HEALTHCARE")
+        form = DispositivoCreateForm(
+            data=self._datos_formulario_dispositivo(
+                marca=otra_marca.id,
+                modelo=self.modelo.id,
+            )
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("modelo", form.errors)
+        self.assertNotIn(
+            self.modelo, form.fields["modelo"].queryset
+        )
+
+    def test_equipo_sin_modelo_se_muestra_como_indefinido(self):
+        self.dispositivo.modelo = None
+        self.dispositivo.save()
+
+        respuesta = self.client.get(
+            reverse("detalle_dispositivo_equipos", args=[self.dispositivo.id])
+        )
+
+        self.assertIsNone(self.dispositivo.modelo_id)
+        self.assertEqual(self.dispositivo.modelo_nombre, "INDEFINIDO")
+        self.assertContains(respuesta, "INDEFINIDO")
+
+    def test_registro_acepta_dejar_el_modelo_vacio(self):
+        respuesta = self.client.post(
+            reverse("registrar_dispositivo_equipos"),
+            self._datos_formulario_dispositivo(
+                modelo="",
+                numero_serie="SERIE-SIN-MODELO",
+            ),
+        )
+
+        equipo = Dispositivo.objects.filter(
+            numero_serie="SERIE-SIN-MODELO"
+        ).first()
+
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertIsNotNone(equipo)
+        self.assertIsNone(equipo.modelo_id)
+        self.assertEqual(equipo.modelo_nombre, "INDEFINIDO")
+
+
+class CatalogoMarcaModeloTests(TestCase):
+    """Relacion marca-modelo, endpoints de autocompletado y vista de catalogo."""
+
+    databases = {"default"}
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.usuario = get_user_model().objects.create_user(
+            username="catalogo", password="clave-catalogo"
+        )
+        cls.philips = MarcaDispositivo.objects.create(nombre="PHILIPS")
+        cls.mindray = MarcaDispositivo.objects.create(nombre="MINDRAY")
+
+    def setUp(self):
+        self.client.force_login(self.usuario)
+
+    # --- Modelo de datos -------------------------------------------------
+
+    def test_una_marca_admite_varios_modelos(self):
+        ModeloDispositivo.objects.create(marca=self.philips, nombre="MX450")
+        ModeloDispositivo.objects.create(marca=self.philips, nombre="MX500")
+
+        self.assertEqual(self.philips.modelos.count(), 2)
+
+    def test_no_permite_repetir_modelo_en_la_misma_marca(self):
+        ModeloDispositivo.objects.create(marca=self.philips, nombre="MX450")
+
+        with self.assertRaises(ValidationError):
+            ModeloDispositivo.objects.create(marca=self.philips, nombre="MX450")
+
+    def test_permite_el_mismo_nombre_en_marcas_distintas(self):
+        uno = ModeloDispositivo.objects.create(marca=self.philips, nombre="SERIE 100")
+        otro = ModeloDispositivo.objects.create(marca=self.mindray, nombre="SERIE 100")
+
+        self.assertNotEqual(uno.pk, otro.pk)
+        self.assertEqual(uno.nombre, otro.nombre)
+
+    def test_normaliza_el_nombre_a_mayusculas(self):
+        modelo = ModeloDispositivo.objects.create(
+            marca=self.philips, nombre="  intellivue mx550  "
+        )
+
+        self.assertEqual(modelo.nombre, "INTELLIVUE MX550")
+
+    # --- Endpoints de autocompletado -------------------------------------
+
+    def test_endpoint_de_modelos_solo_devuelve_los_de_la_marca_pedida(self):
+        ModeloDispositivo.objects.create(marca=self.philips, nombre="MX450")
+        ModeloDispositivo.objects.create(marca=self.mindray, nombre="BENEVISION")
+
+        respuesta = self.client.get(
+            reverse("buscar_modelos_equipos"), {"marca_id": self.philips.pk}
+        )
+        textos = [r["text"] for r in respuesta.json()["results"]]
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(textos, ["MX450"])
+
+    def test_endpoint_de_modelos_exige_marca(self):
+        respuesta = self.client.get(reverse("buscar_modelos_equipos"))
+
+        self.assertEqual(respuesta.status_code, 400)
+        self.assertEqual(respuesta.json()["results"], [])
+
+    def test_endpoint_de_modelos_omite_los_inactivos(self):
+        ModeloDispositivo.objects.create(marca=self.philips, nombre="VIGENTE")
+        ModeloDispositivo.objects.create(
+            marca=self.philips, nombre="RETIRADO", activo=False
+        )
+
+        respuesta = self.client.get(
+            reverse("buscar_modelos_equipos"), {"marca_id": self.philips.pk}
+        )
+        textos = [r["text"] for r in respuesta.json()["results"]]
+
+        self.assertEqual(textos, ["VIGENTE"])
+
+    def test_endpoint_de_marcas_omite_las_inactivas(self):
+        MarcaDispositivo.objects.create(nombre="DESCONTINUADA", activo=False)
+
+        respuesta = self.client.get(reverse("buscar_marcas_equipos"))
+        textos = [r["text"] for r in respuesta.json()["results"]]
+
+        self.assertIn("PHILIPS", textos)
+        self.assertNotIn("DESCONTINUADA", textos)
+
+    def test_endpoint_de_marcas_informa_si_hay_mas_paginas(self):
+        for indice in range(25):
+            MarcaDispositivo.objects.create(nombre=f"MARCA {indice:03d}")
+
+        respuesta = self.client.get(reverse("buscar_marcas_equipos"))
+        cuerpo = respuesta.json()
+
+        self.assertEqual(len(cuerpo["results"]), 20)
+        self.assertTrue(cuerpo["pagination"]["more"])
+
+    # --- Vista de catalogo -----------------------------------------------
+
+    def test_catalogo_crea_una_marca(self):
+        respuesta = self.client.post(
+            reverse("agregar_marca_equipos"), {"nombre": "ge healthcare"}
+        )
+
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertTrue(
+            MarcaDispositivo.objects.filter(nombre="GE HEALTHCARE").exists()
+        )
+
+    def test_catalogo_rechaza_una_marca_duplicada(self):
+        self.client.post(reverse("agregar_marca_equipos"), {"nombre": "philips"})
+
+        self.assertEqual(
+            MarcaDispositivo.objects.filter(nombre="PHILIPS").count(), 1
+        )
+
+    def test_catalogo_crea_un_modelo_dentro_de_la_marca(self):
+        self.client.post(
+            reverse("agregar_modelo_equipos", args=[self.philips.pk]),
+            {"nombre": "intellivue mx700"},
+        )
+
+        modelo = ModeloDispositivo.objects.get(nombre="INTELLIVUE MX700")
+        self.assertEqual(modelo.marca, self.philips)
+
+    def test_catalogo_muestra_solo_los_modelos_de_la_marca_elegida(self):
+        ModeloDispositivo.objects.create(marca=self.philips, nombre="MX450")
+        ModeloDispositivo.objects.create(marca=self.mindray, nombre="BENEVISION")
+
+        respuesta = self.client.get(
+            reverse("catalogo_marcas_equipos"), {"marca": self.philips.pk}
+        )
+
+        self.assertContains(respuesta, "MX450")
+        self.assertNotContains(respuesta, "BENEVISION")
+
+    def test_catalogo_desactiva_y_reactiva_sin_borrar(self):
+        modelo = ModeloDispositivo.objects.create(
+            marca=self.philips, nombre="MX450"
+        )
+        url = reverse("cambiar_estado_modelo_equipos", args=[modelo.pk])
+
+        self.client.post(url)
+        modelo.refresh_from_db()
+        self.assertFalse(modelo.activo)
+
+        self.client.post(url)
+        modelo.refresh_from_db()
+        self.assertTrue(modelo.activo)
+        self.assertTrue(ModeloDispositivo.objects.filter(pk=modelo.pk).exists())
