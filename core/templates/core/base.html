@@ -32,6 +32,9 @@
    <link rel="stylesheet" href="{% static 'core/tom-select/css/tom-select.css' %}">
    <link rel="stylesheet" href="{% static 'core/select2/css/select2.min.css' %}">
    <link rel="stylesheet" href="{% static 'core/virtual-select/css/virtual-select.min.css' %}">
+   {% comment %} flatpickr controles de tiempo perzonalizados {% endcomment %}
+   <link rel="stylesheet" href="{% static 'core/flatpickr/css/flatpickr.min.css' %}">
+   
    <!-- DataTables -->
    <link rel="stylesheet" href="{% static 'core/datatables/css/dataTables.dataTables.css' %}">
    <link rel="stylesheet" href="{% static 'core/datatables/css/responsive.dataTables.css' %}">
@@ -559,16 +562,20 @@
    <script src="{% static 'core/datatables/js/buttons.html5.min.js' %}"></script>
    <script src="{% static 'core/datatables/js/buttons.print.min.js' %}"></script>
 
-   <!-- Excel export -->
+
    <script src="{% static 'core/datatables/jszip/jszip.min.js' %}"></script>
 
-   <script src="{% static 'core/select2/js/select2.min.js' %}"></script>
 
-   <script src="{% static 'core/inputmask/inputmask.js' %}"></script>
+{% comment %} CONTRLES PRESONALIZADOS {% endcomment %}
+<script src="{% static 'core/select2/js/select2.min.js' %}"></script>
+<script src="{% static 'core/inputmask/inputmask.js' %}"></script>
+<script src="{% static 'core/tom-select/js/tom-select.complete.min.js' %}"></script>
+<script src="{% static 'core/virtual-select/js/virtual-select.min.js' %}"></script>
 
-   <script src="{% static 'core/tom-select/js/tom-select.complete.min.js' %}"></script>
 
-   <script src="{% static 'core/virtual-select/js/virtual-select.min.js' %}"></script>
+
+<script src="{% static 'core/flatpickr/js/es.js' %}"></script>
+<script src="{% static 'core/flatpickr/js/flatpickr.js' %}"></script>
 
 
 
