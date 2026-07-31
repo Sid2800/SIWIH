@@ -46,8 +46,42 @@
         {% endif %}
     </div>
 
-    <!-- Filtros -->
+    <!-- Filtros. El reporte se actualiza solo al cambiar cualquier filtro; no
+         hay botón "Generar". Los sub-selectores de trimestre/semestre/año
+         aparecen únicamente cuando el rango lo requiere. -->
     <div class="sexp-reportes-filtros">
+        <div class="sexp-filtro-grupo">
+            <label>Rango</label>
+            <select id="filtro-rango">
+                <option value="">Personalizado</option>
+                <option value="diario">Hoy</option>
+                <option value="semanal">Esta Semana</option>
+                <option value="mensual" selected>Este Mes</option>
+                <option value="trimestral">Trimestre</option>
+                <option value="semestral">Semestre</option>
+                <option value="anual">Año</option>
+            </select>
+        </div>
+        <div class="sexp-filtro-grupo" id="grupo-anio" style="display:none;">
+            <label>Año</label>
+            <select id="filtro-anio"></select>
+        </div>
+        <div class="sexp-filtro-grupo" id="grupo-trimestre" style="display:none;">
+            <label>Trimestre</label>
+            <select id="filtro-trimestre">
+                <option value="1">1.º (Ene–Mar)</option>
+                <option value="2">2.º (Abr–Jun)</option>
+                <option value="3">3.º (Jul–Sep)</option>
+                <option value="4">4.º (Oct–Dic)</option>
+            </select>
+        </div>
+        <div class="sexp-filtro-grupo" id="grupo-semestre" style="display:none;">
+            <label>Semestre</label>
+            <select id="filtro-semestre">
+                <option value="1">1.º (Ene–Jun)</option>
+                <option value="2">2.º (Jul–Dic)</option>
+            </select>
+        </div>
         <div class="sexp-filtro-grupo">
             <label>Fecha Inicio</label>
             <input type="date" id="filtro-fecha-inicio">
@@ -56,25 +90,19 @@
             <label>Fecha Fin</label>
             <input type="date" id="filtro-fecha-fin">
         </div>
-        <div class="sexp-filtro-grupo">
-            <label>Rango Rápido</label>
-            <select id="filtro-rango">
-                <option value="">Personalizado</option>
-                <option value="diario">Hoy</option>
-                <option value="semanal">Esta Semana</option>
-                <option value="mensual" selected>Este Mes</option>
-                <option value="trimestral">Este Trimestre</option>
-                <option value="semestral">Este Semestre</option>
-                <option value="anual">Este Año</option>
+
+        <!-- Exportación: tipo de reporte junto a los botones -->
+        <div class="sexp-filtro-grupo sexp-filtro-grupo--export">
+            <label>Tipo de Reporte a exportar</label>
+            <select id="filtro-tipo-reporte">
+                <option value="solicitudes" selected>Cantidad de solicitudes por motivo y área</option>
+                <option value="expedientes">Cantidad de expedientes solicitados por motivo y área</option>
             </select>
         </div>
-        <button class="sexp-filtro-btn" id="btn-generar-reporte">
-            <i class="bi bi-funnel"></i> Generar
-        </button>
-        <button class="sexp-filtro-btn sexp-filtro-btn--export" id="btn-exportar-excel">
+        <button class="sexp-filtro-btn sexp-filtro-btn--export" id="btn-exportar-excel" disabled>
             <i class="bi bi-file-earmark-spreadsheet"></i> Excel
         </button>
-        <button class="sexp-filtro-btn" id="btn-exportar-pdf" style="background:#ef4444;color:#fff;">
+        <button class="sexp-filtro-btn" id="btn-exportar-pdf" style="background:#ef4444;color:#fff;" disabled>
             <i class="bi bi-file-earmark-pdf"></i> PDF
         </button>
     </div>
@@ -123,14 +151,14 @@
             <div class="sexp-reporte-card">
                 <h3><i class="bi bi-building"></i> Demanda por Área</h3>
                 <table class="sexp-reporte-tabla">
-                    <thead><tr><th>Área</th><th>Solicitudes</th></tr></thead>
+                    <thead><tr><th>Área</th><th>Solicitudes</th><th>Expedientes</th></tr></thead>
                     <tbody id="tbody-areas"></tbody>
                 </table>
             </div>
             <div class="sexp-reporte-card">
                 <h3><i class="bi bi-pie-chart"></i> Motivos de Uso</h3>
                 <table class="sexp-reporte-tabla">
-                    <thead><tr><th>Motivo</th><th>Cantidad</th></tr></thead>
+                    <thead><tr><th>Motivo</th><th>Solicitudes</th><th>Expedientes</th></tr></thead>
                     <tbody id="tbody-motivos"></tbody>
                 </table>
             </div>
