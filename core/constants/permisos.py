@@ -300,6 +300,14 @@ ROLES_GLOBALES = ['directivo', 'admin']
 
 
 
+# -----------------------------
+# PERMISOS APP AGENDA MEDICA
+# -----------------------------
+AGENDA_MEDICA_EDITOR_ROLES = ['admin', ]
+AGENDA_MEDICA_EDITOR_UNIDADES = ['ADMI']
+
+AGENDA_MEDICA_VISUALIZACION_ROLES = ["admin", "digitador", "directivo"]
+AGENDA_MEDICA_VISUALIZACION_UNIDADES = ["ADMI"]
 
 # -----------------------------
 # PERMISOS APP S_EXP    solo estan declarados no se usan

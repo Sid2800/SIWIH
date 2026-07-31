@@ -60,3 +60,9 @@ def construir_nombre_dinamico(obj, campos):
     return " ".join(
             filter(None, [getattr(obj, campo, "") for campo in campos])
         ).strip()
+
+
+def str_to_bool(value, default=True):
+    if value is None:
+        return default
+    return value in ["1", "true", "True"]

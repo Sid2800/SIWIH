@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     'referencia',
     'clinico',
     'usuario',
+    'agenda_medica',
     's_exp',
     'mapeo_camas',
     'rrhh'

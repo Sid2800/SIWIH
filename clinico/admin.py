@@ -1,5 +1,5 @@
 from django.contrib import admin
-from clinico.models import Diagnostico, CIE10, Tipo_personal_salud, Condicion_paciente, Especialidad
+from clinico.models import Diagnostico, CIE10, Tipo_personal_salud, Condicion_paciente, Especialidad, Tipo_atencion
 
 # Register your models here.
 class CIE10Admin(admin.ModelAdmin):
@@ -81,9 +81,19 @@ class UnidadClinicaAdmin(admin.ModelAdmin):
         return "-"
 
 
+class TipoAtencionAdmin(admin.ModelAdmin):
+    list_display = ('nombre_tipo_atencion', 'prioridad_display', 'estado')
+    search_fields = ('nombre_tipo_atencion',)
+    list_filter = ('prioridad', 'estado')
+    ordering = ('nombre_tipo_atencion',)
+
+    def prioridad_display(self, obj):
+        return obj.get_prioridad_display()
+
 
 admin.site.register(CIE10, CIE10Admin)
 admin.site.register(Diagnostico,DiagnosticoAdmin)
 admin.site.register(Tipo_personal_salud, TipoPersonalSaludAdmin)
 admin.site.register(Especialidad, EspecialidadAdmin)
 admin.site.register(Condicion_paciente,CondicionPacienteAdmin)
+admin.site.register(Tipo_atencion, TipoAtencionAdmin)

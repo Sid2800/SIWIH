@@ -808,7 +808,13 @@ async function enviarFormulario() {
                 ¿Coincide con los datos que está registrando?
             `;
 
-            const resultadoModal = await confirmarAccion(titulo, mensaje, "SI", "NO");
+            const resultadoModal = await confirmarAccion({
+                                                            titulo: titulo,
+                                                            mensajes: [mensaje],
+                                                            botonAfirmativo: "SI",
+                                                            botonNegativo: "NO"
+                                                        });
+                                                        
             if (resultadoModal){
                 formData.append("idExterno", externo.id)
             }

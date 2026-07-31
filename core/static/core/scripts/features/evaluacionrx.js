@@ -583,7 +583,10 @@ document.addEventListener('DOMContentLoaded', function () {
                         const titulo = `Desactivar Evaluacion RX`;
                         const mensaje = `¿ Realmente desea desactivar la evalucion imagenologia, es un proceso irreversible ?`;
                         
-                        const resultado = await confirmarAccion(titulo, mensaje);
+                        const resultado = await confirmarAccion({
+                                                                    titulo: titulo,
+                                                                    mensajes: [mensaje]
+                                                                });
                         
                         if (resultado) {
                             // Desactiva el botón aquí para evitar múltiples clics
@@ -676,7 +679,10 @@ document.addEventListener('DOMContentLoaded', function () {
                     const titulo = "Paciente Interno Encontrado";
                     const mensaje = `El DNI ${externo.dni} pertenece a ${pacienteInternoExistente.nombreCompleto}. ¿Desea ligar esta evaluación a su expediente?`;
 
-                    const resultadoModal = await confirmarAccion(titulo, mensaje);
+                    const resultadoModal = await confirmarAccion({
+                                                                    titulo: titulo,
+                                                                    mensajes: [mensaje]
+                                                                });
 
                     if (resultadoModal) {
                         formData.append("paciente_ligado_id", pacienteInternoExistente.id);
@@ -733,7 +739,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (data.success) {
                 toastr.success("Proceso realizado correctamente");
                 setTimeout(() => {
-                  window.location.href = data.redirect_url;
+                    window.location.href = data.redirect_url;
                 }, 1000);
                 return;
             } else {

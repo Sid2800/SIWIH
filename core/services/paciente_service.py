@@ -924,7 +924,7 @@ class PacienteService:
 
         fecha = paciente.fecha_nacimiento
 
-        # Asegurar formato string si tu función lo requiere
+        # Asegurar formato string 
         if not isinstance(fecha, str):
             fecha = fecha.strftime("%Y-%m-%d")
 
