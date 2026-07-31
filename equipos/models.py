@@ -377,6 +377,17 @@ class Dispositivo(models.Model):
         return "SIN TIPO"
 
     @property
+    def costo_formateado(self):
+        # Honduras escribe el dinero con coma para los miles y punto para los
+        # decimales: L 1,234.56. Django, con LANGUAGE_CODE = "es", localiza al
+        # formato español (1234,56) y dejaria la pantalla contradiciendo al
+        # formulario, que espera el punto. Por eso se formatea aqui y la
+        # plantilla imprime esta cadena tal cual.
+        if self.costo_adquisicion is None:
+            return ""
+        return f"{self.costo_adquisicion:,.2f}"
+
+    @property
     def modelo_nombre(self):
         # El modelo puede ser desconocido. En vez de crear una fila de catalogo
         # para representarlo, se deja en NULL y se muestra asi en pantalla.

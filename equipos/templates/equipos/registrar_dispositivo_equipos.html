@@ -61,6 +61,16 @@
                     {{ form.tipo_tecnologia }}
                     {{ form.tipo_tecnologia.errors }}
                 </div>
+                {% comment %}
+                   La ficha identifica al equipo en el archivo fisico, asi que
+                   se consulta a diario y vive arriba, aunque siga siendo
+                   opcional. El campo del modelo no cambio de nombre.
+                {% endcomment %}
+                <div class="equipos-registro__campo">
+                    <label for="inventario_numero_ficha">Ficha</label>
+                    {{ form.inventario_numero_ficha }}
+                    {{ form.inventario_numero_ficha.errors }}
+                </div>
             </div>
         </section>
 
@@ -195,7 +205,7 @@
            usuario no tenga que buscarlo.
         {% endcomment %}
         <details class="equipos-registro__opcionales"
-                 {% if form.marca.errors or form.modelo.errors or form.color.errors or form.numero_serie.errors or form.inventario_bienes_nacionales.errors or form.inventario_numero_ficha.errors or form.frecuencia_mantenimiento_meses.errors or form.fecha_instalacion.errors or form.fin_garantia.errors or form.costo_adquisicion.errors or form.observaciones.errors %}open{% endif %}>
+                 {% if form.marca.errors or form.modelo.errors or form.color.errors or form.numero_serie.errors or form.inventario_bienes_nacionales.errors or form.frecuencia_mantenimiento_meses.errors or form.fecha_instalacion.errors or form.fin_garantia.errors or form.costo_adquisicion.errors or form.observaciones.errors %}open{% endif %}>
             <summary class="equipos-registro__opcionales-resumen">
                 <h3 class="equipos-registro__opcionales-titulo">
                     <i class="bi bi-sliders"></i>
@@ -233,11 +243,6 @@
                         <label for="inventario_bienes_nacionales">Inventario de bienes nacionales</label>
                         {{ form.inventario_bienes_nacionales }}
                         {{ form.inventario_bienes_nacionales.errors }}
-                    </div>
-                    <div class="equipos-registro__campo">
-                        <label for="inventario_numero_ficha">Inventario número de ficha</label>
-                        {{ form.inventario_numero_ficha }}
-                        {{ form.inventario_numero_ficha.errors }}
                     </div>
                     <div class="equipos-registro__campo">
                         <label for="frecuencia_dispositivo">Frecuencia de mantenimiento</label>
@@ -741,6 +746,20 @@ document.addEventListener('DOMContentLoaded', function () {
             // marca-modelo que no existe.
             modeloSelect.val(null).trigger('change.select2');
             refrescarEstadoModelo();
+        });
+    }
+
+    // ------------------------------------------------------------------
+    // Tipo de equipo: mismo Select2 remoto que la marca, pero sin depender
+    // de nadie. Tampoco lleva "tags": los tipos solo nacen en el catalogo.
+    // ------------------------------------------------------------------
+    const tipoSelect = $('#tipo_dispositivo');
+
+    if (tipoSelect.length && tipoSelect.select2) {
+        configurarSelectRemoto(tipoSelect, {
+            url: tipoSelect.data('url-tipos'),
+            placeholder: 'Buscar o elegir tipo de equipo',
+            sinResultados: 'No se encontraron tipos de equipo'
         });
     }
 

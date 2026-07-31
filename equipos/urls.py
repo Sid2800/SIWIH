@@ -84,7 +84,31 @@ urlpatterns = [
         name='cambiar_estado_modelo_equipos'
     ),
 
-    # Autocompletado de los Select2 dependientes del formulario de equipos.
+    # Tipos de equipo: comparten la pantalla de catalogo porque son la misma
+    # tarea de mantenimiento. A diferencia de marcas y modelos, se pueden
+    # renombrar para corregir erratas sin duplicar el catalogo.
+    path(
+        'catalogo/tipos/agregar/',
+        views.agregar_tipo_catalogo,
+        name='agregar_tipo_equipos'
+    ),
+    path(
+        'catalogo/tipos/<int:tipo_id>/editar/',
+        views.editar_tipo_catalogo,
+        name='editar_tipo_equipos'
+    ),
+    path(
+        'catalogo/tipos/<int:tipo_id>/estado/',
+        views.cambiar_estado_tipo,
+        name='cambiar_estado_tipo_equipos'
+    ),
+
+    # Autocompletado de los Select2 del formulario de equipos.
+    path(
+        'buscar-tipos/',
+        views.buscar_tipos,
+        name='buscar_tipos_equipos'
+    ),
     path(
         'buscar-marcas/',
         views.buscar_marcas,

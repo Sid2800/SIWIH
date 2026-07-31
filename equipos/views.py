@@ -26,6 +26,7 @@ from .forms import (
     ImagenDispositivoForm,
     MarcaCatalogoForm,
     ModeloCatalogoForm,
+    TipoCatalogoForm,
     TIPOS_IMAGEN_DISPOSITIVO,
 )
 from .models import (
@@ -1102,6 +1103,25 @@ def _paginar_autocompletado(queryset, request, construir):
 
 
 @login_required
+@registrar_errores_vista("Error al buscar tipos de equipo")
+def buscar_tipos(request):
+    # Alimenta el Select2 de tipo. Mismo patron que marcas: sin texto devuelve
+    # las primeras para poder abrir y elegir con el raton sin escribir nada.
+    consulta = request.GET.get("q", "").strip()
+    tipos = TipoDispositivo.objects.filter(activo=True)
+
+    if consulta:
+        tipos = tipos.filter(nombre__icontains=consulta)
+
+    pagina = _paginar_autocompletado(
+        tipos.order_by("nombre"),
+        request,
+        lambda tipo: {"id": tipo.id, "text": tipo.nombre},
+    )
+    return _respuesta_select2(pagina)
+
+
+@login_required
 @registrar_errores_vista("Error al buscar marcas de equipo")
 def buscar_marcas(request):
     # Alimenta el Select2 de marca. Sin texto devuelve las primeras marcas para
@@ -1213,15 +1233,36 @@ def _marca_seleccionada(request):
     return MarcaDispositivo.objects.filter(pk=int(marca_id)).first()
 
 
-def _url_catalogo(marca=None):
+def _tipo_en_edicion(request):
+    # El tipo que se esta editando viaja por querystring, igual que la marca
+    # seleccionada, para que recargar la pantalla no pierda el contexto.
+    tipo_id = (request.GET.get("tipo") or "").strip()
+
+    if not tipo_id.isdigit():
+        return None
+
+    return TipoDispositivo.objects.filter(pk=int(tipo_id)).first()
+
+
+def _url_catalogo(marca=None, tipo=None):
+    # Marca y tipo son secciones independientes de la misma pantalla, asi que
+    # se conservan ambas para no perder una al operar sobre la otra.
     url = reverse("catalogo_marcas_equipos")
-    return f"{url}?marca={marca.pk}" if marca else url
+    partes = []
+
+    if marca:
+        partes.append(f"marca={marca.pk}")
+    if tipo:
+        partes.append(f"tipo={tipo.pk}")
+
+    return f"{url}?{'&'.join(partes)}" if partes else url
 
 
 @login_required
 @registrar_errores_vista("Error en catalogo de marcas y modelos")
 def catalogo_marcas_modelos(request):
     marca = _marca_seleccionada(request)
+    tipo_editado = _tipo_en_edicion(request)
 
     # Se muestran activas e inactivas: desactivar no es esconder, y desde aqui
     # se reactiva. El contador ayuda a detectar marcas vacias.
@@ -1239,6 +1280,12 @@ def catalogo_marcas_modelos(request):
             .order_by("-activo", "nombre")
         )
 
+    # Los tipos comparten pantalla con marcas y modelos porque son el mismo
+    # tipo de tarea: mantener los catalogos que alimentan el formulario.
+    tipos = TipoDispositivo.objects.annotate(
+        total_equipos=Count("dispositivos"),
+    ).order_by("-activo", "nombre")
+
     return render(
         request,
         "equipos/catalogo_marcas_equipos.html",
@@ -1246,8 +1293,13 @@ def catalogo_marcas_modelos(request):
             "marcas": marcas,
             "marca_seleccionada": marca,
             "modelos": modelos,
+            "tipos": tipos,
+            "tipo_editado": tipo_editado,
             "form_marca": MarcaCatalogoForm(),
             "form_modelo": ModeloCatalogoForm(marca=marca) if marca else None,
+            # El mismo formulario sirve para alta y edicion; lo unico que
+            # cambia es si se le pasa la instancia que se esta editando.
+            "form_tipo": TipoCatalogoForm(instance=tipo_editado),
             "url_regresar": reverse("inicio_equipos"),
         },
     )
@@ -1312,6 +1364,67 @@ def cambiar_estado_marca(request, marca_id):
         f"Marca {marca.nombre} {'reactivada' if marca.activo else 'desactivada'}.",
     )
     return redirect(_url_catalogo(marca))
+
+
+@login_required
+@registrar_errores_vista("Error al agregar tipo de equipo")
+@require_POST
+def agregar_tipo_catalogo(request):
+    form = TipoCatalogoForm(request.POST)
+
+    if not form.is_valid():
+        primer_error = next(
+            (str(e) for errores in form.errors.values() for e in errores),
+            "Revise los datos del tipo de equipo.",
+        )
+        messages.error(request, primer_error)
+        return redirect(_url_catalogo())
+
+    tipo = form.save()
+    messages.success(request, f"Tipo {tipo.nombre} agregado correctamente.")
+    return redirect(_url_catalogo())
+
+
+@login_required
+@registrar_errores_vista("Error al editar tipo de equipo")
+@require_POST
+def editar_tipo_catalogo(request, tipo_id):
+    # Editar el nombre no rompe los equipos que ya lo usan: apuntan por id, no
+    # por texto. Sirve para corregir erratas sin duplicar el catalogo.
+    tipo = get_object_or_404(TipoDispositivo, pk=tipo_id)
+    form = TipoCatalogoForm(request.POST, instance=tipo)
+
+    if not form.is_valid():
+        primer_error = next(
+            (str(e) for errores in form.errors.values() for e in errores),
+            "Revise los datos del tipo de equipo.",
+        )
+        messages.error(request, primer_error)
+        # Se vuelve al modo edicion para que el usuario corrija sin repetir
+        # el camino desde la lista.
+        return redirect(_url_catalogo(tipo=tipo))
+
+    tipo = form.save()
+    messages.success(request, f"Tipo {tipo.nombre} actualizado correctamente.")
+    return redirect(_url_catalogo())
+
+
+@login_required
+@registrar_errores_vista("Error al cambiar estado de tipo de equipo")
+@require_POST
+def cambiar_estado_tipo(request, tipo_id):
+    # No se elimina: Dispositivo.tipo es PROTECT y borrarlo perderia el
+    # historico. Desactivar lo saca del formulario de registro sin tocar los
+    # equipos que ya lo tienen.
+    tipo = get_object_or_404(TipoDispositivo, pk=tipo_id)
+    tipo.activo = not tipo.activo
+    tipo.save(update_fields=["activo"])
+
+    messages.success(
+        request,
+        f"Tipo {tipo.nombre} {'reactivado' if tipo.activo else 'desactivado'}.",
+    )
+    return redirect(_url_catalogo())
 
 
 @login_required

@@ -6924,6 +6924,26 @@ button.equipos-imagenes__vista:hover img {
    min-width: 0;
 }
 
+/* Los tipos no cuelgan de la marca elegida, asi que ocupan la fila entera en
+   vez de competir por una de las dos columnas. */
+.equipos-catalogo__columna--completa {
+   grid-column: 1 / -1;
+}
+
+/* El catalogo de tipos pasa del centenar de entradas: en pantallas anchas se
+   reparte en varias columnas para no obligar a un desplazamiento larguisimo. */
+.equipos-catalogo__lista--columnas {
+   display: grid;
+   grid-template-columns: repeat(auto-fill, minmax(28rem, 1fr));
+}
+
+.equipos-catalogo__cancelar {
+   align-self: center;
+   color: var(--colorTextoMenu);
+   font-size: 1.3rem;
+   text-decoration: underline;
+}
+
 .equipos-catalogo__form {
    align-items: end;
    display: grid;

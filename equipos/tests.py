@@ -1,10 +1,12 @@
 from datetime import date, timedelta
+from decimal import Decimal
 from io import BytesIO
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db.models import ProtectedError
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from PIL import Image
@@ -27,7 +29,7 @@ from .models import (
     TipoDispositivo,
     TipoTecnologiaDispositivo,
 )
-from .forms import DispositivoCreateForm
+from .forms import CostoLempirasField, DispositivoCreateForm
 from .services.ficha_baja_pdf_service import FichaBajaPdfService
 
 
@@ -208,6 +210,58 @@ class EquiposViewsTests(TestCase):
 
         self.assertContains(respuesta, reverse('catalogo_marcas_equipos'))
         self.assertContains(respuesta, 'Marcas y modelos')
+
+    def test_un_tipo_con_equipos_no_se_puede_borrar(self):
+        # El catalogo solo ofrece desactivar, pero la proteccion real vive en
+        # el modelo: aunque se intente por otra via, no se pierde el historico.
+        with self.assertRaises(ProtectedError):
+            self.dispositivo.tipo.delete()
+
+    def test_los_tipos_inactivos_no_se_ofrecen_al_registrar(self):
+        retirado = TipoDispositivo.objects.create(
+            nombre="TIPO RETIRADO", activo=False
+        )
+
+        form = DispositivoCreateForm()
+
+        self.assertNotIn(retirado, form.fields["tipo"].queryset)
+
+    def test_la_edicion_conserva_el_tipo_inactivo_del_equipo(self):
+        # Si el tipo se desactiva despues de registrar, abrir el equipo no
+        # puede obligar a cambiarlo para poder guardar.
+        tipo = self.dispositivo.tipo
+        tipo.activo = False
+        tipo.save()
+
+        form = DispositivoCreateForm(instance=self.dispositivo)
+
+        self.assertIn(tipo, form.fields["tipo"].queryset)
+
+    def test_el_tipo_se_busca_por_ajax(self):
+        respuesta = self.client.get(reverse("registrar_dispositivo_equipos"))
+
+        self.assertContains(respuesta, "data-url-tipos")
+        self.assertContains(respuesta, reverse("buscar_tipos_equipos"))
+
+    def test_ficha_se_muestra_arriba_con_su_etiqueta_corta(self):
+        respuesta = self.client.get(reverse("registrar_dispositivo_equipos"))
+        html = respuesta.content.decode()
+
+        self.assertIn('<label for="inventario_numero_ficha">Ficha</label>', html)
+        self.assertNotIn("Inventario número de ficha", html)
+        self.assertIn('placeholder="Ej. F/212300"', html)
+        # Debe quedar fuera del bloque plegable de datos opcionales.
+        self.assertLess(
+            html.index("inventario_numero_ficha"),
+            html.index("equipos-registro__opcionales"),
+        )
+
+    def test_inventario_de_bienes_nacionales_solo_dice_opcional(self):
+        respuesta = self.client.get(reverse("registrar_dispositivo_equipos"))
+        html = respuesta.content.decode()
+
+        self.assertIn("Inventario de bienes nacionales", html)
+        self.assertNotIn("Ej. F/212300 (opcional)", html)
 
     def test_url_equipos_es_canonica(self):
         self.assertEqual(reverse("inicio_equipos"), "/equipos/")
@@ -1554,3 +1608,187 @@ class CatalogoMarcaModeloTests(TestCase):
         modelo.refresh_from_db()
         self.assertTrue(modelo.activo)
         self.assertTrue(ModeloDispositivo.objects.filter(pk=modelo.pk).exists())
+
+
+class CostoEnLempirasTests(TestCase):
+    """El importe se escribe y se muestra como se usa en Honduras: L 1,234.56"""
+
+    databases = {"default"}
+
+    def _limpiar(self, texto):
+        return CostoLempirasField(
+            required=False, max_digits=12, decimal_places=2
+        ).clean(texto)
+
+    def test_acepta_el_punto_decimal_hondureno(self):
+        self.assertEqual(self._limpiar("1234.56"), Decimal("1234.56"))
+
+    def test_acepta_la_coma_decimal_de_quien_viene_del_teclado_espanol(self):
+        # Antes esto devolvia "Introduzca un numero" y parecia que el campo no
+        # admitia decimales.
+        self.assertEqual(self._limpiar("1234,56"), Decimal("1234.56"))
+
+    def test_acepta_el_formato_completo_con_separador_de_miles(self):
+        self.assertEqual(self._limpiar("1,234.56"), Decimal("1234.56"))
+
+    def test_acepta_tambien_el_formato_espanol_completo(self):
+        self.assertEqual(self._limpiar("1.234,56"), Decimal("1234.56"))
+
+    def test_un_separador_con_tres_digitos_detras_es_de_miles(self):
+        # "1,500" son mil quinientos lempiras, no uno con cinco.
+        self.assertEqual(self._limpiar("1,500"), Decimal("1500"))
+        self.assertEqual(self._limpiar("1.500"), Decimal("1500"))
+
+    def test_acepta_varios_grupos_de_miles(self):
+        self.assertEqual(self._limpiar("1,234,567.89"), Decimal("1234567.89"))
+
+    def test_ignora_el_simbolo_de_moneda_y_los_espacios(self):
+        self.assertEqual(self._limpiar("L 1,234.56"), Decimal("1234.56"))
+        self.assertEqual(self._limpiar("L. 1,234.56"), Decimal("1234.56"))
+
+    def test_un_entero_sin_separadores_no_cambia(self):
+        self.assertEqual(self._limpiar("1234"), Decimal("1234"))
+
+    def test_vacio_sigue_siendo_opcional(self):
+        self.assertIsNone(self._limpiar(""))
+
+    def test_el_detalle_muestra_el_formato_hondureno(self):
+        # La propiedad evita que Django localice a la española (1234,56) y
+        # deje la pantalla contradiciendo al formulario.
+        equipo = Dispositivo(costo_adquisicion=Decimal("1234.56"))
+
+        self.assertEqual(equipo.costo_formateado, "1,234.56")
+
+    def test_sin_costo_la_propiedad_no_revienta(self):
+        self.assertEqual(Dispositivo(costo_adquisicion=None).costo_formateado, "")
+
+    def test_el_formulario_no_usa_input_numerico(self):
+        # <input type="number"> depende del idioma del navegador y llega a
+        # rechazar el punto decimal segun el equipo.
+        html = str(DispositivoCreateForm()["costo_adquisicion"])
+
+        self.assertNotIn('type="number"', html)
+        self.assertIn('inputmode="decimal"', html)
+
+
+class CatalogoTipoEquipoTests(TestCase):
+    """Autocompletado de tipos y su gestion desde la vista de catalogo."""
+
+    databases = {"default"}
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.usuario = get_user_model().objects.create_user(
+            username="catalogo-tipos", password="clave-tipos"
+        )
+        cls.monitor = TipoDispositivo.objects.create(nombre="MONITOR")
+        cls.bomba = TipoDispositivo.objects.create(nombre="BOMBA DE INFUSION")
+
+    def setUp(self):
+        self.client.force_login(self.usuario)
+
+    # --- Endpoint de autocompletado --------------------------------------
+
+    def test_endpoint_de_tipos_filtra_por_texto(self):
+        respuesta = self.client.get(
+            reverse("buscar_tipos_equipos"), {"q": "bomba"}
+        )
+        nombres = [item["text"] for item in respuesta.json()["results"]]
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn("BOMBA DE INFUSION", nombres)
+        self.assertNotIn("MONITOR", nombres)
+
+    def test_endpoint_de_tipos_sin_texto_devuelve_el_catalogo(self):
+        # Permite abrir el selector y elegir con el raton sin escribir nada.
+        respuesta = self.client.get(reverse("buscar_tipos_equipos"))
+        nombres = [item["text"] for item in respuesta.json()["results"]]
+
+        self.assertIn("MONITOR", nombres)
+        self.assertIn("BOMBA DE INFUSION", nombres)
+
+    def test_endpoint_de_tipos_omite_los_inactivos(self):
+        self.bomba.activo = False
+        self.bomba.save()
+
+        respuesta = self.client.get(reverse("buscar_tipos_equipos"))
+        nombres = [item["text"] for item in respuesta.json()["results"]]
+
+        self.assertNotIn("BOMBA DE INFUSION", nombres)
+
+    def test_endpoint_de_tipos_exige_sesion(self):
+        self.client.logout()
+
+        respuesta = self.client.get(reverse("buscar_tipos_equipos"))
+
+        self.assertEqual(respuesta.status_code, 302)
+
+    # --- Vista de catalogo -----------------------------------------------
+
+    def test_catalogo_crea_un_tipo_normalizado(self):
+        respuesta = self.client.post(
+            reverse("agregar_tipo_equipos"), {"nombre": "desfibrilador"}
+        )
+
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertTrue(
+            TipoDispositivo.objects.filter(nombre="DESFIBRILADOR").exists()
+        )
+
+    def test_catalogo_rechaza_duplicado_por_mayusculas_y_espacios(self):
+        self.client.post(
+            reverse("agregar_tipo_equipos"), {"nombre": "  monitor  "}
+        )
+
+        self.assertEqual(
+            TipoDispositivo.objects.filter(nombre="MONITOR").count(), 1
+        )
+
+    def test_catalogo_renombra_un_tipo(self):
+        self.client.post(
+            reverse("editar_tipo_equipos", args=[self.monitor.pk]),
+            {"nombre": "monitor de signos vitales"},
+        )
+        self.monitor.refresh_from_db()
+
+        self.assertEqual(self.monitor.nombre, "MONITOR DE SIGNOS VITALES")
+
+    def test_renombrar_no_puede_chocar_con_otro_tipo(self):
+        self.client.post(
+            reverse("editar_tipo_equipos", args=[self.monitor.pk]),
+            {"nombre": "bomba de infusion"},
+        )
+        self.monitor.refresh_from_db()
+
+        self.assertEqual(self.monitor.nombre, "MONITOR")
+
+    def test_catalogo_desactiva_y_reactiva_el_tipo_sin_borrarlo(self):
+        url = reverse("cambiar_estado_tipo_equipos", args=[self.monitor.pk])
+
+        self.client.post(url)
+        self.monitor.refresh_from_db()
+        self.assertFalse(self.monitor.activo)
+
+        self.client.post(url)
+        self.monitor.refresh_from_db()
+        self.assertTrue(self.monitor.activo)
+        self.assertTrue(
+            TipoDispositivo.objects.filter(pk=self.monitor.pk).exists()
+        )
+
+    def test_catalogo_lista_los_tipos_y_su_formulario(self):
+        respuesta = self.client.get(reverse("catalogo_marcas_equipos"))
+
+        self.assertContains(respuesta, "Tipos de equipo")
+        self.assertContains(respuesta, "MONITOR")
+        self.assertContains(respuesta, reverse("agregar_tipo_equipos"))
+
+    def test_catalogo_abre_el_modo_edicion_del_tipo_elegido(self):
+        respuesta = self.client.get(
+            reverse("catalogo_marcas_equipos"), {"tipo": self.monitor.pk}
+        )
+
+        self.assertContains(
+            respuesta,
+            reverse("editar_tipo_equipos", args=[self.monitor.pk]),
+        )

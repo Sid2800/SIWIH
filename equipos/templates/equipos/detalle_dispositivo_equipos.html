@@ -223,7 +223,7 @@
                 <div><dt>Color</dt><dd>{{ dispositivo.color|default:"INDEFINIDO" }}</dd></div>
                 <div><dt>Número de serie</dt><dd>{{ dispositivo.numero_serie|default:"INDEFINIDO" }}</dd></div>
                 <div><dt>Inventario de bienes nacionales</dt><dd>{{ dispositivo.inventario_bienes_nacionales|default:"NO APLICA" }}</dd></div>
-                <div><dt>Inventario número de ficha</dt><dd>{{ dispositivo.inventario_numero_ficha|default:"NO APLICA" }}</dd></div>
+                <div><dt>Ficha</dt><dd>{{ dispositivo.inventario_numero_ficha|default:"NO APLICA" }}</dd></div>
             </dl>
         </section>
 
@@ -265,7 +265,7 @@
                     <dt>Costo</dt>
                     <dd>
                         {% if dispositivo.costo_adquisicion is not None %}
-                            L {{ dispositivo.costo_adquisicion }}
+                            L {{ dispositivo.costo_formateado }}
                         {% else %}
                             No indicado
                         {% endif %}

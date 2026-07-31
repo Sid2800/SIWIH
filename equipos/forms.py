@@ -26,6 +26,65 @@ from .models import (
 )
 
 
+class CostoLempirasField(forms.DecimalField):
+    """Costo escrito como se usa en Honduras: L 1,234.56
+
+    Honduras separa los decimales con punto y los miles con coma, al reves que
+    España. Como el proyecto usa LANGUAGE_CODE = "es", Django asume el formato
+    español: muestra 1234,56 en pantalla pero solo acepta 1234.56 al escribir.
+    El usuario ve una coma, escribe una coma y recibe "Introduzca un numero",
+    de ahi la impresion de que el campo no admite decimales.
+
+    Este campo acepta las dos convenciones y las normaliza antes de convertir.
+    """
+
+    #: Se aplica una sola regla: el ULTIMO separador que aparece es el decimal
+    #: y los anteriores son de miles. La unica excepcion es un separador solo
+    #: seguido de exactamente tres digitos ("1,500"), que siempre es de miles.
+    #: Con dos decimales no existe un importe valido que se escriba asi.
+    SEPARADORES = (".", ",")
+
+    def to_python(self, valor):
+        if isinstance(valor, str):
+            valor = self._normalizar(valor)
+        return super().to_python(valor)
+
+    @classmethod
+    def _normalizar(cls, texto):
+        # Se quitan espacios normales y duros: Django usa el espacio duro como
+        # separador de miles en español y puede llegar de un copiar y pegar.
+        texto = texto.strip().replace(" ", "").replace("\xa0", "")
+
+        if not texto:
+            return texto
+
+        # "L", "L." o "Lps" delante del importe es habitual al copiar de otro
+        # documento. Se retira para no romper la conversion.
+        sin_moneda = texto.lstrip("LlPpSs.").strip()
+        if sin_moneda and sin_moneda[0].isdigit():
+            texto = sin_moneda
+
+        posiciones = [
+            (texto.rfind(sep), sep) for sep in cls.SEPARADORES if sep in texto
+        ]
+
+        if not posiciones:
+            return texto
+
+        _, decimal = max(posiciones)
+        decimales = texto.rsplit(decimal, 1)[1]
+
+        # Un unico separador con tres digitos detras es de miles, no decimal.
+        if len(posiciones) == 1 and len(decimales) == 3:
+            return texto.replace(decimal, "")
+
+        entero = texto.rsplit(decimal, 1)[0]
+        for sep in cls.SEPARADORES:
+            entero = entero.replace(sep, "")
+
+        return f"{entero}.{decimales}"
+
+
 TIPOS_IMAGEN_DISPOSITIVO = (
     ("GENERAL", "General"),
     ("INVENTARIO", "Inventario"),
@@ -303,6 +362,26 @@ class DispositivoCreateForm(forms.ModelForm):
             }
         ),
     )
+    # Se declara aparte para aceptar el importe escrito a la hondureña. Va como
+    # texto y no como <input type="number">: ese control depende del idioma del
+    # navegador y, con la configuracion en español, llega a rechazar el punto
+    # decimal segun el equipo desde el que se registre. inputmode="decimal"
+    # conserva el teclado numerico en telefono y tablet.
+    costo_adquisicion = CostoLempirasField(
+        required=False,
+        max_digits=12,
+        decimal_places=2,
+        min_value=0,
+        label="Costo de adquisición",
+        widget=forms.TextInput(
+            attrs={
+                "class": "formularioCampo-text",
+                "id": "costo_dispositivo",
+                "inputmode": "decimal",
+                "placeholder": "Ej. 1,234.56",
+            }
+        ),
+    )
     # La imagen vive en SIWIH Images, por eso es un campo auxiliar y no forma
     # parte del modelo Dispositivo de la base principal.
     foto_general = forms.ImageField(
@@ -385,14 +464,17 @@ class DispositivoCreateForm(forms.ModelForm):
                 attrs={
                     "class": "formularioCampo-text",
                     "id": "inventario_bienes_nacionales",
-                    "placeholder": "Ej. F/212300 (opcional)",
+                    "placeholder": "Opcional",
                 }
             ),
+            # El campo del modelo sigue llamandose inventario_numero_ficha; solo
+            # cambia como se presenta. Renombrarlo obligaria a una migracion sin
+            # ninguna ganancia en la base.
             "inventario_numero_ficha": forms.TextInput(
                 attrs={
                     "class": "formularioCampo-text",
                     "id": "inventario_numero_ficha",
-                    "placeholder": "Opcional",
+                    "placeholder": "Ej. F/212300",
                 }
             ),
             "estado": forms.Select(
@@ -423,15 +505,8 @@ class DispositivoCreateForm(forms.ModelForm):
                 },
                 format="%Y-%m-%d",
             ),
-            "costo_adquisicion": forms.NumberInput(
-                attrs={
-                    "class": "formularioCampo-text",
-                    "id": "costo_dispositivo",
-                    "min": 0,
-                    "step": "0.01",
-                    "placeholder": "Ingrese el costo",
-                }
-            ),
+            # El widget lo define CostoLempirasField mas abajo; aqui no se
+            # declara para no pisarlo.
             "observaciones": forms.Textarea(
                 attrs={
                     "class": "formularioCampo-text no-resize",
@@ -493,8 +568,13 @@ class DispositivoCreateForm(forms.ModelForm):
             if self.instance.color_id:
                 filtro_color |= Q(pk=self.instance.color_id)
 
+        # El tipo tambien se busca por AJAX: el catalogo pasa del centenar de
+        # entradas y volcarlas en el HTML alarga cada carga sin necesidad.
         self.fields["tipo"].queryset = TipoDispositivo.objects.filter(filtro_tipo)
         self.fields["tipo"].empty_label = "Seleccione el tipo de equipo"
+        self.fields["tipo"].widget.attrs["data-url-tipos"] = reverse(
+            "buscar_tipos_equipos"
+        )
 
         # Marca y modelo se cargan por AJAX, asi que el HTML solo necesita
         # contener la opcion ya elegida. Cargar los catalogos completos serian
@@ -713,6 +793,55 @@ class MarcaCatalogoForm(forms.ModelForm):
         )
         if duplicada.exists():
             raise forms.ValidationError("Ya existe una marca con ese nombre.")
+
+        return nombre
+
+
+class TipoCatalogoForm(forms.ModelForm):
+    """Alta y edicion de tipos de equipo desde la vista de catalogo.
+
+    Igual que marcas y modelos, los tipos no se crean desde el formulario de
+    equipos: alli solo se eligen. Este formulario sirve para las dos cosas
+    porque el alta y la edicion piden exactamente los mismos datos; la
+    diferencia esta en si llega o no una instancia.
+    """
+
+    class Meta:
+        model = TipoDispositivo
+        fields = ["nombre", "descripcion"]
+        widgets = {
+            "nombre": forms.TextInput(
+                attrs={
+                    "class": "formularioCampo-text",
+                    "id": "nombre_tipo_catalogo",
+                    "placeholder": "Ej. MONITOR DE SIGNOS VITALES",
+                    "maxlength": 100,
+                }
+            ),
+            "descripcion": forms.TextInput(
+                attrs={
+                    "class": "formularioCampo-text",
+                    "id": "descripcion_tipo_catalogo",
+                    "placeholder": "Opcional",
+                    "maxlength": 250,
+                }
+            ),
+        }
+
+    def clean_nombre(self):
+        # normalizar_nombre_catalogo recorta espacios y pasa a mayusculas, asi
+        # que "  monitor " y "MONITOR" acaban siendo el mismo nombre y la
+        # comprobacion de abajo los detecta como duplicados.
+        nombre = normalizar_nombre_catalogo(self.cleaned_data.get("nombre"))
+
+        if not nombre:
+            raise forms.ValidationError("Debe ingresar el nombre del tipo.")
+
+        duplicado = TipoDispositivo.objects.filter(nombre=nombre).exclude(
+            pk=self.instance.pk
+        )
+        if duplicado.exists():
+            raise forms.ValidationError("Ya existe un tipo de equipo con ese nombre.")
 
         return nombre
 
