@@ -340,3 +340,40 @@ def parse_fecha_filtro_dia(fecha_texto, fin_del_dia=False):
         fecha = fecha.replace(hour=0, minute=0, second=0, microsecond=0)
     return timezone.make_aware(fecha, timezone.get_current_timezone())
 
+
+
+def parsear_fecha_iso(fecha):
+    """
+    Convierte una fecha ISO enviada por JavaScript a datetime.
+    Retorna None si la fecha es vacía.
+    """
+    if not fecha:
+        return None
+
+    if isinstance(fecha, datetime):
+        return fecha
+
+    return datetime.fromisoformat(
+        fecha.replace("Z", "+00:00")
+    )
+
+
+
+def fechas_iguales(fecha1, fecha2):
+    """
+    Compara dos datetime ignorando la precisión superior a milisegundos.
+    """
+
+    if fecha1 is None or fecha2 is None:
+        return False
+
+    fecha1 = fecha1.replace(
+        microsecond=(fecha1.microsecond // 1000) * 1000
+    )
+
+    fecha2 = fecha2.replace(
+        microsecond=(fecha2.microsecond // 1000) * 1000
+    )
+
+
+    return fecha1 == fecha2

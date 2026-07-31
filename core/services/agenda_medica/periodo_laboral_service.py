@@ -1,18 +1,20 @@
 
 from django.db.models.functions import ExtractYear
-from agenda_medica.models import Periodo_laboral, Dia_laboral
-from agenda_medica import validators as agenda_validator
+from agenda_medica.models import Periodo_laboral, Dia_laboral, Cupo_agenda
+
 from datetime import date, timedelta
-from core.constants.choices_constants import EstadoRegistro, DiaSemana
+from core.constants.choices_constants import EstadoRegistro, DiaSemana, EstadoCupoAgenda
 from django.core.exceptions import ValidationError
 from core.constants.domain_constants import AccionImpactoPeriodoLaboral, TipoCambioFechaPeriodo
 from django.db import transaction
 from core.constants.domain_constants import LogApp
 from core.utils.utilidades_logging import *
+from core.utils.utilidades_fechas import obtener_fechas_por_dia_semana
 from types import SimpleNamespace
-from django.db.models import Sum, Count, Value
+from django.db.models import Sum, Count, Value, Q
 from django.db.models.functions import Coalesce
-
+from itertools import groupby
+from operator import attrgetter
 
 class PeriodoLaboralService :
 
@@ -43,6 +45,17 @@ class PeriodoLaboralService :
             return periodo  
         except Periodo_laboral.DoesNotExist:
             return None
+    
+
+    @staticmethod
+    def obtener_cantidad_dias_semana( periodo_laboral, dia_semana):
+        return len(
+            obtener_fechas_por_dia_semana(
+                periodo_laboral.fecha_inicio,
+                periodo_laboral.fecha_fin,
+                dia_semana
+            )
+        )
 
     @staticmethod
     def obtener_dias_configurados(id_periodo):
@@ -53,13 +66,18 @@ class PeriodoLaboralService :
                 estado=EstadoRegistro.ACTIVO
             )
             .annotate(
-                total_cupos=Coalesce(
-                    Sum("cupos__cupos"),
+                total_cupos_configurados=Coalesce(
+                    Sum(
+                        "cupos__cupos",
+                        filter=~Q(cupos__estado=EstadoCupoAgenda.INACTIVO)
+                    ),
                     Value(0)
                 ),
-
                 total_tipos=Coalesce(
-                    Count("cupos"),
+                    Count(
+                        "cupos",
+                        filter=Q(cupos__estado=EstadoRegistro.ACTIVO)
+                    ),
                     Value(0)
                 )
             )
@@ -67,6 +85,40 @@ class PeriodoLaboralService :
         )
         return dias_laborales
     
+
+    
+    @staticmethod
+    def obtener_cupos_agrupados_por_fecha(periodo_laboral, dia_numero):
+        """
+        Obtiene los cupos activos de un día laboral del período,
+        agrupados por fecha.
+
+        """
+        cupos = (
+            Cupo_agenda.objects
+            .filter(
+                configuracion_cupo__dia_laboral__periodo_laboral=periodo_laboral,
+                configuracion_cupo__dia_laboral__dia_semana=dia_numero,
+                estado=EstadoCupoAgenda.DISPONIBLE
+            )
+            .select_related(
+                "configuracion_cupo",
+                "configuracion_cupo__dia_laboral",
+            )
+            .order_by(
+                "configuracion_cupo__dia_laboral__dia_semana",
+                "fecha",
+                "configuracion_cupo__orden",
+                "id"
+            )
+        )
+        return [
+            list(grupo)
+                for _, grupo in groupby(
+                    cupos,
+                    key=attrgetter("fecha")
+                )
+            ]
 
     @staticmethod
     def construir_dias_semana_ui(id_periodo):
@@ -93,7 +145,7 @@ class PeriodoLaboralService :
                 "configurado": True,
                 "hora_inicio": dia.hora_inicio,
                 "hora_fin": dia.hora_fin,
-                "total_cupos": dia.total_cupos,
+                "total_cupos": dia.total_cupos_configurados,
                 "total_tipos": dia.total_tipos,
             })
                 
@@ -483,20 +535,21 @@ class PeriodoLaboralService :
 
     @staticmethod
     def analizarImpactoPeriodoLaboral(periodo):
+        from agenda_medica.validators import PeriodoLaboralValidator
         #validacion critica
         periodo_registro = None
         if periodo.id:
             periodo_registro = (
-                agenda_validator
+                PeriodoLaboralValidator
                 .validarReglasCriticasPeriodoLaboral(periodo)
             )
-
         resultado = PeriodoLaboralService._analizarImpactoPeriodoLaboral(periodo, periodo_registro)
         return resultado 
     
 
     @staticmethod
     def procesarPeriodoLaboral(periodo, usuario):
+        from agenda_medica.validators import PeriodoLaboralValidator
 
         def aplicar_reduccion_inicial(periodo_afectado):
             with transaction.atomic():
@@ -615,7 +668,7 @@ class PeriodoLaboralService :
         periodo_registro = None
         if periodo.id:
             periodo_registro = (
-                agenda_validator
+                PeriodoLaboralValidator
                 .validarReglasCriticasPeriodoLaboral(periodo)
             )
 

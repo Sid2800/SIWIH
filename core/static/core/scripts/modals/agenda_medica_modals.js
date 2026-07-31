@@ -587,6 +587,9 @@ const ManejarPeriodoLaboral = (function (){
 
 //   dia laboral
 const ManejarDiaLaboral = (function (){
+    
+    //#region  estado
+
     let estado = {
         titulo: "",
         diaID: null,
@@ -596,6 +599,13 @@ const ManejarDiaLaboral = (function (){
     };
 
     let TiposAtencionregistros = [];
+
+    let controles = {};
+
+    //#endregion
+
+
+    //#region Modal
 
 
     async function open(config ={}) {
@@ -672,9 +682,10 @@ const ManejarDiaLaboral = (function (){
                             <table class="tabla-estatica-procesos">
                                 <thead>
                                     <tr>
+                                        <th>Or.</th>
                                         <th>Tipo Atención</th>
                                         <th>Cupos</th>
-                                        <th class="tabla-estatica-columna-responsive">Duración</th>
+                                        <th class="tabla-estatica-columna-responsive">Dur.</th>
                                         <th>Acciones</th>
                                     </tr>
                                 </thead>
@@ -723,34 +734,54 @@ const ManejarDiaLaboral = (function (){
     }
 
 
+    function inicializarControles(){
+        controles = {
+            totalCupos: document.getElementById('modal-dia-laboral-horario-cupos'),
+            horaInicio: document.getElementById("modal-dia-laboral-horario-inicio"),
+            horaFin: document.getElementById("modal-dia-laboral-horario-fin"),
+            tipoAtencion: document.getElementById("modal-dia-laboral-tipo_atencion"),
+            botonAgregarEditar: document.getElementById("agregar-editar-cupo-boton"),
+            tablaBody: document.getElementById("tabla-estatica-tipos-atencion-body"),
+            duracion: document.getElementById("modal-dia-laboral-duracion_minutos"),
+            cuposDetalle: document.getElementById("modal-dia-laboral-cupos"),
+            duracionDetalle: document.getElementById("modal-dia-laboral-duracion_minutos"),
+            indicador: document.querySelector(".indicador-tabla-estatica")
+        }
+    }
+
+
     async function inicializar(){
-        const headerModal = document.getElementById('modalDiaLaboralHeader');
-        const cupos = document.getElementById('modal-dia-laboral-horario-cupos');
+
+        inicializarControles();
+        
+        controles.fpHoraInicio = flatpickr(controles.horaInicio, {
+            locale: "es",
+            enableTime: true,
+            noCalendar: true,
+            time_24hr: true,
+            dateFormat: "H:i",
+            defaultDate: estado.contexto.jornada.horaInicio || "08:00"
+        });
+
+        controles.fpHoraFin = flatpickr(controles.horaFin, {
+            locale: "es",
+            enableTime: true,
+            noCalendar: true,
+            time_24hr: true,
+            dateFormat: "H:i",
+            defaultDate: estado.contexto.jornada.horaFin || "08:00"
+        });
+        controles.totalCupos.value = "0";
+
+        await TipoAtencionLoader.cargar(controles.tipoAtencion.id);
 
         
-        flatpickr("#modal-dia-laboral-horario-inicio", {
-            locale: "es",
-            enableTime: true,
-            noCalendar: true,
-            time_24hr: true,
-            dateFormat: "H:i",
-            defaultDate: estado.contexto.jornada.horaInicio || "08:00" 
-        });
+        // si existe id llenar porque esta editantro
+        if (estado.diaID){
+            estado.diaRegistro = await obtenerDiaLaboral();
+            llenarDiaLaboral();
 
-        flatpickr("#modal-dia-laboral-horario-fin", {
-            locale: "es",
-            enableTime: true,
-            noCalendar: true,
-            time_24hr: true,
-            dateFormat: "H:i",
-            defaultDate: estado.contexto.jornada.horaFin || "08:00" 
-            
-        });
-
-
-        cupos.value = "0";
-
-        await TipoAtencionLoader.cargar('modal-dia-laboral-tipo_atencion');
+        }
 
         renderDatosContexto("modalDiaLaboralHeader", {
             "Personal Clínico": estado.contexto.personalClinicoNombre,
@@ -762,149 +793,280 @@ const ManejarDiaLaboral = (function (){
         inicializarListeners();
     }
 
+    //#endregion
+
+    //#region  metodos de editar
+
+    async function obtenerDiaLaboral(){
+
+        if(!estado.diaID){
+            return;
+        }
+
+        try {
+            const response = await fetch(
+                `${API_URLS.obtenerDiaLaboral}?id=${estado.diaID}`,
+                {
+                    method: "GET",
+                    headers: {
+                        "Content-Type": "application/json",
+                    }
+                }
+            );
+
+            const data = await response.json();
+            if (!response.ok){
+                throw new Error(data.error);
+            }
+            return data;
+        } catch (error) {
+            toastr.error(
+                error.message,
+                "Error al obtener el dia laboral"
+            );
+        }
+        
+
+    }
+
+    function llenarDiaLaboral(){
+
+        controles.fpHoraInicio.setDate(
+            estado.diaRegistro.hora_inicio,
+            false
+        );
+
+        controles.fpHoraFin.setDate(
+            estado.diaRegistro.hora_fin,
+            false
+        );
+
+        TiposAtencionregistros = estado.diaRegistro.configuraciones;
+        
+    }
+
+
+    function obtenerConfiguracionesGuardar() {
+        let orden = 1;
+
+        return TiposAtencionregistros
+            .filter(registro => {
+                // Si nunca existió en BD y fue eliminado, no enviarlo
+                return !(registro.id === null && registro.eliminado);
+            })
+            .map(registro => ({
+                id: registro.id,
+                id_tipo_atencion: registro.tipoAtencionId,
+                cupos: registro.cupos,
+                duracion: registro.duracion,
+                diaId: estado.diaID,
+                eliminado: registro.eliminado,
+                orden: registro.eliminado ? 0 : orden++
+            }));
+    }
+
+    async function validarImpactoDialaboral(formData){
+
+        if (!formData){
+            return
+        }
+        try {
+                const csrfToken = window.CSRF_TOKEN;
+                if (!validarConfiguraciones()) {
+                    return false;
+                }
+                const configuraciones = obtenerConfiguracionesGuardar();
+
+                const response = await fetch(API_URLS.validarImpactoDiaLaboral, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": csrfToken 
+                },
+                body: JSON.stringify({
+                    horaInicio: formData.horaInicio, 
+                    horaFin: formData.horaFin,
+                    configuraciones: configuraciones,
+                    diaID: estado.diaRegistro.id,
+                    diaNumero: estado.diaNumero,
+                    periodoId: contextoAgenda.periodoId
+                })
+                });
+                
+                const data = await response.json();
+
+                // VALIDACIONES CONTROLADAS
+                if (response.status === 400) {
+                    toastr.warning(data.error, "Error de Validacion");
+                    return false;
+                }
+
+                // ERRORES REALES
+                if (response.status >= 500) {
+                    throw new Error(
+                        data.error ||
+                        "No se pudo consultar el impacto del dia laboral "
+                    );
+                }
+                
+                return data;
+
+            } catch (error) {
+                toastr.error( error.message, "Error al consultar el impacto del dia laboral");
+            }
+
+        return
+    }
+
+    //#endregion
+
 
     function inicializarListeners(){
-        const botonAgregarEditar = document.getElementById('agregar-editar-cupo-boton');
-        const tablaBody = document.querySelector("#tabla-estatica-tipos-atencion-body");
-        botonAgregarEditar.addEventListener(
+
+        controles.botonAgregarEditar.addEventListener(
                 'click',
                 agregarEditarTipoAtencion
             );
 
-        tablaBody.addEventListener('dblclick', (e) => {
+        controles.tablaBody.addEventListener('dblclick', (e) => {
             const fila = e.target.closest('tr');
             const botonEliminar = e.target.closest('.botonTablaEliminar');
             if (botonEliminar) return;
             if(!fila) return;
-            const id = Number(fila.dataset.id);
+            const id = Number(fila.dataset.tipoAtencionId);
             if (id){
                 editarTipoAtencion(id)
             }
         });
 
-        tablaBody.addEventListener('click', (e) => {
+        controles.tablaBody.addEventListener('click', (e) => {
             const fila = e.target.closest('tr');
             if(!fila) return;
 
-            const id = Number(fila.dataset.id);
+            const id = Number(fila.dataset.tipoAtencionId);
+
+            console.table(fila.dataset);
 
             const botonEditar = e.target.closest('.botonTablaEditar');
             const botonEliminar = e.target.closest('.botonTablaEliminar');
+            const botonSubir = e.target.closest('.botonTablaSubir');
+            const botonBajar = e.target.closest('.botonTablaBajar');
 
             if(botonEditar && id){
                 editarTipoAtencion(id);
             }
             else if(botonEliminar){
                 eliminarTipoAtencion(id);
-
+            }
+            else if (botonSubir) {
+                subirTipoAtencion(id);
+            }
+            else if (botonBajar) {
+                bajarTipoAtencion(id);
             }
 
         });
     }   
 
-
-    function editarTipoAtencion(id){
-        const tipoAtencion = document.querySelector('#modal-dia-laboral-tipo_atencion')
-        const cupos = document.getElementById('modal-dia-laboral-cupos')
-        const duracion = document.getElementById('modal-dia-laboral-duracion_minutos')
-
-        if (!id) { return;}
-         // buscar por id si ya esta en los registros 
-        const registro =
-            TiposAtencionregistros.find(
-                item => item.id === id
-            );
-
-        if (registro){
-            // llenar el registro 
-            console.table(registro);
-            cupos.value = registro.cupos;
-            duracion.value = registro.duracion;
-            tipoAtencion.setValue(String(registro.id));
-        } else {
-            return;
-        }
-    } 
-
-
-    function eliminarTipoAtencion(id){
-        if(!id){ return; }
-
-        TiposAtencionregistros =
-            TiposAtencionregistros.filter(
-                item => item.id !== id
-            );
-
-        renderizarTabla();
-
-        limpiarControles();
-
-        toastr.info(
-            "Tipo de atención eliminado"
-        );
-    }
+    //#region  renderizar
 
 
     function actualizarTotalCupos(){
         const total =
-            TiposAtencionregistros.reduce( // funcion que se usa para acumular un valor dento de un array
+            TiposAtencionregistros
+            .filter(item => !item.eliminado) // quitamos los eleiminados del total
+            .reduce( // funcion que se usa para acumular un valor dento de un array
                 (acumulador, item) => acumulador + item.cupos,  // es la varuiabkle que pasa entre iterdcaione sy va cmabiand su valor 
                 0                           // valor inical del acumulador
             ); 
 
-        document.getElementById(
-            'modal-dia-laboral-horario-cupos'
-        ).value = total;
+
+        controles.totalCupos.value = total;
     }
 
-
     function renderizarTabla(){
-        const tbody =
-            document.getElementById(
-                "tabla-estatica-tipos-atencion-body"
-            );
+        const tbody = controles.tablaBody;
 
         tbody.innerHTML = "";
 
-        if(TiposAtencionregistros.length === 0){
+        const registrosActivos = TiposAtencionregistros.filter(
+            item => !item.eliminado
+        );
 
+        if(TiposAtencionregistros.length === 0){
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="4"
+                    <td colspan="5"
                         class="tabla-estatica-tabla-vacia">
                         No hay tipos de atención registrados
                     </td>
                 </tr>
             `;
-
-
             actualizarTotalCupos();
             actualizarIndicadorJornada();
             return;
         }
 
         
-        TiposAtencionregistros.forEach(item => {
+        TiposAtencionregistros
+        .filter(item => !item.eliminado)
+        .forEach((item, indice) => {
+
             tbody.innerHTML += `
-                <tr data-id="${item.id}">
-                    <td>${item.tipo}</td>
+                <tr
+                    data-id="${item.id ?? ""}"
+                    data-tipo-atencion-id="${item.tipoAtencionId}">
+
+
+                    <td>
+                        <div class="tabla-estatica-orden-wrapper">
+                            <div class="tabla-estatica-orden-botones">
+
+                                <button
+                                    type="button"
+                                    class="tabla-estatica-boton botonTablaSubir">
+                                    <i class="bi bi-caret-up-fill"></i>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    class="tabla-estatica-boton botonTablaBajar">
+                                    <i class="bi bi-caret-down-fill"></i>
+                                </button>
+                
+                            </div>
+                            
+                            <div class="tabla-estatica-orden-numero">
+                                ${indice + 1}
+                            </div>
+                        </div>
+                        
+
+                        
+                    </td>
+
+                    <td class="tabla-estatica-columna-limitada">${item.tipoAtencion}</td>
                     <td>${item.cupos}</td>
 
                     <td class="tabla-estatica-columna-responsive">
-                        ${item.duracion} MIN
+                        ${item.duracion} M
                     </td>
 
                     <td>
                         <div class="tabla-estatica-acciones-wrapper">
-                            <button type="button"
-                                    class="tabla-estatica-boton botonTablaEditar">
+
+                            <button
+                                type="button"
+                                class="tabla-estatica-boton botonTablaEditar">
                                 <i class="bi bi-pencil-square"></i>
                             </button>
 
-                            <button type="button"
-                                    class="tabla-estatica-boton botonTablaEliminar">
+                            <button
+                                type="button"
+                                class="tabla-estatica-boton botonTablaEliminar">
                                 <i class="bi bi-trash-fill"></i>
                             </button>
+
                         </div>
                     </td>
 
@@ -917,16 +1079,83 @@ const ManejarDiaLaboral = (function (){
         
     }
 
+    function actualizarIndicadorJornada(){
+        
+        if(!controles.indicador){ return; }
+
+        if(validarDuracionJornada()){
+            controles.indicador.classList.add('oculto');
+        } else {
+            controles.indicador.classList.remove('oculto');
+        }
+    }
+
+    function limpiarControles(){
+        const tipoAtencion = document.getElementById('modal-dia-laboral-tipo_atencion').virtualSelect
+
+        tipoAtencion.reset();
+        controles.cuposDetalle.value = 1;
+        controles.duracionDetalle.value = 5;
+    }
+
+    //#endregion
+
+
+    //#region  Gestion de  tipos de atencion
+
+    function editarTipoAtencion(id){
+        if (!id) { return;}
+         // buscar por id si ya esta en los registros 
+        const registro =
+            TiposAtencionregistros.find(
+                item => item.tipoAtencionId === id &&
+                !item.eliminado
+            );
+
+        if (registro){
+            // llenar el registro 
+            controles.cuposDetalle.value = registro.cupos;
+            controles.duracionDetalle.value = registro.duracion;
+            controles.tipoAtencion.setValue(String(registro.tipoAtencionId));
+        } else {
+            return;
+        }
+    } 
+
+
+    function eliminarTipoAtencion(id) {
+
+        if (!id) {
+            return;
+        }
+
+        const registro = TiposAtencionregistros.find(item => item.tipoAtencionId === id);
+
+        if (!registro) {
+            return;
+        }
+
+        registro.eliminado = true;
+        renderizarTabla();
+        limpiarControles();
+
+        toastr.info(
+            "Tipo de atención eliminado"
+        );
+    }
+
 
     function agregarEditarTipoAtencion(){
         Swal.resetValidationMessage();
 
         const tipoAtencion = document.getElementById('modal-dia-laboral-tipo_atencion').virtualSelect
-        const cupos = document.getElementById('modal-dia-laboral-cupos')
-        const duracion = document.getElementById('modal-dia-laboral-duracion_minutos')
         const opciones = tipoAtencion.getSelectedOptions();
 
-        if(TiposAtencionregistros.length >= 5){
+        const totalActivos = TiposAtencionregistros.filter(x => !x.eliminado).length;
+
+
+
+        if(totalActivos >= 5){
             Swal.showValidationMessage(
                 "El límite de tipos de atención es 5"
             );
@@ -941,59 +1170,92 @@ const ManejarDiaLaboral = (function (){
             return;
         }
 
-        if (!cupos || Number(cupos.value) <= 0) {
+        if (!controles.cuposDetalle || Number(controles.cuposDetalle.value) <= 0) {
             Swal.showValidationMessage(
                 "Ingrese una cantidad de cupos válida"
             );
             return;
         }
 
-        if (!duracion || Number(duracion.value) < 5) {
+        if (!controles.duracionDetalle || Number(controles.duracionDetalle.value) < 5) {
             Swal.showValidationMessage(
                 "La duración debe ser mayor o igual a 5 minutos"
             );
             return;
         }
 
+        console.log(opciones.value);
+
         const nuevo = {
-            id: Number(opciones.value),
-            tipo: opciones.label,
-            cupos: Number(cupos.value),
-            duracion: Number(duracion.value),
+            id: null, // null mientras no exista en BD,
+            tipoAtencionId: Number(opciones.value),
+            tipoAtencion: opciones.label,
+            cupos: Number(controles.cuposDetalle.value),
+            duracion: Number(controles.duracionDetalle.value),
+            eliminado: false
         }
 
         // buscar por id si ya esta en los registros 
         const index = TiposAtencionregistros.findIndex(
-            item => item.id === nuevo.id
+            item => item.tipoAtencionId === nuevo.tipoAtencionId
         );
 
 
         if (index >= 0){
+             // Conservar el id de BD si ya existía
+            nuevo.id = TiposAtencionregistros[index].id;
             TiposAtencionregistros[index] = nuevo;
             toastr.info("Tipo de atención actualizado");
         } else {
             TiposAtencionregistros.push(nuevo);
+            toastr.success("Tipo de atención agregado");
         }
 
         renderizarTabla();
         limpiarControles();
     }
 
+    function subirTipoAtencion(id) {
 
-    function actualizarIndicadorJornada(){
-        const indicador = document.querySelector('.indicador-tabla-estatica');
-        if(!indicador){ return; }
+        const indice = TiposAtencionregistros.findIndex(
+            item => item.tipoAtencionId === id
+        );
 
-        if(validarDuracionJornada()){
-            indicador.classList.add('oculto');
-        } else {
-            indicador.classList.remove('oculto');
-        }
+        if (indice <= 0) return;
+
+        const temporal = TiposAtencionregistros[indice - 1];
+        TiposAtencionregistros[indice - 1] = TiposAtencionregistros[indice];
+        TiposAtencionregistros[indice] = temporal;
+
+        renderizarTabla();
+    }
+
+    function bajarTipoAtencion(id) {
+
+        const indice = TiposAtencionregistros.findIndex(
+            item => item.tipoAtencionId === id
+        );
+
+        if (indice === -1 || indice >= TiposAtencionregistros.length - 1) return;
+
+        const temporal = TiposAtencionregistros[indice + 1];
+        TiposAtencionregistros[indice + 1] = TiposAtencionregistros[indice];
+        TiposAtencionregistros[indice] = temporal;
+
+        renderizarTabla();
     }
 
 
+    //#endregion
+
+
+    //#region validaciones
+
     function validarDuracionJornada(){
-        const totalMinutos = TiposAtencionregistros.reduce(
+        
+        const totalMinutos = TiposAtencionregistros
+            .filter(item => !item.eliminado) // excluimos los eliminados
+            .reduce(
                 (totalActual, registro) => {
                     return ( totalActual + (registro.cupos * registro.duracion));
                 },
@@ -1004,23 +1266,9 @@ const ManejarDiaLaboral = (function (){
     }
 
 
-    function limpiarControles(){
-        const tipoAtencion = document.getElementById('modal-dia-laboral-tipo_atencion').virtualSelect
-        const cupos = document.getElementById('modal-dia-laboral-cupos')
-        const duracion = document.getElementById('modal-dia-laboral-duracion_minutos')
-
-        tipoAtencion.reset();
-        cupos.value = 1;
-        duracion.value = 5;
-    }
-
-
     function  validarCampos() {
-        const horarioInicio = document.getElementById('modal-dia-laboral-horario-inicio')._flatpickr;
-        const horarioFin = document.getElementById('modal-dia-laboral-horario-fin')._flatpickr;
-
-        const horaInicio = horarioInicio.input.value;
-        const horaFin = horarioFin.input.value;
+        const horaInicio = controles.fpHoraInicio.input.value;
+        const horaFin = controles.fpHoraFin.input.value;
 
         const inicioMinutos = convertirHoraMinutos(horaInicio);
         const finMinutos = convertirHoraMinutos(horaFin);
@@ -1034,7 +1282,7 @@ const ManejarDiaLaboral = (function (){
         }
 
 
-        if(TiposAtencionregistros.length === 0){
+        if(!validarConfiguraciones()){
             Swal.showValidationMessage(
                 "Debe registrar al menos un tipo de atención"
             );
@@ -1042,13 +1290,120 @@ const ManejarDiaLaboral = (function (){
         }
 
 
-        
-
         return  {
                 horaInicio,
                 horaFin,
             };
     }
+
+    function validarConfiguraciones() {
+
+        const existenConfiguraciones = TiposAtencionregistros.some(
+            item => !item.eliminado
+        ); 
+        
+        return existenConfiguraciones;
+    }
+
+    //#endregion
+    
+
+
+    //#region Persistencia
+
+    function construirMensajesImpacto(impactos) {
+
+        const mensajes = [];
+
+        if (impactos.eliminar?.length) {
+
+            let html = `
+                <strong>Eliminaciones</strong>
+                <ul>`;
+
+            impactos.eliminar.forEach(item => {
+                html += `
+                    <li>
+                        <strong>${item.tipoAtencion}</strong><br>
+                        Se eliminarán <strong>${item.cupos}</strong> cupos programados.
+                        ${item.citas > 0
+                            ? `<br><strong>${item.citas}</strong> citas deberán ser reprogramadas.`
+                            : ""}
+                    </li>
+                `;
+            });
+            html += "</ul>";
+            mensajes.push(html);
+        }
+
+        if (impactos.editar?.length) {
+
+            let html = `
+                <strong>Ediciones</strong>
+                <ul>
+            `;
+
+            impactos.editar.forEach(item => {
+                let descripcion = "";
+                switch (item.tipoCambio) {
+                    case "REDUCCION_CUPOS":
+                        descripcion = `
+                            Se eliminarán <strong>${item.cupos}</strong> cupos.
+                            ${item.citas > 0
+                                ? `<br><strong>${item.citas}</strong> citas deberán ser reprogramadas.`
+                                : ""}
+                        `;
+                        break;
+                    case "DURACION":
+                        descripcion = `
+                            Se actualizará el horario de <strong>${item.cupos}</strong> cupos.
+                            ${item.citas > 0
+                                ? `<br><strong>${item.citas}</strong> citas modificarán su horario.`
+                                : ""}
+                        `;
+                        break;
+                }
+                html += `
+                    <li>
+                        <strong>${item.tipoAtencion}</strong><br>
+                        ${descripcion}
+                    </li>
+                `;
+
+            });
+
+            html += "</ul>";
+
+            mensajes.push(html);
+        }
+
+        if (impactos.general?.length) {
+
+            let html = `
+                <strong>Información general</strong>
+                <ul>
+            `;
+
+            impactos.general.forEach(item => {
+                html += `
+                    <li>${item.mensaje}</li>
+                `;
+            });
+
+            html += "</ul>";
+
+            mensajes.push(html);
+        }
+
+        mensajes.push(`
+            <strong>¿Desea aplicar estos cambios?</strong><br><br>
+            Se actualizará la agenda del período laboral.
+        `);
+
+        return mensajes;
+    }
+
+
 
     async function procesarGuardado() {
         Swal.resetValidationMessage();
@@ -1058,51 +1413,61 @@ const ManejarDiaLaboral = (function (){
             return
         }
 
-        console.log(formData);
-
+        let confirmado = true;
+        let resultado = null;
         //ojo si hay registro es edicion
         if (estado && estado.diaRegistro){// indica que estamos editando 
-            // validad impacto 
-                const confirmado = await confirmarAccion({
-                titulo: "jlsadkjalskdas",
-                mensajes: [ "mensaje1","mensaje2","mensaje3"],
+
+            resultado = await validarImpactoDialaboral(formData);
+
+            // Si resultado.resultado === null
+            //     → No hubo cambios.
+            if (!resultado.conflictos){
+                toastr.info("El dia no tiene conflictos", "Registro validado");
+                return false
+            }
+            // Si resultado.resultado contiene impacto
+            //     → Mostrar confirmación.
+
+            const mensajes = construirMensajesImpacto(resultado.impactos);
+
+            confirmado = await confirmarAccion({
+                titulo: "Revise el impacto de los cambios",
+                mensajes: mensajes,
                 icono: "warning"
-            });
+                })
+            
+
+            // });
         }else {// estamos agregandio llamado a guardado
-            guardarPeriodo(formData);
-            return "guradao agregar"
+            resultado = guardarDiaLaboral(formData);
+            return resultado
         }
 
         
         
-        if (!confirmado){
-            return "cancelo"
+        if (confirmado){
+
+            await editarDiaLaboral(formData, resultado.f_modificado);
+            
         }else{
-            return "aprobo cambios"
-            // llmar a guardar
+            return false
         }
     }
 
 
-
-    async function guardarPeriodo(formData){
+    async function guardarDiaLaboral(formData){
         if (!formData){
             return
         }
 
-
         try {
             const csrfToken = window.CSRF_TOKEN;
-            if (!Array.isArray(TiposAtencionregistros) || TiposAtencionregistros.length === 0) {
-                toastr.error("Debe agregar al menos un estudio antes de continuar.");
-                return;
+            if (!validarConfiguraciones()) {
+                return false;
             }
-            const configuraciones = TiposAtencionregistros.map(registro => ({
-                id: registro.id,
-                cupos: registro.cupos,
-                duracion: registro.duracion,
-                diaId: estado.diaID,
-            }));
+
+            const configuraciones = obtenerConfiguracionesGuardar();
 
             const response = await fetch(API_URLS.guardarDiaPeriodoLaboral, {
                 method: "POST",
@@ -1115,13 +1480,12 @@ const ManejarDiaLaboral = (function (){
                     horaFin: formData.horaFin,
                     configuraciones: configuraciones,
                     diaNumero: estado.diaNumero,
-                    periodoId: contextoAgenda.periodoId
+                    periodoId: contextoAgenda.periodoId,
                 })
             });
 
             const data = await response.json(); 
 
-            console.log(data);
             // VALIDACIONES CONTROLADAS
             if (response.status === 400) {
                 toastr.warning(data.error, "Error de Validacion");
@@ -1129,17 +1493,80 @@ const ManejarDiaLaboral = (function (){
             }
 
             // ERRORES REALES
-                if (response.status >= 500) {
-                    throw new Error(
-                        data.error ||
-                        "No se pudo guardar el período"
-                    );
-                }
+            if (response.status >= 500) {
+                throw new Error(
+                    data.error ||
+                    "No se pudo guardar el día laboral"
+                );
+            }
+            
 
         } catch (error) {
             toastr.error(error.message, "Error al guardar el dia laboral ");
+            return false
         }
     }
+
+
+
+    async function editarDiaLaboral(formData, fechaModificado) {
+
+        if (!formData){
+            return
+        }
+
+        try {
+            const csrfToken = window.CSRF_TOKEN;
+            if (!validarConfiguraciones()) {
+                return false;
+            }
+
+            const configuraciones = obtenerConfiguracionesGuardar();
+
+            const response = await fetch(API_URLS.editarPeriodoLaboral, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": csrfToken 
+                },
+                body: JSON.stringify({
+                    horaInicio: formData.horaInicio, 
+                    horaFin: formData.horaFin,
+                    configuraciones: configuraciones,
+                    diaID: estado.diaRegistro.id,
+                    diaNumero: estado.diaNumero,
+                    periodoId: contextoAgenda.periodoId,
+                    fechaModificado: fechaModificado,
+                })
+            });
+
+            const data = await response.json(); 
+
+            // VALIDACIONES CONTROLADAS
+            if (response.status === 400) {
+                toastr.warning(data.error, "Error de Validacion");
+                return false;
+            }
+
+            // ERRORES REALES
+            if (response.status >= 500) {
+                throw new Error(
+                    data.error ||
+                    "No se pudo guardar el día laboral"
+                );
+            }
+            
+
+        } catch (error) {
+            toastr.error(error.message, "Error al guardar el dia laboral ");
+            return false
+        }
+
+    }
+    //#endregion
+
+
+    
 
 
     return {  open };

@@ -194,14 +194,14 @@ table.dataTable>tfoot>tr>td {
 /*BACKGRAUND PARA LAS CELDAS SELECCIONADAS*/
 
 table.dataTable>tbody>tr.selected>* {
-   box-shadow: inset 0 0 0 9999px var(--negro-hover) !important;
+   box-shadow: inset 0 0 0 9999px var(--colorBoton) !important;
    color: var(--blanco-apagado);
    font-weight: bold;
 }
 
 table.dataTable.hover>tbody>tr.selected:hover>*,
 table.dataTable.display>tbody>tr.selected:hover>* {
-   box-shadow: inset 0 0 0 9999px var(--negro-hover) !important;
+   box-shadow: inset 0 0 0 9999px var(--colorBoton) !important;
 }
 
 
@@ -1426,7 +1426,7 @@ font-size: 1.6rem;
 }
 
 #data_table_agenda_medica tr.selected .datatable-agenda-boton {
-   background-color: var(--blanco-suave);
+   background-color: var(--blanco-apagado);
    color: var(--negro-suave);
 }
 
@@ -1774,8 +1774,8 @@ font-size: 1.5rem;
 }
 
 .material-symbols-outlined {
-   font-weight: 250; 
-   font-size: 3.2rem;
+   font-weight: 300; 
+   font-size: 3.5rem;
 }
 
 
@@ -2341,8 +2341,9 @@ no logro establecer una clase perzonalizada */
 
 .contenedor-modal{
    background-color: var(--colorContendor);
-   width: 70%;
+   width: 90%;
    font-family: var(--fuenteCuerpo);
+   display: flex !important;
    
 }
 
@@ -2431,7 +2432,13 @@ no logro establecer una clase perzonalizada */
 }
 
 /*tamaño del modal en pantallas peques */
-@media (min-width: 50rem) {
+@media (min-width: 36rem) {
+   .contenedor-modal{
+      width: 60%;
+   }
+}
+
+@media (min-width: 60rem) {
    .contenedor-modal{
       width: 30%;
    }
@@ -4786,7 +4793,7 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
 }
 
 
-<<<<<<< HEAD
+
 /*
 >>>>>>>>>>>>>>>>>>>>>   APP DE AGENDA MEDICA
 */
@@ -5197,11 +5204,20 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
 
 
 
+
+
+
+
 .tabla-estatica-columna-responsive{
    display: none;
 }
 
-
+.tabla-estatica-columna-limitada{
+    max-width: 2rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 
 
 
@@ -5235,6 +5251,13 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
 
    .modalDiaLaboralControlesCupos > :last-child{
       justify-content: flex-end;
+   }
+
+   .tabla-estatica-columna-limitada{
+      max-width: none;
+      white-space: normal;
+      overflow: visible;
+      text-overflow: clip;
    }
 
 
@@ -5309,7 +5332,37 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
 }
 
 
+/* columna de orndenamiento */
+.tabla-estatica-orden-wrapper{
+   display: flex;
+   justify-content: center;
+   align-items: center;
+   column-gap: .8rem;
+}
 
+.tabla-estatica-orden-botones{
+   display: flex;
+   flex-direction: column;
+   row-gap: .2rem;
+}
+
+.tabla-estatica-boton.botonTablaSubir,
+.tabla-estatica-boton.botonTablaBajar{
+   height: 1.8rem;
+   width: 2.4rem;
+   border-radius: .3rem;
+   display: flex;
+   align-items: center;
+   justify-content: center;
+
+}
+
+tbody tr:first-child .botonTablaSubir,
+tbody tr:last-child .botonTablaBajar{
+   opacity: .30;
+   pointer-events: none;
+   filter: grayscale(100%);
+}
 
 
 .tabla-estatica-procesos thead th{
@@ -5355,10 +5408,6 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
    text-align: center;
    line-height: 4rem;
 }
-=======
-/* ============================================================
-   EXPEDIENTE — Tabs de Historial (Propietarios / Préstamos)
-   ============================================================ */
 
 .exp-historial-tabs {
    display: flex;
@@ -5416,4 +5465,3 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
       padding: 0.6rem 1rem;
    }
 }
->>>>>>> main

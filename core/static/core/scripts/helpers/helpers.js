@@ -79,10 +79,7 @@ async function confirmarAccion(config = {}) {
       .join("");
 
    const resultado = await Swal.fire({
-      title: `
-         <i class="bi ${claseIcono}"></i>
-         ${titulo}
-      `,
+      title: `<i class="bi ${claseIcono}"></i>${titulo}`,
       html: `
          <div class="tituloFormulario-subrallado"></div>
          <div class="contener-modal-mensajes-confirmacion">
@@ -133,7 +130,7 @@ async function confirmarAccion(config = {}) {
 }
 
 
-function renderDatosPaciente(containerId, datos = {}) {
+function renderDatosContexto(containerId, datos = {}) {
 
    const header = document.getElementById(containerId);
 
@@ -186,9 +183,12 @@ const API_URLS = {
    listarJornadaLaboralAPI: urls["listarJornadaLaboralAPI"],
    guardarPeriodoLaboral: urls["guardarPeriodoLaboral"],
    validarImpactoPeriodoLaboral: urls["validarImpactoPeriodoLaboral"],
+   validarImpactoDiaLaboral: urls["validarImpactoDiaLaboral"],
    obtenerPeriodoLaboral: urls["obtenerPeriodoLaboral"],
    listarTiposAtencion: urls["listarTiposAtencion"],
-   guardarDiaPeriodoLaboral: urls["guardarDiaPeriodoLaboral"]
+   guardarDiaPeriodoLaboral: urls["guardarDiaPeriodoLaboral"],
+   obtenerDiaLaboral: urls["obtenerDiaLaboral"],
+   editarPeriodoLaboral: urls["editarPeriodoLaboral"],
 
 };
 
@@ -1276,7 +1276,7 @@ async function AgregarAtencionModal(paciente=null, zona=null, atencionId=null) {
          if (paciente) {
             const { id, ...pacienteSinId } = paciente;
 
-            renderDatosPaciente(
+            renderDatosContexto(
                "modalAgregarAtencionHeader",
                pacienteSinId
             );

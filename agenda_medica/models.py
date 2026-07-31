@@ -43,6 +43,14 @@ class Periodo_laboral(models.Model):
             f"{self.fecha_fin.strftime('%d/%m/%Y')}"
     )
 
+    @property
+    def total_cupos(self):
+        return Cupo_agenda.objects.filter(
+            configuracion_cupo__dia_laboral__periodo_laboral=self
+        ).exclude(
+            estado=EstadoCupoAgenda.INACTIVO
+        ).count()
+
     def clean(self): 
         if self.fecha_inicio > self.fecha_fin: 
             raise ValidationError("La fecha de inicio no puede ser mayor que la fecha de fin.")
@@ -76,6 +84,15 @@ class Dia_laboral(models.Model):
     fecha_modificado = models.DateTimeField(verbose_name="Fecha Editado", auto_now=True )
     modificado_por = models.ForeignKey(User, on_delete=models.PROTECT, related_name='dia_laboral_modificados', null=True, blank=True )
 
+    @property
+    def total_cupos(self):
+        return Cupo_agenda.objects.filter(
+            configuracion_cupo__dia_laboral=self
+        ).exclude(
+            estado=EstadoCupoAgenda.INACTIVO
+        ).count()
+
+
     class Meta: 
         unique_together = ("periodo_laboral", "dia_semana") 
         ordering = ["dia_semana"]
@@ -86,6 +103,7 @@ class Dia_laboral(models.Model):
             models.Index(fields=["periodo_laboral", "dia_semana"]),
         ]
 
+    
     def clean(self): 
         # Validar horario 
         if self.hora_inicio >= self.hora_fin: 
@@ -105,10 +123,17 @@ class Configuracion_cupo(models.Model):
     tipo_atencion = models.ForeignKey(Tipo_atencion, verbose_name="Tipo Atencion", on_delete=models.PROTECT)
     cupos = models.PositiveSmallIntegerField(verbose_name="Cupos")
     duracion_minutos = models.PositiveSmallIntegerField()
+    orden = models.PositiveSmallIntegerField(default=1)
     estado = models.SmallIntegerField(
         choices=EstadoRegistro.choices,
         default=EstadoRegistro.ACTIVO
     )
+
+    @property
+    def total_cupos(self):
+        return self.cupos_agenda.exclude(
+            estado=EstadoCupoAgenda.INACTIVO
+        ).count()
 
     class Meta: 
         unique_together = ("dia_laboral", "tipo_atencion") 
@@ -127,8 +152,6 @@ class Configuracion_cupo(models.Model):
             raise ValidationError("La duración debe ser mayor a cero.") 
     
     def __str__(self): return f"{self.tipo_atencion} - {self.cupos} cupos"
-
-
 
 
 class Ausencia(models.Model):
@@ -164,8 +187,6 @@ class Ausencia(models.Model):
         )
 
 
-
-
 class Cupo_agenda(models.Model):
     personal_salud = models.ForeignKey(PersonalSalud, on_delete=models.PROTECT, related_name="cupos_agenda")
     configuracion_cupo = models.ForeignKey(Configuracion_cupo, on_delete=models.PROTECT,  related_name="cupos_agenda")
@@ -186,6 +207,8 @@ class Cupo_agenda(models.Model):
     @property
     def especialidad(self):
         return self.personal_salud.especialidad
+    
+
 
     class Meta:
         verbose_name = "Cupo agenda"

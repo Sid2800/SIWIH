@@ -3,23 +3,23 @@ from core.mixins import UnidadRolRequiredMixin
 from django.views.generic import TemplateView
 from django.views.generic import DetailView
 from django.core.exceptions import ValidationError
-from core.constants import permisos
 from datetime import datetime, timedelta, time, date
 from django.db.models import Value, CharField, F, Q, Case, When, Exists, OuterRef,  IntegerField, Subquery, Func
 from django.db.models.functions import Concat, Coalesce, Cast
 from django.http import JsonResponse
 from django.utils import timezone
 from core.constants.permisos import AGENDA_MEDICA_EDITOR_ROLES, AGENDA_MEDICA_EDITOR_UNIDADES
+from core.constants.domain_constants import LogApp
 from django.views.decorators.http import require_GET
 from django.urls import  reverse
 from core.utils.utilidades_fechas import formatear_fecha_dd_mm_yyyy
 from agenda_medica.models import Periodo_laboral
-from agenda_medica import validators as agenda_validators
+from agenda_medica.validators import DiaLaboralValidator, PeriodoLaboralValidator
 from core.services.agenda_medica.periodo_laboral_service import PeriodoLaboralService
 from core.services.agenda_medica.configuracion_dia_service  import  ConfiguracionDiaService
 from usuario.permisos import verificar_permisos_usuario
 from core.utils.utilidades_textos import generar_slug
-
+from core.utils.utilidades_logging import log_info
 from core.utils.utilidades_request import parse_json_request
 
 # Create your views here.
@@ -34,10 +34,23 @@ class ListaPeriodoLaborales(UnidadRolRequiredMixin,TemplateView):
         
         context['usuario'] = usuario
         anios = PeriodoLaboralService.anios_periodos()
-        print(anios)
         context['anios'] = anios
 
         return context
+    
+
+
+class Calendario(UnidadRolRequiredMixin,TemplateView):
+    template_name = "agenda_medica/calendario.html"
+    required_roles = AGENDA_MEDICA_EDITOR_ROLES
+    required_unidades = AGENDA_MEDICA_EDITOR_UNIDADES
+
+    def get_context_data(self,**kwargs):
+        context = super().get_context_data(**kwargs)
+        usuario = self.request.user
+        context['usuario'] = usuario
+        return context
+    
     
 
 class ConfigurarAgenda(UnidadRolRequiredMixin,DetailView):
@@ -45,7 +58,7 @@ class ConfigurarAgenda(UnidadRolRequiredMixin,DetailView):
     required_roles = AGENDA_MEDICA_EDITOR_ROLES
     required_unidades = AGENDA_MEDICA_EDITOR_UNIDADES
     model = Periodo_laboral
-    context_object_name = 'periodo' # ejem {{ paciente.estado }}
+    context_object_name = 'periodo'
 
     def get_context_data(self,**kwargs):
         context = super().get_context_data(**kwargs)
@@ -186,6 +199,7 @@ def listarPeriodosLaboralesAPI(request):
     })
     
 
+
 @require_GET
 def obtenerPeriodoLaboral(request):
     id = request.GET.get('id')
@@ -224,7 +238,7 @@ def guardarPeriodoLaboral(request):
         return JsonResponse({'error': str(e)}, status=400)
     
     try:
-        periodo = agenda_validators.validarArgumentosPeriodoLaboral(data, request.user.id)
+        periodo = PeriodoLaboralValidator.validarArgumentosPeriodoLaboral(data, request.user.id)
     except ValueError as e:
         return JsonResponse(
             {'error': str(e)},
@@ -264,7 +278,7 @@ def validarImpactoPeriodoLaboral(request):
         return JsonResponse({'error': e.messages[0]}, status=400)
 
     try:
-        periodo = agenda_validators.validarArgumentosPeriodoLaboral(data, request.user.id)
+        periodo = PeriodoLaboralValidator.validarArgumentosPeriodoLaboral(data, request.user.id)
     except ValueError as e:
         return JsonResponse(
             {'error': e.messages[0]},
@@ -278,6 +292,7 @@ def validarImpactoPeriodoLaboral(request):
 
     try:
         resultado = PeriodoLaboralService.analizarImpactoPeriodoLaboral(periodo)
+
         return JsonResponse({'resultado': resultado}, status=200)
     except ValidationError as e:
         return JsonResponse({'error': e.messages[0]}, status=400)
@@ -294,15 +309,17 @@ def guardarDiaLaboral(request):
     try:
         data = parse_json_request(request)
     except ValueError as e:
-        return JsonResponse({'error': str(e)}, status=400)
-
-
+        return JsonResponse(
+            {"error": "El cuerpo de la solicitud contiene un JSON inválido."},
+            status=400
+        )
+    
     try:
-        diaLaboralConfigurado = agenda_validators.validarArgumentosDiaLaboral(data, request.user.id)
+        diaLaboralConfigurado = DiaLaboralValidator.validarArgumentosDiaLaboral(data)
     except ValueError as e:
         return JsonResponse(
-            {'error':  e.messages[0]},
-            status=400
+            {"error": "Error interno del servidor."},
+            status=500
         )
     except ValidationError as e:
         return JsonResponse(
@@ -310,21 +327,127 @@ def guardarDiaLaboral(request):
             status=400
         )
 
-
-    
-
     try:
-        #PeriodoLaboralService.analizarImpactoPeriodoLaboral(periodo)
-        #resultadoGuardado = PeriodoLaboralService.procesarPeriodoLaboral(diaLaboralConfigurado,request.user)
+        #PeriodoLaboralService.analizarImpactoPeriodoLaboral(periodo) al editar
         resultado = ConfiguracionDiaService.crear_dia_laboral(diaLaboralConfigurado,request.user)
-        if True:#resultadoGuardado:
+        if resultado:
             return JsonResponse({'guardo': True}, status=200)
-        else:
-            return JsonResponse({'guardo': False}, status=200)
+    
 
     except ValidationError as e:
         return JsonResponse({'error': e.messages[0]}, status=400)
 
     except Exception as e:
-        print(e)
+        log_info(
+                f"[ConfiguracionDiaService]: crear_dia_laboral {e}",
+                LogApp.AGENDA
+            )
         return JsonResponse({'error': 'No se pudo guardar el periodo'}, status=500)
+    
+
+
+
+@require_GET
+def obtenerDiaLaboral(request):
+    id = request.GET.get('id')
+    if not id:
+        return JsonResponse({'error': 'El parametro id es requerido'}, status=400)
+    
+    detalle = ConfiguracionDiaService.obtener_dia_laboral_detallado(id)
+
+
+    if not detalle:
+        return JsonResponse(
+            {"error": "No se encontró el día laboral."},
+            status=404
+        )
+    
+    return JsonResponse(detalle  , status=200)
+
+
+
+
+def validarImpactoDiaLaboral(request):
+    if not verificar_permisos_usuario(request.user, AGENDA_MEDICA_EDITOR_ROLES, AGENDA_MEDICA_EDITOR_UNIDADES):
+        return JsonResponse({'error': 'No tienes permisos para realizar esta accion'}, status=403)
+    
+    try:
+        data = parse_json_request(request)
+    except ValueError as e:
+        return JsonResponse({"error": "Error interno del servidor."}, status=500)
+    
+
+    try:
+        dia_laboral = DiaLaboralValidator.validarArgumentosDiaLaboral(data)
+
+    except ValueError as e:
+        return JsonResponse({"error": "Error interno del servidor."}, status=500)
+    
+    except ValidationError as e:
+        return JsonResponse(
+            {'error': e.messages[0]},
+            status=400
+        )
+
+    try:
+        # resultado = PeriodoLaboralService.analizarImpactoPeriodoLaboral(periodo)
+        resultado, f_modificado= ConfiguracionDiaService.analizarImpactoEditarDiaLaboral(dia_laboral)
+
+        
+        if resultado:
+            return JsonResponse({'conflictos': True, 'impactos':resultado, 'f_modificado':f_modificado}, status=200)
+        else:
+            return JsonResponse({'conflictos': False, 'impactos':None }, status=200)
+
+        #     print(mensajes)
+
+    except ValidationError as e:
+        return JsonResponse({'error': e.messages[0]}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': 'No se pudo procesar el periodo'}, status=500)
+
+
+
+
+def editarImpactoDiaLaboral(request):
+    if not verificar_permisos_usuario(request.user, AGENDA_MEDICA_EDITOR_ROLES, AGENDA_MEDICA_EDITOR_UNIDADES):
+        return JsonResponse({'error': 'No tienes permisos para realizar esta accion'}, status=403)
+    
+    try:
+        data = parse_json_request(request)
+    except ValueError as e:
+        return JsonResponse({"error": "Error interno del servidor."}, status=500)
+    
+
+    try:
+        dia_laboral = DiaLaboralValidator.validarArgumentosDiaLaboral(data)
+
+        
+
+    except ValueError as e:
+        return JsonResponse({"error": "Error interno del servidor."}, status=500)
+    
+    except ValidationError as e:
+        return JsonResponse(
+            {'error': e.messages[0]},
+            status=400
+        )
+
+    try:
+
+        resultado= ConfiguracionDiaService.editarDiaLaboral(dia_laboral, request.user)
+        # print(dia_laboral)
+        
+        if True:#resultado:
+            return JsonResponse({'guarda': True}, status=200)
+        else:
+            return JsonResponse({'guarda': False}, status=200)
+
+        #     print(mensajes)
+
+    except ValidationError as e:
+        return JsonResponse({'error': e.messages[0]}, status=400)
+    except Exception as e:
+        log_info(e, LogApp.AGENDA)
+
+        return JsonResponse({'error': 'No se pudo procesar el periodo'}, status=500)

@@ -1,0 +1,63 @@
+{% extends 'core/base.html'%}
+
+
+
+{% block title %}CALENDARIO{% endblock title %}
+
+{% block content %}
+   <div class="contenedor2" style="height: 100%;"> 
+
+      <div class="tituloFormulario" style="margin-bottom: 2rem;">
+         <div class="tituloFormulario-texto"> 
+               <i class="bi bi-calendar3"></i>
+               <h2 class="sin-margen">Agenda Medica</h2>
+         </div>
+         <div class="tituloFormulario-subrallado"></div>
+      </div>
+      <div class="agenda-medica-calendario">
+         <div class="agenda-medica-calendario__filtros"></div>
+         <div class="agenda-medica-calendario__calendario" id="calendario"></div>
+      </div>
+   
+
+   </div>
+
+
+
+   
+{% endblock content %}
+
+{% load static %}
+
+
+{% block extra_js %}
+{% load static %}
+
+<link rel="stylesheet" href="{% static 'core/timegridjs/css/timegrid.css' %}">
+<script src="{% static 'core/timegridjs/js/core/icons.js' %}"></script>
+<script src="{% static 'core/timegridjs/js/core/index.js' %}"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+
+const calendar = TimeGrid.create("#calendario", {
+   startHour: 7,
+   endHour: 16,
+   resolution:5,
+   interval:60,
+
+   locale: "es",
+   view: "day",
+   title: ' <span class="material-symbols-outlined"  > stethoscope</span> JORGE ADOLFO AMAYA AMADOR ',
+   navigation: true,
+   views: true,
+   date: new Date(2026, 7, 30)
+
+});
+
+
+
+
+});
+</script>
+{% endblock extra_js %}
