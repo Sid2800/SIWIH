@@ -4129,6 +4129,10 @@ padding: .6rem .5rem  0  0;
    
 }
 
+.referenciaReferenciaCamposOtros{
+   row-gap: 0;
+}
+
 
 .referenciaReferenciaCamposDiagnostico,
 .referenciaRespuestaCamposDiagnostico{
@@ -4255,7 +4259,15 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
    width: 8rem;
 }
 
+#contenedor-elaborada-por,
+#contenedor-personal-salud-refiere{
+   margin-bottom: 1rem;
+}
 
+#contenedor-personal-salud-refiere{
+   display: grid;
+   grid-template-columns: auto 1fr;
+}
 
 #contenedor-evaluacion,
 #contenedor-interactivo,
@@ -4264,11 +4276,18 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
 #seguimiento-campo-institucional-2,
 #seguimiento-campo-referencia-1,
 #seguimiento-campo-referencia-2,
+#contenedor-elaborada-por,
+#contenedor-personal-salud-refiere,
 #formularioReferencia-botonImprimir{
-   transform: translateY(0);
+   /* transform: translateY(0); */
+      /* overflow: hidden; */
    opacity: 1;
-   transition: height 0.6s ease, opacity 0.6s ease, transform 0.6s ease;
-   overflow: hidden;
+   transition:
+      height 0.6s ease,
+      opacity 0.6s ease,
+      transform 0.6s ease,
+      margin-bottom 0.6s ease;
+
 }
 
 
@@ -4279,6 +4298,8 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
 #seguimiento-campo-institucional-2.oculto,
 #seguimiento-campo-referencia-1.oculto,
 #seguimiento-campo-referencia-2.oculto,
+#contenedor-elaborada-por.oculto,
+#contenedor-personal-salud-refiere.oculto,
 #formularioReferencia-botonImprimir.oculto{
    margin-top: 0rem;
    transform: translateY(-20px);
@@ -4286,6 +4307,11 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
    pointer-events: none;
    height: 0;
 
+}
+
+#contenedor-elaborada-por.oculto,
+#contenedor-personal-salud-refiere.oculto{
+   margin-bottom: 0;
 }
 
 

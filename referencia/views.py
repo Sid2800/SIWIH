@@ -118,6 +118,8 @@ class ReferenciaAddView(UnidadRolRequiredMixin, CreateView):
         form.instance.motivo_no_atencion = motivo_no_atencion
             
         try:
+            # agregr el personal de salud que elaboro la referencia
+            form.instance.personal_salud_refiere = form.cleaned_data.get("personal_salud_refiere")
             with transaction.atomic():
                 response = super().form_valid(form) 
 
@@ -241,7 +243,8 @@ class ReferenciaEditView(UnidadRolRequiredMixin, UpdateView):
         usuario = self.request.user
         diagnosticos = form.diagnosticos_validados
         motivo_no_atencion = form.cleaned_data.get('motivo_no_atencion')
-        
+
+
         if usuario:
             form.instance.modificado_por = usuario
 
@@ -254,6 +257,9 @@ class ReferenciaEditView(UnidadRolRequiredMixin, UpdateView):
         form.instance.motivo_no_atencion = motivo_no_atencion
 
         try:
+            # agregr el personal de salud que elaboro la referencia
+            form.instance.personal_salud_refiere = form.cleaned_data.get("personal_salud_refiere")
+
             with transaction.atomic():
                 response = super().form_valid(form)
 

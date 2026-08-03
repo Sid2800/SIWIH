@@ -170,16 +170,27 @@
                         </fieldset >
                         
                         <fieldset class="referenciaReferenciaCamposOtros">
-                            <legend>Elaboracion</legend>
-                            <div class="formularioCampo">
+                            <legend>Elaboración</legend>
+
+                            {# Campo legado (Referencias recibidas) #}
+                            <div class="formularioCampo" id="contenedor-elaborada-por">
                                 <label>Elaborado por</label>
-                                {{ form.elaborada_por }}   
-                            </div>  
+                                {{ form.elaborada_por }}
+                            </div>
+
+                            {# Campo nuevo (Referencias enviadas) #}
+                            {{ form.personal_salud_refiere_id }}
+
+                            <div class="formularioCampo" id="contenedor-personal-salud-refiere">
+                                <label>Profesional</label>
+                                <div id="vs-personal-salud-refiere"></div>
+                            </div>
+
                             <div class="formularioCampo">
                                 <label>Aten. requerida</label>
-                                {{ form.atencion_requerida }}   
-                            </div>   
-                        </fieldset >
+                                {{ form.atencion_requerida }}
+                            </div>
+                        </fieldset>
 
                         <div class="referenciaReferenciaCamposDiagnostico" >
                             <label class= "form-subtitulo-fieldset-falso">DIAGNOSTICO</label>
@@ -200,6 +211,8 @@
                         <legend>Observaciones</legend>
                             {{ form.observaciones }}  
                         </fieldset >
+
+                        
                     
                         <div class="referenciaReferenciaEvaluacion" id="contenedor-evaluacion">
                             <fieldset class="radio-fielset referenciaOportuna">

@@ -2,6 +2,7 @@ from django.db import models
 from paciente.models import Paciente
 from servicio.models import Institucion_salud, Sala, Area_atencion, ServiciosAux, Unidad_clinica
 from clinico.models import Tipo_personal_salud, Diagnostico, Condicion_paciente
+from rrhh.models import PersonalSalud
 from core.constants.choices_constants import AtencionRequerida, MetodoSeguimiento, FuenteSeguimiento
 from django.contrib.auth.models import User
 from django.utils import timezone
@@ -97,6 +98,16 @@ class Referencia(models.Model):
         on_delete=models.PROTECT,
         null=True,
         blank=True,
+    )
+
+    # NUEVO
+    personal_salud_refiere = models.ForeignKey(
+        PersonalSalud,
+        related_name="referencias_realizadas",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        verbose_name="Personal que refiere"
     )
 
     # Área que refiere (solo para referencias tipo enviada)
@@ -272,6 +283,17 @@ class Respuesta(models.Model):
         null=True,
         blank=True,
     )
+
+    # NUEVO
+    personal_salud_responde = models.ForeignKey(
+        PersonalSalud,
+        related_name="respuestas_realizadas",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        verbose_name="Personal de salud que responde"
+    )
+
     motivo = models.ForeignKey(
         Motivo_envio,
         related_name="respuestas",

@@ -11,6 +11,8 @@ from core.services.servicio_service import ServicioService
 from core.validators.fecha_validator import validar_fecha
 from core.validators.paciente import validar_paciente
 from .validators import validar_instituciones_origen_destino, validar_diagnosticos_json, validar_referencia_para_respuesta
+from core.validators.main_validator import validar_entero_positivo
+from rrhh.validators import validar_personal_salud_activo
 from django.db.models import Q
 
 
@@ -28,8 +30,11 @@ class ReferenciaCreateForm(forms.ModelForm):
     idReferencia = forms.CharField(widget=forms.HiddenInput(), required=False)
     idSeguimiento = forms.CharField(widget=forms.HiddenInput(), required=False)
 
-
-    
+    personal_salud_refiere_id = forms.IntegerField(
+        required=False,
+        widget=forms.HiddenInput()
+    )
+        
     fecha_elaboracion = forms.DateTimeField(
         initial=localtime,  # devuelve datetime con tu zona local
         widget=forms.DateTimeInput(
@@ -63,7 +68,36 @@ class ReferenciaCreateForm(forms.ModelForm):
 
     class Meta:
         model = Referencia
-        fields = ["fecha_elaboracion", "fecha_recepcion", "tipo","institucion_origen", "institucion_destino", "atencion_requerida", "motivo","motivo_detalle","elaborada_por","oportuna","justificada","observaciones","especialidad_destino","unidad_clinica_refiere","motivo_no_atencion"]
+        fields = [
+                # Fechas
+                "fecha_elaboracion",
+                "fecha_recepcion",
+
+                # Datos generales
+                "tipo",
+                "institucion_origen",
+                "institucion_destino",
+                "atencion_requerida",
+
+                # Motivo
+                "motivo",
+                "motivo_detalle",
+
+                # Elaboración
+                "elaborada_por",
+
+                # Calidad
+                "oportuna",
+                "justificada",
+
+                # Destino
+                "especialidad_destino",
+                "unidad_clinica_refiere",
+                "motivo_no_atencion",
+
+                # Observaciones
+                "observaciones",
+            ]
 
 
     def asignar_propiedades_campos_paciente(self):
@@ -107,6 +141,7 @@ class ReferenciaCreateForm(forms.ModelForm):
             'placeholder': 'Institucion Origen'
         })
         self.fields['motivo_no_atencion'].widget = forms.HiddenInput()
+
 
 
         if self.instance and self.instance.pk:
@@ -203,7 +238,12 @@ class ReferenciaCreateForm(forms.ModelForm):
         fecha_recepcion = cleaned_data.get("fecha_recepcion")
         especialidad_destino = cleaned_data.get("especialidad_destino")
         unidad_clinica = cleaned_data.get('unidad_clinica_refiere')
-        atencion_requerida = self.cleaned_data.get("atencion_requerida")
+        atencion_requerida = cleaned_data.get("atencion_requerida")
+        personal_salud_refiere_id = cleaned_data.get("personal_salud_refiere_id")
+
+
+
+
         if atencion_requerida is None:
             raise forms.ValidationError("Debe indicar la atencion requerida")
         
@@ -240,6 +280,16 @@ class ReferenciaCreateForm(forms.ModelForm):
                     raise forms.ValidationError("Unidad clínica inactiva")
             else:
                 raise forms.ValidationError("Debe indicar el área que refiere")
+            
+            # validar que si es enviada debe consigar que profesional la digito 
+            if not personal_salud_refiere_id:
+                raise forms.ValidationError("Debe indicar el profesional de salud que elaboró la referencia.")  
+            
+            validar_entero_positivo(personal_salud_refiere_id, "personal_salud_refiere")
+            personal_salud = validar_personal_salud_activo(personal_salud_refiere_id)
+            cleaned_data["personal_salud_refiere"] = personal_salud
+            cleaned_data["elaborada_por"] = personal_salud.tipo_personal_salud
+
 
         else: #recibida
             cleaned_data['especialidad_destino'] = None
@@ -256,7 +306,8 @@ class ReferenciaCreateForm(forms.ModelForm):
                 cleaned_data['oportuna'] = oportuna
             else:
                 raise forms.ValidationError("Debe indicar los datos de calidad (Justificada, Oportuna).")
-            
+
+
     
 
 
@@ -272,6 +323,7 @@ class ReferenciaCreateForm(forms.ModelForm):
         self.diagnosticos_validados = validar_diagnosticos_json(diagnosticos_json)
 
         return cleaned_data
+
 
 
 class ReferenciaEditForm(ReferenciaCreateForm):
@@ -291,6 +343,12 @@ class ReferenciaEditForm(ReferenciaCreateForm):
             # Agregar la institución destino aunque esté inactiva
             if self.instance.institucion_destino:
                 qs_activas = qs_activas | Institucion_salud.objects.filter(pk=self.instance.institucion_destino.pk)
+
+            # Inicializar el campo oculto del personal de salud que refiere
+            if self.instance.personal_salud_refiere_id:
+                self.fields["personal_salud_refiere_id"].initial = (
+                    self.instance.personal_salud_refiere_id
+                )
 
 
         self.fields['institucion_origen'].queryset = qs_activas.distinct()
