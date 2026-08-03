@@ -27,9 +27,19 @@
              aria-labelledby="titulo-equipo-baja">
         <header class="equipos-baja__equipo-cabecera">
             {% if imagen_general %}
-                <img class="equipos-baja__equipo-imagen"
+                {% comment %}
+                   Se puede ampliar antes de confirmar: la baja es irreversible
+                   y conviene poder mirar bien la foto para asegurarse de que
+                   es el equipo correcto. Usa el visor de las fotografias.
+                {% endcomment %}
+                <img class="equipos-baja__equipo-imagen equipos-baja__equipo-imagen--ampliable"
+                     id="ampliar_foto_equipo"
                      src="{{ imagen_general.url }}"
-                     alt="Foto general del equipo {{ dispositivo.codigo }}">
+                     data-imagen-url="{{ imagen_general.url }}"
+                     alt="Foto general del equipo {{ dispositivo.codigo }}"
+                     title="Ampliar la foto del equipo"
+                     role="button"
+                     tabindex="0">
             {% else %}
                 <span class="equipos-baja__equipo-icono" aria-hidden="true">
                     <i class="bi bi-device-hdd"></i>
@@ -227,6 +237,30 @@
 {% block media_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    // La foto del equipo se amplia en el visor compartido. Confirmar la baja
+    // no tiene vuelta atras, asi que conviene poder mirarla de cerca antes.
+    const fotoEquipo = document.getElementById('ampliar_foto_equipo');
+
+    if (fotoEquipo && typeof ImageViewer !== 'undefined') {
+        function ampliarFotoEquipo() {
+            ImageViewer.open(
+                fotoEquipo.dataset.imagenUrl,
+                0,
+                'Foto del equipo',
+                [fotoEquipo.alt]
+            );
+        }
+
+        fotoEquipo.addEventListener('click', ampliarFotoEquipo);
+        fotoEquipo.addEventListener('keydown', function (evento) {
+            // Con role="button" el navegador no activa por teclado solo.
+            if (evento.key === 'Enter' || evento.key === ' ') {
+                evento.preventDefault();
+                ampliarFotoEquipo();
+            }
+        });
+    }
+
     // El editor compartido recorta la captura y entrega el WebP que acepta
     // SIWIH Images. El archivo original nunca se envía al servidor.
     const fichaFirmada = document.getElementById('ficha_firmada_dispositivo');
