@@ -277,6 +277,16 @@ class Dispositivo(models.Model):
         null=True,
         blank=True,
     )
+    # Muchos equipos son de un solo color, asi que este queda en NULL y no se
+    # rellena con INDEFINIDO: no tenerlo es un dato valido, no un hueco.
+    color_secundario = models.ForeignKey(
+        ColorDispositivo,
+        on_delete=models.PROTECT,
+        related_name="dispositivos_color_secundario",
+        null=True,
+        blank=True,
+        verbose_name="Color secundario",
+    )
     numero_serie = models.CharField(max_length=100, unique=True, null=True, blank=True)
     inventario_bienes_nacionales = models.CharField(
         max_length=30,
@@ -408,6 +418,14 @@ class Dispositivo(models.Model):
 
         if self.color_id is None:
             self.color = obtener_catalogo_indefinido(ColorDispositivo)
+
+        # Se compara despues de resolver el principal: si el usuario deja el
+        # principal vacio y elige INDEFINIDO como secundario, acaban siendo el
+        # mismo y hay que avisarlo igual.
+        if self.color_secundario_id and self.color_secundario_id == self.color_id:
+            errores["color_secundario"] = (
+                "El color secundario debe ser diferente del color principal"
+            )
 
         # El modelo es opcional porque a veces se desconoce; en ese caso queda
         # en NULL y la interfaz lo presenta como INDEFINIDO. Pero si viene,

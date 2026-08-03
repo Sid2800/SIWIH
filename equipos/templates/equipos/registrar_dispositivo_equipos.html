@@ -205,7 +205,7 @@
            usuario no tenga que buscarlo.
         {% endcomment %}
         <details class="equipos-registro__opcionales"
-                 {% if form.marca.errors or form.modelo.errors or form.color.errors or form.numero_serie.errors or form.inventario_bienes_nacionales.errors or form.frecuencia_mantenimiento_meses.errors or form.fecha_instalacion.errors or form.fin_garantia.errors or form.costo_adquisicion.errors or form.observaciones.errors %}open{% endif %}>
+                 {% if form.marca.errors or form.modelo.errors or form.color.errors or form.color_secundario.errors or form.numero_serie.errors or form.inventario_bienes_nacionales.errors or form.frecuencia_mantenimiento_meses.errors or form.fecha_instalacion.errors or form.fin_garantia.errors or form.costo_adquisicion.errors or form.observaciones.errors %}open{% endif %}>
             <summary class="equipos-registro__opcionales-resumen">
                 <h3 class="equipos-registro__opcionales-titulo">
                     <i class="bi bi-sliders"></i>
@@ -230,9 +230,14 @@
                         {{ form.modelo.errors }}
                     </div>
                     <div class="equipos-registro__campo">
-                        <label for="color_dispositivo">Color</label>
+                        <label for="color_dispositivo">Color principal</label>
                         {{ form.color }}
                         {{ form.color.errors }}
+                    </div>
+                    <div class="equipos-registro__campo">
+                        <label for="color_secundario_dispositivo">Color secundario</label>
+                        {{ form.color_secundario }}
+                        {{ form.color_secundario.errors }}
                     </div>
                     <div class="equipos-registro__campo">
                         <label for="serie_dispositivo">Número de serie</label>

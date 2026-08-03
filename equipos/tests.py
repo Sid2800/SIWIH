@@ -169,6 +169,9 @@ class EquiposViewsTests(TestCase):
             "modelo": self.modelo.id,
             "area_gestora": self.area_gestora.id,
             "color": self.color.id,
+            # Por defecto se registra con un solo color: el secundario es la
+            # excepcion, no la norma.
+            "color_secundario": "",
             "numero_serie": "SERIE-PRUEBA",
             "inventario_bienes_nacionales": "",
             "inventario_numero_ficha": "",
@@ -210,6 +213,142 @@ class EquiposViewsTests(TestCase):
 
         self.assertContains(respuesta, reverse('catalogo_marcas_equipos'))
         self.assertContains(respuesta, 'Marcas y modelos')
+
+    # --- Color secundario -------------------------------------------------
+
+    def test_registro_con_un_solo_color_deja_el_secundario_vacio(self):
+        respuesta = self.client.post(
+            reverse("registrar_dispositivo_equipos"),
+            self._datos_formulario_dispositivo(numero_serie="SOLO-UN-COLOR"),
+        )
+        equipo = Dispositivo.objects.filter(numero_serie="SOLO-UN-COLOR").first()
+
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertIsNotNone(equipo)
+        self.assertIsNone(equipo.color_secundario_id)
+
+    def test_registro_admite_dos_colores_distintos(self):
+        segundo = ColorDispositivo.objects.get_or_create(nombre="AZUL")[0]
+
+        respuesta = self.client.post(
+            reverse("registrar_dispositivo_equipos"),
+            self._datos_formulario_dispositivo(
+                numero_serie="DOS-COLORES", color_secundario=segundo.id
+            ),
+        )
+        equipo = Dispositivo.objects.filter(numero_serie="DOS-COLORES").first()
+
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertIsNotNone(equipo)
+        self.assertEqual(equipo.color_id, self.color.id)
+        self.assertEqual(equipo.color_secundario_id, segundo.id)
+
+    def test_registro_rechaza_dos_colores_iguales(self):
+        respuesta = self.client.post(
+            reverse("registrar_dispositivo_equipos"),
+            self._datos_formulario_dispositivo(
+                numero_serie="COLOR-REPETIDO", color_secundario=self.color.id
+            ),
+        )
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertContains(
+            respuesta,
+            "El color secundario debe ser diferente del color principal",
+        )
+        self.assertFalse(
+            Dispositivo.objects.filter(numero_serie="COLOR-REPETIDO").exists()
+        )
+
+    def test_edicion_agrega_cambia_y_quita_el_color_secundario(self):
+        azul = ColorDispositivo.objects.get_or_create(nombre="AZUL")[0]
+        verde = ColorDispositivo.objects.get_or_create(nombre="VERDE")[0]
+        url = reverse("editar_dispositivo_equipos", args=[self.dispositivo.id])
+        datos = self._datos_formulario_dispositivo(
+            numero_serie=self.dispositivo.numero_serie
+        )
+        datos.pop("foto_general", None)
+
+        # Agregar
+        self.client.post(url, {**datos, "color_secundario": azul.id})
+        self.dispositivo.refresh_from_db()
+        self.assertEqual(self.dispositivo.color_secundario_id, azul.id)
+
+        # Cambiar
+        self.client.post(url, {**datos, "color_secundario": verde.id})
+        self.dispositivo.refresh_from_db()
+        self.assertEqual(self.dispositivo.color_secundario_id, verde.id)
+
+        # Quitar
+        self.client.post(url, {**datos, "color_secundario": ""})
+        self.dispositivo.refresh_from_db()
+        self.assertIsNone(self.dispositivo.color_secundario_id)
+
+    def test_los_colores_inactivos_no_se_ofrecen_en_ninguno_de_los_dos(self):
+        retirado = ColorDispositivo.objects.create(
+            nombre="COLOR RETIRADO", activo=False
+        )
+
+        form = DispositivoCreateForm()
+
+        self.assertNotIn(retirado, form.fields["color"].queryset)
+        self.assertNotIn(retirado, form.fields["color_secundario"].queryset)
+
+    def test_la_edicion_conserva_el_color_secundario_inactivo_del_equipo(self):
+        # Si el color se desactiva despues, abrir el equipo no puede obligar a
+        # cambiarlo para poder guardar.
+        azul = ColorDispositivo.objects.get_or_create(nombre="AZUL")[0]
+        self.dispositivo.color_secundario = azul
+        self.dispositivo.save()
+        azul.activo = False
+        azul.save()
+
+        form = DispositivoCreateForm(instance=self.dispositivo)
+
+        self.assertIn(azul, form.fields["color_secundario"].queryset)
+
+    def test_el_selector_secundario_ofrece_la_opcion_vacia_con_su_texto(self):
+        respuesta = self.client.get(reverse("registrar_dispositivo_equipos"))
+
+        self.assertContains(respuesta, "Sin color secundario")
+        self.assertContains(respuesta, "color_secundario_dispositivo")
+
+    def test_el_detalle_muestra_los_dos_colores(self):
+        azul = ColorDispositivo.objects.get_or_create(nombre="AZUL")[0]
+        self.dispositivo.color_secundario = azul
+        self.dispositivo.save()
+
+        respuesta = self.client.get(
+            reverse("detalle_dispositivo_equipos", args=[self.dispositivo.id])
+        )
+
+        self.assertContains(respuesta, "Color principal")
+        self.assertContains(respuesta, "Color secundario")
+        self.assertContains(respuesta, "AZUL")
+
+    def test_el_detalle_sin_color_secundario_dice_no_indicado(self):
+        respuesta = self.client.get(
+            reverse("detalle_dispositivo_equipos", args=[self.dispositivo.id])
+        )
+
+        self.assertContains(respuesta, "Color secundario")
+        self.assertContains(respuesta, "No indicado")
+
+    def test_un_equipo_previo_a_la_migracion_conserva_sus_datos(self):
+        # La migracion es un AddField con null=True: los equipos que ya
+        # existian no se tocan y quedan sin color secundario.
+        self.dispositivo.refresh_from_db()
+
+        self.assertIsNone(self.dispositivo.color_secundario_id)
+        self.assertEqual(self.dispositivo.color_id, self.color.id)
+
+    def test_un_color_usado_como_secundario_no_se_puede_borrar(self):
+        azul = ColorDispositivo.objects.get_or_create(nombre="AZUL")[0]
+        self.dispositivo.color_secundario = azul
+        self.dispositivo.save()
+
+        with self.assertRaises(ProtectedError):
+            azul.delete()
 
     def test_un_tipo_con_equipos_no_se_puede_borrar(self):
         # El catalogo solo ofrece desactivar, pero la proteccion real vive en

@@ -405,6 +405,7 @@ class DispositivoCreateForm(forms.ModelForm):
             "modelo",
             "area_gestora",
             "color",
+            "color_secundario",
             "numero_serie",
             "inventario_bienes_nacionales",
             "inventario_numero_ficha",
@@ -451,6 +452,12 @@ class DispositivoCreateForm(forms.ModelForm):
                 attrs={
                     "class": "formularioCampo-select",
                     "id": "color_dispositivo",
+                }
+            ),
+            "color_secundario": forms.Select(
+                attrs={
+                    "class": "formularioCampo-select",
+                    "id": "color_secundario_dispositivo",
                 }
             ),
             "numero_serie": forms.TextInput(
@@ -567,6 +574,8 @@ class DispositivoCreateForm(forms.ModelForm):
                 filtro_area_gestora |= Q(pk=self.instance.area_gestora_id)
             if self.instance.color_id:
                 filtro_color |= Q(pk=self.instance.color_id)
+            if self.instance.color_secundario_id:
+                filtro_color |= Q(pk=self.instance.color_secundario_id)
 
         # El tipo tambien se busca por AJAX: el catalogo pasa del centenar de
         # entradas y volcarlas en el HTML alarga cada carga sin necesidad.
@@ -617,8 +626,14 @@ class DispositivoCreateForm(forms.ModelForm):
             filtro_area_gestora
         ).exclude(nombre="INDEFINIDO")
         self.fields["area_gestora"].empty_label = "Seleccione el area gestora"
+        # Los dos colores salen del mismo catalogo y comparten filtro, asi que
+        # un color nuevo queda disponible para ambos sin tocar nada mas.
         self.fields["color"].queryset = ColorDispositivo.objects.filter(filtro_color)
         self.fields["color"].empty_label = "Sin especificar"
+        self.fields["color_secundario"].queryset = ColorDispositivo.objects.filter(
+            filtro_color
+        )
+        self.fields["color_secundario"].empty_label = "Sin color secundario"
         self.fields["tipo_tecnologia"].choices = [
             ("", "Seleccione el tipo de tecnología"),
             *TipoTecnologiaDispositivo.choices,
@@ -768,7 +783,7 @@ class MarcaCatalogoForm(forms.ModelForm):
                 attrs={
                     "class": "formularioCampo-text",
                     "id": "nombre_marca_catalogo",
-                    "placeholder": "Ej. PHILIPS",
+                    "placeholder": "Ingrese Marca",
                     "maxlength": 100,
                 }
             ),
@@ -862,7 +877,7 @@ class ModeloCatalogoForm(forms.ModelForm):
                 attrs={
                     "class": "formularioCampo-text",
                     "id": "nombre_modelo_catalogo",
-                    "placeholder": "Ej. INTELLIVUE MX450",
+                    "placeholder": "Ingrese Modelo",
                     "maxlength": 100,
                 }
             ),
