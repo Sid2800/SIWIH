@@ -63,9 +63,8 @@ class FichaBajaPdfService:
         dispositivo,
         asignacion,
         usuario,
-        fecha_baja,
+        fecha_orden_trabajo,
         motivo,
-        responsable_peticion,
         habitacion_estancia,
         numero_orden_trabajo,
     ):
@@ -84,8 +83,8 @@ class FichaBajaPdfService:
         ancho_contenido = ancho - x_contenido - 25
         fecha_informe = timezone.localdate()
         ubicacion = asignacion.ubicacion if asignacion else None
-        nombre_responsable_peticion = cls._nombre_empleado(
-            responsable_peticion
+        nombre_empleado_asignado = cls._nombre_empleado(
+            asignacion.responsable if asignacion else None
         )
 
         pdf.setFillColor(colors.black)
@@ -134,10 +133,14 @@ class FichaBajaPdfService:
 
         filas = [
             ("Fecha del informe", cls._fecha(fecha_informe), False),
-            ("Fecha de orden de trabajo", cls._fecha(fecha_baja), False),
             (
-                "Responsable de la petición",
-                nombre_responsable_peticion,
+                "Fecha de orden de trabajo",
+                cls._fecha(fecha_orden_trabajo),
+                False,
+            ),
+            (
+                "Empleado asignado",
+                nombre_empleado_asignado,
                 False,
             ),
             (
@@ -298,7 +301,7 @@ class FichaBajaPdfService:
             ancho,
             ahora_local.strftime("%d/%m/%Y %H:%M"),
             usuario.username,
-            nombre_responsable_peticion,
+            nombre_empleado_asignado,
             1,
             1,
         )

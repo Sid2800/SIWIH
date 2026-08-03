@@ -1,6 +1,5 @@
 import base64
 import logging
-from datetime import timedelta
 from functools import wraps
 from io import BytesIO
 import qrcode
@@ -401,25 +400,6 @@ def _preparar_dispositivos_para_tabla(dispositivos):
             dispositivo.get_estado_display(),
         )
         dispositivo.criticidad_css = criticidad_css.get(dispositivo.criticidad, "")
-        dispositivo.garantia_estado, dispositivo.garantia_css = _obtener_estado_garantia(
-            dispositivo
-        )
-
-
-def _obtener_estado_garantia(dispositivo):
-    # Calcula etiqueta visual de garantia sin guardarla en base de datos.
-    if not dispositivo.fin_garantia:
-        return "No indicada", "equipos-estado--inactivo"
-
-    hoy = timezone.localdate()
-
-    if dispositivo.fin_garantia < hoy:
-        return "Vencida", "equipos-estado--alta"
-
-    if dispositivo.fin_garantia <= hoy + timedelta(days=30):
-        return "Vence pronto", "equipos-estado--media"
-
-    return "Vigente", "equipos-estado--vigente"
 
 
 @registrar_errores_vista("Error en listado de equipos")
@@ -784,10 +764,12 @@ def tramite_baja_dispositivo(request, dispositivo_id):
             "modelo",
             "area_gestora",
             "color",
+            "color_secundario",
         ),
         pk=dispositivo_id,
     )
     orden_trabajo_baja = _obtener_orden_trabajo_baja(dispositivo)
+    asignacion_actual = _obtener_asignacion_actual(dispositivo)
 
     if _obtener_baja_dispositivo(dispositivo):
         messages.warning(request, "Este equipo ya tiene un registro de baja.")
@@ -796,10 +778,17 @@ def tramite_baja_dispositivo(request, dispositivo_id):
     form = BajaDispositivoForm(
         request.POST or None,
         request.FILES or None,
-        initial={"fecha_baja": timezone.localdate()},
     )
 
     formulario_valido = request.method == "POST" and form.is_valid()
+    if request.method == "POST" and not asignacion_actual:
+        form.add_error(
+            None,
+            "El equipo no tiene una asignación activa. Debe asignar un "
+            "empleado antes de tramitar la baja.",
+        )
+        formulario_valido = False
+
     if formulario_valido and not orden_trabajo_baja:
         form.add_error(
             None,
@@ -834,6 +823,9 @@ def tramite_baja_dispositivo(request, dispositivo_id):
                 )
                 baja = form.save(commit=False)
                 baja.dispositivo = dispositivo_bloqueado
+                # La fecha real pertenece a la confirmacion definitiva, no a
+                # la preparacion previa de la ficha.
+                baja.fecha_baja = timezone.localdate()
                 baja.registrado_por = request.user
                 baja.ficha_firmada_uuid = ficha_uuid
                 baja.save()
@@ -858,12 +850,17 @@ def tramite_baja_dispositivo(request, dispositivo_id):
                 dispositivo_id=dispositivo.id,
             )
 
+    # La cabecera reutiliza la misma foto GENERAL que la ficha de detalle. Si
+    # SIWIH Images no responde, el tramite sigue disponible con su icono local.
+    contexto_imagenes = _obtener_contexto_imagenes_dispositivo(dispositivo.id)
+
     return render(
         request,
         "equipos/tramite_baja_dispositivo_equipos.html",
         {
             "form": form,
             "dispositivo": dispositivo,
+            "asignacion_actual": asignacion_actual,
             "url_regresar": reverse(
                 "detalle_dispositivo_equipos",
                 kwargs={"dispositivo_id": dispositivo.id},
@@ -873,6 +870,8 @@ def tramite_baja_dispositivo(request, dispositivo_id):
                 kwargs={"dispositivo_id": dispositivo.id},
             ),
             "orden_trabajo_baja": orden_trabajo_baja,
+            "fecha_baja_automatica": timezone.localdate(),
+            "imagen_general": contexto_imagenes["imagen_general"],
         },
     )
 
@@ -890,17 +889,15 @@ def ficha_baja_dispositivo_pdf(request, dispositivo_id):
             "area_gestora",
             "color",
             "baja",
-            "baja__responsable_peticion",
             "orden_trabajo_baja",
         ),
         pk=dispositivo_id,
     )
     baja_dispositivo = _obtener_baja_dispositivo(dispositivo)
+    asignacion_actual = _obtener_asignacion_actual(dispositivo)
 
     if baja_dispositivo:
-        fecha_baja = baja_dispositivo.fecha_baja
         motivo = baja_dispositivo.motivo
-        responsable_peticion = baja_dispositivo.responsable_peticion
         habitacion_estancia = baja_dispositivo.habitacion_estancia
     elif request.method == "POST":
         # El PDF se genera antes de tener la fotografia firmada.
@@ -916,23 +913,32 @@ def ficha_baja_dispositivo_pdf(request, dispositivo_id):
                 "line-height:1.6;color:#7f1d1d'>"
                 "<h1 style='font-size:1.25rem;margin:0 0 .75rem'>"
                 "Faltan datos para generar la ficha</h1>"
-                "<p style='margin:0 0 .5rem;color:#333'>Complete la fecha de "
-                "baja, el responsable de la petición y el motivo antes de "
+                "<p style='margin:0 0 .5rem;color:#333'>Complete el motivo antes de "
                 "generar la ficha.</p>"
                 "<p style='margin:0;color:#333'>Puede cerrar esta pestaña y "
                 "volver al trámite.</p>"
                 "</body></html>",
                 content_type="text/html; charset=utf-8",
             )
-        fecha_baja = form.cleaned_data["fecha_baja"]
         motivo = form.cleaned_data["motivo"]
-        responsable_peticion = form.cleaned_data["responsable_peticion"]
         habitacion_estancia = form.cleaned_data["habitacion_estancia"]
     else:
-        fecha_baja = timezone.localdate()
         motivo = ""
-        responsable_peticion = None
         habitacion_estancia = ""
+
+    if request.method == "POST" and not asignacion_actual:
+        return HttpResponseBadRequest(
+            "<!doctype html><html lang='es'><head><meta charset='utf-8'>"
+            "<title>Equipo sin asignación</title></head>"
+            "<body style='font-family:system-ui,sans-serif;padding:2.5rem;"
+            "line-height:1.6;color:#7f1d1d'>"
+            "<h1 style='font-size:1.25rem;margin:0 0 .75rem'>"
+            "El equipo no tiene una asignación activa</h1>"
+            "<p style='margin:0;color:#333'>Asigne un empleado al equipo "
+            "antes de generar la ficha de baja.</p>"
+            "</body></html>",
+            content_type="text/html; charset=utf-8",
+        )
 
     # Solo reservan correlativo el POST con datos validos (el usuario esta
     # generando la ficha de verdad) y la reimpresion de una baja ya registrada.
@@ -946,13 +952,22 @@ def ficha_baja_dispositivo_pdf(request, dispositivo_id):
     else:
         orden_trabajo = _obtener_orden_trabajo_baja(dispositivo)
 
+    if orden_trabajo and orden_trabajo.fecha_creado:
+        fecha_orden_trabajo = timezone.localtime(
+            orden_trabajo.fecha_creado
+        ).date()
+    elif baja_dispositivo:
+        # Compatibilidad con bajas antiguas que no tengan orden reservada.
+        fecha_orden_trabajo = baja_dispositivo.fecha_baja
+    else:
+        fecha_orden_trabajo = timezone.localdate()
+
     return FichaBajaPdfService.generar(
         dispositivo=dispositivo,
-        asignacion=_obtener_asignacion_actual(dispositivo),
+        asignacion=asignacion_actual,
         usuario=request.user,
-        fecha_baja=fecha_baja,
+        fecha_orden_trabajo=fecha_orden_trabajo,
         motivo=motivo,
-        responsable_peticion=responsable_peticion,
         habitacion_estancia=habitacion_estancia,
         numero_orden_trabajo=(
             orden_trabajo.numero_orden if orden_trabajo else "SIN ASIGNAR"

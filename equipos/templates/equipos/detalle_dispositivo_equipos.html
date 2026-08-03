@@ -136,11 +136,20 @@
                     </div>
 
                     {% if ficha_baja_firmada %}
+                        {% comment %}
+                           Conserva href y target: si el visor no carga, el
+                           enlace sigue abriendo la constancia en otra pestaña
+                           como antes. El JS intercepta el clic y la muestra en
+                           el mismo visor que usan las fotos del equipo.
+                        {% endcomment %}
                         <a class="equipos-baja__ficha"
+                           id="abrir_ficha_firmada"
                            href="{{ ficha_baja_firmada.url }}"
                            target="_blank"
                            rel="noopener"
-                           aria-label="Abrir ficha firmada de baja">
+                           data-imagen-url="{{ ficha_baja_firmada.url }}"
+                           data-imagen-etiqueta="Constancia de baja de {{ dispositivo.codigo }}"
+                           aria-label="Ver ficha firmada de baja">
                             <span class="equipos-baja__ficha-icono">
                                 <i class="bi bi-file-earmark-check-fill"></i>
                             </span>
@@ -166,9 +175,9 @@
                             </div>
                         {% endif %}
                         <div>
-                            <dt>Responsable de la petición</dt>
+                            <dt>Empleado asignado</dt>
                             <dd>
-                                {{ baja_dispositivo.responsable_peticion|default:"INDEFINIDO" }}
+                                {{ asignacion_actual.responsable|default:"INDEFINIDO" }}
                             </dd>
                         </div>
                         <div>
@@ -261,7 +270,10 @@
                         {% endif %}
                     </dd>
                 </div>
-                <div><dt>Fin de garantía</dt><dd><i class="bi bi-calendar3"></i> {{ dispositivo.fin_garantia|date:"d/m/Y"|default:"No indicada" }}</dd></div>
+                <div>
+                    <dt>Garantía</dt>
+                    <dd>{{ dispositivo.get_garantia_anios_display }}</dd>
+                </div>
                 <div>
                     <dt>Costo</dt>
                     <dd>
@@ -354,6 +366,23 @@ document.addEventListener('DOMContentLoaded', function () {
                     etiquetasGaleria
                 );
             });
+        });
+    }
+
+    // La constancia de baja usa el mismo visor que las fotos del equipo, pero
+    // va aparte de la galeria: no es una de las seis fotografias y no debe
+    // aparecer al pasar de una a otra con las flechas.
+    const enlaceFicha = document.getElementById('abrir_ficha_firmada');
+
+    if (enlaceFicha && typeof ImageViewer !== 'undefined') {
+        enlaceFicha.addEventListener('click', function (evento) {
+            evento.preventDefault();
+            ImageViewer.open(
+                enlaceFicha.dataset.imagenUrl,
+                0,
+                'Ficha firmada',
+                [enlaceFicha.dataset.imagenEtiqueta]
+            );
         });
     }
 

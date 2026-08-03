@@ -11,9 +11,6 @@
                 <i class="bi bi-file-earmark-check"></i>
                 <div>
                     <h2 class="sin-margen">Trámite de baja</h2>
-                    <p class="equipos-baja__subtitulo">
-                        Preparar la documentación del equipo {{ dispositivo.codigo }}.
-                    </p>
                 </div>
             </div>
             <a class="equipos-volver equipos-volver--inline equipos-encabezado-volver"
@@ -24,6 +21,50 @@
         </div>
         <div class="tituloFormulario-subrallado"></div>
     </div>
+
+    {# La baja parte de la ficha y de la asignacion vigentes del equipo. #}
+    <section class="equipos-baja__equipo"
+             aria-labelledby="titulo-equipo-baja">
+        <header class="equipos-baja__equipo-cabecera">
+            {% if imagen_general %}
+                <img class="equipos-baja__equipo-imagen"
+                     src="{{ imagen_general.url }}"
+                     alt="Foto general del equipo {{ dispositivo.codigo }}">
+            {% else %}
+                <span class="equipos-baja__equipo-icono" aria-hidden="true">
+                    <i class="bi bi-device-hdd"></i>
+                </span>
+            {% endif %}
+            <div>
+                <span class="equipos-baja__equipo-etiqueta">Equipo seleccionado</span>
+                <h3 id="titulo-equipo-baja">{{ dispositivo.tipo }}</h3>
+                <p>{{ dispositivo.codigo }}</p>
+            </div>
+        </header>
+
+        <dl class="equipos-baja__equipo-datos">
+            <div><dt>Código</dt><dd>{{ dispositivo.codigo }}</dd></div>
+            <div><dt>Tipo de equipo</dt><dd>{{ dispositivo.tipo }}</dd></div>
+            <div><dt>Marca</dt><dd>{{ dispositivo.marca|default:"INDEFINIDO" }}</dd></div>
+            <div><dt>Modelo</dt><dd>{{ dispositivo.modelo|default:"INDEFINIDO" }}</dd></div>
+            <div><dt>Número de serie</dt><dd>{{ dispositivo.numero_serie|default:"INDEFINIDO" }}</dd></div>
+            <div><dt>Ficha</dt><dd>{{ dispositivo.inventario_numero_ficha|default:"NO APLICA" }}</dd></div>
+            <div><dt>Bienes nacionales</dt><dd>{{ dispositivo.inventario_bienes_nacionales|default:"NO APLICA" }}</dd></div>
+            <div><dt>Área gestora</dt><dd>{{ dispositivo.area_gestora|default:"INDEFINIDO" }}</dd></div>
+            <div><dt>Estado actual</dt><dd>{{ dispositivo.get_estado_display }}</dd></div>
+            <div><dt>Criticidad</dt><dd>{{ dispositivo.get_criticidad_display }}</dd></div>
+            <div><dt>Ubicación</dt><dd>{{ asignacion_actual.ubicacion|default:"SIN ASIGNACIÓN" }}</dd></div>
+            <div><dt>Empleado asignado</dt><dd>{{ asignacion_actual.responsable|default:"SIN RESPONSABLE" }}</dd></div>
+        </dl>
+
+        {% if not asignacion_actual %}
+            <p class="equipos-baja__equipo-aviso" role="alert">
+                <i class="bi bi-exclamation-triangle"></i>
+                Este equipo no tiene una asignación activa. Debe asignar un
+                empleado antes de tramitar la baja.
+            </p>
+        {% endif %}
+    </section>
 
     {% comment %}
        El tramite se resuelve en una sola pantalla: el tecnico llena los datos,
@@ -67,17 +108,13 @@
 
             <div class="equipos-registro__campos equipos-registro__campos--dos">
                 <div class="equipos-registro__campo">
-                    <label for="fecha_baja_dispositivo">Fecha de baja *</label>
-                    {{ form.fecha_baja }}
-                    {{ form.fecha_baja.errors }}
-                </div>
-
-                <div class="equipos-registro__campo">
-                    <label for="responsable_peticion_baja">
-                        Responsable de la petición *
-                    </label>
-                    {{ form.responsable_peticion }}
-                    {{ form.responsable_peticion.errors }}
+                    <label>Fecha de baja</label>
+                    <input type="text"
+                           class="formularioCampo-text"
+                           value="{{ fecha_baja_automatica|date:'d/m/Y' }}"
+                           readonly
+                           aria-label="Fecha de baja asignada automáticamente">
+                    <small>Se asigna automáticamente al confirmar la baja.</small>
                 </div>
 
                 <div class="equipos-registro__campo">
@@ -104,9 +141,6 @@
             </h3>
 
             <div class="equipos-registro__campo">
-                <label for="ficha_firmada_dispositivo">
-                    Fotografía o escaneo de la ficha firmada *
-                </label>
                 {{ form.ficha_firmada }}
                 <input type="file"
                        id="ficha_firmada_camara"
@@ -125,8 +159,7 @@
                          hidden>
                     <div id="ficha_firmada_contenido">
                         <i class="bi bi-file-earmark-arrow-up"></i>
-                        <strong>Agregar ficha firmada</strong>
-                        <small>JPG, PNG o WebP; se preparará como WebP</small>
+                        <strong>Subir foto</strong>
                     </div>
                 </div>
 
@@ -172,14 +205,16 @@
                         formaction="{{ url_ficha_baja }}"
                         formmethod="post"
                         formtarget="_blank"
-                        formnovalidate>
+                        formnovalidate
+                        {% if not asignacion_actual %}disabled aria-disabled="true"{% endif %}>
                     <i class="bi bi-file-earmark-pdf"></i>
                     {% if orden_trabajo_baja %}Regenerar ficha{% else %}Generar ficha PDF{% endif %}
                 </button>
 
                 <button class="formularioBotones-boton equipos-registro__boton equipos-baja__boton"
                         id="confirmar_baja_dispositivo"
-                        type="submit">
+                        type="submit"
+                        {% if not asignacion_actual %}disabled aria-disabled="true"{% endif %}>
                     <i class="bi bi-check2-circle"></i>
                     Confirmar baja definitiva
                 </button>
@@ -202,13 +237,10 @@ document.addEventListener('DOMContentLoaded', function () {
     const previewFicha = document.getElementById('ficha_firmada_preview');
     const contenidoFicha = document.getElementById('ficha_firmada_contenido');
     const estadoFicha = document.getElementById('ficha_firmada_estado');
-    // Botones y campos del tramite. Varios existen solo en una de las dos
-    // etapas, por eso todo el codigo que los usa comprueba antes que esten.
+    // Botones y campos necesarios para generar la ficha y confirmar la baja.
     const formularioBaja = document.querySelector('.equipos-baja__formulario');
     const botonGenerar = document.getElementById('generar_ficha_pdf');
     const botonConfirmar = document.getElementById('confirmar_baja_dispositivo');
-    const campoFecha = document.getElementById('fecha_baja_dispositivo');
-    const campoResponsable = document.getElementById('responsable_peticion_baja');
     const campoMotivo = document.getElementById('motivo_baja_dispositivo');
     let previewUrl = null;
 
@@ -304,21 +336,12 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // La ficha necesita estos tres datos. Sin validarlos aqui el POST llega
+    // La ficha necesita el motivo. Sin validarlo aqui el POST llega
     // incompleto y, como el boton abre pestaña nueva, el 400 del servidor
     // quedaba como texto suelto en una pestaña en blanco.
     function datosFichaFaltantes() {
         const faltantes = [];
 
-        if (campoFecha && !campoFecha.value) {
-            faltantes.push({ campo: campoFecha, etiqueta: 'la fecha de baja' });
-        }
-        if (campoResponsable && !campoResponsable.value) {
-            faltantes.push({
-                campo: campoResponsable,
-                etiqueta: 'el responsable de la petición'
-            });
-        }
         if (campoMotivo && !campoMotivo.value.trim()) {
             faltantes.push({ campo: campoMotivo, etiqueta: 'el motivo de baja' });
         }
@@ -327,12 +350,6 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function enfocarCampo(campo) {
-        // El responsable es un select2: abrir su buscador es mas util que
-        // enfocar el select original, que esta oculto.
-        if (campo === campoResponsable && window.jQuery && $(campo).data('select2')) {
-            $(campo).select2('open');
-            return;
-        }
         campo.focus();
     }
 
@@ -401,45 +418,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Reutiliza el mismo buscador remoto del empleado a cargo. Así el
-    // formulario no carga toda la tabla de RR. HH. en el HTML.
-    const responsablePeticionSelect = $('#responsable_peticion_baja');
-
-    if (
-        responsablePeticionSelect.length
-        && responsablePeticionSelect.select2
-    ) {
-        responsablePeticionSelect.select2({
-            width: '100%',
-            placeholder: 'Buscar por DNI o nombre',
-            minimumInputLength: 1,
-            ajax: {
-                url: "{% url 'buscar_empleados_equipos' %}",
-                dataType: 'json',
-                delay: 250,
-                data: function (params) {
-                    return {
-                        q: params.term || ''
-                    };
-                },
-                processResults: function (data) {
-                    return data;
-                },
-                cache: true
-            },
-            language: {
-                inputTooShort: function () {
-                    return 'Escriba el DNI o nombre del empleado';
-                },
-                noResults: function () {
-                    return 'No se encontraron empleados';
-                },
-                searching: function () {
-                    return 'Buscando...';
-                }
-            }
-        });
-    }
 });
 </script>
 {% endblock media_js %}

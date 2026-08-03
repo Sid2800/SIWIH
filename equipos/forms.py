@@ -1,5 +1,3 @@
-from datetime import date
-
 from django import forms
 from django.db.models import Q
 from django.urls import reverse
@@ -15,6 +13,7 @@ from .models import (
     ColorDispositivo,
     CriticidadDispositivo,
     Dispositivo,
+    DuracionGarantiaDispositivo,
     EstadoDispositivo,
     MarcaDispositivo,
     ModeloDispositivo,
@@ -103,18 +102,6 @@ class EmpleadoChoiceField(forms.ModelChoiceField):
 
 
 class BajaDispositivoForm(forms.ModelForm):
-    responsable_peticion = EmpleadoChoiceField(
-        queryset=Empleado.objects.none(),
-        required=True,
-        label="Responsable de la petición",
-        widget=forms.Select(
-            attrs={
-                "class": "formularioCampo-select",
-                "id": "responsable_peticion_baja",
-                "data-placeholder": "Buscar por DNI o nombre",
-            }
-        ),
-    )
     # La fotografia firmada no pertenece a la base principal; el formulario la
     # valida para que la vista pueda enviarla a SIWIH Images antes de confirmar.
     ficha_firmada = forms.ImageField(
@@ -133,27 +120,15 @@ class BajaDispositivoForm(forms.ModelForm):
     class Meta:
         model = BajaDispositivo
         fields = [
-            "fecha_baja",
-            "responsable_peticion",
             "habitacion_estancia",
             "motivo",
         ]
         widgets = {
-            "fecha_baja": forms.DateInput(
-                attrs={
-                    "class": "formularioCampo-date",
-                    "id": "fecha_baja_dispositivo",
-                    "type": "date",
-                    "max": date.today().strftime("%Y-%m-%d"),
-                },
-                format="%Y-%m-%d",
-            ),
             "habitacion_estancia": forms.TextInput(
                 attrs={
                     "class": "formularioCampo-text",
                     "id": "habitacion_estancia_baja",
                     "maxlength": 100,
-                    "placeholder": "Ej. Habitación 3 o estancia de emergencia",
                 }
             ),
             "motivo": forms.Textarea(
@@ -161,7 +136,6 @@ class BajaDispositivoForm(forms.ModelForm):
                     "class": "formularioCampo-text no-resize",
                     "id": "motivo_baja_dispositivo",
                     "rows": 4,
-                    "placeholder": "Describa el motivo por el que se da de baja el equipo.",
                 }
             ),
         }
@@ -180,38 +154,6 @@ class BajaDispositivoForm(forms.ModelForm):
         self.fields["ficha_firmada"].widget.use_required_attribute = (
             lambda initial: False
         )
-
-        responsable_id = None
-        if self.is_bound:
-            responsable_id = self.data.get(
-                self.add_prefix("responsable_peticion")
-            )
-        else:
-            responsable_id = (
-                self.initial.get("responsable_peticion")
-                or getattr(self.instance, "responsable_peticion_id", None)
-            )
-
-        # Mantiene el formulario ligero: Select2 busca por AJAX y el queryset
-        # solo incorpora al empleado elegido cuando se envían los datos.
-        if responsable_id and str(responsable_id).isdigit():
-            filtro_responsable = Q(pk=responsable_id)
-            if self.is_bound:
-                filtro_responsable &= Q(estado=EstadoRegistro.ACTIVO)
-
-            self.fields["responsable_peticion"].queryset = (
-                Empleado.objects.filter(filtro_responsable)
-            )
-
-        self.fields[
-            "responsable_peticion"
-        ].empty_label = "Buscar responsable de la petición"
-
-    def clean_fecha_baja(self):
-        fecha_baja = self.cleaned_data["fecha_baja"]
-        if fecha_baja and fecha_baja > date.today():
-            raise forms.ValidationError("La fecha de baja no puede ser futura.")
-        return fecha_baja
 
     def clean_motivo(self):
         motivo = (self.cleaned_data.get("motivo") or "").strip()
@@ -413,7 +355,7 @@ class DispositivoCreateForm(forms.ModelForm):
             "criticidad",
             "frecuencia_mantenimiento_meses",
             "fecha_instalacion",
-            "fin_garantia",
+            "garantia_anios",
             "costo_adquisicion",
             "observaciones",
         ]
@@ -504,13 +446,11 @@ class DispositivoCreateForm(forms.ModelForm):
                 },
                 format="%Y-%m-%d",
             ),
-            "fin_garantia": forms.DateInput(
+            "garantia_anios": forms.Select(
                 attrs={
-                    "class": "formularioCampo-date",
+                    "class": "formularioCampo-select",
                     "id": "garantia_dispositivo",
-                    "type": "date",
-                },
-                format="%Y-%m-%d",
+                }
             ),
             # El widget lo define CostoLempirasField mas abajo; aqui no se
             # declara para no pisarlo.
@@ -637,6 +577,9 @@ class DispositivoCreateForm(forms.ModelForm):
         self.fields["tipo_tecnologia"].choices = [
             ("", "Seleccione el tipo de tecnología"),
             *TipoTecnologiaDispositivo.choices,
+        ]
+        self.fields["garantia_anios"].choices = [
+            *DuracionGarantiaDispositivo.choices,
         ]
         self.fields["estado"].choices = [
             (EstadoDispositivo.OPERATIVO, EstadoDispositivo.OPERATIVO.label),

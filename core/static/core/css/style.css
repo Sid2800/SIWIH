@@ -6103,6 +6103,105 @@ table.dataTable tbody td.equipos-listado__vacio {
    font-weight: 400;
    margin: .4rem 0 0;
 }
+
+.equipos-baja__equipo {
+   background-color: var(--blanco);
+   border: .1rem solid var(--colorLinea);
+   border-radius: 1.2rem;
+   display: grid;
+   gap: 1.5rem;
+   padding: 1.6rem;
+}
+
+.equipos-baja__equipo-cabecera {
+   align-items: center;
+   display: flex;
+   gap: 1.2rem;
+}
+
+/* Mismo hueco que la foto: sin equipo fotografiado la cabecera no debe
+   cambiar de alto ni descolocar el titulo. */
+.equipos-baja__equipo-icono {
+   align-items: center;
+   border: .1rem solid var(--colorLinea);
+   border-radius: 1rem;
+   display: inline-flex;
+   flex: 0 0 auto;
+   font-size: 5rem;
+   height: 13rem;
+   justify-content: center;
+   width: 17rem;
+}
+
+/* La foto es la forma mas rapida de confirmar que se esta dando de baja el
+   equipo correcto, asi que ocupa lo suficiente para reconocerlo de un vistazo. */
+.equipos-baja__equipo-imagen {
+   background-color: var(--colorFondo);
+   border: .1rem solid var(--colorLinea);
+   border-radius: 1rem;
+   flex: 0 0 auto;
+   height: 13rem;
+   object-fit: cover;
+   width: 17rem;
+}
+
+.equipos-baja__equipo-etiqueta {
+   color: var(--colorTextoMenu);
+   font-size: 1.1rem;
+   font-weight: 700;
+   text-transform: uppercase;
+}
+
+.equipos-baja__equipo-cabecera h3 {
+   font-size: 2rem;
+   margin: .2rem 0;
+}
+
+.equipos-baja__equipo-cabecera p {
+   color: var(--colorTextoMenu);
+   font-size: 1.25rem;
+   margin: 0;
+}
+
+.equipos-baja__equipo-datos {
+   display: grid;
+   gap: .8rem;
+   grid-template-columns: repeat(4, minmax(0, 1fr));
+   margin: 0;
+}
+
+.equipos-baja__equipo-datos > div {
+   border: .1rem solid var(--colorLinea);
+   border-radius: .8rem;
+   display: grid;
+   gap: .3rem;
+   min-width: 0;
+   padding: .9rem 1rem;
+}
+
+.equipos-baja__equipo-datos dt {
+   color: var(--colorTextoMenu);
+   font-size: 1.1rem;
+   font-weight: 700;
+}
+
+.equipos-baja__equipo-datos dd {
+   font-size: 1.25rem;
+   font-weight: 600;
+   margin: 0;
+   overflow-wrap: anywhere;
+}
+
+.equipos-baja__equipo-aviso {
+   align-items: center;
+   background-color: rgba(255, 193, 7, .14);
+   border: .1rem solid rgba(255, 193, 7, .55);
+   border-radius: .8rem;
+   display: flex;
+   gap: .8rem;
+   margin: 0;
+   padding: 1rem;
+}
 .equipos-baja__advertencia {
    align-items: flex-start;
    background-color: rgba(220, 53, 69, .12);
@@ -6315,6 +6414,10 @@ table.dataTable tbody td.equipos-listado__vacio {
 }
 
 @media (max-width: 1300px) {
+   .equipos-baja__equipo-datos {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+   }
+
    .equipos-detalle__resumen {
       grid-template-columns: 18rem 1fr;
    }
@@ -6326,6 +6429,10 @@ table.dataTable tbody td.equipos-listado__vacio {
 }
 
 @media (max-width: 1050px) {
+   .equipos-baja__equipo-datos {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+   }
+
    .equipos-detalle__secciones {
       grid-template-columns: 1fr;
    }
@@ -6448,6 +6555,23 @@ table.dataTable tbody td.equipos-listado__vacio {
 
    .equipos-baja__advertencia {
       flex-direction: column;
+   }
+
+   /* En telefono la cabecera se apila: con la foto ya grande, mantenerla al
+      lado dejaria el nombre del equipo en una columna de pocos caracteres. */
+   .equipos-baja__equipo-cabecera {
+      align-items: flex-start;
+      flex-direction: column;
+   }
+
+   .equipos-baja__equipo-imagen,
+   .equipos-baja__equipo-icono {
+      height: 18rem;
+      width: 100%;
+   }
+
+   .equipos-baja__equipo-datos {
+      grid-template-columns: 1fr;
    }
 
    .equipos-baja__resumen-cabecera {

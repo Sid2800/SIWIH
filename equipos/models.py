@@ -69,6 +69,13 @@ class TipoTecnologiaDispositivo(models.IntegerChoices):
     NO_ELECTRONICO = 2, "No electrónico"
 
 
+class DuracionGarantiaDispositivo(models.IntegerChoices):
+    # La garantia se registra como duracion, no como una fecha calculada.
+    SIN_GARANTIA = 0, "Sin garantía"
+    UN_ANIO = 1, "1 año"
+    DOS_ANIOS = 2, "2 años"
+
+
 # Catalogos administrables desde Django admin.
 # El campo activo oculta opciones nuevas sin borrar historico ya usado.
 class TipoDispositivo(models.Model):
@@ -316,7 +323,11 @@ class Dispositivo(models.Model):
         help_text="Cantidad de meses entre mantenimientos preventivos.",
     )
     fecha_instalacion = models.DateField(null=True, blank=True)
-    fin_garantia = models.DateField(null=True, blank=True)
+    garantia_anios = models.PositiveSmallIntegerField(
+        choices=DuracionGarantiaDispositivo.choices,
+        default=DuracionGarantiaDispositivo.SIN_GARANTIA,
+        verbose_name="Garantía",
+    )
     costo_adquisicion = models.DecimalField(
         max_digits=12,
         decimal_places=2,
@@ -365,10 +376,8 @@ class Dispositivo(models.Model):
                 name="bio_disp_costo_no_negativo",
             ),
             models.CheckConstraint(
-                condition=Q(fin_garantia__isnull=True)
-                | Q(fecha_instalacion__isnull=True)
-                | Q(fin_garantia__gte=F("fecha_instalacion")),
-                name="bio_disp_garantia_fecha_valida",
+                condition=Q(garantia_anios__in=DuracionGarantiaDispositivo.values),
+                name="equipo_garantia_anios_valida",
             ),
         ]
 
@@ -453,15 +462,6 @@ class Dispositivo(models.Model):
         except ValidationError as error:
             errores["inventario_numero_ficha"] = error
 
-        if (
-            self.fecha_instalacion
-            and self.fin_garantia
-            and self.fin_garantia < self.fecha_instalacion
-        ):
-            errores["fin_garantia"] = (
-                "El fin de garantía no puede ser anterior a la fecha de instalación."
-            )
-
         if self.inventario_bienes_nacionales:
             inventario_existente = Dispositivo.objects.filter(
                 inventario_bienes_nacionales__iexact=(
@@ -538,16 +538,13 @@ class BajaDispositivo(models.Model):
         on_delete=models.PROTECT,
         related_name="baja",
     )
-    fecha_baja = models.DateField(verbose_name="Fecha de baja")
-    motivo = models.CharField(max_length=255, verbose_name="Motivo de baja")
-    responsable_peticion = models.ForeignKey(
-        Empleado,
-        on_delete=models.PROTECT,
-        related_name="bajas_dispositivos_equipos_solicitadas",
-        null=True,
-        blank=True,
-        verbose_name="Responsable de la petición",
+    # La fecha corresponde al cierre definitivo del tramite y no es editable.
+    fecha_baja = models.DateField(
+        default=timezone.localdate,
+        editable=False,
+        verbose_name="Fecha de baja",
     )
+    motivo = models.CharField(max_length=255, verbose_name="Motivo de baja")
     habitacion_estancia = models.CharField(
         max_length=100,
         blank=True,

@@ -113,12 +113,11 @@ class BajaDispositivoAdmin(admin.ModelAdmin):
     list_display = (
         "dispositivo",
         "fecha_baja",
-        "responsable_peticion",
         "motivo",
         "registrado_por",
         "fecha_registro",
     )
-    list_filter = ("fecha_baja", "responsable_peticion", "registrado_por")
+    list_filter = ("fecha_baja", "registrado_por")
     search_fields = (
         "dispositivo__tipo__nombre",
         "dispositivo__marca__nombre",
@@ -126,15 +125,11 @@ class BajaDispositivoAdmin(admin.ModelAdmin):
         "dispositivo__numero_serie",
         "dispositivo__inventario_bienes_nacionales",
         "dispositivo__inventario_numero_ficha",
-        "responsable_peticion__dni",
-        "responsable_peticion__primer_nombre",
-        "responsable_peticion__primer_apellido",
         "motivo",
         "registrado_por__username",
     )
     autocomplete_fields = (
         "dispositivo",
-        "responsable_peticion",
         "registrado_por",
     )
     readonly_fields = ("fecha_registro",)

@@ -9,6 +9,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db.models import ProtectedError
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 from PIL import Image
 
 from core.constants.choices_constants import EstadoRegistro, TipoUnidad
@@ -22,6 +23,7 @@ from .models import (
     ColorDispositivo,
     CriticidadDispositivo,
     Dispositivo,
+    DuracionGarantiaDispositivo,
     EstadoDispositivo,
     MarcaDispositivo,
     ModeloDispositivo,
@@ -179,7 +181,7 @@ class EquiposViewsTests(TestCase):
             "criticidad": CriticidadDispositivo.MEDIA,
             "frecuencia_mantenimiento_meses": "",
             "fecha_instalacion": "",
-            "fin_garantia": "",
+            "garantia_anios": DuracionGarantiaDispositivo.SIN_GARANTIA,
             "costo_adquisicion": "",
             "observaciones": "",
             "tipo_area": "clinica",
@@ -783,6 +785,49 @@ class EquiposViewsTests(TestCase):
         )
         self.assertEqual(dispositivo.fecha_instalacion, fecha_futura)
 
+    def test_registro_guarda_garantia_como_duracion_en_anios(self):
+        respuesta = self.client.post(
+            reverse("registrar_dispositivo_equipos"),
+            self._datos_formulario_dispositivo(
+                numero_serie="SERIE-GARANTIA-DOS-ANIOS",
+                garantia_anios=DuracionGarantiaDispositivo.DOS_ANIOS,
+            ),
+        )
+
+        dispositivo = Dispositivo.objects.get(
+            numero_serie="SERIE-GARANTIA-DOS-ANIOS"
+        )
+        self.assertRedirects(
+            respuesta,
+            reverse("detalle_dispositivo_equipos", args=[dispositivo.id]),
+        )
+        self.assertEqual(
+            dispositivo.garantia_anios,
+            DuracionGarantiaDispositivo.DOS_ANIOS,
+        )
+
+        detalle = self.client.get(
+            reverse("detalle_dispositivo_equipos", args=[dispositivo.id])
+        )
+        self.assertContains(detalle, "2 años")
+
+    def test_registro_rechaza_duracion_de_garantia_no_permitida(self):
+        respuesta = self.client.post(
+            reverse("registrar_dispositivo_equipos"),
+            self._datos_formulario_dispositivo(
+                numero_serie="SERIE-GARANTIA-INVALIDA",
+                garantia_anios=3,
+            ),
+        )
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertTrue(respuesta.context["form"].errors.get("garantia_anios"))
+        self.assertFalse(
+            Dispositivo.objects.filter(
+                numero_serie="SERIE-GARANTIA-INVALIDA"
+            ).exists()
+        )
+
     def test_usuario_autenticado_puede_abrir_edicion(self):
         respuesta = self.client.get(
             reverse('editar_dispositivo_equipos', args=[self.dispositivo.id])
@@ -926,7 +971,7 @@ class EquiposViewsTests(TestCase):
                 "criticidad": CriticidadDispositivo.ALTA,
                 "frecuencia_mantenimiento_meses": "",
                 "fecha_instalacion": "",
-                "fin_garantia": "",
+                "garantia_anios": DuracionGarantiaDispositivo.DOS_ANIOS,
                 "costo_adquisicion": "",
                 "observaciones": "Equipo actualizado en prueba.",
                 "tipo_area": "no_clinica",
@@ -1016,12 +1061,37 @@ class EquiposViewsTests(TestCase):
         self.assertContains(respuesta, self.dispositivo.codigo)
         self.assertContains(respuesta, "Generar ficha PDF")
         self.assertContains(respuesta, "Confirmar baja definitiva")
-        self.assertContains(respuesta, "Responsable de la petición")
-        self.assertContains(respuesta, 'id="responsable_peticion_baja"')
+        self.assertContains(respuesta, "Equipo seleccionado")
+
+    def test_tramite_baja_muestra_la_imagen_general_del_equipo(self):
+        self.obtener_imagenes_mock.return_value = (
+            [
+                {
+                    "tipo_imagen": "GENERAL",
+                    "url": "http://imagenes.test/equipo-general.webp",
+                }
+            ],
+            False,
+        )
+
+        respuesta = self.client.get(
+            reverse(
+                "tramite_baja_dispositivo_equipos",
+                args=[self.dispositivo.id],
+            )
+        )
+
+        self.assertEqual(respuesta.status_code, 200)
         self.assertContains(
             respuesta,
-            reverse("buscar_empleados_equipos"),
+            "http://imagenes.test/equipo-general.webp",
         )
+        self.assertContains(
+            respuesta,
+            f"Foto general del equipo {self.dispositivo.codigo}",
+        )
+        self.assertContains(respuesta, "Empleado asignado")
+        self.assertContains(respuesta, self.responsable_original.nombre_completo)
         self.assertContains(respuesta, "Habitación / Estancia")
         self.assertNotContains(
             respuesta,
@@ -1054,7 +1124,6 @@ class EquiposViewsTests(TestCase):
             ),
             {
                 "fecha_baja": date.today().isoformat(),
-                "responsable_peticion": self.responsable_nuevo.id,
                 "habitacion_estancia": "Observación 2",
                 "motivo": "Daño irreversible para previsualizar.",
             },
@@ -1089,7 +1158,6 @@ class EquiposViewsTests(TestCase):
         )
         datos_ficha = {
             "fecha_baja": date.today().isoformat(),
-            "responsable_peticion": self.responsable_nuevo.id,
             "habitacion_estancia": "Observación 2",
             "motivo": "Daño irreversible para previsualizar.",
         }
@@ -1122,7 +1190,6 @@ class EquiposViewsTests(TestCase):
             ),
             {
                 "fecha_baja": date.today().isoformat(),
-                "responsable_peticion": self.responsable_nuevo.id,
                 "habitacion_estancia": "",
                 "motivo": "",
             },
@@ -1131,6 +1198,34 @@ class EquiposViewsTests(TestCase):
         self.assertEqual(respuesta.status_code, 400)
         self.assertFalse(
             BajaDispositivo.objects.filter(dispositivo=self.dispositivo).exists()
+        )
+
+    def test_ficha_baja_pdf_rechaza_equipo_sin_asignacion_activa(self):
+        self.asignacion_original.fecha_fin = timezone.now()
+        self.asignacion_original.save(update_fields=["fecha_fin"])
+
+        respuesta = self.client.post(
+            reverse(
+                "ficha_baja_dispositivo_equipos",
+                args=[self.dispositivo.id],
+            ),
+            {
+                "fecha_baja": date.today().isoformat(),
+                "habitacion_estancia": "",
+                "motivo": "Equipo retirado de uso.",
+            },
+        )
+
+        self.assertEqual(respuesta.status_code, 400)
+        self.assertContains(
+            respuesta,
+            "El equipo no tiene una asignación activa",
+            status_code=400,
+        )
+        self.assertFalse(
+            OrdenTrabajoBajaDispositivo.objects.filter(
+                dispositivo=self.dispositivo
+            ).exists()
         )
 
     def test_codigo_inventario_pdf_usa_solo_numero_de_ficha(self):
@@ -1162,14 +1257,16 @@ class EquiposViewsTests(TestCase):
     def test_baja_crea_registro_y_cambia_estado_del_dispositivo(self):
         # Dar de baja crea historial y cambia el estado sin eliminar la ficha.
         orden = self._reservar_orden_trabajo()
+        fecha_esperada = timezone.localdate()
         respuesta = self.client.post(
             reverse(
                 'tramite_baja_dispositivo_equipos',
                 args=[self.dispositivo.id],
             ),
             {
-                "fecha_baja": date.today().isoformat(),
-                "responsable_peticion": self.responsable_nuevo.id,
+                # Aunque un cliente intente enviar otra fecha, el formulario
+                # no la acepta y el servidor usa la fecha de confirmacion.
+                "fecha_baja": "2000-01-01",
                 "habitacion_estancia": "Observación 2",
                 "motivo": "Equipo retirado de uso por daño irreversible.",
                 "ficha_firmada": self._foto_general_webp(),
@@ -1185,11 +1282,8 @@ class EquiposViewsTests(TestCase):
         baja = self.dispositivo.baja
 
         self.assertEqual(self.dispositivo.estado, EstadoDispositivo.DADO_DE_BAJA)
+        self.assertEqual(baja.fecha_baja, fecha_esperada)
         self.assertEqual(baja.motivo, "Equipo retirado de uso por daño irreversible.")
-        self.assertEqual(
-            baja.responsable_peticion,
-            self.responsable_nuevo,
-        )
         self.assertEqual(baja.habitacion_estancia, "Observación 2")
         self.assertEqual(
             str(baja.ficha_firmada_uuid),
@@ -1210,7 +1304,6 @@ class EquiposViewsTests(TestCase):
             ),
             {
                 "fecha_baja": date.today().isoformat(),
-                "responsable_peticion": self.responsable_nuevo.id,
                 "habitacion_estancia": "",
                 "motivo": "Equipo retirado de uso.",
                 "ficha_firmada": self._foto_general_webp(),
@@ -1237,7 +1330,6 @@ class EquiposViewsTests(TestCase):
             ),
             {
                 "fecha_baja": date.today().isoformat(),
-                "responsable_peticion": self.responsable_nuevo.id,
                 "habitacion_estancia": "",
                 "motivo": "Equipo retirado de uso.",
             },
@@ -1271,7 +1363,6 @@ class EquiposViewsTests(TestCase):
             ),
             {
                 "fecha_baja": date.today().isoformat(),
-                "responsable_peticion": self.responsable_nuevo.id,
                 "habitacion_estancia": "",
                 "motivo": "Equipo retirado de uso.",
                 "ficha_firmada": self._foto_general_webp(),
@@ -1308,7 +1399,6 @@ class EquiposViewsTests(TestCase):
             ),
             {
                 "fecha_baja": date.today().isoformat(),
-                "responsable_peticion": self.responsable_nuevo.id,
                 "habitacion_estancia": "",
                 "motivo": "Equipo viejo sin todos los datos técnicos.",
                 "ficha_firmada": self._foto_general_webp(),
@@ -1354,7 +1444,6 @@ class EquiposViewsTests(TestCase):
             dispositivo=self.dispositivo,
             fecha_baja=date.today(),
             motivo="Equipo retirado de inventario.",
-            responsable_peticion=self.responsable_nuevo,
             habitacion_estancia="Sala 2",
             ficha_firmada_uuid=(
                 "22222222-2222-4222-8222-222222222222"
@@ -1378,10 +1467,14 @@ class EquiposViewsTests(TestCase):
             )
         )
 
-        self.assertContains(respuesta, self.responsable_nuevo.nombre_completo)
+        self.assertContains(respuesta, self.responsable_original.nombre_completo)
         self.assertContains(respuesta, "Sala 2")
         self.assertContains(respuesta, orden.numero_orden)
         self.assertContains(respuesta, "Ver ficha firmada")
+        # La constancia se abre en el visor compartido, pero conserva el href
+        # para que siga funcionando si el visor no carga.
+        self.assertContains(respuesta, 'id="abrir_ficha_firmada"')
+        self.assertContains(respuesta, "http://imagenes.test/media/ficha.webp")
         self.assertContains(respuesta, "bi-file-earmark-check-fill")
         self.assertContains(respuesta, "bi-box-arrow-up-right")
         self.assertContains(
