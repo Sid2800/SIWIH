@@ -838,6 +838,41 @@ class EquiposViewsTests(TestCase):
         self.assertNotContains(respuesta, "Trámite de baja")
         self.assertContains(respuesta, self.dispositivo.codigo)
 
+    def test_tramite_de_baja_permite_ampliar_la_foto_del_equipo(self):
+        # La baja es irreversible: hay que poder mirar bien la foto antes de
+        # confirmar que es el equipo correcto.
+        self.obtener_imagenes_mock.return_value = (
+            [
+                {
+                    "tipo_imagen": "GENERAL",
+                    "url": "http://imagenes.test/media/general.webp",
+                    "miniatura": "http://imagenes.test/media/thumb-general.webp",
+                }
+            ],
+            False,
+        )
+
+        respuesta = self.client.get(
+            reverse("tramite_baja_dispositivo_equipos", args=[self.dispositivo.id])
+        )
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertContains(respuesta, 'id="ampliar_foto_equipo"')
+        self.assertContains(respuesta, "equipos-baja__equipo-imagen--ampliable")
+        self.assertContains(respuesta, "http://imagenes.test/media/general.webp")
+
+    def test_tramite_sin_foto_no_ofrece_ampliar(self):
+        # Sin foto se muestra un icono, que no abre nada: no debe insinuar
+        # que se puede pulsar.
+        self.obtener_imagenes_mock.return_value = ([], False)
+
+        respuesta = self.client.get(
+            reverse("tramite_baja_dispositivo_equipos", args=[self.dispositivo.id])
+        )
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertNotContains(respuesta, 'id="ampliar_foto_equipo"')
+
     def test_edicion_muestra_fotos_existentes_y_solo_tipos_faltantes(self):
         self.obtener_imagenes_mock.return_value = (
             [

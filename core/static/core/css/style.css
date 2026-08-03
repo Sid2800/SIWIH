@@ -6119,6 +6119,19 @@ table.dataTable tbody td.equipos-listado__vacio {
    gap: 1.2rem;
 }
 
+/* Solo se marca como ampliable cuando hay foto: el icono de respaldo no abre
+   nada y no debe insinuar que se puede pulsar. */
+.equipos-baja__equipo-imagen--ampliable {
+   cursor: zoom-in;
+   transition: border-color .2s ease;
+}
+
+.equipos-baja__equipo-imagen--ampliable:hover,
+.equipos-baja__equipo-imagen--ampliable:focus-visible {
+   border-color: var(--negro);
+   outline: none;
+}
+
 /* Mismo hueco que la foto: sin equipo fotografiado la cabecera no debe
    cambiar de alto ni descolocar el titulo. */
 .equipos-baja__equipo-icono {
