@@ -472,6 +472,12 @@ class RespuestaCreateForm(forms.ModelForm):
 
     idRespuesta = forms.CharField(widget=forms.HiddenInput(), required=False)
 
+    personal_salud_responde_id = forms.IntegerField( 
+        required=False,
+        widget=forms.HiddenInput()
+
+    )
+
     # campos si es que repeusta inicia una referncia enviada
     seguimiento_referencia_institucion_destino = forms.ModelChoiceField(
         queryset=Institucion_salud.objects.none(),
@@ -543,6 +549,7 @@ class RespuestaCreateForm(forms.ModelForm):
         readonly = False  
 
         if self.instance and self.instance.pk:
+
             if self.instance.seguimiento_referencia:
                 # ---- Institución destino ----
                 qs_extra = Institucion_salud.objects.filter(
@@ -556,6 +563,15 @@ class RespuestaCreateForm(forms.ModelForm):
                     initial_especialidad = self.instance.seguimiento_referencia.especialidad_destino.pk
 
                 readonly = True
+
+
+                
+            # Inicializar el campo oculto del personal de salud que reponde
+            self.fields["personal_salud_responde_id"].initial = (
+                self.instance.personal_salud_responde_id
+            )
+
+            
 
         # Asignar querysets
         self.fields['seguimiento_referencia_especialidad_destino'].queryset = qs_especialidades_referencia.distinct()
@@ -656,8 +672,11 @@ class RespuestaCreateForm(forms.ModelForm):
     def clean(self):
         cleaned_data = super().clean()
 
+
         # Campos clave
         tipo_referencia = int(self.data.get("tipo")) if self.data.get("tipo") is not None else None
+        personal_salud_responde_id = cleaned_data.get("personal_salud_responde_id")
+
 
         # Fechas
         fecha_elaboracion = cleaned_data.get("fecha_elaboracion")  # datetime
@@ -691,6 +710,14 @@ class RespuestaCreateForm(forms.ModelForm):
             
             if unidad_clinica_responde.estado != 1:
                 raise forms.ValidationError("Unidad clínica inactiva")
+            
+            # Validar el profesional de salud que elaboró la respuesta
+            if not personal_salud_responde_id:
+                raise forms.ValidationError("Debe indicar el profesional de salud que elaboró la respuesta.") 
+            validar_entero_positivo(personal_salud_responde_id, "personal_salud_responde")
+            personal_salud = validar_personal_salud_activo(personal_salud_responde_id)
+            cleaned_data["personal_salud_responde"] = personal_salud
+            cleaned_data["elaborada_por"] = personal_salud.tipo_personal_salud 
 
 
             # BLOQUEO DE CAMBIO SI YA EXISTE UNA REFERENCIA ENVIADA

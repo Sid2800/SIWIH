@@ -929,7 +929,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
 
-    async function inicializarPersonalSalud(){
+    async function inicializarPersonalSaludRefiere(){
         let data = await PersonalClinicoLoader.cargar();
 
 
@@ -969,6 +969,50 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
     }
+
+    async function inicializarPersonalSaludResponde(){
+
+        const hidden = document.getElementById("respuesta_personal_salud_responde_id");
+
+        // El formulario de respuesta para referencias recibidas no existe
+        if (!hidden) {
+            return;
+        }
+
+        let data = await PersonalClinicoLoader.cargar();
+
+        const opciones = data.map(item => ({
+                value: item.id,
+                label: item.nombre,
+                customData: item.especialidad__nombre_especialidad,
+                description: item.especialidad__nombre_especialidad
+            }));
+
+        // inicializar el vistual select 
+        VirtualSelect.init({
+            ele: '#vs-personal-salud-responde',
+            options: opciones,
+            hasOptionDescription: true,
+            searchPlaceholderText: 'Buscar...',
+            search: true,
+            placeholder: 'Seleccione',
+            additionalClasses: 'custom-wrapper',
+            additionalDropboxClasses: 'custom-dropbox',
+        }); 
+
+        const personal = document.querySelector('#vs-personal-salud-responde');
+        personal.addEventListener('change', () => {
+            hidden.value = personal.value;
+        });
+
+           // Si el formulario viene en modo edición, seleccionar el valor inicial
+        if (modoUso === 2 && hidden.value) {
+            personal.setValue(hidden.value);
+        }
+
+    }
+
+
 
 
 //#endregion
@@ -1195,7 +1239,7 @@ document.addEventListener('DOMContentLoaded', function () {
     inicializarTablaRefDiagnostico();
 
     //inicializacion del virtual selct 
-    inicializarPersonalSalud()
+    inicializarPersonalSaludRefiere()
 
     // Lógica del tab
     document.querySelectorAll('.referenciaTabsBoton').forEach(btn => {
@@ -1298,6 +1342,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
         /*  Respuesta ahora bien en add o en edit */
         selectsRespuesta = inicializarFormRespuesta();
+
+        // Nuevo
+        inicializarPersonalSaludResponde();
 
         if (typeof tipo !== 'undefined' && tipo === 0) {
             //para el seguimeito del paciente en la respuesta
@@ -1433,17 +1480,17 @@ document.addEventListener('DOMContentLoaded', function () {
 
             if (data.success) {
                 toastr.success("Referencia registrada correctamente");
-                // if (data.redirect_url) {
-                //         setTimeout(() => {
+                if (data.redirect_url) {
+                        setTimeout(() => {
 
-                //             if(modoUso == 1){
-                //                 window.location.href = data.redirect_url;
-                //             }else {
-                //                 location.reload();
-                //             }
+                            if(modoUso == 1){
+                                window.location.href = data.redirect_url;
+                            }else {
+                                location.reload();
+                            }
                             
-                //         }, 600);
-                //     }
+                        }, 600);
+                    }
                 return;
             } else {
                 toastr.error(data.error || "Algo salió mal.");
@@ -1508,9 +1555,18 @@ document.addEventListener('DOMContentLoaded', function () {
         if (typeof tipo !== 'undefined' && tipo === 0){
             if (
                 !validarTomSelect(selectsRespuesta.respuestaAreaCaptaSelect, "Seleccione el área que captó la referencia") ||
-                !validarTomSelect(selectsRespuesta.respuestaUnidaClinicaRespondeSelect, "Seleccione la unidad clinica que brindó la respuesta") ||
-                !validarTomSelect(selectsRespuesta.respuestaElaboradaPorSelect, "Seleccione el tipo de personal que escribió la respuesta")
+                !validarTomSelect(selectsRespuesta.respuestaUnidaClinicaRespondeSelect, "Seleccione la unidad clinica que brindó la respuesta") 
+                // ||   legacy ahora este valor se hereda del profesional no se define por el usuario
+                // !validarTomSelect(selectsRespuesta.respuestaElaboradaPorSelect, "Seleccione el tipo de personal que escribió la respuesta")
             ) {
+                return;
+            }
+
+            // Validar que profesional hizo la respuesta
+            const personalSaludResponde = document.getElementById('respuesta_personal_salud_responde_id');
+
+            if (!personalSaludResponde.value) {
+                toastr.error("Debe indicar el profesional que elaboró la respuesta.");
                 return;
             }
 
@@ -1533,6 +1589,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 toastr.error("Debe indicar al menos un tipo de seguimiento");
                 return;
             }
+
+        
+            
         }
 
 

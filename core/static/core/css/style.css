@@ -4264,10 +4264,18 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
    margin-bottom: 1rem;
 }
 
+/* ajuste a grid para xcontrelar la expacion del control virtual select */
 #contenedor-personal-salud-refiere{
    display: grid;
    grid-template-columns: auto 1fr;
 }
+
+#contenedor-personal-salud-responde{
+   display: grid;
+   grid-template-columns: 1fr;
+}
+
+
 
 #contenedor-evaluacion,
 #contenedor-interactivo,
@@ -4663,6 +4671,7 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
 
    .referencia-respuesta-seguimiento-seguimiento-op{
       column-gap: 3rem;
+      margin-bottom: 1rem;
    }
 }
 

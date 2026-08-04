@@ -341,11 +341,11 @@
                             </div>
 
 
-
                         </div>
                         
 
                         <div class="referenciaRespuestaPanel referenciaRespuestaPanelDerecho">
+
                             <fieldset class="referenciaRespuestaCamposMotivo">
                                 <legend>Motivo de envio</legend>
                                 <div class="formularioCampo">
@@ -360,11 +360,18 @@
                             </fieldset >
 
                             <fieldset class="referenciaRespuestaCamposOtros">
+
+                                {# Campo oculto del profesional que responde (Referencia recibida) #}
+                                {{ form_respuesta.personal_salud_responde_id }}
                                 <legend>Elaboracion</legend>
-                                <div class="formularioCampo">
-                                    <label>Elaborado por</label>
-                                    {{ form_respuesta.elaborada_por }}   
-                                </div>  
+
+                                <div class="formularioCampo" 
+                                    id="contenedor-personal-salud-responde">
+                                    <label>Profesional</label>
+                                    <div id="vs-personal-salud-responde"></div>
+                                </div>
+
+
                                 <div class="formularioCampo">
                                     <label>Aten. requerida</label>
                                     {{ form_respuesta.atencion_requerida }}   
@@ -479,6 +486,7 @@
 
                             <div class="referenciaRespuestaCamposDiagnostico" >
                                 <label class= "form-subtitulo-fieldset-falso">DIAGNOSTICO</label>
+                      
                                 {% if form.tipo.value == 1  %}
                                     <table id="referencia-tabla-respuesta-diagnosticos"  class="display" style="width:100%">
                                         <thead>
@@ -511,7 +519,7 @@
                             <fieldset class="referenciaRespuestaCamposOtros">
                             <legend>Elaboracion</legend>
                                     <div class="formularioCampo">
-                                        <label>Elaborado por</label>
+                                        <label>Elaborado por   </label>
                                         {{ form_respuesta.elaborada_por }}   
                                     </div>  
                                     <div class="formularioCampo">
@@ -544,6 +552,7 @@
 
         <!-- Botón para guardar -->
         <div class="formularioBotones">
+            
 
             {% if MD == 2 and form.tipo.value == 1 %}
                 <label class="ck-formulario" for="switchSeguimiento">

@@ -294,18 +294,21 @@ class RespuestaCreateUpdateView(View):
         referencia = form.referencia
         seguimiento = form.cleaned_data.get("seguimiento")
 
+        
+
 
         if usuario:
             form.instance.creado_por = usuario
             form.instance.modificado_por = usuario
 
-
         if referencia:
             form.instance.referencia = referencia
 
-
-
         try:
+            # agregr el personal de salud que elaboro la respuesta
+            form.instance.personal_salud_responde = form.cleaned_data.get("personal_salud_responde")
+
+
             with transaction.atomic():
 
                 if referencia.motivo_no_atencion is not None:
