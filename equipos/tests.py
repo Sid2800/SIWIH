@@ -33,6 +33,7 @@ from .models import (
 )
 from .forms import CostoLempirasField, DispositivoCreateForm
 from .services.ficha_baja_pdf_service import FichaBajaPdfService
+from .services.ficha_activo_fijo_pdf_service import FichaActivoFijoPdfService
 
 
 class EquiposViewsTests(TestCase):
@@ -1197,6 +1198,107 @@ class EquiposViewsTests(TestCase):
             self.dispositivo.estado,
             EstadoDispositivo.OPERATIVO,
         )
+
+    def test_detalle_ofrece_ficha_de_activo_fijo(self):
+        respuesta = self.client.get(
+            reverse("detalle_dispositivo_equipos", args=[self.dispositivo.id])
+        )
+        url_ficha = reverse(
+            "ficha_activo_fijo_equipos",
+            args=[self.dispositivo.id],
+        )
+
+        self.assertContains(respuesta, url_ficha)
+        self.assertContains(respuesta, "Ficha de activo fijo")
+
+    def test_ficha_activo_fijo_genera_pdf_sin_modificar_el_equipo(self):
+        fecha_modificado = self.dispositivo.fecha_modificado
+
+        with patch(
+            "equipos.services.ficha_activo_fijo_pdf_service."
+            "ReportePdfBaseService.dibujar_pie_pagina_carta"
+        ) as dibujar_pie_pagina:
+            respuesta = self.client.get(
+                reverse(
+                    "ficha_activo_fijo_equipos",
+                    args=[self.dispositivo.id],
+                )
+            )
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(respuesta["Content-Type"], "application/pdf")
+        self.assertIn("inline;", respuesta["Content-Disposition"])
+        self.assertIn(self.dispositivo.codigo, respuesta["Content-Disposition"])
+        self.assertTrue(respuesta.content.startswith(b"%PDF"))
+        self.assertFalse(
+            dibujar_pie_pagina.call_args.kwargs["mostrar_paginacion"]
+        )
+        self.assertEqual(
+            dibujar_pie_pagina.call_args.kwargs["etiqueta_usuario"],
+            "GENERADO POR: ",
+        )
+        self.dispositivo.refresh_from_db()
+        self.assertEqual(self.dispositivo.fecha_modificado, fecha_modificado)
+
+    def test_ficha_activo_fijo_mapea_datos_y_deja_campos_manuales_vacios(self):
+        azul = ColorDispositivo.objects.get_or_create(nombre="AZUL")[0]
+        Dispositivo.objects.filter(pk=self.dispositivo.pk).update(
+            color_secundario=azul,
+            numero_serie="SERIE-ACTIVO-001",
+            inventario_bienes_nacionales="BN-100",
+            inventario_numero_ficha="F/212300",
+            costo_adquisicion=Decimal("12500.50"),
+        )
+        self.dispositivo.refresh_from_db()
+
+        datos = FichaActivoFijoPdfService.construir_datos(
+            self.dispositivo,
+            self.asignacion_original,
+        )
+
+        self.assertEqual(datos["numero_inventario"], "BN-100")
+        self.assertEqual(datos["inventario_bn"], "F/212300")
+        self.assertIn("MONITOR", datos["descripcion"])
+        self.assertEqual(datos["marca"], "MINDRAY")
+        self.assertEqual(datos["modelo"], "BENE VIEW")
+        self.assertEqual(datos["color"], "BLANCO / AZUL")
+        self.assertEqual(datos["numero_serie"], "SERIE-ACTIVO-001")
+        self.assertEqual(datos["precio"], "L 12,500.50")
+        self.assertEqual(datos["departamento"], str(self.area_clinica))
+        self.assertEqual(
+            datos["fecha_entrega"],
+            timezone.localtime(self.dispositivo.fecha_creado).strftime(
+                "%d/%m/%Y"
+            ),
+        )
+
+        campos_manuales = (
+            "potencia",
+            "principal_componente",
+            "inactivo",
+            "en_reparacion",
+            "fecha_baja",
+            "numero_factura",
+            "tipo_garantia",
+            "activo_sustituido",
+            "orden_compra",
+            "comprobante",
+            "familia",
+            "subfamilia",
+            "codigo_local",
+            "centro_costo",
+            "sala_ambiente",
+            "jefe_departamento",
+            "proveedor",
+            "proveedor_mantenimiento",
+            "contrato_mantenimiento",
+            "fecha_inicio_contrato",
+            "fecha_fin_contrato",
+            "tipo_contrato",
+            "duracion_garantia",
+            "fecha_fin_garantia",
+        )
+        self.assertTrue(all(datos[campo] == "" for campo in campos_manuales))
 
     def test_otro_usuario_reutiliza_la_orden_del_mismo_equipo(self):
         url_ficha = reverse(

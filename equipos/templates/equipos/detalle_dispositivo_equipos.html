@@ -56,6 +56,13 @@
 
         <div class="equipos-detalle__acciones">
             <a class="formularioBotones-boton equipos-detalle__boton"
+               href="{% url 'ficha_activo_fijo_equipos' dispositivo.id %}"
+               target="_blank"
+               rel="noopener">
+                <i class="bi bi-file-earmark-pdf"></i>
+                Ficha de activo fijo
+            </a>
+            <a class="formularioBotones-boton equipos-detalle__boton"
                href="{% url 'qr_dispositivo_equipos' dispositivo.id %}">
                 <i class="bi bi-qr-code"></i>
                 Ver / Imprimir QR

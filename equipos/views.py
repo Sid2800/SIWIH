@@ -41,6 +41,7 @@ from .models import (
     TipoDispositivo,
 )
 from .services.ficha_baja_pdf_service import FichaBajaPdfService
+from .services.ficha_activo_fijo_pdf_service import FichaActivoFijoPdfService
 
 
 logger = logging.getLogger("siwi")
@@ -972,6 +973,30 @@ def ficha_baja_dispositivo_pdf(request, dispositivo_id):
         numero_orden_trabajo=(
             orden_trabajo.numero_orden if orden_trabajo else "SIN ASIGNAR"
         ),
+    )
+
+
+@registrar_errores_vista("Error al generar ficha de activo fijo")
+@require_http_methods(["GET"])
+def ficha_activo_fijo_pdf(request, dispositivo_id):
+    # Es una vista dinamica: consulta la ficha vigente y no crea registros.
+    dispositivo = get_object_or_404(
+        Dispositivo.objects.select_related(
+            "tipo",
+            "marca",
+            "modelo",
+            "area_gestora",
+            "color",
+            "color_secundario",
+        ),
+        pk=dispositivo_id,
+    )
+    asignacion_actual = _obtener_asignacion_actual(dispositivo)
+
+    return FichaActivoFijoPdfService.generar(
+        dispositivo=dispositivo,
+        asignacion=asignacion_actual,
+        usuario=request.user,
     )
 
 

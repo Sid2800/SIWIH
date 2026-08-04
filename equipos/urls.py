@@ -41,6 +41,11 @@ urlpatterns = [
         name='ficha_baja_dispositivo_equipos'
     ),
     path(
+        'dispositivos/<int:dispositivo_id>/ficha-activo-fijo/',
+        views.ficha_activo_fijo_pdf,
+        name='ficha_activo_fijo_equipos'
+    ),
+    path(
         'dispositivos/<int:dispositivo_id>/qr/',
         views.qr_dispositivo,
         name='qr_dispositivo_equipos'
