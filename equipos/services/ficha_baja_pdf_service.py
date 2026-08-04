@@ -79,8 +79,13 @@ class FichaBajaPdfService:
         ancho, alto = letter
         ReportePdfBaseService.dibujar_encabezado(pdf, ancho, alto - 25)
 
-        x_contenido = 110
-        ancho_contenido = ancho - x_contenido - 25
+        # La imagen lateral mide 105 puntos, pero su franja azul visible ocupa
+        # solo 27. Centramos el bloque en el espacio blanco real de la hoja.
+        ancho_franja_visible = 27
+        ancho_contenido = 16.5 * cm
+        x_contenido = ancho_franja_visible + (
+            (ancho - ancho_franja_visible - ancho_contenido) / 2
+        )
         fecha_informe = timezone.localdate()
         ubicacion = asignacion.ubicacion if asignacion else None
         nombre_empleado_asignado = cls._nombre_empleado(
@@ -301,9 +306,11 @@ class FichaBajaPdfService:
             ancho,
             ahora_local.strftime("%d/%m/%Y %H:%M"),
             usuario.username,
-            nombre_empleado_asignado,
+            "",
             1,
             1,
+            mostrar_paginacion=False,
+            etiqueta_usuario="GENERADO POR: ",
         )
         pdf.save()
         return response

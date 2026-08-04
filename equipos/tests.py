@@ -1152,22 +1152,34 @@ class EquiposViewsTests(TestCase):
         self.assertContains(respuesta_busqueda, url_tramite)
 
     def test_ficha_baja_pdf_no_registra_baja_ni_cambia_estado(self):
-        respuesta = self.client.post(
-            reverse(
-                'ficha_baja_dispositivo_equipos',
-                args=[self.dispositivo.id],
-            ),
-            {
-                "fecha_baja": date.today().isoformat(),
-                "habitacion_estancia": "Observación 2",
-                "motivo": "Daño irreversible para previsualizar.",
-            },
-        )
+        with patch(
+            "equipos.services.ficha_baja_pdf_service."
+            "ReportePdfBaseService.dibujar_pie_pagina_carta"
+        ) as dibujar_pie_pagina:
+            respuesta = self.client.post(
+                reverse(
+                    'ficha_baja_dispositivo_equipos',
+                    args=[self.dispositivo.id],
+                ),
+                {
+                    "fecha_baja": date.today().isoformat(),
+                    "habitacion_estancia": "Observación 2",
+                    "motivo": "Daño irreversible para previsualizar.",
+                },
+            )
 
         self.assertEqual(respuesta.status_code, 200)
         self.assertEqual(respuesta["Content-Type"], "application/pdf")
         self.assertIn("inline;", respuesta["Content-Disposition"])
         self.assertTrue(respuesta.content.startswith(b"%PDF"))
+        self.assertFalse(
+            dibujar_pie_pagina.call_args.kwargs["mostrar_paginacion"]
+        )
+        self.assertEqual(dibujar_pie_pagina.call_args.args[5], "")
+        self.assertEqual(
+            dibujar_pie_pagina.call_args.kwargs["etiqueta_usuario"],
+            "GENERADO POR: ",
+        )
         self.assertFalse(
             BajaDispositivo.objects.filter(dispositivo=self.dispositivo).exists()
         )
@@ -1598,6 +1610,13 @@ class EquiposViewsTests(TestCase):
                 self.assertEqual(respuesta.status_code, 200)
                 self.assertContains(respuesta, self.dispositivo.codigo)
 
+    def test_listado_incluye_boton_buscar_vinculado_a_los_filtros(self):
+        respuesta = self.client.get(reverse("listado_dispositivos_equipos"))
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertContains(respuesta, "equipos-listado__boton-buscar")
+        self.assertContains(respuesta, 'form="equipos-listado-filtros"', count=2)
+
     def test_busqueda_equipo_usa_los_mismos_campos_que_el_listado(self):
         url = reverse("buscar_dispositivo_equipos")
 
@@ -1633,6 +1652,10 @@ class EquiposViewsTests(TestCase):
         self.assertEqual(respuesta.status_code, 200)
         self.assertEqual(respuesta.context['consulta'], 'Monitor EQ-001')
         self.assertContains(respuesta, 'Monitor EQ-001')
+        self.assertNotContains(
+            respuesta,
+            "Los resultados de la consulta se muestran debajo.",
+        )
 
 
     # --- Pareja marca-modelo: se valida en el servidor, no solo en el

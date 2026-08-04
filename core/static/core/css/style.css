@@ -4915,12 +4915,6 @@ a.equipos-submenu__opcion:hover {
    min-height: 4.6rem;
 }
 
-.equipos-busqueda__ayuda {
-   color: var(--colorTextoMenu);
-   font-size: 1.2rem;
-   margin: 0;
-}
-
 .equipos-busqueda__filtro {
    display: grid;
    gap: .45rem;
@@ -5385,15 +5379,13 @@ a.equipos-submenu__opcion:hover {
 }
 
 .equipos-listado__acciones-superior .equipos-listado__busqueda {
-   flex: 1 1 34rem;
-   max-width: 60rem;
+   flex: 1 1 50rem;
+   max-width: none;
    min-width: 0;
 }
 
 .equipos-listado__acciones-superior .equipos-listado__busqueda .formularioCampo-text {
-   border-width: .2rem;
    box-sizing: border-box;
-   min-height: 4.8rem;
 }
 
 .equipos-listado__registrar {
@@ -5419,11 +5411,12 @@ a.equipos-submenu__opcion:hover {
 }
 
 .equipos-listado__busqueda {
-   display: flex;
-   flex-direction: column;
-   gap: .7rem;
-   max-width: min(100%, 45rem);
+   max-width: none;
    width: 100%;
+}
+
+.equipos-listado__boton-buscar {
+   white-space: nowrap;
 }
 
 .equipos-listado__campo-icono {
@@ -5500,9 +5493,12 @@ a.equipos-submenu__opcion:hover {
    width: 100%;
 }
 
+/* Sin table-layout: fixed a proposito. Con el, la tabla siempre cabe porque
+   comprime las columnas, y DataTables Responsive no tendria nunca motivo para
+   colapsar ninguna. Los anchos de .equipos-listado__col-* quedan como
+   sugerencia, no como imposicion. */
 .equipos-listado__tabla {
    min-width: 0;
-   table-layout: fixed;
    width: 100%;
 }
 
@@ -5517,6 +5513,12 @@ a.equipos-submenu__opcion:hover {
    text-overflow: ellipsis;
    vertical-align: middle;
    white-space: nowrap;
+}
+
+/* Columna de la flecha de despliegue. Estrecha: solo aloja el control que
+   inserta DataTables Responsive. */
+.equipos-listado__col-detalle {
+   width: 3.2rem;
 }
 
 .equipos-listado__col-codigo {
@@ -5726,95 +5728,10 @@ table.dataTable tbody td.equipos-listado__vacio {
 }
 
 @media (max-width: 900px) {
-   .equipos-listado__tabla-contenedor {
-      overflow: visible;
-   }
-
-   .equipos-listado__tabla {
-      display: block;
-      width: 100%;
-   }
-
-   .equipos-listado__tabla thead {
-      clip: rect(0 0 0 0);
-      clip-path: inset(50%);
-      height: .1rem;
-      margin: -.1rem;
-      overflow: hidden;
-      padding: 0;
-      position: absolute;
-      white-space: nowrap;
-      width: .1rem;
-   }
-
-   .equipos-listado__tabla tbody {
-      display: grid;
-      gap: .9rem;
-      width: 100%;
-   }
-
-   .equipos-listado__tabla tbody tr {
-      background-color: var(--blanco);
-      border: .1rem solid var(--colorTablaceldaBorde);
-      border-radius: 1rem;
-      box-shadow: 0 .2rem .8rem rgba(0, 0, 0, .07);
-      display: grid;
-      gap: .35rem 1rem;
-      grid-template-areas:
-         "codigo acciones"
-         "tipo tipo"
-         "estado estado";
-      grid-template-columns: minmax(0, 1fr) 3.6rem;
-      padding: 1rem 1.1rem;
-      position: relative;
-   }
-
-   .equipos-listado__tabla tbody tr:nth-child(odd) {
-      background-color: var(--colorTablaStriped);
-   }
-
-   .equipos-listado__tabla tbody td {
-      border-top: 0 !important;
-      box-shadow: none !important;
-      display: block;
-      font-size: 1.2rem;
-      min-width: 0;
-      padding: 0 !important;
-      width: auto !important;
-   }
-
-   .equipos-listado__tabla .equipos-listado__col-serie,
-   .equipos-listado__tabla .equipos-listado__col-marca,
-   .equipos-listado__tabla .equipos-listado__col-modelo,
-   .equipos-listado__tabla .equipos-listado__col-area {
-      display: none;
-   }
-
-   .equipos-listado__tabla tbody td.equipos-listado__col-codigo {
-      align-self: center;
-      grid-area: codigo;
-      padding-right: .5rem !important;
-   }
-
-   .equipos-listado__tabla tbody td.equipos-listado__col-tipo {
-      color: var(--colorTextoMenu);
-      grid-area: tipo;
-   }
-
-   .equipos-listado__tabla tbody td.equipos-listado__col-estado {
-      grid-area: estado;
-      margin-top: .35rem;
-      overflow: visible;
-   }
-
-   .equipos-listado__tabla tbody td.equipos-listado__col-acciones {
-      align-self: start;
-      display: flex;
-      grid-area: acciones;
-      justify-content: flex-end;
-      overflow: visible !important;
-   }
-
+   /* El colapso de columnas lo lleva DataTables Responsive: la tabla sigue
+      siendo una tabla y lo que no cabe se consulta desplegando la fila.
+      Antes se convertia en tarjetas y escondia serie, marca, modelo y area
+      con display:none, sin ninguna forma de verlas. */
    .equipos-listado__acciones-resumen {
       height: 3.4rem;
       width: 3.4rem;
@@ -5823,12 +5740,6 @@ table.dataTable tbody td.equipos-listado__vacio {
    .equipos-listado__acciones-panel {
       min-width: 17rem;
       right: 0;
-   }
-
-   .equipos-listado__tabla tbody td.equipos-listado__vacio {
-      display: block !important;
-      grid-column: 1 / -1;
-      width: 100% !important;
    }
 }
 

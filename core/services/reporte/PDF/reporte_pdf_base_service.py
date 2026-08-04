@@ -37,13 +37,28 @@ class ReportePdfBaseService:
             )
 
     @staticmethod
-    def dibujar_pie_pagina_carta(pdf, alto, ancho, fecha, usuario, usuario_nombre, pagina_actual, total_paginas):
+    def dibujar_pie_pagina_carta(
+        pdf,
+        alto,
+        ancho,
+        fecha,
+        usuario,
+        usuario_nombre,
+        pagina_actual,
+        total_paginas,
+        mostrar_paginacion=True,
+        etiqueta_usuario="POR -> ",
+    ):
         y = alto - 750  
         pdf.setFillColor(colors.black)
         
 
         fecha = fecha[:40]
-        user_info = f"{usuario} ({usuario_nombre})"[:40]
+        usuario = str(usuario or "").strip()
+        usuario_nombre = str(usuario_nombre or "").strip()
+        user_info = (
+            f"{usuario} ({usuario_nombre})" if usuario_nombre else usuario
+        )[:40]
 
         # --------- IZQUIERDA: FECHA ---------
         texto_izq = "IMPRESO EL -> "
@@ -54,7 +69,7 @@ class ReportePdfBaseService:
         pdf.drawString(40 + pdf.stringWidth(texto_izq, "Helvetica", 7), y, fecha.upper())
         
         # --------- DERECHA: USUARIO ---------
-        texto_der = "POR -> "
+        texto_der = etiqueta_usuario
         ancho_texto_der = pdf.stringWidth(texto_der, "Helvetica", 7)
         ancho_user_info = pdf.stringWidth(user_info, "Helvetica-Bold", 7)
 
@@ -65,17 +80,29 @@ class ReportePdfBaseService:
         pdf.setFont("Helvetica-Bold", 7)
         pdf.drawString(x_derecha + ancho_texto_der, y, user_info)
 
-        # --------- CENTRO: PÁGINA ---------
-        pagina_str_normal = "Página "
-        pagina_str_bold = f"{pagina_actual:02d} de {total_paginas:02d}"
+        if mostrar_paginacion:
+            # --------- CENTRO: PAGINA ---------
+            pagina_str_normal = "Página "
+            pagina_str_bold = f"{pagina_actual:02d} de {total_paginas:02d}"
 
-        x_centro = (ancho / 2) - (pdf.stringWidth(pagina_str_normal + pagina_str_bold, "Helvetica", 7) / 2)
-        
-        pdf.setFont("Helvetica", 7)
-        pdf.drawString(x_centro, y - 15, pagina_str_normal)
+            x_centro = (ancho / 2) - (
+                pdf.stringWidth(
+                    pagina_str_normal + pagina_str_bold,
+                    "Helvetica",
+                    7,
+                )
+                / 2
+            )
 
-        pdf.setFont("Helvetica-Bold", 7)
-        pdf.drawString(x_centro + pdf.stringWidth(pagina_str_normal, "Helvetica", 7), y - 15, pagina_str_bold)
+            pdf.setFont("Helvetica", 7)
+            pdf.drawString(x_centro, y - 15, pagina_str_normal)
+
+            pdf.setFont("Helvetica-Bold", 7)
+            pdf.drawString(
+                x_centro + pdf.stringWidth(pagina_str_normal, "Helvetica", 7),
+                y - 15,
+                pagina_str_bold,
+            )
 
         try:
             watermark = os.path.join(settings.BASE_DIR, 'core/static/core/img/SIWIFINAL.png')

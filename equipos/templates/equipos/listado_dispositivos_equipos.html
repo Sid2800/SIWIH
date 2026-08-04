@@ -23,18 +23,22 @@
         </div>
 
         <div class="equipos-listado__acciones-superior">
-            <div class="equipos-listado__busqueda">
-                <div class="equipos-listado__campo-icono">
+            <div class="equipos-busqueda__barra equipos-listado__busqueda">
+                <i class="bi bi-search" aria-hidden="true"></i>
+                <input class="formularioCampo-text"
+                       id="buscar_listado_dispositivo"
+                       name="q"
+                       type="search"
+                       value="{{ filtros.q }}"
+                       placeholder="Buscar por código interno, tipo, marca o color"
+                       aria-label="Buscar equipos"
+                       form="equipos-listado-filtros">
+                <button class="formularioBotones-boton equipos-busqueda__boton equipos-listado__boton-buscar"
+                        type="submit"
+                        form="equipos-listado-filtros">
                     <i class="bi bi-search"></i>
-                    <input class="formularioCampo-text"
-                           id="buscar_listado_dispositivo"
-                           name="q"
-                           type="search"
-                           value="{{ filtros.q }}"
-                           placeholder="Buscar por código interno, tipo, marca o color"
-                           aria-label="Buscar equipos"
-                           form="equipos-listado-filtros">
-                </div>
+                    <span>Buscar</span>
+                </button>
             </div>
 
             <a class="formularioBotones-boton equipos-listado__registrar"
@@ -147,6 +151,13 @@
         <table class="dataTable stripe hover row-border equipos-listado__tabla">
             <thead>
                 <tr>
+                    {% comment %}
+                       Columna de la flecha que despliega los datos colapsados.
+                       Va aparte del codigo porque ese es un enlace y el clic
+                       seria ambiguo. La rellena DataTables Responsive.
+                    {% endcomment %}
+                    <th class="equipos-listado__col-detalle"
+                        aria-label="Ver más datos"></th>
                     <th class="equipos-listado__col-codigo">Código</th>
                     <th class="equipos-listado__col-tipo">Tipo de equipo</th>
                     <th class="equipos-listado__col-marca">Marca</th>
@@ -163,6 +174,7 @@
                         <tr class="equipos-listado__fila equipos-listado__fila--editable"
                             data-edit-url="{% url 'editar_dispositivo_equipos' dispositivo.id %}"
                             title="Doble clic para editar {{ dispositivo.codigo }}">
+                            <td class="equipos-listado__col-detalle"></td>
                             <td class="equipos-listado__col-codigo">
                                 <a class="equipos-listado__codigo"
                                    href="{% url 'detalle_dispositivo_equipos' dispositivo.id %}">
@@ -218,7 +230,7 @@
                     {% endwith %}
                 {% empty %}
                     <tr>
-                        <td class="equipos-listado__vacio" colspan="8">
+                        <td class="equipos-listado__vacio" colspan="9">
                             <i class="bi bi-inbox"></i>
                             <strong>No se encontraron equipos</strong>
                             <span>Prueba limpiar los filtros o registra un nuevo equipo.</span>
