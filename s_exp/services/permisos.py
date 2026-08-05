@@ -85,6 +85,59 @@ def es_exp_admin(user):
     ).exists()
 
 
+def puede_recuperar_expedientes(user):
+    """
+    True si el usuario puede RECUPERAR expedientes de urgencia (forzar su
+    devolución inmediata a Admisión, saltándose el flujo normal).
+
+    Es un permiso distinto de es_exp_admin: aquella incluye a digitadores y
+    directivos de CUALQUIER unidad, y esta acción solo corresponde a Admisión
+    (son quienes reciben físicamente el expediente).
+
+    Se permite a:
+      - superuser / staff
+      - usuarios "globales" con alguno de S_EXP_RECUPERACION_ROLES (misma regla
+        que el filtro tiene_rol: un usuario global no se ata a una unidad)
+      - rol de S_EXP_RECUPERACION_ROLES (admin/digitador) en una unidad de
+        S_EXP_RECUPERACION_UNIDADES (ADMI)
+
+    Se incluye 'digitador' porque el personal real de Admisión tiene ese rol;
+    con solo 'admin' el permiso dejaría fuera a quienes deben usarlo.
+
+    El código de unidad ('ADMI') se compara contra
+    servicio_unidad.nombre_corto_unidad, igual que el filtro tiene_rol (la tabla
+    de unidades no tiene campo 'codigo').
+    """
+    from core.constants.permisos import (
+        S_EXP_ADMIN_ROLES, S_EXP_RECUPERACION_ROLES, S_EXP_RECUPERACION_UNIDADES,
+    )
+    from core.services.usuario_service import UsuarioService
+
+    if not user or not user.is_authenticated:
+        return False
+    # Staff/superuser siempre: administran el sistema completo.
+    if user.is_superuser or user.is_staff:
+        return True
+    if not es_usuario_valido_rrhh(user):
+        return False
+
+    qs = PerfilUnidad.objects.filter(usuario=user, rol__in=S_EXP_RECUPERACION_ROLES)
+
+    # Un usuario "global" no se ata a una unidad (misma idea que el filtro
+    # tiene_rol). Aquí ese salto se limita al rol ADMIN a propósito: un
+    # 'digitador' global de otra área (p. ej. Calidad) NO es personal de
+    # Admisión y no debe poder forzar la devolución de un expediente.
+    try:
+        if UsuarioService.es_global(user) and qs.filter(rol__in=S_EXP_ADMIN_ROLES).exists():
+            return True
+    except Exception:
+        pass
+
+    return qs.filter(
+        servicio_unidad__nombre_corto_unidad__in=S_EXP_RECUPERACION_UNIDADES
+    ).exists()
+
+
 def es_exp_solicitante(user):
     """
     True si el usuario puede SOLICITAR expedientes.

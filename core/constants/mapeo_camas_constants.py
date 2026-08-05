@@ -1,7 +1,7 @@
 # 2026-06-01: constantes operativas centralizadas para el flujo de mapeo de camas.
 
 MAX_CAMBIOS_CAMA = 5
-VENTANA_LIMITE_CAMBIOS_SALA_HORAS = 24
+VENTANA_LIMITE_CAMBIOS_SALA_HORAS = 1
 VENTANA_ALTAS_RECIENTES_HORAS = 24
 
 OBSERVACION_CAMBIO_MANUAL_MAPA = "Cambio manual desde mapa"

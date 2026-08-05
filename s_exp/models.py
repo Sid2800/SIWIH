@@ -52,6 +52,36 @@ class CatalogoCodigoMixin(models.Model):
         return cls._cache_id[codigo]
 
     @classmethod
+    def ids_de(cls, codigos):
+        """
+        Devuelve la lista de ids ENTEROS de varios códigos (cacheado).
+
+        Pensado para filtros `campo_id__in=[...]` en vez de
+        `campo__codigo__in=[...]`: este último obliga a un JOIN contra el
+        catálogo y a comparar texto en cada fila; con los ids el filtro es un IN
+        sobre la FK (entero, indexado) y no toca el catálogo.
+        """
+        return [cls.id_de(c) for c in codigos]
+
+    @classmethod
+    def id_de_seguro(cls, codigo):
+        """
+        Como id_de(), pero devuelve None si el código no existe en vez de lanzar.
+
+        Se usa con valores que vienen del USUARIO (p. ej. el filtro de estado de
+        una pantalla): con id_de() un valor inválido reventaría en 500, mientras
+        que el filtro por texto simplemente no encontraba nada. Con None el
+        llamador decide (normalmente devolver vacío), conservando ese
+        comportamiento sin exponer un error.
+        """
+        if not codigo:
+            return None
+        try:
+            return cls.id_de(codigo)
+        except cls.DoesNotExist:
+            return None
+
+    @classmethod
     def codigo_de(cls, id_):
         """Devuelve el CÓDIGO (texto) a partir de un id, sin query (cacheado)."""
         if not id_:
@@ -476,6 +506,80 @@ class SolicitudExpedienteDetalle(models.Model):
         null=True,
         verbose_name='Comentario de devolución del expediente'
     )
+    # -------------------------------------------------------------------------
+    # Decisión del USUARIO al iniciar la devolución (flujo devolución completa /
+    # parcial). Es distinta de 'devuelto'/'comentario_devolucion', que los llena
+    # el ADMIN durante la auditoría de recepción física.
+    #   - None  : el usuario aún no inició devolución para este expediente.
+    #   - True  : el usuario quiere devolver este expediente (completa, o los
+    #             marcados "Devolver" en la parcial).
+    #   - False : el usuario lo deja "todavía en uso" (parcial no devueltos).
+    # El admin usa este valor para PRE-CARGAR su auditoría (Recibido / No Recibido).
+    # -------------------------------------------------------------------------
+    usuario_solicita_devolver = models.BooleanField(
+        null=True,
+        blank=True,
+        default=None,
+        verbose_name='El usuario solicitó devolver este expediente'
+    )
+    comentario_usuario_devolucion = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name='Comentario del usuario al iniciar la devolución'
+    )
+    # ---- Préstamo pendiente (marcado en la Revisión de Entrega) ----
+    # El expediente fue encontrado pero NO se entrega aún: queda RESERVADO
+    # (expediente_prestamo.estado = EXP_PENDIENTE_PRESTAMO, no disponible para
+    # otros) hasta que el admin lo entregue ("Entregar pendientes") o lo cancele
+    # ("Cancelar pendientes"). Persiste aunque el resto de la solicitud ya se
+    # haya entregado; se muestra en morado en los listados.
+    prestamo_pendiente = models.BooleanField(
+        default=False,
+        verbose_name='Marcado como préstamo pendiente'
+    )
+    comentario_pendiente = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name='Comentario del préstamo pendiente'
+    )
+    # ---- Trazabilidad de horas POR EXPEDIENTE ----
+    # No basta con Prestamo.fecha_entrega / fecha_devolucion_real (que son de la
+    # solicitud completa) porque cada expediente puede moverse en momentos
+    # distintos:
+    #   - Un "préstamo pendiente" se entrega después que el resto.
+    #   - Una devolución parcial regresa solo algunos expedientes.
+    # La hora de SOLICITUD es común y sale de SolicitudPrestamo.fecha_creacion.
+    fecha_entrega = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='Fecha y hora en que se entregó este expediente'
+    )
+    fecha_devolucion = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='Fecha y hora en que se devolvió este expediente'
+    )
+    # ---- Recuperación de URGENCIA por Admisión ----
+    # Admisión puede exigir un expediente prestado por una emergencia. Esa
+    # acción se salta el flujo normal: el expediente se devuelve de inmediato
+    # (fecha_devolucion queda sellada como en cualquier devolución) sin pasar
+    # por la auditoría del usuario que lo tenía.
+    # Se marca aparte para poder distinguir una devolución normal de una
+    # recuperación forzada, y para avisar al usuario que lo tenía.
+    recuperado_admision = models.BooleanField(
+        default=False,
+        verbose_name='Recuperado de urgencia por Admisión'
+    )
+    motivo_recuperacion = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name='Motivo/observaciones de la recuperación de urgencia'
+    )
+    # La alerta al usuario que lo tenía se muestra hasta que la lee.
+    recuperacion_leida = models.BooleanField(
+        default=False,
+        verbose_name='El usuario ya vio el aviso de la recuperación'
+    )
 
     class Meta:
         db_table = 's_exp_solicituddetalle'
@@ -569,17 +673,40 @@ class Prestamo(models.Model):
     def __str__(self):
         return f"Préstamo #{self.id} - Solicitud #{self.solicitud.id} - {self.estado}"
 
+    # Estados en los que el préstamo sigue vigente (hay expedientes fuera del
+    # archivo) y por lo tanto el CRONÓMETRO debe seguir corriendo:
+    #   - Entregado         → préstamo normal en curso.
+    #   - Vencido           → se pasó del límite, pero sigue sin devolverse.
+    #   - DevolucionParcial → solo regresaron ALGUNOS expedientes; la solicitud
+    #                         NO ha terminado y los que siguen prestados
+    #                         continúan consumiendo tiempo.
+    # Se excluyen Cerrado y DevueltoVencido (ahí el préstamo ya finalizó).
+    ESTADOS_CRONOMETRO_ACTIVO = ('Entregado', 'Vencido', 'DevolucionParcial')
+
+    @property
+    def cronometro_activo(self):
+        """
+        True si el tiempo del préstamo debe seguir contando.
+
+        Antes las propiedades de tiempo exigían estado == 'Entregado', por lo que
+        al registrar una devolución PARCIAL (estado 'DevolucionParcial') el
+        cronómetro desaparecía aunque la solicitud siguiera abierta.
+        """
+        return self.estado_id in {
+            EstadoPrestamo.id_de(codigo) for codigo in self.ESTADOS_CRONOMETRO_ACTIVO
+        }
+
     @property
     def esta_vencido(self):
         from django.utils import timezone
-        if self.fecha_limite and self.estado_id == EstadoPrestamo.id_de('Entregado'):
+        if self.fecha_limite and self.cronometro_activo:
             return timezone.now() > self.fecha_limite
         return False
 
     @property
     def tiempo_restante_segundos(self):
         from django.utils import timezone
-        if self.fecha_limite and self.estado_id == EstadoPrestamo.id_de('Entregado'):
+        if self.fecha_limite and self.cronometro_activo:
             delta = self.fecha_limite - timezone.now()
             return max(0, int(delta.total_seconds()))
         return None
@@ -587,7 +714,7 @@ class Prestamo(models.Model):
     @property
     def porcentaje_tiempo_usado(self):
         from django.utils import timezone
-        if self.fecha_entrega and self.fecha_limite and self.estado_id == EstadoPrestamo.id_de('Entregado'):
+        if self.fecha_entrega and self.fecha_limite and self.cronometro_activo:
             total = (self.fecha_limite - self.fecha_entrega).total_seconds()
             usado = (timezone.now() - self.fecha_entrega).total_seconds()
             if total > 0:

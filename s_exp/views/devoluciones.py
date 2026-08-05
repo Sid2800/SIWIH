@@ -43,8 +43,8 @@ def prestamos_para_devolucion_api(request):
     try:
         # Mostrar solicitudes marcadas para devolución O con devoluciones incompletas pendientes
         qs = Prestamo.objects.select_related('solicitud__usuario').filter(
-            solicitud__estado_flujo__codigo='SOL_EN_DEVOLUCION',
-            estado__codigo__in=['Entregado', 'Vencido', 'DevolucionParcial']
+            solicitud__estado_flujo_id=EstadoSolicitud.id_de('SOL_EN_DEVOLUCION'),
+            estado_id__in=EstadoPrestamo.ids_de(['Entregado', 'Vencido', 'DevolucionParcial'])
         ).order_by('fecha_limite')
 
         # Importamos los servicios — acceso unificado a datos del detalle
@@ -79,6 +79,12 @@ def prestamos_para_devolucion_api(request):
                     "paciente_identidad": DatosDetalleSolicitud.paciente_dni(d),
                     "paciente_nombre": DatosDetalleSolicitud.paciente_nombre_completo(d),
                     "comentario_devolucion": d.comentario_devolucion or '',
+                    # Decisión que dejó el USUARIO al iniciar la devolución. El
+                    # front del admin la usa para precargar el radio:
+                    #   True  -> "Recibido" ; False -> "No Recibido" (+ comentario)
+                    #   None  -> sin decisión previa (comportamiento anterior)
+                    "usuario_solicita_devolver": d.usuario_solicita_devolver,
+                    "comentario_usuario_devolucion": d.comentario_usuario_devolucion or '',
                 })
 
             data.append({
@@ -102,32 +108,104 @@ def prestamos_para_devolucion_api(request):
         return JsonResponse({"error": "Error interno del servidor"}, status=500)
 
 
+# Comentario por defecto para los expedientes que el usuario NO devuelve en una
+# devolución parcial (editable por el usuario en el modal).
+COMENTARIO_TODAVIA_EN_USO = 'Todavía en uso'
+
+
 @csrf_protect
 @require_POST
 def solicitar_devolucion_api(request):
-    """El personal (usuario) marca que ya no usará los expedientes y los devuelve al archivo."""
+    """
+    El personal (usuario) inicia la devolución de los expedientes al archivo.
+
+    Origen del flujo: botones "Devolución completa" / "Devolución parcial" de la
+    pantalla "Mis Solicitudes" del usuario. En ambos casos la solicitud pasa a
+    SOL_EN_DEVOLUCION y queda a la espera de la auditoría física del admin; lo
+    que cambia es la DECISIÓN por expediente que el usuario deja registrada para
+    que el admin la vea precargada:
+
+      body = {
+        "solicitud_id": int,
+        "tipo": "completa" | "parcial",   # default "completa"
+        "decisiones": [                    # solo en "parcial"
+            {"detalle_id": int, "devolver": bool, "comentario": str}, ...
+        ]
+      }
+
+    - completa: TODOS los expedientes aprobados y aún no devueltos se marcan
+      usuario_solicita_devolver=True (el admin los verá pre-marcados "Recibido").
+    - parcial: cada expediente toma la decisión del usuario. Los que NO se
+      devuelven guardan comentario_usuario_devolucion ("Todavía en uso" por
+      defecto, editable) y el admin los verá pre-marcados "No Recibido".
+
+    Rendimiento: una sola escritura por rama (update masivo en completa,
+    bulk_update en parcial) dentro de una transacción atómica, para no dejar la
+    solicitud en un estado a medias si algo falla.
+    """
     if not request.user.is_authenticated:
          return JsonResponse({"error": "No autenticado"}, status=401)
-    
+
+    from django.db import transaction
+
     try:
         body = json.loads(request.body)
         solicitud_id = body.get('solicitud_id')
-        
+        tipo = (body.get('tipo') or 'completa').lower()
+        decisiones = body.get('decisiones', []) or []
+
         # El usuario puede devolver si está en préstamo o si fue incompleta (quedan pendientes)
         solicitud = SolicitudPrestamo.objects.get(
-            id=solicitud_id, 
-            usuario=request.user, 
-            estado_flujo__codigo__in=['SOL_EN_PRESTAMO', 'SOL_INCOMPLETA']
+            id=solicitud_id,
+            usuario=request.user,
+            estado_flujo_id__in=EstadoSolicitud.ids_de(['SOL_EN_PRESTAMO', 'SOL_INCOMPLETA'])
         )
-        
-        solicitud.estado_flujo_id = EstadoSolicitud.id_de('SOL_EN_DEVOLUCION')
-        solicitud.save()
 
-        _registrar_log(
-            request.user, 'SOLICITUD_DEVOLUCION_INICIADA',
-            f'Usuario marcó solicitud #{solicitud.id} para devolución.',
-            'SolicitudPrestamo', solicitud.id
-        )
+        with transaction.atomic():
+            if tipo == 'parcial':
+                # Mapa detalle_id -> decisión, restringido a detalles de ESTA
+                # solicitud que sigan aprobados y sin devolver (lo demás se ignora).
+                decisiones_por_id = {}
+                for dec in decisiones:
+                    try:
+                        did = int(dec.get('detalle_id'))
+                    except (TypeError, ValueError):
+                        continue
+                    decisiones_por_id[did] = dec
+
+                pendientes = list(solicitud.detalles.filter(
+                    aprobado=True, devuelto=False, id__in=decisiones_por_id.keys()
+                ))
+                for d in pendientes:
+                    dec = decisiones_por_id[d.id]
+                    quiere = bool(dec.get('devolver'))
+                    d.usuario_solicita_devolver = quiere
+                    if quiere:
+                        d.comentario_usuario_devolucion = None
+                    else:
+                        d.comentario_usuario_devolucion = (
+                            (dec.get('comentario') or '').strip() or COMENTARIO_TODAVIA_EN_USO
+                        )
+                if pendientes:
+                    SolicitudExpedienteDetalle.objects.bulk_update(
+                        pendientes,
+                        ['usuario_solicita_devolver', 'comentario_usuario_devolucion']
+                    )
+            else:
+                # Completa: todos los pendientes -> el usuario quiere devolverlos.
+                solicitud.detalles.filter(aprobado=True, devuelto=False).update(
+                    usuario_solicita_devolver=True,
+                    comentario_usuario_devolucion=None
+                )
+
+            solicitud.estado_flujo_id = EstadoSolicitud.id_de('SOL_EN_DEVOLUCION')
+            solicitud.save()
+
+            _registrar_log(
+                request.user, 'SOLICITUD_DEVOLUCION_INICIADA',
+                f'Usuario inició devolución ({tipo}) de la solicitud #{solicitud.id}.',
+                'SolicitudPrestamo', solicitud.id
+            )
 
         return JsonResponse({"success": True})
     except SolicitudPrestamo.DoesNotExist:
@@ -173,10 +251,16 @@ def procesar_devolucion_api(request):
         except Exception as _e:
             log_warning(f"No se pudo resolver ubicacion ADMISION: {_e}", app=LogApp.S_EXP)
 
+        # Hora de ESTA auditoría: se sella en cada expediente recibido ahora.
+        # Clave para las devoluciones parciales: cada tanda queda con su propia
+        # fecha, así se sabe cuándo regresó realmente cada expediente.
+        ahora_dev = timezone.now()
+
         for det_id in detalles_recibidos:
             detalle = SolicitudExpedienteDetalle.objects.get(id=det_id, solicitud=solicitud)
             if not detalle.devuelto:
                 detalle.devuelto = True
+                detalle.fecha_devolucion = ahora_dev
                 if esta_vencido:
                     detalle.fuera_de_tiempo = True
                 detalle.comentario_devolucion = _comentario(det_id)
@@ -212,6 +296,8 @@ def procesar_devolucion_api(request):
             detalle = SolicitudExpedienteDetalle.objects.get(id=det_id, solicitud=solicitud)
             if not detalle.devuelto:
                 detalle.devuelto = True  # Se marca como procesado
+                # Fecha en que se cerró el expediente (aunque sea como perdido).
+                detalle.fecha_devolucion = ahora_dev
                 detalle.comentario_devolucion = _comentario(det_id) or 'Marcado como perdido'
                 detalle.save()
                 

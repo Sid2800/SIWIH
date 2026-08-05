@@ -27,6 +27,7 @@ from .dashboard import (
     MonitoreoPrestamosView,
     ControlDevolucionesView,
     ReportesView,
+    RecuperacionExpedientesView,
     BuscadorExpedientesView,
     SeguimientoView,
     dashboard_stats_api,
@@ -48,6 +49,12 @@ from .solicitudes import (
 from .prestamos import (
     prestamos_activos_api,
     marcar_entregado_api,
+    entregar_pendientes_api,
+    cancelar_pendientes_api,
+)
+from .recuperacion import (
+    expedientes_recuperables_api,
+    recuperar_expedientes_api,
 )
 from .devoluciones import (
     prestamos_para_devolucion_api,
@@ -64,6 +71,7 @@ from .alertas import (
     alertas_usuario_api,
     marcar_notificacion_leida_api,
     marcar_vencimiento_leido_api,
+    marcar_recuperacion_leida_api,
 )
 from .reportes import (
     reportes_data_api,
@@ -94,6 +102,7 @@ __all__ = [
     "MonitoreoPrestamosView",
     "ControlDevolucionesView",
     "ReportesView",
+    "RecuperacionExpedientesView",
     "BuscadorExpedientesView",
     "SeguimientoView",
     "dashboard_stats_api",
@@ -111,6 +120,10 @@ __all__ = [
     "mis_solicitudes_api",
     "prestamos_activos_api",
     "marcar_entregado_api",
+    "entregar_pendientes_api",
+    "cancelar_pendientes_api",
+    "expedientes_recuperables_api",
+    "recuperar_expedientes_api",
     "prestamos_para_devolucion_api",
     "solicitar_devolucion_api",
     "procesar_devolucion_api",
@@ -121,6 +134,7 @@ __all__ = [
     "alertas_usuario_api",
     "marcar_notificacion_leida_api",
     "marcar_vencimiento_leido_api",
+    "marcar_recuperacion_leida_api",
     "reportes_data_api",
     "exportar_reporte_excel",
     "exportar_reporte_pdf",

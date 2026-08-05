@@ -22,14 +22,13 @@ from core.constants.permisos import (
     MAPEO_CAMAS_INTENTOS_CAMBIO_UNIDADES as MAPEO_CAMAS_INTENTO_CAMBIO_UNIDADES,
     MAPEO_CAMAS_MAPEAR_ROLES,
     MAPEO_CAMAS_MAPEAR_UNIDADES,
-    ROLES_GLOBALES,
     MAPEO_CAMAS_VISUALIZACION_ROLES,
     MAPEO_CAMAS_VISUALIZACION_UNIDADES,
 )
 from core.services.usuario_service import UsuarioService
 from usuario.permisos import verificar_permisos_usuario
 
-from mapeo_camas.models import HistorialEstadoCama
+from mapeo_camas.models import HistorialEstadoCama, MapeoSesionCama
 from servicio.models import Sala
 
 from core.constants.mapeo_camas_constants import (
@@ -63,6 +62,11 @@ def _tiene_acceso_global_mapeo(usuario):
     return bool(usuario and (usuario.is_superuser or UsuarioService.es_global(usuario)))
 
 
+def _tiene_acceso_edicion_global_mapeo(usuario):
+    """Permite escritura completa solo a superusuario o admin global."""
+    return bool(usuario and (usuario.is_superuser or UsuarioService.es_admin_global(usuario)))
+
+
 def _tiene_permiso_historiales(usuario):
     """Permite acceso de solo visualización al mapa e historiales."""
     return _tiene_acceso_global_mapeo(usuario)
@@ -70,8 +74,8 @@ def _tiene_permiso_historiales(usuario):
 
 def _tiene_permiso_cambios_mapa(usuario):
     """Permite cambios manuales de estado/movimiento en camas."""
-    # [2026-06-23] Permitir usuario GLOBAL además de roles explícitos
-    if usuario and UsuarioService.es_global(usuario):
+    # [2026-07-17] Solo admin global puede escribir fuera del rol/unidad.
+    if _tiene_acceso_edicion_global_mapeo(usuario):
         return True
     return verificar_permisos_usuario(
         usuario,
@@ -82,8 +86,8 @@ def _tiene_permiso_cambios_mapa(usuario):
 
 def _tiene_permiso_mapear(usuario):
     """Permite iniciar/finalizar/cancelar sesiones de mapeo."""
-    # [2026-06-23] Permitir usuario GLOBAL además de roles explícitos
-    if usuario and UsuarioService.es_global(usuario):
+    # [2026-07-17] Solo admin global puede gestionar sesiones de mapeo.
+    if _tiene_acceso_edicion_global_mapeo(usuario):
         return True
     return verificar_permisos_usuario(
         usuario,
@@ -131,17 +135,14 @@ def _puede_gestionar_sesion_mapeo(usuario):
 def _puede_cancelar_mapeo(usuario):
     """Permite cancelar/finalizar sesiones de mapeo de otros usuarios.
     
-    [2026-06-23] Acceso para: superusuario, GLOBAL, o rol en ROLES_GLOBALES.
-    Permite que usuario GLOBAL finalice mapeos ajenos sin necesidad de rol específico.
+    [2026-07-17] Acceso para: superusuario o admin global.
+    El directivo global queda en modo lectura y no puede cancelar mapeos ajenos.
     """
-    if usuario and usuario.is_superuser:
-        return True
-    # Usuario GLOBAL puede finalizar mapeos de otros usuarios
-    if usuario and UsuarioService.es_global(usuario):
+    if _tiene_acceso_edicion_global_mapeo(usuario):
         return True
     return verificar_permisos_usuario(
         usuario,
-        ROLES_GLOBALES,
+        ["admin"],
         MAPEO_CAMAS_MAPEAR_UNIDADES,
     )
 
@@ -149,9 +150,9 @@ def _puede_cancelar_mapeo(usuario):
 def _puede_cancelar_mapeo_banner(usuario):
     """Permite mostrar el botón de cancelar en alerta de mapeos ajenos.
 
-    [2026-06-23] Regla UI: solo superusuario o usuario con alcance GLOBAL.
+    [2026-07-17] Regla UI: solo superusuario o admin global.
     """
-    return bool(usuario and (usuario.is_superuser or UsuarioService.es_global(usuario)))
+    return _tiene_acceso_edicion_global_mapeo(usuario)
 
 
 # [2026-05-07] Helper para calcular inicio de ventana de límite de movimientos
@@ -161,12 +162,21 @@ def _inicio_ventana_limite_sala():
 
 
 def _filtro_observaciones_movimiento_limite():
-    """Filtro común para contar movimientos que consumen límite por sala.
-    Los movimientos de superadmin quedan fuera porque usan otra observación."""
+    """Filtro para contar SOLO MOVIMIENTOS que consumen límite por sala.
+    
+    [2026-07-09] DIAGNÓSTICO BD COMPLETADO:
+    - MOV_PAC: Movimiento inter-servicio (diferentes salas) → CUENTA ✓
+    - MOV_PAC_DETALLE: Movimiento intra-servicio (misma sala) → NO CUENTA ✗
+    - CAMBIO_TRASLADO_MAPEO: Movimiento en sesión mapeo → CUENTA ✓
+    - MOV_PAC_SUPERADMIN: Movimiento admin → NO CUENTA ✗
+    
+    Se excluyen intra-servicio (MOV_PAC_DETALLE) y cambios de estado sin movimiento.
+    Datos BD: Servicio 200 tiene 12 MOV_PAC + 6 MOV_PAC_DETALLE.
+    Solo los 12 MOV_PAC deberían contar en el límite.
+    """
     return Q(observacion__codigo__in=[
-        OBSERVACION_MOVIMIENTO_PACIENTE_MAPA,
-        OBSERVACION_MOVIMIENTO_PACIENTE_MAPA_DETALLE,
-        OBSERVACION_CAMBIO_TRASLADO_MAPEO,
+        OBSERVACION_MOVIMIENTO_PACIENTE_MAPA,          # MOV_PAC: inter-servicio
+        OBSERVACION_CAMBIO_TRASLADO_MAPEO,             # Cambio traslado en mapeo
     ])
 
 
@@ -278,4 +288,46 @@ def _validar_limite_intentos_salas(usuario, sala_ids):
                 status=400,
             )
 
+    return None
+
+
+# [2026-07-09] Validación para bloquear cambios mientras hay mapeo en proceso
+def _validar_mapeo_no_iniciado(usuario):
+    """Valida que NO haya una sesión de mapeo en proceso (EN_PROGRESO).
+    
+    IMPORTANTE: Esta validación SOLO aplica a usuarios con rol/unidad MAPEO_CAMAS_INTENTOS_CAMBIO
+    (digitador en ADMI/SALA). Los demás usuarios pueden hacer cambios libremente.
+    
+    Retorna JsonResponse 400 si existe una sesión activa y el usuario es restringido; 
+    en caso contrario None.
+    """
+    # [2026-07-09] Validar explícitamente por permisos de intentos de cambio.
+    if not usuario or getattr(usuario, "is_superuser", False):
+        return None
+    if not verificar_permisos_usuario(
+        usuario,
+        MAPEO_CAMAS_INTENTO_CAMBIO_ROLES,
+        MAPEO_CAMAS_INTENTO_CAMBIO_UNIDADES,
+    ):
+        return None
+    
+    sesion_activa = MapeoSesionCama.objects.filter(
+        estado__codigo="EN_PROGRESO",
+        fecha_fin__isnull=True,
+    ).exclude(usuario=usuario).order_by("-fecha_inicio").first()
+    
+    if sesion_activa:
+        return JsonResponse(
+            {
+                "ok": False,
+                "error": (
+                    f"No se pueden realizar cambios mientras hay un mapeo en proceso. "
+                    f"Iniciado por {sesion_activa.usuario.get_full_name()} "
+                    f"a las {sesion_activa.fecha_inicio:%H:%M}."
+                ),
+                "sesion_id": sesion_activa.id,
+            },
+            status=400,
+        )
+    
     return None

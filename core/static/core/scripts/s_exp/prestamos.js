@@ -25,6 +25,10 @@ $(document).ready(function () {
  */
 function initTabla() {
     tablaPrestamos = $('#tabla_prestamos').DataTable({
+        // responsive: en pantallas chicas la tabla NO se estira; las columnas que
+        // no caben se colapsan y se ven tocando/clickeando la fila (fila hija),
+        // igual que el resto de tablas del sistema.
+        responsive: true,
         processing: true,
         serverSide: true,
         ajax: {
@@ -39,9 +43,13 @@ function initTabla() {
             }
         },
         columns: [
-            { data: 'id', render: (data) => `#${data}` },
+            // responsivePriority: menor número = se conserva visible por más tiempo.
+            // Lo esencial (préstamo, solicitante, cronómetro y acciones) permanece;
+            // el resto (expedientes, área, motivo) se colapsa en la fila hija.
+            { data: 'id', responsivePriority: 1, render: (data) => `#${data}` },
             {
                 data: null,
+                responsivePriority: 2,
                 render: function (data) {
                     return `<div><strong>${data.usuario_nombre}</strong><br><small class="sexp-opacity-6">${data.usuario}</small></div>`;
                 }
@@ -50,7 +58,55 @@ function initTabla() {
             {
                 data: 'expedientes',
                 render: function (data) {
-                    return data.map(n => `<span class="sexp-exp-tag">#${n}</span>`).join(' ');
+                    // La API manda detalles ENRIQUECIDOS para poder colorear cada
+                    // expediente según su estado real (antes venían solo números,
+                    // por eso salían todos sin color). Se mantiene compatibilidad
+                    // por si llegara un número suelto.
+                    return (data || []).map(e => {
+                        if (typeof e !== 'object') return `<span class="sexp-exp-tag">#${e}</span>`;
+                        const sanitize = (t) => (t || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                        let cls = 'sexp-exp-tag';
+                        let title = '';
+                        let estadoTag = 'normal';
+                        if (e.prestamo_pendiente) {
+                            // Morado: encontrado pero aún no entregado (reservado).
+                            cls += ' sexp-exp-tag--prestamo-pendiente';
+                            title = e.comentario_pendiente
+                                ? `Pendiente de entrega: ${e.comentario_pendiente}`
+                                : 'Pendiente de entrega';
+                            estadoTag = 'prestamo_pendiente';
+                        } else if (e.fuera_de_tiempo) {
+                            cls += ' sexp-exp-tag--late';
+                            title = 'Devuelto fuera de tiempo';
+                            estadoTag = 'late';
+                        } else if (e.devuelto) {
+                            // Ya devuelto (p. ej. en una devolución parcial previa).
+                            title = e.comentario_devolucion || 'Devuelto correctamente';
+                            estadoTag = 'devuelto';
+                        } else {
+                            // Sigue prestado: el tiempo le corre.
+                            cls += ' sexp-exp-tag--pendiente';
+                            title = 'Pendiente de devolver';
+                            estadoTag = 'pendiente';
+                        }
+                        // Tocar/clickear el expediente abre su info (mostrarInfoExpediente
+                        // vive en expediente_info.js, cargado globalmente). Necesario
+                        // sobre todo en móvil, donde no hay tooltip al pasar el mouse.
+                        const info = {
+                            numero: e.numero,
+                            estado: estadoTag,
+                            paciente_nombre: e.paciente_nombre || '',
+                            paciente_identidad: e.paciente_identidad || '',
+                            fecha_entrega: e.fecha_entrega || '',
+                            fecha_devolucion: e.fecha_devolucion || '',
+                            motivo_rechazo: e.motivo_rechazo_individual || '',
+                            comentario_devolucion: e.comentario_devolucion || '',
+                            comentario_pendiente: e.comentario_pendiente || ''
+                        };
+                        const dataAttr = `data-info="${sanitize(JSON.stringify(info))}"`;
+                        const onClick = `onclick="mostrarInfoExpediente(JSON.parse(this.getAttribute('data-info')))"`;
+                        return `<span class="${cls}" title="${sanitize(title)}" ${dataAttr} ${onClick}>#${e.numero}</span>`;
+                    }).join(' ');
                 }
             },
             {
@@ -77,8 +133,15 @@ function initTabla() {
             },
             {
                 data: null,
+                responsivePriority: 3,
                 render: function (p) {
-                    if (p.estado === 'Entregado' && p.fecha_limite) {
+                    // El cronómetro sigue corriendo mientras haya expedientes fuera
+                    // del archivo. Incluye DevolucionParcial: en una parcial solo
+                    // regresaron algunos, la solicitud NO terminó y el tiempo debe
+                    // continuar (antes solo se contemplaba 'Entregado' y por eso el
+                    // tiempo desaparecía al hacer una devolución parcial).
+                    const CON_CRONOMETRO = ['Entregado', 'Vencido', 'DevolucionParcial'];
+                    if (CON_CRONOMETRO.includes(p.estado) && p.fecha_limite) {
                         const timerId = 'timer-' + p.id;
                         return `<div>
                             <span class="sexp-timer" id="${timerId}" data-limite="${p.fecha_limite}" data-porcentaje="${p.porcentaje_tiempo_usado}">--:--:--</span>
@@ -95,6 +158,7 @@ function initTabla() {
             {
                 data: null,
                 orderable: false,
+                responsivePriority: 2,
                 render: function (p) {
                     if (p.estado === 'Activo' && p.solicitud_estado_flujo === 'SOL_LISTO_RECOGER') {
                         return `<button class="sexp-action-btn sexp-action-btn--aprobar" onclick="marcarEntregado(${p.id})">

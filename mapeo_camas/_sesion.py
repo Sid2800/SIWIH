@@ -3,6 +3,7 @@
 
 import json
 
+from django.conf import settings
 from django.contrib.sessions.models import Session
 from django.db import transaction
 from django.utils import timezone
@@ -20,9 +21,9 @@ from ._helpers import get_estado_mapeo, _resolver_ingreso_operativo
 # [2026-06-26 SCOPE] Prefijo técnico para serializar alcance de sesión sin migración adicional.
 _SCOPE_PREFIX = "__MAPEO_SCOPE__="
 
-def _cancelar_sesion_mapeo_sin_sesion_django(sesion):
+def _cancelar_sesion_mapeo_sin_sesion_django(sesion, *, permitir_cierre=False):
     """[2026-06-22] Cancela una sesion de mapeo cuyo usuario ya no tiene sesion Django activa."""
-    if not sesion:
+    if not sesion or not permitir_cierre:
         return None
 
     with transaction.atomic():
@@ -57,8 +58,11 @@ def _usuarios_con_sesion_django_activa(usuario_ids):
     return usuarios_activos
 
 
-def _cerrar_sesiones_mapeo_sin_sesion_django(qs=None):
+def _cerrar_sesiones_mapeo_sin_sesion_django(qs=None, *, permitir_cierre=False):
     """[2026-06-22] Depura sesiones EN_PROGRESO cuyo usuario ya perdió la sesión Django."""
+    if not permitir_cierre and not getattr(settings, "MAPEO_CAMAS_PERMITIR_DEPURACION_SESIONES_HUERFANAS", False):
+        return []
+
     sesiones_qs = qs or MapeoSesionCama.objects.filter(
         estado=get_estado_mapeo("EN_PROGRESO", "ESTADO_SESION"),
         fecha_fin__isnull=True,
@@ -72,7 +76,7 @@ def _cerrar_sesiones_mapeo_sin_sesion_django(qs=None):
     for sesion in sesiones:
         if str(sesion.usuario_id) in usuarios_activos:
             continue
-        _cancelar_sesion_mapeo_sin_sesion_django(sesion)
+        _cancelar_sesion_mapeo_sin_sesion_django(sesion, permitir_cierre=True)
         sesiones_canceladas.append(sesion.id)
 
     return sesiones_canceladas
@@ -80,7 +84,7 @@ def _cerrar_sesiones_mapeo_sin_sesion_django(qs=None):
 # [2026-05-07] Helper para obtener sesión de mapeo activa del usuario
 def _obtener_sesion_mapeo_activa(usuario):
     """Retorna la sesion EN_PROGRESO activa mas reciente del usuario."""
-    sesion = (
+    return (
         MapeoSesionCama.objects.filter(
             usuario=usuario,
             estado=get_estado_mapeo("EN_PROGRESO", "ESTADO_SESION"),
@@ -89,17 +93,6 @@ def _obtener_sesion_mapeo_activa(usuario):
         .order_by("-fecha_inicio")
         .first()
     )
-
-    if sesion:
-        sesiones_activas = _usuarios_con_sesion_django_activa([sesion.usuario_id])
-        if str(sesion.usuario_id) not in sesiones_activas:
-            _cancelar_sesion_mapeo_sin_sesion_django(sesion)
-            return None
-
-    if not sesion:
-        return None
-
-    return sesion
 
 
 # [2026-05-07] Helper para obtener IDs de servicios en sesión de mapeo

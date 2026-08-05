@@ -1,0 +1,146 @@
+{% extends 'core/base.html' %}
+{% load static %}
+{% load permisos_unidad %}
+{% load s_exp_permisos %}
+
+{% block title %}Recuperación de Expedientes{% endblock title %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'core/css/s_exp.css' %}">
+{% endblock extra_css %}
+
+{% block content %}
+{% comment %}
+Pantalla de recuperacion de URGENCIA (solo Admision).
+Reusa las clases de la Recepcion de egresos SDGI (contendorLista, listbox,
+listasRecepcion...) para no duplicar estilos ya existentes.
+Los comentarios multilinea van con este tag, no con la sintaxis de una linea:
+esa solo admite UNA linea y, si se parte, se renderiza como texto y rompe el
+layout flex de las listas.
+{% endcomment %}
+<div class="contenedor2 contenedorListaRecepcion sexp-recup-page">
+    <div class="tituloFormulario sexp-margin-bottom-15">
+        <div class="tituloFormulario-texto">
+            <i class="bi bi-exclamation-octagon"></i>
+            <h2 class="sin-margen">Recuperación de Expedientes (Urgencia)</h2>
+        </div>
+        <div class="tituloFormulario-subrallado"></div>
+    </div>
+
+    <div class="sexp-nav-modulos">
+        <a href="{% url 's_exp_buscador' %}" class="sexp-nav-link">
+            <i class="bi bi-search"></i> Solicitar Expedientes
+        </a>
+        <a href="{% url 's_exp_seguimiento' %}" class="sexp-nav-link">
+            <i class="bi bi-clock-history"></i> Mis Solicitudes
+        </a>
+        <!-- Las pestañas de admin van gateadas: a esta pagina tambien entra el
+             personal de Admision con rol digitador, que NO es admin del modulo y
+             no debe verlas (no tiene acceso a ellas). -->
+        {% if request.user|tiene_rol:"admin:ADMI" %}
+        <a href="{% url 's_exp_solicitudes' %}" class="sexp-nav-link">
+            <i class="bi bi-list-check"></i> Gestión Solicitudes
+        </a>
+        <a href="{% url 's_exp_monitoreo' %}" class="sexp-nav-link">
+            <i class="bi bi-binoculars"></i> Monitoreo
+        </a>
+        <a href="{% url 's_exp_devoluciones' %}" class="sexp-nav-link">
+            <i class="bi bi-arrow-return-left"></i> Devoluciones
+        </a>
+        <a href="{% url 's_exp_reportes' %}" class="sexp-nav-link">
+            <i class="bi bi-bar-chart-line"></i> Reportes
+        </a>
+        {% endif %}
+        <a href="{% url 's_exp_recuperacion' %}" class="sexp-nav-link sexp-nav-link--active">
+            <i class="bi bi-exclamation-octagon"></i> Recuperación
+        </a>
+    </div>
+
+    <p class="sexp-auditoria-help">
+        <i class="bi bi-exclamation-triangle"></i>
+        Exija un expediente que ya está prestado por una <strong>emergencia o urgencia</strong>.
+        Al confirmar, el expediente se devuelve <strong>de inmediato a Admisión</strong> sin
+        esperar al usuario que lo tiene, y se le notifica. Los demás expedientes de esa
+        solicitud siguen prestados.
+    </p>
+
+    <fieldset class="recepcionIngresoCampos">
+        <legend>Datos de la recuperación</legend>
+
+        <div class="formularioCampo">
+            <label for="recup-fecha">Fecha</label>
+            <input type="text" id="recup-fecha" class="formularioCampo-text" disabled>
+        </div>
+
+        <div class="formularioCampo">
+            <label for="recup-responsable">Responsable</label>
+            <input type="text" id="recup-responsable" class="formularioCampo-text"
+                   value="{{ request.user.get_full_name|default:request.user.username }}" disabled>
+        </div>
+
+        <div class="formularioCampo" id="recepcionIngresoObservaciones">
+            <label for="recup-observaciones">Motivo / Observaciones</label>
+            <textarea id="recup-observaciones" cols="40" rows="10" maxlength="200"
+                      class="formularioCampo-text"
+                      placeholder="Motivo de la urgencia (obligatorio)"></textarea>
+        </div>
+    </fieldset>
+
+    <div class="listasRecepcion">
+        <!-- Izquierda: solo expedientes ENTREGADOS (estado fisico EXP_PRESTADO),
+             es decir, los que estan fuera del archivo. Los apartados/reservados y
+             los pendientes de entrega no aparecen: siguen en el archivo. -->
+        <div class="contendorLista">
+            <h3 class="sin-margen">Expedientes entregados</h3>
+            <input type="text" class="formularioCampo-text" id="recup-buscar-izq"
+                   placeholder="Buscar por identidad, expediente o nombre" autocomplete="off">
+            <ul id="recup-lista-izq" class="listbox sin-margen"></ul>
+            <label>Total <span id="recup-total-izq">0</span> --- Filtrado <span id="recup-sub-izq">0</span></label>
+        </div>
+
+        <div class="listasRecepcionBotones">
+            <button type="button" id="recup-mover-der" class="formularioBotones-boton"
+                    title="Mover seleccionado a la derecha">
+                <i class="bi bi-arrow-right-circle"></i>
+            </button>
+            <button type="button" id="recup-mover-izq" class="formularioBotones-boton"
+                    title="Mover seleccionado a la izquierda">
+                <i class="bi bi-arrow-left-circle"></i>
+            </button>
+            <button type="button" id="recup-mover-todo-der" class="formularioBotones-boton"
+                    title="Mover todos a la derecha">
+                <i class="bi bi-skip-forward-circle"></i>
+            </button>
+            <button type="button" id="recup-mover-todo-izq" class="formularioBotones-boton"
+                    title="Mover todos a la izquierda">
+                <i class="bi bi-skip-backward-circle"></i>
+            </button>
+        </div>
+
+        <!-- Derecha: los que se van a exigir ahora -->
+        <div class="contendorLista">
+            <h3 class="sin-margen">Por Recuperar</h3>
+            <input type="text" class="formularioCampo-text sin-margen" id="recup-buscar-der"
+                   placeholder="Buscar por identidad, expediente o nombre" autocomplete="off">
+            <ul id="recup-lista-der" class="listbox"></ul>
+            <label>Total <span id="recup-total-der">0</span> --- Filtrado <span id="recup-sub-der">0</span></label>
+        </div>
+    </div>
+
+    <div class="recepcionIngresoBotones">
+        <a href="{% url 's_exp_solicitudes' %}" class="formularioBotones-boton">
+            <i class="bi bi-arrow-left-circle formularioBotones-icono"></i>
+            <span>Volver</span>
+        </a>
+
+        <button type="button" class="formularioBotones-boton" id="recup-confirmar">
+            <i class="bi bi-check-square-fill"></i>
+            <span>Confirmar recuperación</span>
+        </button>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script src="{% static 'core/scripts/s_exp/recuperacion.js' %}"></script>
+{% endblock extra_js %}

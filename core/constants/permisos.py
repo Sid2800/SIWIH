@@ -300,6 +300,14 @@ ROLES_GLOBALES = ['directivo', 'admin']
 
 
 
+# -----------------------------
+# PERMISOS APP AGENDA MEDICA
+# -----------------------------
+AGENDA_MEDICA_EDITOR_ROLES = ['admin', ]
+AGENDA_MEDICA_EDITOR_UNIDADES = ['ADMI']
+
+AGENDA_MEDICA_VISUALIZACION_ROLES = ["admin", "digitador", "directivo"]
+AGENDA_MEDICA_VISUALIZACION_UNIDADES = ["ADMI"]
 
 # -----------------------------
 # PERMISOS APP S_EXP    solo estan declarados no se usan
@@ -308,6 +316,18 @@ ROLES_GLOBALES = ['directivo', 'admin']
 # Acceso de administración (aprobar, rechazar, monitorear, devoluciones, reportes)
 S_EXP_ADMIN_ROLES = ['admin']
 S_EXP_ADMIN_UNIDADES = ['ADMI']
+
+# Recuperación de expedientes de URGENCIA: forzar la devolución inmediata de un
+# expediente prestado, saltándose el flujo normal (emergencias).
+# Es exclusivo de Admisión: son quienes reciben físicamente el expediente.
+# Se separa de S_EXP_ADMIN_ROLES a propósito:
+#   - S_EXP_ADMIN_ROLES = ['admin'] dejaría fuera al personal real de Admisión,
+#     que en la práctica tiene rol 'digitador' en la unidad ADMI.
+#   - es_exp_admin() sería demasiado amplio: incluye digitador/directivo de
+#     CUALQUIER unidad, y esta acción no le corresponde a otras áreas.
+# staff/superuser tienen acceso siempre (se resuelve en el servicio).
+S_EXP_RECUPERACION_ROLES = ['admin', 'digitador']
+S_EXP_RECUPERACION_UNIDADES = ['ADMI']
 
 # Acceso de usuario solicitante (buscar, solicitar, seguimiento)
 S_EXP_SOLICITANTE_ROLES = ['admin', 'digitador', 'directivo']
@@ -324,6 +344,7 @@ S_EXP_SOLICITANTE_UNIDADES = [
    "EST",   # Estadística
    "GCL",   #gestion clinica / medicos 
    "TS",    #trabajo social 
+   "RRHH",
 
 ]
 # remapeir todo los usaurios visitante admision a sus repectivos unidades 
@@ -338,20 +359,31 @@ S_EXP_SOLICITANTE_UNIDADES = [
 # -----------------------------
 
 # [2026-06-22] Acceso de solo visualización al template del mapa de camas.
-MAPEO_CAMAS_VISUALIZACION_ROLES = ["admin", "digitador", "visitante", "directivo"]
+# Este permiso permite abrir el mapa y consultar su estado, pero no iniciar
+# una sesion de mapeo ni modificar camas.
+MAPEO_CAMAS_VISUALIZACION_ROLES = ["admin", "visitante", "directivo", "digitador"]
 MAPEO_CAMAS_VISUALIZACION_UNIDADES = ["ADMI", 'ENF']
 
-# [2026-05-18] Acceso para entrar y ejecutar flujo de mapeo.
+# [2026-05-18] Acceso para entrar y ejecutar el flujo de mapeo.
+# Habilita iniciar una sesion, consultar/restaurar su estado activo, procesar
+# acciones dentro de esa sesion y finalizarla o cancelarla segun corresponda.
+# No equivale a permiso de cambios manuales fuera del flujo de mapeo.
 MAPEO_CAMAS_MAPEAR_ROLES = ["admin", "digitador",]
 MAPEO_CAMAS_MAPEAR_UNIDADES = ["ADMI"]
 
 # [2026-05-18] Acceso para cambios manuales en el mapa (edición directa).
-MAPEO_CAMAS_CAMBIOS_ROLES = []
-MAPEO_CAMAS_CAMBIOS_UNIDADES = ["ADMI"]
+# Se usa para actualizar una cama o mover un paciente sin tener una sesion de
+# mapeo activa. Es el permiso de edicion directa del mapa.
+MAPEO_CAMAS_CAMBIOS_ROLES = ["digitador" ]
+MAPEO_CAMAS_CAMBIOS_UNIDADES = ["ENF"]
 
-# [2026-06-11] Ajuste operativo: el limite de intentos aplica.
-MAPEO_CAMAS_INTENTOS_CAMBIO_ROLES = []
-MAPEO_CAMAS_INTENTOS_CAMBIO_UNIDADES = ["ADMI"]
+# [2026-06-11] Ajuste operativo: este permiso no abre una capacidad nueva,
+# sino que limita el permiso de cambios manuales en salas con control por
+# ventana de intentos. En la practica, habilita los mismos cambios que
+# MAPEO_CAMAS_CAMBIOS_* pero solo hasta el maximo permitido por servicio/sala.
+#No se recomieda colocar este permiso a un usuario que tenga Camas Mapear activado. ya que lo limita tambien. movimiento. 
+MAPEO_CAMAS_INTENTOS_CAMBIO_ROLES = ["digitador"]
+MAPEO_CAMAS_INTENTOS_CAMBIO_UNIDADES = ["ENF"]
 
 # Acceso de auditoría (historiales, detalle de historial)
 # [2026-05-11] Visitante habilitado para visualizar templates de historial.

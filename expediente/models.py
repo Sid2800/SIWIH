@@ -170,19 +170,6 @@ class ExpedienteUbicacion(models.Model):
         verbose_name = 'Ubicación de Expediente'
         verbose_name_plural = 'Ubicaciones de Expediente'
         ordering = ['tipo', 'id']
-        constraints = [
-            # Integridad a nivel BD: exactamente UNA de las dos FK debe estar
-            # llena, coherente con el `tipo`. (CheckConstraint funciona en
-            # MySQL 8.0.16+; en versiones viejas se ignora silenciosamente,
-            # por eso ADEMÁS validamos en clean()).
-            models.CheckConstraint(
-                name='expubic_clinica_xor_noclinica',
-                condition=(
-                    models.Q(tipo=1, unidad_clinica__isnull=False, unidad_no_clinica__isnull=True) |
-                    models.Q(tipo=2, unidad_clinica__isnull=True, unidad_no_clinica__isnull=False)
-                ),
-            ),
-        ]
 
     def clean(self):
         """

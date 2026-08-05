@@ -5,33 +5,30 @@
     <p class="dash-kpi__value" id="kpi-total-camas">—</p>
   </article>
   <article class="dash-kpi mapa-cama--ocupada" role="status">
-    <p class="dash-kpi__label" id="kpi-label-ocupadas">Ocupadas</p>
+    <p class="dash-kpi__label" id="kpi-label-ocupadas">Ocupadas (h / % ventana)</p>
     <p class="dash-kpi__value" id="kpi-ocupadas">—</p>
   </article>
   <article class="dash-kpi mapa-cama--vacia" role="status">
-    <p class="dash-kpi__label" id="kpi-label-disponibles">Disponibles</p>
+    <p class="dash-kpi__label" id="kpi-label-disponibles">Disponibles (h / % ventana)</p>
     <p class="dash-kpi__value" id="kpi-disponibles">—</p>
   </article>
   <article class="dash-kpi mapa-cama--fuera-servicio" role="status">
-    <p class="dash-kpi__label">Fuera de servicio</p>
+    <p class="dash-kpi__label">Fuera de servicio (h / % ventana)</p>
     <p class="dash-kpi__value" id="kpi-fuera-servicio">—</p>
   </article>
  
   {# [2026-07-02] CAMBIO: Reemplazadas métricas de sesión mapeo por estados operativos #}
+  {# [2026-07-09] Removido Mantenimiento (consolidado en Fuera de servicio) #}
   <article class="dash-kpi" role="status">
-    <p class="dash-kpi__label">Mantenimiento</p>
-    <p class="dash-kpi__value" id="kpi-mantenimiento">—</p>
-  </article>
-  <article class="dash-kpi" role="status">
-    <p class="dash-kpi__label">Consulta externa</p>
+    <p class="dash-kpi__label">Consulta externa (h / % ventana)</p>
     <p class="dash-kpi__value" id="kpi-consulta-externa">—</p>
   </article>
   <article class="dash-kpi" role="status">
-    <p class="dash-kpi__label">Pre-altas</p>
+    <p class="dash-kpi__label">Pre-altas (h / % ventana)</p>
     <p class="dash-kpi__value" id="kpi-pre-altas">—</p>
   </article>
    <article class="dash-kpi" role="status">
-    <p class="dash-kpi__label">% Ocupación</p>
+    <p class="dash-kpi__label">% Ocupación ventana</p>
     <p class="dash-kpi__value"><span id="kpi-porcentaje-ocupacion">—</span></p>
     <div class="dash-progress" id="kpi-ocupacion-progress-wrap"
          role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">

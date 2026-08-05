@@ -76,7 +76,13 @@ $(document).ready(function () {
     }
 
     BtnReclasificarRN.addEventListener('click', async function (){
-        const resultado = await confirmarAccion('¿Está seguro?', `Realmente desea reclasificar ${ReclasificarRN.textContent} Recien Nacidos`);
+        const resultado = await confirmarAccion({
+                titulo: '¿Está seguro?',
+                mensajes: [
+                    `Realmente desea reclasificar ${ReclasificarRN.textContent} Recien Nacidos`
+                ]
+            });
+            
         if (resultado){
             BtnReclasificarRN.disabled = true;
             await traer_RN_candidatos_HIJO(true);

@@ -105,9 +105,9 @@ class IngresoCreateForm(forms.ModelForm):
             if IngresoService.tiene_ingreso_activo(paciente.id):
                 self.add_error(None, 'El paciente seleccionado ya cuenta con un ingreso activo.')
 
-            # validacion de expediente este disponible en admision
+            # Validar que el expediente no esté prestado o apartado
             try:
-                ExpedienteValidator.validar_disponible(
+                ExpedienteValidator.validar_no_prestado(
                     paciente.expediente_numero
                 )
             except ValidationError as e:

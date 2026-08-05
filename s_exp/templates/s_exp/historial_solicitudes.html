@@ -1,6 +1,7 @@
 {% extends 'core/base.html' %}
 {% load static %}
 {% load permisos_unidad %}
+{% load s_exp_permisos %}
 
 {% block title %}Historial de Solicitudes{% endblock title %}
 
@@ -40,6 +41,11 @@
         <a href="{% url 's_exp_reportes' %}" class="sexp-nav-link">
             <i class="bi bi-bar-chart-line"></i> Reportes
         </a>
+        {% if request.user|puede_recuperar %}
+        <a href="{% url 's_exp_recuperacion' %}" class="sexp-nav-link">
+            <i class="bi bi-exclamation-octagon"></i> Recuperación
+        </a>
+        {% endif %}
     </div>
 
     <!-- Filtros rápidos -->

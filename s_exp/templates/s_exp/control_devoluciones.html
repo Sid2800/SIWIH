@@ -1,6 +1,7 @@
 {% extends 'core/base.html' %}
 {% load static %}
 {% load permisos_unidad %}
+{% load s_exp_permisos %}
 
 {% block title %}Control de Devoluciones{% endblock title %}
 
@@ -38,6 +39,11 @@
         <a href="{% url 's_exp_reportes' %}" class="sexp-nav-link">
             <i class="bi bi-bar-chart-line"></i> Reportes
         </a>
+        {% if request.user|puede_recuperar %}
+        <a href="{% url 's_exp_recuperacion' %}" class="sexp-nav-link">
+            <i class="bi bi-exclamation-octagon"></i> Recuperación
+        </a>
+        {% endif %}
     </div>
 
 
@@ -192,13 +198,23 @@ function abrirModalAuditoria(prestamoId, detallesEncoded) {
         const nom = d.paciente_nombre || 'N/A';
         const estado = d.estado_devolucion || 'pendiente';
         const yaProcesado = (estado === 'devuelto' || estado === 'perdido');
-        const comentarioPrev = (d.comentario_devolucion || '').replace(/"/g, '&quot;');
+        // Comentario precargado: el del admin si ya existe; si no, y el usuario
+        // dejó el expediente "en uso", se hereda su comentario (o "Todavía en uso").
+        let comentarioBase = d.comentario_devolucion || '';
+        if (!comentarioBase && d.usuario_solicita_devolver === false) {
+            comentarioBase = d.comentario_usuario_devolucion || 'Todavía en uso';
+        }
+        const comentarioPrev = comentarioBase.replace(/"/g, '&quot;');
 
-        // Estado pre-seleccionado y clase de la tarjeta
+        // Estado pre-seleccionado y clase de la tarjeta.
+        // Para los PENDIENTES se precarga según lo que el usuario decidió al
+        // iniciar la devolución (usuario_solicita_devolver):
+        //   false -> "No Recibido" (sigue en uso) ; true/null -> "Recibido".
         let valorInicial, clase = '';
         if (estado === 'devuelto') { valorInicial = 'recibido'; clase = ' sexp-auditoria-card--done'; }
         else if (estado === 'perdido') { valorInicial = 'perdido'; clase = ' sexp-auditoria-card--lost'; }
-        else { valorInicial = 'recibido'; }  // pendiente: por defecto recibido
+        else if (d.usuario_solicita_devolver === false) { valorInicial = 'no_recibido'; }
+        else { valorInicial = 'recibido'; }
 
         const disabledAttr = yaProcesado ? ' disabled' : '';
 
@@ -211,6 +227,16 @@ function abrirModalAuditoria(prestamoId, detallesEncoded) {
         } else if (estado === 'perdido') {
             lockBadge = `<span class="sexp-auditoria-lock" style="background:rgba(239,68,68,0.25);color:var(--negro);" title="Marcado como perdido en auditoría previa">
                             <i class="bi bi-x-circle-fill"></i> Perdido
+                         </span>`;
+        } else if (d.usuario_solicita_devolver === false) {
+            // El usuario lo dejó "todavía en uso" (devolución parcial)
+            lockBadge = `<span class="sexp-auditoria-lock" style="background:rgba(139,92,246,0.22);color:var(--negro);" title="El usuario lo dejó 'todavía en uso'">
+                            <i class="bi bi-hourglass-split"></i> Usuario: en uso
+                         </span>`;
+        } else if (d.usuario_solicita_devolver === true) {
+            // El usuario marcó este expediente para devolver
+            lockBadge = `<span class="sexp-auditoria-lock" style="background:rgba(34,197,94,0.20);color:var(--negro);" title="El usuario marcó este expediente para devolver">
+                            <i class="bi bi-arrow-return-left"></i> Usuario: devolver
                          </span>`;
         } else {
             // Pendiente — visible que se puede interactuar
@@ -236,7 +262,7 @@ function abrirModalAuditoria(prestamoId, detallesEncoded) {
                         <i class="bi bi-check-circle"></i> Recibido
                     </label>
                     <label class="sexp-auditoria-radio sexp-auditoria-radio--no"${yaProcesado ? ' style="cursor:not-allowed;opacity:0.6;"' : ''}>
-                        <input type="radio" name="estado_exp_${d.id}" value="no_recibido" data-detalle="${d.id}"${disabledAttr}>
+                        <input type="radio" name="estado_exp_${d.id}" value="no_recibido" data-detalle="${d.id}"${valorInicial==='no_recibido'?' checked':''}${disabledAttr}>
                         <i class="bi bi-hourglass-split"></i> No Recibido
                     </label>
                     <label class="sexp-auditoria-radio sexp-auditoria-radio--lost"${yaProcesado ? ' style="cursor:not-allowed;opacity:0.6;"' : ''}>
@@ -293,14 +319,25 @@ function abrirModalAuditoria(prestamoId, detallesEncoded) {
             const actionsContainer = document.querySelector('.swal2-actions');
             if (actionsContainer) actionsContainer.classList.add('contener-modal-contenedor-botones');
 
-            // Aplicar clase visual inicial según pre-selección
+            // Aplicar clase visual inicial + estado del comentario según pre-selección.
+            // Si arranca en "Recibido" (y no está ya procesado), el comentario queda
+            // en blanco y deshabilitado; guardamos el comentario original por si el
+            // admin cambia de opción y hay que restaurarlo.
             document.querySelectorAll('.sexp-auditoria-card').forEach(card => {
                 const sel = card.querySelector('input[type="radio"]:checked');
                 if (sel && sel.value === 'no_recibido') card.classList.add('sexp-auditoria-card--no');
                 else if (sel && sel.value === 'perdido') card.classList.add('sexp-auditoria-card--lost');
+
+                const coment = card.querySelector('.sexp-auditoria-coment');
+                if (coment && !coment.disabled) {
+                    coment.dataset.comentOrig = coment.value;
+                    if (sel && sel.value === 'recibido') { coment.value = ''; coment.disabled = true; }
+                }
             });
 
-            // Resaltar tarjeta cuando se elija "no recibido" o "perdido"
+            // Resaltar tarjeta y manejar el comentario al cambiar de opción:
+            //  - Recibido    -> comentario en blanco y deshabilitado.
+            //  - No Recibido / Perdido -> comentario editable (restaura el original si está vacío).
             document.querySelectorAll('.sexp-auditoria-card input[type="radio"]').forEach(rad => {
                 rad.addEventListener('change', function () {
                     const det = this.dataset.detalle;
@@ -309,6 +346,17 @@ function abrirModalAuditoria(prestamoId, detallesEncoded) {
                     card.classList.remove('sexp-auditoria-card--no', 'sexp-auditoria-card--lost');
                     if (this.value === 'no_recibido') card.classList.add('sexp-auditoria-card--no');
                     else if (this.value === 'perdido') card.classList.add('sexp-auditoria-card--lost');
+
+                    const coment = card.querySelector('.sexp-auditoria-coment');
+                    if (coment) {
+                        if (this.value === 'recibido') {
+                            coment.value = '';
+                            coment.disabled = true;
+                        } else {
+                            coment.disabled = false;
+                            if (!coment.value.trim()) coment.value = coment.dataset.comentOrig || '';
+                        }
+                    }
                 });
             });
 

@@ -69,76 +69,6 @@ $(document).ready(function () {
 });
 
 /**
- * Muestra un popup con la información del expediente al tocar/clickear el tag.
- * Útil en móvil/tablet donde el tooltip nativo no aparece sin mouse.
- * @param {Object} info - Datos del expediente y su estado.
- */
-function mostrarInfoExpediente(info) {
-    if (!info) return;
-    const num = info.numero || '—';
-    const estado = info.estado || 'normal';
-
-    const labelEstado = {
-        'rechazado': '<span class="sexp-exp-info-estado--rec"><i class="bi bi-x-circle-fill"></i> No prestado</span>',
-        'pendiente': '<span class="sexp-exp-info-estado--pend"><i class="bi bi-hourglass-split"></i> Pendiente de devolver</span>',
-        'late': '<span class="sexp-exp-info-estado--late"><i class="bi bi-exclamation-triangle-fill"></i> Devuelto fuera de tiempo</span>',
-        'devuelto': '<span class="sexp-exp-info-estado--ok"><i class="bi bi-check-circle-fill"></i> Devuelto correctamente</span>',
-        'normal': '<span class="sexp-exp-info-estado--ok"><i class="bi bi-circle-fill"></i> En proceso</span>'
-    };
-
-    let filas = `
-        <div class="sexp-exp-info-fila">
-            <span class="sexp-exp-info-label">Expediente:</span>
-            <span class="sexp-exp-info-valor"><strong>#${num}</strong></span>
-        </div>
-        <div class="sexp-exp-info-fila">
-            <span class="sexp-exp-info-label">Estado:</span>
-            <span class="sexp-exp-info-valor">${labelEstado[estado] || labelEstado.normal}</span>
-        </div>`;
-
-    if (info.paciente_identidad) {
-        filas += `<div class="sexp-exp-info-fila">
-            <span class="sexp-exp-info-label">Identidad:</span>
-            <span class="sexp-exp-info-valor">${info.paciente_identidad}</span>
-        </div>`;
-    }
-    if (info.paciente_nombre) {
-        filas += `<div class="sexp-exp-info-fila">
-            <span class="sexp-exp-info-label">Paciente:</span>
-            <span class="sexp-exp-info-valor">${info.paciente_nombre}</span>
-        </div>`;
-    }
-    if (info.motivo_rechazo) {
-        filas += `<div class="sexp-exp-info-fila">
-            <span class="sexp-exp-info-label">Motivo:</span>
-            <span class="sexp-exp-info-valor">${info.motivo_rechazo}</span>
-        </div>`;
-    }
-    if (info.comentario_devolucion) {
-        filas += `<div class="sexp-exp-info-fila">
-            <span class="sexp-exp-info-label">Comentario:</span>
-            <span class="sexp-exp-info-valor">${info.comentario_devolucion}</span>
-        </div>`;
-    }
-
-    Swal.fire({
-        title: `Expediente #${num}`,
-        html: `<div class="sexp-exp-info-popup">${filas}</div>`,
-        showCancelButton: false,
-        confirmButtonText: '<i class="bi bi-check-circle-fill"></i> Cerrar',
-        customClass: {
-            popup: 'contenedor-modal',
-            title: 'contener-modal-titulo',
-            confirmButton: 'contener-modal-boton-confirmar',
-        },
-        didOpen: () => {
-            const actionsContainer = document.querySelector('.swal2-actions');
-            if (actionsContainer) actionsContainer.classList.add('contener-modal-contenedor-botones-min');
-        }
-    });
-}
-
-/**
  * Inicializa el DataTable de gestión de solicitudes.
  * Carga datos desde el servidor con paginación, ordenamiento y búsqueda.
  */
@@ -184,6 +114,15 @@ function initTabla() {
                             cls = 'sexp-exp-tag sexp-exp-tag--rechazado';
                             title = e.motivo_rechazo_individual ? `No prestado: ${e.motivo_rechazo_individual}` : 'No prestado';
                             estadoTag = 'rechazado';
+                        } else if (e.prestamo_pendiente) {
+                            // Préstamo pendiente (morado): se encontró pero no se entregó.
+                            // Tiene prioridad sobre "pendiente de devolver" porque el
+                            // expediente sigue reservado aunque el resto ya se entregó.
+                            cls = 'sexp-exp-tag sexp-exp-tag--prestamo-pendiente';
+                            title = e.comentario_pendiente
+                                ? `Pendiente de entrega: ${e.comentario_pendiente}`
+                                : 'Pendiente de entrega';
+                            estadoTag = 'prestamo_pendiente';
                         } else if (enPrestamo && e.devuelto === false) {
                             cls = 'sexp-exp-tag sexp-exp-tag--pendiente';
                             title = 'Pendiente de devolver';
@@ -201,7 +140,8 @@ function initTabla() {
                             paciente_nombre: e.paciente_nombre || '',
                             paciente_identidad: e.paciente_identidad || '',
                             motivo_rechazo: e.motivo_rechazo_individual || '',
-                            comentario_devolucion: e.comentario_devolucion || ''
+                            comentario_devolucion: e.comentario_devolucion || '',
+                            comentario_pendiente: e.comentario_pendiente || ''
                         };
                         const dataAttr = `data-info="${sanitize(JSON.stringify(info))}"`;
                         const onClick = `onclick="mostrarInfoExpediente(JSON.parse(this.getAttribute('data-info')))"`;
@@ -243,6 +183,33 @@ function initTabla() {
                         <button class="sexp-action-btn sexp-action-btn--imprimir" onclick="imprimirSolicitud(${data.id})">
                             <i class="bi bi-printer"></i> Imprimir
                         </button>`;
+
+                    // Préstamos pendientes: solo tienen sentido DESPUÉS de pulsar
+                    // "Entregar" (antes de eso el pendiente todavía se puede quitar
+                    // desde la Revisión de Entrega). Una vez entregada la solicitud,
+                    // los pendientes siguen visibles en cualquier estado posterior,
+                    // porque permanecen reservados aunque el resto ya se entregó.
+                    const ESTADOS_YA_ENTREGADA = [
+                        'SOL_EN_PRESTAMO', 'SOL_EN_DEVOLUCION', 'SOL_INCOMPLETA', 'SOL_FINALIZADA'
+                    ];
+                    // Se guardan los pendientes de esta solicitud para que los
+                    // modales de entregar/cancelar puedan listarlos y dejar
+                    // seleccionar cuáles, sin volver a consultar al servidor.
+                    const _pendientes = (data.expedientes || []).filter(e => e.prestamo_pendiente);
+                    (window.__sexpPendientes = window.__sexpPendientes || {})[data.id] = _pendientes;
+                    const nPendientes = _pendientes.length;
+                    const btnsPendientes = (nPendientes && ESTADOS_YA_ENTREGADA.includes(data.estado_flujo)) ? `
+                        <button class="sexp-action-btn sexp-action-btn--entregar-pend"
+                                title="Entregar los ${nPendientes} expediente(s) que quedaron pendientes"
+                                onclick="entregarPendientes(${data.id})">
+                            <i class="bi bi-box-arrow-up-right"></i> Entregar pendientes (${nPendientes})
+                        </button>
+                        <button class="sexp-action-btn sexp-action-btn--cancelar-pend"
+                                title="Cancelar los pendientes: los expedientes vuelven a estar disponibles"
+                                onclick="cancelarPendientes(${data.id})">
+                            <i class="bi bi-x-octagon"></i> Cancelar pendientes (${nPendientes})
+                        </button>` : '';
+
                     if (data.estado_flujo === 'SOL_APROBADA_ORGANIZANDO') {
                         const haImpreso = sexpFlujoLocal.haImpreso(data.id);
                         const haRevisado = sexpFlujoLocal.haRevisado(data.id);
@@ -270,6 +237,8 @@ function initTabla() {
                                     onclick="marcarListo(${data.id})">
                                 <i class="bi bi-bell"></i> Listo para entregar
                             </button>`;
+                        // Aún no se entrega: los pendientes se gestionan desde la
+                        // propia Revisión de Entrega, no con botones aquí.
                         return `
                             <div class="sexp-action-group">
                                 ${btnImprimir}
@@ -288,9 +257,10 @@ function initTabla() {
                     }
                     const estadosImprimibles = ['SOL_EN_PRESTAMO', 'SOL_EN_DEVOLUCION', 'SOL_FINALIZADA', 'SOL_INCOMPLETA'];
                     if (estadosImprimibles.includes(data.estado_flujo)) {
-                        return btnImprimir;
+                        return `<div class="sexp-action-group">${btnImprimir}${btnsPendientes}</div>`;
                     }
-                    return '';
+                    // Otros estados (p. ej. rechazada): solo se muestran los pendientes si los hay.
+                    return btnsPendientes ? `<div class="sexp-action-group">${btnsPendientes}</div>` : '';
                 }
             }
         ],
@@ -782,8 +752,12 @@ function _mostrarModalRevision(id, expedientes) {
     const filasHtml = expedientes.map(function (exp) {
         const identidad = exp.paciente_identidad || exp.identidad || '';
         const nombre = exp.paciente_nombre || exp.nombre || '';
+        // Pre-carga: si la revisión ya se guardó antes con "préstamo pendiente",
+        // el check viene marcado y el comentario trae su texto.
+        const pend = !!exp.prestamo_pendiente;
+        const comentPrev = (exp.comentario_pendiente || '').replace(/"/g, '&quot;');
         return `
-        <div class="sexp-revision-card" id="rev-row-${exp.detalle_id}">
+        <div class="sexp-revision-card${pend ? ' sexp-revision-card--pendiente' : ''}" id="rev-row-${exp.detalle_id}">
             <div class="sexp-revision-card-header">
                 <label class="sexp-exp-dec-check" title="Marcado = encontrado, desmarcado = NO encontrado">
                     <input type="checkbox" class="sexp-revision-check" data-detalle="${exp.detalle_id}" checked>
@@ -796,9 +770,16 @@ function _mostrarModalRevision(id, expedientes) {
                 </div>
             </div>
             <div class="sexp-revision-card-comentario">
+                <label class="sexp-exp-dec-check sexp-revision-pend-check"
+                       title="Se encontró el expediente pero NO se entrega todavía: queda reservado">
+                    <input type="checkbox" class="sexp-revision-pendiente" data-detalle="${exp.detalle_id}"${pend ? ' checked' : ''}>
+                    <span class="sexp-exp-dec-checkmark"></span>
+                    <span class="sexp-revision-pend-label">Marcar como préstamo pendiente</span>
+                </label>
                 <label class="sexp-revision-card-label">Comentario:</label>
                 <input type="text" class="sexp-revision-comentario" data-detalle="${exp.detalle_id}"
-                       placeholder="Obligatorio si se desmarca" maxlength="200">
+                       value="${pend ? comentPrev : ''}"
+                       placeholder="Obligatorio si se desmarca o si es préstamo pendiente" maxlength="200">
             </div>
         </div>`;
     }).join('');
@@ -843,10 +824,34 @@ function _mostrarModalRevision(id, expedientes) {
                 chk.addEventListener('change', function () {
                     const det = this.dataset.detalle;
                     const row = document.getElementById('rev-row-' + det);
+                    const pend = document.querySelector(`.sexp-revision-pendiente[data-detalle="${det}"]`);
+                    const com = document.querySelector(`.sexp-revision-comentario[data-detalle="${det}"]`);
                     if (this.checked) {
                         row.classList.remove('sexp-revision-card--rechazado');
+                        // Se vuelve a habilitar la opción de préstamo pendiente.
+                        if (pend) pend.disabled = false;
                     } else {
                         row.classList.add('sexp-revision-card--rechazado');
+                        // Si NO se encontró, "préstamo pendiente" no aplica:
+                        // se limpia la marca y el texto escrito previamente.
+                        if (pend) { pend.checked = false; pend.disabled = true; }
+                        row.classList.remove('sexp-revision-card--pendiente');
+                        if (com) com.value = '';
+                    }
+                });
+            });
+
+            // Check "Marcar como préstamo pendiente": resalta la tarjeta en morado.
+            // Al DESMARCARLO se limpia también el comentario, porque ese texto
+            // justificaba el pendiente y ya no aplica.
+            document.querySelectorAll('.sexp-revision-pendiente').forEach(chk => {
+                chk.addEventListener('change', function () {
+                    const row = document.getElementById('rev-row-' + this.dataset.detalle);
+                    if (!row) return;
+                    row.classList.toggle('sexp-revision-card--pendiente', this.checked);
+                    if (!this.checked) {
+                        const com = row.querySelector('.sexp-revision-comentario');
+                        if (com) com.value = '';
                     }
                 });
             });
@@ -884,15 +889,32 @@ function _mostrarModalRevision(id, expedientes) {
         preConfirm: () => {
             const decisiones = [];
             const desmarcadosSinComentario = [];
+            const pendientesSinComentario = [];
             document.querySelectorAll('.sexp-revision-check').forEach(chk => {
                 const det = parseInt(chk.dataset.detalle, 10);
                 const encontrado = chk.checked;
+                const pendChk = document.querySelector(`.sexp-revision-pendiente[data-detalle="${det}"]`);
+                // "Préstamo pendiente" solo tiene sentido si se encontró el expediente.
+                const pendiente = encontrado && !!pendChk && pendChk.checked;
                 const com = (document.querySelector(`.sexp-revision-comentario[data-detalle="${det}"]`).value || '').trim();
+
+                // Comentario obligatorio en dos casos: no encontrado, o préstamo pendiente.
                 if (!encontrado && !com) desmarcadosSinComentario.push(det);
-                decisiones.push({ detalle_id: det, encontrado: encontrado, comentario: com });
+                if (pendiente && !com) pendientesSinComentario.push(det);
+
+                decisiones.push({
+                    detalle_id: det,
+                    encontrado: encontrado,
+                    prestamo_pendiente: pendiente,
+                    comentario: com,
+                });
             });
             if (desmarcadosSinComentario.length) {
                 Swal.showValidationMessage('Agregue un comentario para cada expediente desmarcado.');
+                return false;
+            }
+            if (pendientesSinComentario.length) {
+                Swal.showValidationMessage('El comentario es obligatorio para los marcados como préstamo pendiente.');
                 return false;
             }
             return { decisiones };
@@ -974,5 +996,176 @@ function entregarPrestamoDesdeGestion(prestamoId, solicitudId) {
                 toastr.error(err);
             }
         });
+    });
+}
+
+
+/* =============================================================================
+ * PRÉSTAMOS PENDIENTES (estado EXP_PENDIENTE_PRESTAMO)
+ * -----------------------------------------------------------------------------
+ * Origen: en la "Revisión de Entrega" el admin marca un expediente como
+ * "préstamo pendiente" (lo encontró pero no lo entrega todavía). Ese expediente
+ * queda RESERVADO y no se entrega con el resto de la solicitud, así que sigue
+ * pendiente hasta que el admin ejecute una de estas dos acciones.
+ * =========================================================================== */
+
+/**
+ * Cuerpo común de "Entregar pendientes" / "Cancelar pendientes".
+ *
+ * Ambos modales listan los expedientes pendientes de la solicitud y dejan
+ * SELECCIONAR con checkbox cuáles se procesan; comparten cuerpo porque solo
+ * difieren en textos, endpoint y en que cancelar pide un comentario POR
+ * expediente. La lista sale de window.__sexpPendientes (guardada al renderizar
+ * la tabla), sin otra consulta al servidor.
+ *
+ * @param {Object} cfg - {url, solicitudId, titulo, ayuda, icon, confirmText,
+ *                        okMsg, conComentario, marcadoPorDefecto}
+ *   conComentario     : cancelar -> cada expediente lleva su motivo obligatorio.
+ *   marcadoPorDefecto : entregar arranca todo marcado (caso común); cancelar
+ *                       arranca desmarcado, para elegir a conciencia qué NO se
+ *                       presta (acción destructiva).
+ */
+function _resolverPendientes(cfg) {
+    const pendientes = (window.__sexpPendientes || {})[cfg.solicitudId] || [];
+    if (!pendientes.length) {
+        toastr.info('No hay expedientes pendientes en esta solicitud.');
+        return;
+    }
+
+    const sanitize = (t) => (t || '').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    const chk = cfg.marcadoPorDefecto ? ' checked' : '';
+    const comDis = cfg.marcadoPorDefecto ? '' : ' disabled';  // el comentario sigue al check
+
+    const filas = pendientes.map(e => {
+        const comentario = cfg.conComentario ? `
+            <input type="text" class="sexp-pend-coment" data-detalle="${e.detalle_id}" maxlength="200"
+                   placeholder="Motivo de la cancelación (obligatorio)"${comDis}>` : '';
+        return `
+        <div class="sexp-pend-row" id="pend-row-${e.detalle_id}">
+            <div class="sexp-pend-cab">
+                <label class="sexp-exp-dec-check" title="Seleccionar este expediente">
+                    <input type="checkbox" class="sexp-pend-chk" data-detalle="${e.detalle_id}"${chk}>
+                    <span class="sexp-exp-dec-checkmark"></span>
+                </label>
+                <span class="sexp-exp-tag">#${e.numero}</span>
+                <div class="sexp-pend-pac">
+                    <span class="sexp-pend-id">${sanitize(e.paciente_identidad) || 'S/ID'}</span>
+                    <span class="sexp-pend-nom">${sanitize(e.paciente_nombre) || 'N/A'}</span>
+                </div>
+            </div>
+            ${comentario}
+        </div>`;
+    }).join('');
+
+    Swal.fire({
+        title: cfg.titulo,
+        width: '52rem',
+        html: `
+            <div class="sexp-revision-modal">
+                <p class="sexp-auditoria-help"><i class="bi bi-info-circle"></i> <span>${cfg.ayuda}</span></p>
+                <div class="sexp-pend-lista">${filas}</div>
+            </div>`,
+        icon: cfg.icon || 'question',
+        showCancelButton: true,
+        confirmButtonText: cfg.confirmText,
+        cancelButtonText: '<i class="bi bi-x-circle-fill"></i> Cancelar',
+        customClass: {
+            popup: 'contenedor-modal sexp-modal-grande',
+            title: 'contener-modal-titulo',
+            confirmButton: 'contener-modal-boton-confirmar',
+            cancelButton: 'contener-modal-boton-cancelar',
+        },
+        didOpen: () => {
+            const actionsContainer = document.querySelector('.swal2-actions');
+            if (actionsContainer) actionsContainer.classList.add('contener-modal-contenedor-botones');
+            // El comentario sigue al check: si el expediente no se procesa, su
+            // motivo se deshabilita y limpia (no aplica).
+            if (cfg.conComentario) {
+                document.querySelectorAll('.sexp-pend-chk').forEach(c => {
+                    c.addEventListener('change', function () {
+                        const com = document.querySelector(`.sexp-pend-coment[data-detalle="${this.dataset.detalle}"]`);
+                        if (!com) return;
+                        com.disabled = !this.checked;
+                        if (!this.checked) com.value = '';
+                    });
+                });
+            }
+        },
+        preConfirm: () => {
+            const seleccion = Array.from(document.querySelectorAll('.sexp-pend-chk:checked'))
+                .map(c => parseInt(c.dataset.detalle, 10));
+            if (!seleccion.length) {
+                Swal.showValidationMessage('Seleccione al menos un expediente.');
+                return false;
+            }
+            const payload = { solicitud_id: cfg.solicitudId, detalle_ids: seleccion };
+            if (cfg.conComentario) {
+                const comentarios = {};
+                const faltan = [];
+                seleccion.forEach(id => {
+                    const com = document.querySelector(`.sexp-pend-coment[data-detalle="${id}"]`);
+                    const v = ((com && com.value) || '').trim();
+                    if (!v) faltan.push(id);
+                    comentarios[id] = v;
+                });
+                if (faltan.length) {
+                    Swal.showValidationMessage('Cada expediente seleccionado necesita un comentario.');
+                    return false;
+                }
+                payload.comentarios = comentarios;
+            }
+            return payload;
+        }
+    }).then(function (result) {
+        if (!result.isConfirmed) return;
+        $.ajax({
+            url: cfg.url,
+            method: 'POST',
+            headers: { 'X-CSRFToken': window.CSRF_TOKEN },
+            contentType: 'application/json',
+            data: JSON.stringify(result.value),
+            success: function (resp) {
+                if (resp.success) {
+                    toastr.success(cfg.okMsg.replace('{n}', resp.resueltos));
+                    if (typeof tablaSolicitudes !== 'undefined') tablaSolicitudes.ajax.reload(null, false);
+                }
+            },
+            error: function (xhr) {
+                const err = xhr.responseJSON ? xhr.responseJSON.error : 'Error desconocido';
+                toastr.error(err);
+            }
+        });
+    });
+}
+
+/** Entrega los expedientes pendientes seleccionados (pasan a EXP_PRESTADO). */
+function entregarPendientes(solicitudId) {
+    _resolverPendientes({
+        url: window.urls.s_exp_entregar_pendientes_api,
+        solicitudId: solicitudId,
+        titulo: '¿Entregar pendientes?',
+        ayuda: 'Marque los expedientes que va a <strong>entregar</strong>. Pasarán a estar prestados y se moverán a la unidad del solicitante.',
+        confirmText: '<i class="bi bi-check-circle-fill"></i> Entregar seleccionados',
+        okMsg: '{n} expediente(s) entregado(s).',
+        marcadoPorDefecto: true,   // entregar todos es lo común
+    });
+}
+
+/**
+ * Cancela los pendientes seleccionados: vuelven a estar disponibles y quedan
+ * como NO prestados. Cada expediente lleva su motivo (obligatorio), distinto
+ * del comentario que explicaba por qué había quedado pendiente.
+ */
+function cancelarPendientes(solicitudId) {
+    _resolverPendientes({
+        url: window.urls.s_exp_cancelar_pendientes_api,
+        solicitudId: solicitudId,
+        titulo: '¿Cancelar pendientes?',
+        ayuda: 'Marque los expedientes a <strong>cancelar</strong> y escriba el motivo de cada uno. Volverán a estar <strong>disponibles</strong> y se registrarán como <strong>NO prestados</strong>.',
+        icon: 'warning',
+        confirmText: '<i class="bi bi-x-octagon-fill"></i> Cancelar seleccionados',
+        okMsg: '{n} expediente(s) cancelado(s).',
+        conComentario: true,
+        marcadoPorDefecto: false,  // acción destructiva: elegir a conciencia
     });
 }
