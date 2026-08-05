@@ -7,3 +7,7 @@ class EquiposConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'equipos'
     verbose_name = 'Equipos'
+
+    def ready(self):
+        # Registra el receptor post_migrate que asegura la unidad EQ.
+        from . import signals  # noqa: F401

@@ -1,8 +1,10 @@
 from datetime import date, timedelta
 from decimal import Decimal
+from importlib import import_module
 from io import BytesIO
 from unittest.mock import patch
 
+from django.apps import apps as django_apps
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ValidationError
@@ -19,6 +21,7 @@ from core.constants.choices_constants import (
     RolUsuario,
     TipoUnidad,
 )
+from expediente.models import ExpedienteUbicacion
 from rrhh.models import Empleado
 from servicio.models import Area_atencion, Servicio, Unidad
 from usuario.models import PerfilUnidad
@@ -45,6 +48,8 @@ from .permisos import (
     puede_editar_equipos,
     puede_visualizar_equipos,
 )
+from .signals import CODIGO_UNIDAD as CODIGO_UNIDAD_EQUIPOS
+from .signals import asegurar_unidad_equipos
 from .services.ficha_baja_pdf_service import FichaBajaPdfService
 from .services.ficha_activo_fijo_pdf_service import FichaActivoFijoPdfService
 
@@ -2594,15 +2599,10 @@ class PermisosEquiposTests(TestCase):
             respuesta,
             reverse("tramite_baja_dispositivo_equipos", args=[self.dispositivo.pk]),
         )
-        # Sin el atributo data-edit-url el doble clic de la fila queda
-        # desarmado. Se busca con el igual porque el JS incluido menciona
-        # 'data-edit-url' como selector y siempre esta presente.
-        self.assertNotContains(respuesta, 'data-edit-url="')
-        # Lo que si puede hacer sigue disponible.
-        self.assertContains(
-            respuesta,
-            reverse("detalle_dispositivo_equipos", args=[self.dispositivo.pk]),
-        )
+        # El doble clic no se desarma: lleva al detalle, que es lo que este
+        # usuario si puede ver. Una fila muerta se siente como un fallo.
+        detalle = reverse("detalle_dispositivo_equipos", args=[self.dispositivo.pk])
+        self.assertContains(respuesta, f'data-edit-url="{detalle}"')
 
     def test_listado_muestra_acciones_de_edicion_y_baja_al_tecnico(self):
         self.client.force_login(self.tecnico)
@@ -2615,4 +2615,210 @@ class PermisosEquiposTests(TestCase):
             respuesta,
             reverse("tramite_baja_dispositivo_equipos", args=[self.dispositivo.pk]),
         )
-        self.assertContains(respuesta, 'data-edit-url="')
+        editar = reverse("editar_dispositivo_equipos", args=[self.dispositivo.pk])
+        self.assertContains(respuesta, f'data-edit-url="{editar}"')
+
+
+class UnidadEquiposTests(TestCase):
+    """La red de seguridad que garantiza la unidad EQ tras cada migrate."""
+
+    databases = {"default"}
+
+    def setUp(self):
+        # Cada caso parte de una base sin la unidad, que es el estado en el
+        # que queda una instalacion limpia. Hay que retirar antes la ubicacion
+        # que expediente le crea por signal: la referencia con PROTECT y sin
+        # quitarla la unidad no se puede borrar.
+        ExpedienteUbicacion.objects.filter(
+            unidad_no_clinica__nombre_corto_unidad=CODIGO_UNIDAD_EQUIPOS
+        ).delete()
+        Unidad.objects.filter(nombre_corto_unidad=CODIGO_UNIDAD_EQUIPOS).delete()
+
+    def ejecutar_receptor(self, etiqueta_app="equipos"):
+        asegurar_unidad_equipos(
+            sender=None,
+            app_config=django_apps.get_app_config(etiqueta_app),
+        )
+
+    def existe_eq(self):
+        return Unidad.objects.filter(
+            nombre_corto_unidad=CODIGO_UNIDAD_EQUIPOS
+        ).exists()
+
+    def test_crea_la_unidad_cuando_ya_hay_usuarios(self):
+        get_user_model().objects.create_user(username="primero", password="clave")
+
+        self.ejecutar_receptor()
+
+        self.assertTrue(self.existe_eq())
+        unidad = Unidad.objects.get(nombre_corto_unidad=CODIGO_UNIDAD_EQUIPOS)
+        self.assertEqual(unidad.nombre_unidad, "EQUIPOS")
+        self.assertEqual(unidad.estado, EstadoRegistro.ACTIVO)
+        self.assertIsNotNone(unidad.creado_por)
+
+    def test_no_crea_nada_ni_falla_cuando_no_hay_usuarios(self):
+        # Reproduce la instalacion limpia: migrate corre antes que
+        # createsuperuser. El receptor no debe reventar, solo abstenerse.
+        # Se simula el vacio en lugar de borrar usuarios porque media base
+        # los referencia con PROTECT.
+        Usuario = get_user_model()
+        with patch.object(
+            Usuario._default_manager.__class__,
+            "get_queryset",
+            return_value=Usuario.objects.none(),
+        ):
+            self.ejecutar_receptor()
+
+        self.assertFalse(self.existe_eq())
+
+    def test_ignora_el_aviso_de_las_demas_apps(self):
+        # post_migrate se emite una vez por aplicacion instalada.
+        get_user_model().objects.create_user(username="primero", password="clave")
+
+        self.ejecutar_receptor(etiqueta_app="servicio")
+
+        self.assertFalse(self.existe_eq())
+
+    def test_es_idempotente_y_no_duplica_la_unidad(self):
+        get_user_model().objects.create_user(username="primero", password="clave")
+
+        self.ejecutar_receptor()
+        self.ejecutar_receptor()
+
+        self.assertEqual(
+            Unidad.objects.filter(nombre_corto_unidad=CODIGO_UNIDAD_EQUIPOS).count(), 1
+        )
+
+    def test_no_pisa_una_unidad_existente(self):
+        usuario = get_user_model().objects.create_user(
+            username="primero", password="clave"
+        )
+        Unidad.objects.create(
+            nombre_unidad="EQUIPOS BIOMEDICOS",
+            nombre_corto_unidad=CODIGO_UNIDAD_EQUIPOS,
+            tipo=TipoUnidad.APOYO,
+            estado=EstadoRegistro.ACTIVO,
+            creado_por=usuario,
+            modificado_por=usuario,
+        )
+
+        self.ejecutar_receptor()
+
+        unidad = Unidad.objects.get(nombre_corto_unidad=CODIGO_UNIDAD_EQUIPOS)
+        self.assertEqual(unidad.nombre_unidad, "EQUIPOS BIOMEDICOS")
+
+
+class ReversaMigracionUnidadTests(TestCase):
+    """La marcha atras de 0026 nunca debe interrumpir un rollback.
+
+    Es el escenario acordado: probar la rama y poder volver al commit
+    anterior. Si la reversa revienta, el rollback queda a medias.
+    """
+
+    databases = {"default"}
+
+    def cargar_funciones(self):
+        modulo = import_module("equipos.migrations.0026_unidad_equipos")
+        return modulo.crear_unidad_equipos, modulo.quitar_unidad_equipos
+
+    def estado_real(self):
+        # La migracion recibe modelos historicos; aqui basta el registro real
+        # porque el esquema no cambia entre 0025 y 0026.
+        return django_apps
+
+    def test_la_reversa_borra_la_unidad_si_nadie_la_usa(self):
+        crear, quitar = self.cargar_funciones()
+        usuario = get_user_model().objects.create_user(
+            username="responsable-reversa", password="clave"
+        )
+        Unidad.objects.get_or_create(
+            nombre_corto_unidad=CODIGO_UNIDAD_EQUIPOS,
+            defaults={
+                "nombre_unidad": "EQUIPOS",
+                "tipo": TipoUnidad.APOYO,
+                "estado": EstadoRegistro.ACTIVO,
+                "creado_por": usuario,
+                "modificado_por": usuario,
+            },
+        )
+        # El signal de expediente crea la ubicacion protegida; se retira para
+        # dejar la unidad realmente libre.
+        ExpedienteUbicacion.objects.filter(
+            unidad_no_clinica__nombre_corto_unidad=CODIGO_UNIDAD_EQUIPOS
+        ).delete()
+
+        quitar(self.estado_real(), None)
+
+        self.assertFalse(
+            Unidad.objects.filter(nombre_corto_unidad=CODIGO_UNIDAD_EQUIPOS).exists()
+        )
+
+    def test_la_reversa_no_revienta_con_la_ubicacion_protegida(self):
+        # Es el estado normal tras un migrate: la unidad existe y expediente
+        # ya le creo su ExpedienteUbicacion con FK PROTECT.
+        _, quitar = self.cargar_funciones()
+        usuario = get_user_model().objects.create_user(
+            username="responsable-protegida", password="clave"
+        )
+        Unidad.objects.get_or_create(
+            nombre_corto_unidad=CODIGO_UNIDAD_EQUIPOS,
+            defaults={
+                "nombre_unidad": "EQUIPOS",
+                "tipo": TipoUnidad.APOYO,
+                "estado": EstadoRegistro.ACTIVO,
+                "creado_por": usuario,
+                "modificado_por": usuario,
+            },
+        )
+        self.assertTrue(
+            ExpedienteUbicacion.objects.filter(
+                unidad_no_clinica__nombre_corto_unidad=CODIGO_UNIDAD_EQUIPOS
+            ).exists(),
+            "expediente deberia haber creado la ubicacion por signal",
+        )
+
+        # No debe lanzar ProtectedError.
+        quitar(self.estado_real(), None)
+
+        # La unidad se conserva, que es lo correcto: borrarla seria meterse
+        # con datos de otro modulo.
+        self.assertTrue(
+            Unidad.objects.filter(nombre_corto_unidad=CODIGO_UNIDAD_EQUIPOS).exists()
+        )
+
+    def test_la_reversa_conserva_la_unidad_si_hay_tecnicos_asignados(self):
+        _, quitar = self.cargar_funciones()
+        usuario = get_user_model().objects.create_user(
+            username="tecnico-reversa", password="clave"
+        )
+        unidad, _ = Unidad.objects.get_or_create(
+            nombre_corto_unidad=CODIGO_UNIDAD_EQUIPOS,
+            defaults={
+                "nombre_unidad": "EQUIPOS",
+                "tipo": TipoUnidad.APOYO,
+                "estado": EstadoRegistro.ACTIVO,
+                "creado_por": usuario,
+                "modificado_por": usuario,
+            },
+        )
+        PerfilUnidad.objects.create(
+            usuario=usuario,
+            servicio_unidad=unidad,
+            alcance=AlcanceUsuario.UNIDAD,
+            rol=RolUsuario.DIGITADOR,
+        )
+
+        quitar(self.estado_real(), None)
+
+        self.assertTrue(
+            Unidad.objects.filter(nombre_corto_unidad=CODIGO_UNIDAD_EQUIPOS).exists()
+        )
+
+    def test_la_reversa_no_falla_si_la_unidad_no_existe(self):
+        _, quitar = self.cargar_funciones()
+        ExpedienteUbicacion.objects.filter(
+            unidad_no_clinica__nombre_corto_unidad=CODIGO_UNIDAD_EQUIPOS
+        ).delete()
+        Unidad.objects.filter(nombre_corto_unidad=CODIGO_UNIDAD_EQUIPOS).delete()
+
+        quitar(self.estado_real(), None)  # no debe lanzar nada

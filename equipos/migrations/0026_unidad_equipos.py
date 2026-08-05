@@ -1,4 +1,5 @@
 from django.db import migrations
+from django.db.models.deletion import ProtectedError
 
 
 CODIGO_UNIDAD = "EQ"
@@ -22,10 +23,14 @@ def crear_unidad_equipos(apps, schema_editor):
     Usuario = apps.get_model("auth", "User")
 
     # Unidad exige creado_por y modificado_por, que no admiten vacio. En una
-    # base de pruebas recien creada todavia no hay usuarios: las migraciones
-    # corren antes que los fixtures. En ese caso no se crea nada y es el
-    # propio fixture quien da de alta la unidad, que si tiene a quien
-    # atribuirsela. En desarrollo y produccion siempre hay usuarios.
+    # base recien creada las migraciones corren antes que exista ningun
+    # usuario, asi que aqui no hay a quien atribuirla y la migracion se marca
+    # como aplicada sin haber creado nada.
+    #
+    # Ese hueco lo cierra el receptor post_migrate de equipos/signals.py, que
+    # vuelve a intentarlo en cada migrate posterior, cuando ya hay superusuario.
+    # Mientras la unidad no exista nadie puede tener PerfilUnidad en EQ, de
+    # modo que el modulo queda cerrado, nunca abierto.
     responsable = Usuario.objects.order_by("pk").first()
 
     if responsable is None:
@@ -46,16 +51,34 @@ def crear_unidad_equipos(apps, schema_editor):
 def quitar_unidad_equipos(apps, schema_editor):
     """Retira la unidad solo si nadie la esta usando.
 
-    Si ya hay tecnicos con PerfilUnidad en EQ, borrarla dejaria a esa gente
-    sin acceso de forma silenciosa. En ese caso se conserva.
+    Se conserva en dos casos, y en ninguno se interrumpe la marcha atras:
+
+    - Si hay tecnicos con PerfilUnidad en EQ, borrarla les quitaria el acceso
+      de forma silenciosa.
+    - Si expediente ya le creo su ExpedienteUbicacion. Ese modulo la referencia
+      con PROTECT a proposito y su propio codigo advierte que una unidad con
+      ubicacion no se puede eliminar. Borrar esa fila seria meter mano en datos
+      de otro modulo, asi que se deja la unidad donde esta.
+
+    Una unidad de mas es inofensiva: sin PerfilUnidad que apunte a ella no
+    concede nada. Una migracion que revienta a mitad del rollback, no.
     """
     Unidad = apps.get_model("servicio", "Unidad")
     PerfilUnidad = apps.get_model("usuario", "PerfilUnidad")
 
     unidad = Unidad.objects.filter(nombre_corto_unidad=CODIGO_UNIDAD).first()
 
-    if unidad and not PerfilUnidad.objects.filter(servicio_unidad=unidad).exists():
+    if unidad is None:
+        return
+
+    if PerfilUnidad.objects.filter(servicio_unidad=unidad).exists():
+        return
+
+    try:
         unidad.delete()
+    except ProtectedError:
+        # Otro modulo la referencia. Se deja tal cual; el rollback continua.
+        pass
 
 
 class Migration(migrations.Migration):
@@ -63,7 +86,11 @@ class Migration(migrations.Migration):
     dependencies = [
         ("equipos", "0025_remove_dispositivo_bio_disp_garantia_fecha_valida_and_more"),
         ("servicio", "0018_alter_cama_estado_alter_unidad_tipo"),
-        ("usuario", "0001_initial"),
+        # La marcha atras consulta PerfilUnidad.servicio_unidad, que no existe
+        # hasta usuario.0004: en 0001 el campo todavia se llama unidad y apunta
+        # a un modelo que despues se borra. Se depende de la hoja de usuario
+        # para que el estado historico tenga el campo con su nombre actual.
+        ("usuario", "0009_merge_0007_delete_unidad_0008_alter_perfilunidad_rol"),
     ]
 
     operations = [

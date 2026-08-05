@@ -175,13 +175,19 @@
                 {% for dispositivo in dispositivos %}
                     {% with asignacion=dispositivo.asignacion_actual %}
                         {% comment %}
-                           El doble clic para editar solo se arma si el usuario
-                           puede editar. Sin data-edit-url el JS ignora la fila,
-                           asi el consultor no choca contra un acceso denegado.
+                           El destino del doble clic lo decide el servidor
+                           segun el permiso: quien edita va al formulario y
+                           quien solo consulta va al detalle. La fila nunca
+                           queda muerta ni lleva a un acceso denegado.
                         {% endcomment %}
-                        <tr class="equipos-listado__fila{% if request.user|puede_editar_equipo %} equipos-listado__fila--editable{% endif %}"
-                            {% if request.user|puede_editar_equipo %}data-edit-url="{% url 'editar_dispositivo_equipos' dispositivo.id %}"
-                            title="Doble clic para editar {{ dispositivo.codigo }}"{% endif %}>
+                        <tr class="equipos-listado__fila equipos-listado__fila--editable"
+                            {% if request.user|puede_editar_equipo %}
+                                data-edit-url="{% url 'editar_dispositivo_equipos' dispositivo.id %}"
+                                title="Doble clic para editar {{ dispositivo.codigo }}"
+                            {% else %}
+                                data-edit-url="{% url 'detalle_dispositivo_equipos' dispositivo.id %}"
+                                title="Doble clic para ver {{ dispositivo.codigo }}"
+                            {% endif %}>
                             <td class="equipos-listado__col-detalle"></td>
                             <td class="equipos-listado__col-codigo">
                                 <a class="equipos-listado__codigo"
