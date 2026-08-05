@@ -40,6 +40,13 @@ from .models import (
     OrdenTrabajoBajaDispositivo,
     TipoDispositivo,
 )
+from .decorators import (
+    exige_baja_equipos,
+    exige_catalogo_equipos,
+    exige_editar_equipos,
+    exige_formularios_equipos_json,
+    exige_ver_equipos,
+)
 from .services.ficha_baja_pdf_service import FichaBajaPdfService
 from .services.ficha_activo_fijo_pdf_service import FichaActivoFijoPdfService
 
@@ -91,6 +98,7 @@ def registrar_errores_vista(mensaje):
     return decorador
 
 
+@exige_ver_equipos
 def inicio(request):
     # Pantalla de entrada del modulo. Solo renderiza el menu interno de Equipos.
     return render(
@@ -99,6 +107,7 @@ def inicio(request):
     )
 
 
+@exige_editar_equipos
 @registrar_errores_vista("Error al registrar equipo")
 def registrar_dispositivo(request):
     # GET: muestra formulario vacio.
@@ -403,6 +412,7 @@ def _preparar_dispositivos_para_tabla(dispositivos):
         dispositivo.criticidad_css = criticidad_css.get(dispositivo.criticidad, "")
 
 
+@exige_ver_equipos
 @registrar_errores_vista("Error en listado de equipos")
 def listado_dispositivos(request):
     # Vista principal de inventario. Lee filtros GET, aplica consultas,
@@ -547,6 +557,7 @@ def _obtener_contexto_imagenes_dispositivo(dispositivo_id):
     }
 
 
+@exige_ver_equipos
 @registrar_errores_vista("Error al abrir detalle de equipo")
 def detalle_dispositivo(request, dispositivo_id):
     # Ficha solo lectura del equipo. El id llega desde la URL.
@@ -604,6 +615,7 @@ def detalle_dispositivo(request, dispositivo_id):
         }
     )
 
+@exige_editar_equipos
 @registrar_errores_vista("Error al editar equipo")
 def editar_dispositivo(request, dispositivo_id):
     # Reutiliza DispositivoCreateForm y el template de registro.
@@ -684,6 +696,7 @@ def editar_dispositivo(request, dispositivo_id):
     )
 
 
+@exige_editar_equipos
 @registrar_errores_vista("Error al agregar fotografía de equipo")
 @require_POST
 def agregar_imagen_dispositivo(request, dispositivo_id):
@@ -754,6 +767,7 @@ def agregar_imagen_dispositivo(request, dispositivo_id):
     return redirect(url_edicion)
 
 
+@exige_baja_equipos
 @registrar_errores_vista("Error en tramite de baja de equipo")
 def tramite_baja_dispositivo(request, dispositivo_id):
     # No existe un estado pendiente. La baja se crea solamente cuando el
@@ -877,6 +891,7 @@ def tramite_baja_dispositivo(request, dispositivo_id):
     )
 
 
+@exige_baja_equipos
 @registrar_errores_vista("Error al generar ficha de baja de equipo")
 @require_http_methods(["GET", "POST"])
 def ficha_baja_dispositivo_pdf(request, dispositivo_id):
@@ -976,6 +991,7 @@ def ficha_baja_dispositivo_pdf(request, dispositivo_id):
     )
 
 
+@exige_ver_equipos
 @registrar_errores_vista("Error al generar ficha de activo fijo")
 @require_http_methods(["GET"])
 def ficha_activo_fijo_pdf(request, dispositivo_id):
@@ -1033,6 +1049,7 @@ def _construir_url_qr_equipo(request, dispositivo_id):
     return request.build_absolute_uri(ruta_detalle)
 
 
+@exige_ver_equipos
 @registrar_errores_vista("Error al generar QR de equipo")
 def qr_dispositivo(request, dispositivo_id):
     # Pantalla imprimible: el QR contiene la URL de detalle del equipo.
@@ -1057,6 +1074,7 @@ def qr_dispositivo(request, dispositivo_id):
             "qr_data_uri": _generar_qr_data_uri(detalle_url),
         },
     )
+@exige_ver_equipos
 @registrar_errores_vista("Error en busqueda de equipos")
 def buscar_dispositivo(request):
     # Busqueda rapida. Muestra resultados cuando hay texto o filtro de gestoria.
@@ -1142,6 +1160,7 @@ def _paginar_autocompletado(queryset, request, construir):
     }
 
 
+@exige_formularios_equipos_json
 @login_required
 @registrar_errores_vista("Error al buscar tipos de equipo")
 def buscar_tipos(request):
@@ -1161,6 +1180,7 @@ def buscar_tipos(request):
     return _respuesta_select2(pagina)
 
 
+@exige_formularios_equipos_json
 @login_required
 @registrar_errores_vista("Error al buscar marcas de equipo")
 def buscar_marcas(request):
@@ -1180,6 +1200,7 @@ def buscar_marcas(request):
     return _respuesta_select2(pagina)
 
 
+@exige_formularios_equipos_json
 @login_required
 @registrar_errores_vista("Error al buscar modelos de equipo")
 def buscar_modelos(request):
@@ -1213,6 +1234,7 @@ def buscar_modelos(request):
     return _respuesta_select2(pagina)
 
 
+@exige_formularios_equipos_json
 @registrar_errores_vista("Error al buscar empleados para equipos")
 def buscar_empleados(request):
     # Endpoint AJAX usado por Select2 en el formulario de registro/edicion.
@@ -1298,6 +1320,7 @@ def _url_catalogo(marca=None, tipo=None):
     return f"{url}?{'&'.join(partes)}" if partes else url
 
 
+@exige_catalogo_equipos
 @login_required
 @registrar_errores_vista("Error en catalogo de marcas y modelos")
 def catalogo_marcas_modelos(request):
@@ -1345,6 +1368,7 @@ def catalogo_marcas_modelos(request):
     )
 
 
+@exige_catalogo_equipos
 @login_required
 @registrar_errores_vista("Error al agregar marca")
 @require_POST
@@ -1365,6 +1389,7 @@ def agregar_marca_catalogo(request):
     return redirect(_url_catalogo(marca))
 
 
+@exige_catalogo_equipos
 @login_required
 @registrar_errores_vista("Error al agregar modelo")
 @require_POST
@@ -1388,6 +1413,7 @@ def agregar_modelo_catalogo(request, marca_id):
     return redirect(_url_catalogo(marca))
 
 
+@exige_catalogo_equipos
 @login_required
 @registrar_errores_vista("Error al cambiar estado de marca")
 @require_POST
@@ -1406,6 +1432,7 @@ def cambiar_estado_marca(request, marca_id):
     return redirect(_url_catalogo(marca))
 
 
+@exige_catalogo_equipos
 @login_required
 @registrar_errores_vista("Error al agregar tipo de equipo")
 @require_POST
@@ -1425,6 +1452,7 @@ def agregar_tipo_catalogo(request):
     return redirect(_url_catalogo())
 
 
+@exige_catalogo_equipos
 @login_required
 @registrar_errores_vista("Error al editar tipo de equipo")
 @require_POST
@@ -1449,6 +1477,7 @@ def editar_tipo_catalogo(request, tipo_id):
     return redirect(_url_catalogo())
 
 
+@exige_catalogo_equipos
 @login_required
 @registrar_errores_vista("Error al cambiar estado de tipo de equipo")
 @require_POST
@@ -1467,6 +1496,7 @@ def cambiar_estado_tipo(request, tipo_id):
     return redirect(_url_catalogo())
 
 
+@exige_catalogo_equipos
 @login_required
 @registrar_errores_vista("Error al cambiar estado de modelo")
 @require_POST

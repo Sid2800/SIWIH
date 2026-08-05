@@ -361,3 +361,35 @@ MAPEO_CAMAS_HISTORIALES_UNIDADES = ["ADMI"]
 # [2026-05-28] Acceso al dashboard operativo de KPIs/gráficas en tiempo real.
 MAPEO_CAMAS_DASHBOARD_ROLES = []
 MAPEO_CAMAS_DASHBOARD_UNIDADES = ["ADMI"]
+
+
+# -----------------------------
+# PERMISOS APP EQUIPOS
+# -----------------------------
+# EQ es una unidad de autorizacion, no un area fisica del hospital: agrupa a
+# quienes mantienen el inventario. Un digitador solo entra si tiene un
+# PerfilUnidad en EQ; admin y directivo pasan por su alcance GLOBAL.
+#
+# is_staff no concede acceso a este modulo. Solo cuentan rol mas unidad, o
+# ser superusuario: is_staff abre el admin de Django, que es otra cosa.
+#
+# Las cuatro capacidades van separadas aunque hoy tres compartan roles. Asi
+# se puede estrechar una sin tocar las demas: por ejemplo dejar la baja solo
+# en manos de admin sin quitarle al tecnico el registro diario.
+
+# Consultar el inventario sin modificarlo. Es donde llega el directivo.
+EQUIPOS_VISUALIZACION_ROLES = ["admin", "digitador", "directivo"]
+EQUIPOS_VISUALIZACION_UNIDADES = ["EQ"]
+
+# Registrar y editar equipos, cambiar ubicacion o responsable, subir fotos.
+EQUIPOS_EDICION_ROLES = ["admin", "digitador"]
+EQUIPOS_EDICION_UNIDADES = ["EQ"]
+
+# Mantener los catalogos de tipos, marcas y modelos.
+EQUIPOS_CATALOGO_ROLES = ["admin", "digitador"]
+EQUIPOS_CATALOGO_UNIDADES = ["EQ"]
+
+# Tramitar la baja. Va aparte de la edicion porque no tiene vuelta atras:
+# crea el registro, deja el equipo dado de baja y bloquea su edicion.
+EQUIPOS_BAJA_ROLES = ["admin", "digitador"]
+EQUIPOS_BAJA_UNIDADES = ["EQ"]

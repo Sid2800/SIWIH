@@ -4,6 +4,7 @@ from io import BytesIO
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db.models import ProtectedError
@@ -12,9 +13,15 @@ from django.urls import reverse
 from django.utils import timezone
 from PIL import Image
 
-from core.constants.choices_constants import EstadoRegistro, TipoUnidad
+from core.constants.choices_constants import (
+    AlcanceUsuario,
+    EstadoRegistro,
+    RolUsuario,
+    TipoUnidad,
+)
 from rrhh.models import Empleado
 from servicio.models import Area_atencion, Servicio, Unidad
+from usuario.models import PerfilUnidad
 
 from .models import (
     AreaGestora,
@@ -32,8 +39,54 @@ from .models import (
     TipoTecnologiaDispositivo,
 )
 from .forms import CostoLempirasField, DispositivoCreateForm
+from .permisos import (
+    puede_administrar_catalogos_equipos,
+    puede_dar_baja_equipos,
+    puede_editar_equipos,
+    puede_visualizar_equipos,
+)
 from .services.ficha_baja_pdf_service import FichaBajaPdfService
 from .services.ficha_activo_fijo_pdf_service import FichaActivoFijoPdfService
+
+
+def unidad_equipos():
+    """Devuelve la unidad EQ, creandola si la migracion no alcanzo a hacerlo.
+
+    En pruebas la base arranca vacia y la migracion 0026 se salta la creacion
+    cuando no hay ningun usuario todavia. Aqui la garantizamos.
+    """
+    responsable = get_user_model().objects.order_by("pk").first()
+    unidad, _ = Unidad.objects.get_or_create(
+        nombre_corto_unidad="EQ",
+        defaults={
+            "nombre_unidad": "Equipos",
+            "tipo": TipoUnidad.APOYO,
+            "estado": EstadoRegistro.ACTIVO,
+            "creado_por": responsable,
+            "modificado_por": responsable,
+        },
+    )
+    return unidad
+
+
+def dar_acceso_equipos(usuario, rol=RolUsuario.DIGITADOR):
+    """Asigna al usuario un PerfilUnidad en EQ con alcance de unidad."""
+    return PerfilUnidad.objects.create(
+        usuario=usuario,
+        servicio_unidad=unidad_equipos(),
+        alcance=AlcanceUsuario.UNIDAD,
+        rol=rol,
+    )
+
+
+def dar_acceso_global(usuario, rol=RolUsuario.ADMIN):
+    """Asigna un perfil institucional: entra a EQ sin pertenecer a la unidad."""
+    return PerfilUnidad.objects.create(
+        usuario=usuario,
+        servicio_unidad=None,
+        alcance=AlcanceUsuario.GLOBAL,
+        rol=rol,
+    )
 
 
 class EquiposViewsTests(TestCase):
@@ -51,6 +104,10 @@ class EquiposViewsTests(TestCase):
             username="usuario_equipos_2",
             password="clave-prueba-2",
         )
+        # Estas pruebas verifican el comportamiento del modulo, no el control de
+        # acceso: los usuarios necesitan permiso para llegar a las vistas.
+        dar_acceso_equipos(cls.usuario)
+        dar_acceso_equipos(cls.usuario_secundario)
         cls.tipo = TipoDispositivo.objects.create(nombre="MONITOR")
         cls.marca = MarcaDispositivo.objects.create(nombre="MINDRAY")
         # Un modelo ya no existe suelto: cuelga siempre de su marca.
@@ -1861,6 +1918,7 @@ class CatalogoMarcaModeloTests(TestCase):
         cls.usuario = get_user_model().objects.create_user(
             username="catalogo", password="clave-catalogo"
         )
+        dar_acceso_equipos(cls.usuario)
         cls.philips = MarcaDispositivo.objects.create(nombre="PHILIPS")
         cls.mindray = MarcaDispositivo.objects.create(nombre="MINDRAY")
 
@@ -2073,6 +2131,7 @@ class CatalogoTipoEquipoTests(TestCase):
         cls.usuario = get_user_model().objects.create_user(
             username="catalogo-tipos", password="clave-tipos"
         )
+        dar_acceso_equipos(cls.usuario)
         cls.monitor = TipoDispositivo.objects.create(nombre="MONITOR")
         cls.bomba = TipoDispositivo.objects.create(nombre="BOMBA DE INFUSION")
 
@@ -2184,3 +2243,376 @@ class CatalogoTipoEquipoTests(TestCase):
             respuesta,
             reverse("editar_tipo_equipos", args=[self.monitor.pk]),
         )
+
+
+class PermisosEquiposTests(TestCase):
+    """Control de acceso del modulo: quien entra, quien no y a que."""
+
+    databases = {"default"}
+
+    @classmethod
+    def setUpTestData(cls):
+        Usuario = get_user_model()
+        # Un usuario sin ningun PerfilUnidad: el caso del resto del hospital.
+        cls.sin_permiso = Usuario.objects.create_user(
+            username="enfermeria", password="clave-enfermeria"
+        )
+        cls.tecnico = Usuario.objects.create_user(
+            username="tecnico-eq", password="clave-tecnico"
+        )
+        cls.admin_equipos = Usuario.objects.create_user(
+            username="admin-eq", password="clave-admin"
+        )
+        cls.directivo = Usuario.objects.create_user(
+            username="directivo-eq", password="clave-directivo"
+        )
+        # Rol correcto pero en otra unidad: no debe alcanzar Equipos.
+        cls.digitador_otra_unidad = Usuario.objects.create_user(
+            username="digitador-emergencia", password="clave-otra"
+        )
+        # is_staff abre el admin de Django; aqui no debe conceder nada.
+        cls.staff = Usuario.objects.create_user(
+            username="staff-sin-perfil", password="clave-staff", is_staff=True
+        )
+        cls.superusuario = Usuario.objects.create_superuser(
+            username="root-eq", password="clave-root"
+        )
+
+        dar_acceso_equipos(cls.tecnico, RolUsuario.DIGITADOR)
+        dar_acceso_equipos(cls.admin_equipos, RolUsuario.ADMIN)
+        dar_acceso_equipos(cls.directivo, RolUsuario.DIRECTIVO)
+
+        otra_unidad = Unidad.objects.create(
+            nombre_unidad="Emergencia",
+            nombre_corto_unidad="EMER",
+            tipo=TipoUnidad.APOYO,
+            estado=EstadoRegistro.ACTIVO,
+            creado_por=cls.sin_permiso,
+            modificado_por=cls.sin_permiso,
+        )
+        PerfilUnidad.objects.create(
+            usuario=cls.digitador_otra_unidad,
+            servicio_unidad=otra_unidad,
+            alcance=AlcanceUsuario.UNIDAD,
+            rol=RolUsuario.DIGITADOR,
+        )
+
+        cls.tipo = TipoDispositivo.objects.create(nombre="DESFIBRILADOR")
+        cls.marca = MarcaDispositivo.objects.create(nombre="ZOLL")
+        cls.modelo = ModeloDispositivo.objects.create(
+            marca=cls.marca, nombre="R SERIES"
+        )
+        cls.area_gestora, _ = AreaGestora.objects.get_or_create(nombre="BIOMEDICA")
+        cls.color, _ = ColorDispositivo.objects.get_or_create(nombre="BLANCO")
+        cls.dispositivo = Dispositivo.objects.create(
+            tipo=cls.tipo,
+            tipo_tecnologia=TipoTecnologiaDispositivo.ELECTRONICO,
+            marca=cls.marca,
+            modelo=cls.modelo,
+            area_gestora=cls.area_gestora,
+            color=cls.color,
+            numero_serie="SERIE-PERMISOS",
+            estado=EstadoDispositivo.OPERATIVO,
+            criticidad=CriticidadDispositivo.MEDIA,
+            creado_por=cls.tecnico,
+            modificado_por=cls.tecnico,
+        )
+
+    # --- URLs agrupadas por capacidad ------------------------------------
+
+    def urls_visualizacion(self):
+        return [
+            reverse("inicio_equipos"),
+            reverse("listado_dispositivos_equipos"),
+            reverse("buscar_dispositivo_equipos"),
+            reverse("detalle_dispositivo_equipos", args=[self.dispositivo.pk]),
+            reverse("qr_dispositivo_equipos", args=[self.dispositivo.pk]),
+        ]
+
+    def urls_edicion(self):
+        return [
+            reverse("registrar_dispositivo_equipos"),
+            reverse("editar_dispositivo_equipos", args=[self.dispositivo.pk]),
+        ]
+
+    def urls_catalogo(self):
+        return [
+            reverse("catalogo_marcas_equipos"),
+            reverse("agregar_marca_equipos"),
+            reverse("agregar_tipo_equipos"),
+            reverse("agregar_modelo_equipos", args=[self.marca.pk]),
+            reverse("editar_tipo_equipos", args=[self.tipo.pk]),
+            reverse("cambiar_estado_marca_equipos", args=[self.marca.pk]),
+            reverse("cambiar_estado_modelo_equipos", args=[self.modelo.pk]),
+            reverse("cambiar_estado_tipo_equipos", args=[self.tipo.pk]),
+        ]
+
+    def urls_baja(self):
+        return [
+            reverse("tramite_baja_dispositivo_equipos", args=[self.dispositivo.pk]),
+            reverse("ficha_baja_dispositivo_equipos", args=[self.dispositivo.pk]),
+        ]
+
+    def urls_json(self):
+        return [
+            reverse("buscar_tipos_equipos"),
+            reverse("buscar_marcas_equipos"),
+            reverse("buscar_modelos_equipos"),
+            reverse("buscar_empleados_equipos"),
+        ]
+
+    def assertRedirigeAAccesoDenegado(self, url, usuario):
+        self.client.force_login(usuario)
+        respuesta = self.client.get(url)
+        self.assertRedirects(
+            respuesta,
+            reverse("acceso_denegado"),
+            msg_prefix=f"{usuario.username} no deberia entrar a {url}",
+        )
+
+    def assertEntra(self, url, usuario):
+        self.client.force_login(usuario)
+        respuesta = self.client.get(url)
+        self.assertNotEqual(
+            respuesta.status_code,
+            403,
+            msg=f"{usuario.username} deberia entrar a {url}",
+        )
+        if respuesta.status_code in (301, 302):
+            self.assertNotIn(
+                reverse("acceso_denegado"),
+                respuesta["Location"],
+                msg=f"{usuario.username} deberia entrar a {url}",
+            )
+
+    # --- Usuario sin ningun perfil ---------------------------------------
+
+    def test_usuario_sin_perfil_no_entra_a_ninguna_vista_html(self):
+        urls = (
+            self.urls_visualizacion()
+            + self.urls_edicion()
+            + self.urls_catalogo()
+            + self.urls_baja()
+        )
+        for url in urls:
+            with self.subTest(url=url):
+                self.assertRedirigeAAccesoDenegado(url, self.sin_permiso)
+
+    def test_usuario_sin_perfil_recibe_403_en_endpoints_json(self):
+        self.client.force_login(self.sin_permiso)
+        for url in self.urls_json():
+            with self.subTest(url=url):
+                respuesta = self.client.get(url, {"term": "a"})
+                self.assertEqual(respuesta.status_code, 403)
+                self.assertEqual(respuesta["Content-Type"], "application/json")
+
+    def test_anonimo_es_enviado_al_login(self):
+        respuesta = self.client.get(reverse("listado_dispositivos_equipos"))
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertNotIn(reverse("acceso_denegado"), respuesta["Location"])
+
+    # --- is_staff no es autorizacion --------------------------------------
+
+    def test_is_staff_no_concede_acceso_a_equipos(self):
+        for url in self.urls_visualizacion() + self.urls_edicion():
+            with self.subTest(url=url):
+                self.assertRedirigeAAccesoDenegado(url, self.staff)
+
+    def test_superusuario_entra_a_todo(self):
+        urls = (
+            self.urls_visualizacion()
+            + self.urls_edicion()
+            + [reverse("catalogo_marcas_equipos")]
+            + [reverse("tramite_baja_dispositivo_equipos", args=[self.dispositivo.pk])]
+        )
+        for url in urls:
+            with self.subTest(url=url):
+                self.assertEntra(url, self.superusuario)
+
+    # --- El rol correcto en la unidad equivocada ---------------------------
+
+    def test_digitador_de_otra_unidad_no_entra_a_equipos(self):
+        for url in self.urls_visualizacion() + self.urls_edicion():
+            with self.subTest(url=url):
+                self.assertRedirigeAAccesoDenegado(url, self.digitador_otra_unidad)
+
+    def test_alcance_global_entra_sin_pertenecer_a_la_unidad(self):
+        institucional = get_user_model().objects.create_user(
+            username="admin-institucional", password="clave-inst"
+        )
+        dar_acceso_global(institucional, RolUsuario.ADMIN)
+        for url in self.urls_visualizacion() + self.urls_edicion():
+            with self.subTest(url=url):
+                self.assertEntra(url, institucional)
+
+    # --- Tecnico (digitador en EQ): el caso de uso principal ---------------
+
+    def test_tecnico_entra_a_visualizacion_edicion_catalogo_y_baja(self):
+        urls = (
+            self.urls_visualizacion()
+            + self.urls_edicion()
+            + [reverse("catalogo_marcas_equipos")]
+            + [reverse("tramite_baja_dispositivo_equipos", args=[self.dispositivo.pk])]
+        )
+        for url in urls:
+            with self.subTest(url=url):
+                self.assertEntra(url, self.tecnico)
+
+    def test_tecnico_usa_los_endpoints_de_autocompletado(self):
+        self.client.force_login(self.tecnico)
+        # buscar-modelos exige la marca; sin ella responde 400 por su propia
+        # validacion, que no tiene nada que ver con los permisos.
+        parametros = {
+            reverse("buscar_modelos_equipos"): {"marca_id": self.marca.pk},
+        }
+        for url in self.urls_json():
+            with self.subTest(url=url):
+                respuesta = self.client.get(url, parametros.get(url, {}))
+                self.assertEqual(respuesta.status_code, 200)
+
+    def test_admin_de_equipos_entra_a_todo(self):
+        urls = (
+            self.urls_visualizacion()
+            + self.urls_edicion()
+            + [reverse("catalogo_marcas_equipos")]
+            + [reverse("tramite_baja_dispositivo_equipos", args=[self.dispositivo.pk])]
+        )
+        for url in urls:
+            with self.subTest(url=url):
+                self.assertEntra(url, self.admin_equipos)
+
+    # --- Directivo: consulta, no toca -------------------------------------
+
+    def test_directivo_consulta_el_inventario(self):
+        for url in self.urls_visualizacion():
+            with self.subTest(url=url):
+                self.assertEntra(url, self.directivo)
+
+    def test_directivo_no_edita_equipos(self):
+        for url in self.urls_edicion():
+            with self.subTest(url=url):
+                self.assertRedirigeAAccesoDenegado(url, self.directivo)
+
+    def test_directivo_no_administra_catalogos(self):
+        for url in self.urls_catalogo():
+            with self.subTest(url=url):
+                self.assertRedirigeAAccesoDenegado(url, self.directivo)
+
+    def test_directivo_no_tramita_bajas(self):
+        for url in self.urls_baja():
+            with self.subTest(url=url):
+                self.assertRedirigeAAccesoDenegado(url, self.directivo)
+
+    def test_directivo_no_usa_el_autocompletado_de_los_formularios(self):
+        # Los Select2 de tipo, marca, modelo y responsable solo viven en el
+        # formulario de equipos. Quien no puede editar no los necesita, y
+        # dejarlos abiertos filtraria el catalogo y la nomina de empleados.
+        self.client.force_login(self.directivo)
+        for url in self.urls_json():
+            with self.subTest(url=url):
+                respuesta = self.client.get(url, {"term": ""})
+                self.assertEqual(respuesta.status_code, 403)
+
+    # --- POST tambien va protegido, no solo el GET -------------------------
+
+    def test_post_de_edicion_sin_permiso_no_modifica_nada(self):
+        self.client.force_login(self.directivo)
+        respuesta = self.client.post(
+            reverse("editar_dispositivo_equipos", args=[self.dispositivo.pk]),
+            {"numero_serie": "SERIE-ALTERADA"},
+        )
+        self.assertRedirects(respuesta, reverse("acceso_denegado"))
+        self.dispositivo.refresh_from_db()
+        self.assertEqual(self.dispositivo.numero_serie, "SERIE-PERMISOS")
+
+    def test_post_de_catalogo_sin_permiso_no_crea_marcas(self):
+        self.client.force_login(self.directivo)
+        respuesta = self.client.post(
+            reverse("agregar_marca_equipos"), {"nombre": "MARCA INTRUSA"}
+        )
+        self.assertRedirects(respuesta, reverse("acceso_denegado"))
+        self.assertFalse(
+            MarcaDispositivo.objects.filter(nombre="MARCA INTRUSA").exists()
+        )
+
+    # --- Helpers de permisos ----------------------------------------------
+
+    def test_helpers_reflejan_la_matriz_de_permisos(self):
+        casos = [
+            (self.sin_permiso, False, False, False, False),
+            (self.staff, False, False, False, False),
+            (self.digitador_otra_unidad, False, False, False, False),
+            (self.directivo, True, False, False, False),
+            (self.tecnico, True, True, True, True),
+            (self.admin_equipos, True, True, True, True),
+            (self.superusuario, True, True, True, True),
+        ]
+        for usuario, ver, editar, catalogo, baja in casos:
+            with self.subTest(usuario=usuario.username):
+                self.assertIs(puede_visualizar_equipos(usuario), ver)
+                self.assertIs(puede_editar_equipos(usuario), editar)
+                self.assertIs(puede_administrar_catalogos_equipos(usuario), catalogo)
+                self.assertIs(puede_dar_baja_equipos(usuario), baja)
+
+    def test_helpers_rechazan_al_anonimo(self):
+        anonimo = AnonymousUser()
+        self.assertFalse(puede_visualizar_equipos(anonimo))
+        self.assertFalse(puede_editar_equipos(anonimo))
+        self.assertFalse(puede_administrar_catalogos_equipos(anonimo))
+        self.assertFalse(puede_dar_baja_equipos(anonimo))
+
+    # --- Plantillas: lo que no se puede hacer, no se ofrece -----------------
+
+    def test_menu_general_oculta_equipos_a_quien_no_lo_usa(self):
+        enlace = reverse("inicio_equipos")
+        self.client.force_login(self.sin_permiso)
+        self.assertNotContains(self.client.get(reverse("home")), f'href="{enlace}"')
+        self.client.force_login(self.tecnico)
+        self.assertContains(self.client.get(reverse("home")), f'href="{enlace}"')
+
+    def test_inicio_de_equipos_oculta_registrar_y_catalogos_al_directivo(self):
+        self.client.force_login(self.directivo)
+        respuesta = self.client.get(reverse("inicio_equipos"))
+        self.assertNotContains(respuesta, reverse("registrar_dispositivo_equipos"))
+        self.assertNotContains(respuesta, reverse("catalogo_marcas_equipos"))
+        self.assertContains(respuesta, reverse("listado_dispositivos_equipos"))
+
+    def test_inicio_de_equipos_muestra_todo_al_tecnico(self):
+        self.client.force_login(self.tecnico)
+        respuesta = self.client.get(reverse("inicio_equipos"))
+        self.assertContains(respuesta, reverse("registrar_dispositivo_equipos"))
+        self.assertContains(respuesta, reverse("catalogo_marcas_equipos"))
+
+    def test_listado_oculta_acciones_de_edicion_y_baja_al_directivo(self):
+        self.client.force_login(self.directivo)
+        respuesta = self.client.get(reverse("listado_dispositivos_equipos"))
+        self.assertNotContains(
+            respuesta,
+            reverse("editar_dispositivo_equipos", args=[self.dispositivo.pk]),
+        )
+        self.assertNotContains(
+            respuesta,
+            reverse("tramite_baja_dispositivo_equipos", args=[self.dispositivo.pk]),
+        )
+        # Sin el atributo data-edit-url el doble clic de la fila queda
+        # desarmado. Se busca con el igual porque el JS incluido menciona
+        # 'data-edit-url' como selector y siempre esta presente.
+        self.assertNotContains(respuesta, 'data-edit-url="')
+        # Lo que si puede hacer sigue disponible.
+        self.assertContains(
+            respuesta,
+            reverse("detalle_dispositivo_equipos", args=[self.dispositivo.pk]),
+        )
+
+    def test_listado_muestra_acciones_de_edicion_y_baja_al_tecnico(self):
+        self.client.force_login(self.tecnico)
+        respuesta = self.client.get(reverse("listado_dispositivos_equipos"))
+        self.assertContains(
+            respuesta,
+            reverse("editar_dispositivo_equipos", args=[self.dispositivo.pk]),
+        )
+        self.assertContains(
+            respuesta,
+            reverse("tramite_baja_dispositivo_equipos", args=[self.dispositivo.pk]),
+        )
+        self.assertContains(respuesta, 'data-edit-url="')

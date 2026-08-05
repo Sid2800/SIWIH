@@ -1,5 +1,6 @@
 {% extends 'core/base.html' %}
 {% load static %}
+{% load permisos_equipos %}
 
 {% block title %}Buscar equipo{% endblock title %}
 
@@ -86,9 +87,18 @@
                 <tbody>
                     {% for dispositivo in dispositivos %}
                         {% with asignacion=dispositivo.asignacion_actual %}
+                            {% comment %}
+                               Igual que el listado: el destino del doble clic
+                               lo decide el servidor segun el permiso.
+                            {% endcomment %}
                             <tr class="equipos-listado__fila equipos-listado__fila--editable"
-                                data-edit-url="{% url 'editar_dispositivo_equipos' dispositivo.id %}"
-                                title="Doble clic para editar {{ dispositivo.codigo }}">
+                                {% if request.user|puede_editar_equipo %}
+                                    data-edit-url="{% url 'editar_dispositivo_equipos' dispositivo.id %}"
+                                    title="Doble clic para editar {{ dispositivo.codigo }}"
+                                {% else %}
+                                    data-edit-url="{% url 'detalle_dispositivo_equipos' dispositivo.id %}"
+                                    title="Doble clic para ver {{ dispositivo.codigo }}"
+                                {% endif %}>
                                 <td class="equipos-listado__col-detalle"></td>
                                 <td class="equipos-listado__col-codigo">
                                     <a class="equipos-listado__codigo"
@@ -128,15 +138,19 @@
                                                 <span>Ver / Imprimir QR</span>
                                             </a>
                                             {% if dispositivo.estado != 4 %}
-                                                <a href="{% url 'editar_dispositivo_equipos' dispositivo.id %}">
-                                                    <i class="bi bi-pencil"></i>
-                                                    <span>Editar equipo</span>
-                                                </a>
                                                 {# Mantiene las mismas acciones que el listado general. #}
-                                                <a href="{% url 'tramite_baja_dispositivo_equipos' dispositivo.id %}">
-                                                    <i class="bi bi-file-earmark-check"></i>
-                                                    <span>Trámite de baja</span>
-                                                </a>
+                                                {% if request.user|puede_editar_equipo %}
+                                                    <a href="{% url 'editar_dispositivo_equipos' dispositivo.id %}">
+                                                        <i class="bi bi-pencil"></i>
+                                                        <span>Editar equipo</span>
+                                                    </a>
+                                                {% endif %}
+                                                {% if request.user|puede_dar_baja_equipo %}
+                                                    <a href="{% url 'tramite_baja_dispositivo_equipos' dispositivo.id %}">
+                                                        <i class="bi bi-file-earmark-check"></i>
+                                                        <span>Trámite de baja</span>
+                                                    </a>
+                                                {% endif %}
                                             {% endif %}
                                         </div>
                                     </details>

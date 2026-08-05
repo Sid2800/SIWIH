@@ -1,4 +1,5 @@
 {% extends 'core/base.html' %}
+{% load permisos_equipos %}
 
 {% block title %}Listado de equipos{% endblock title %}
 
@@ -41,11 +42,13 @@
                 </button>
             </div>
 
+            {% if request.user|puede_editar_equipo %}
             <a class="formularioBotones-boton equipos-listado__registrar"
                href="{% url 'registrar_dispositivo_equipos' %}">
                 <i class="bi bi-plus-lg"></i>
                 Registrar equipo
             </a>
+            {% endif %}
         </div>
     </div>
 
@@ -171,9 +174,14 @@
             <tbody>
                 {% for dispositivo in dispositivos %}
                     {% with asignacion=dispositivo.asignacion_actual %}
-                        <tr class="equipos-listado__fila equipos-listado__fila--editable"
-                            data-edit-url="{% url 'editar_dispositivo_equipos' dispositivo.id %}"
-                            title="Doble clic para editar {{ dispositivo.codigo }}">
+                        {% comment %}
+                           El doble clic para editar solo se arma si el usuario
+                           puede editar. Sin data-edit-url el JS ignora la fila,
+                           asi el consultor no choca contra un acceso denegado.
+                        {% endcomment %}
+                        <tr class="equipos-listado__fila{% if request.user|puede_editar_equipo %} equipos-listado__fila--editable{% endif %}"
+                            {% if request.user|puede_editar_equipo %}data-edit-url="{% url 'editar_dispositivo_equipos' dispositivo.id %}"
+                            title="Doble clic para editar {{ dispositivo.codigo }}"{% endif %}>
                             <td class="equipos-listado__col-detalle"></td>
                             <td class="equipos-listado__col-codigo">
                                 <a class="equipos-listado__codigo"
@@ -213,15 +221,19 @@
                                             <span>Ver / Imprimir QR</span>
                                         </a>
                                         {% if dispositivo.estado != 4 %}
+                                            {% if request.user|puede_editar_equipo %}
                                             <a href="{% url 'editar_dispositivo_equipos' dispositivo.id %}">
                                                 <i class="bi bi-pencil"></i>
                                                 <span>Editar equipo</span>
                                             </a>
+                                            {% endif %}
                                             {# La baja se inicia desde el inventario, no desde el formulario de edición. #}
+                                            {% if request.user|puede_dar_baja_equipo %}
                                             <a href="{% url 'tramite_baja_dispositivo_equipos' dispositivo.id %}">
                                                 <i class="bi bi-file-earmark-check"></i>
                                                 <span>Trámite de baja</span>
                                             </a>
+                                            {% endif %}
                                         {% endif %}
                                     </div>
                                 </details>
