@@ -2326,11 +2326,14 @@ class PermisosEquiposTests(TestCase):
     # --- URLs agrupadas por capacidad ------------------------------------
 
     def urls_visualizacion(self):
+        # El detalle no esta aqui a proposito: es la unica vista del modulo
+        # abierta a cualquier usuario autenticado, porque es el destino de los
+        # QR pegados a los equipos. Ver test_el_detalle_es_la_excepcion_del_qr
+        # y la clase DetalleReducidoTests.
         return [
             reverse("inicio_equipos"),
             reverse("listado_dispositivos_equipos"),
             reverse("buscar_dispositivo_equipos"),
-            reverse("detalle_dispositivo_equipos", args=[self.dispositivo.pk]),
             reverse("qr_dispositivo_equipos", args=[self.dispositivo.pk]),
         ]
 
@@ -2410,6 +2413,16 @@ class PermisosEquiposTests(TestCase):
                 respuesta = self.client.get(url, {"term": "a"})
                 self.assertEqual(respuesta.status_code, 403)
                 self.assertEqual(respuesta["Content-Type"], "application/json")
+
+    def test_el_detalle_es_la_excepcion_del_qr(self):
+        # Los codigos QR van pegados a los aparatos y los escanea cualquiera.
+        # Por eso el detalle si abre sin permiso de Equipos, pero mostrando
+        # una version reducida: el contenido lo cubre DetalleReducidoTests.
+        url = reverse("detalle_dispositivo_equipos", args=[self.dispositivo.pk])
+
+        for usuario in (self.sin_permiso, self.staff, self.digitador_otra_unidad):
+            with self.subTest(usuario=usuario.username):
+                self.assertEntra(url, usuario)
 
     def test_anonimo_es_enviado_al_login(self):
         respuesta = self.client.get(reverse("listado_dispositivos_equipos"))
@@ -2822,3 +2835,175 @@ class ReversaMigracionUnidadTests(TestCase):
         Unidad.objects.filter(nombre_corto_unidad=CODIGO_UNIDAD_EQUIPOS).delete()
 
         quitar(self.estado_real(), None)  # no debe lanzar nada
+
+
+class DetalleReducidoTests(TestCase):
+    """La cara reducida del detalle: lo que ve quien no pertenece a Equipos.
+
+    Es la URL que llevan los codigos QR pegados a los aparatos, asi que la
+    abre cualquiera del hospital. Lo importante es que no se escape nada
+    administrativo por ahi.
+    """
+
+    databases = {"default"}
+
+    @classmethod
+    def setUpTestData(cls):
+        Usuario = get_user_model()
+        cls.enfermera = Usuario.objects.create_user(
+            username="enfermera-reducido", password="clave-enfermera"
+        )
+        cls.tecnico = Usuario.objects.create_user(
+            username="tecnico-reducido", password="clave-tecnico"
+        )
+        dar_acceso_equipos(cls.tecnico, RolUsuario.DIGITADOR)
+
+        cls.tipo = TipoDispositivo.objects.create(nombre="VENTILADOR")
+        cls.marca = MarcaDispositivo.objects.create(nombre="DRAGER")
+        cls.modelo = ModeloDispositivo.objects.create(
+            marca=cls.marca, nombre="EVITA 4"
+        )
+        cls.area_gestora, _ = AreaGestora.objects.get_or_create(nombre="BIOMEDICA")
+        cls.color, _ = ColorDispositivo.objects.get_or_create(nombre="BLANCO")
+        cls.dispositivo = Dispositivo.objects.create(
+            tipo=cls.tipo,
+            tipo_tecnologia=TipoTecnologiaDispositivo.ELECTRONICO,
+            marca=cls.marca,
+            modelo=cls.modelo,
+            area_gestora=cls.area_gestora,
+            color=cls.color,
+            numero_serie="SERIE-REDUCIDO",
+            inventario_bienes_nacionales="BN-987654",
+            inventario_numero_ficha="FICHA-4321",
+            costo_adquisicion=Decimal("125000"),
+            estado=EstadoDispositivo.OPERATIVO,
+            criticidad=CriticidadDispositivo.ALTA,
+            creado_por=cls.tecnico,
+            modificado_por=cls.tecnico,
+        )
+
+    def setUp(self):
+        # El detalle consulta el servidor de imagenes; aqui no debe depender
+        # de que este encendido.
+        patch(
+            "equipos.views.MediaService.obtener_imagenes_dispositivo",
+            return_value=([], False),
+        ).start()
+        patch(
+            "equipos.views.MediaService.obtener_ficha_baja_dispositivo",
+            return_value=(None, False),
+        ).start()
+        self.addCleanup(patch.stopall)
+
+    def url_detalle(self):
+        return reverse("detalle_dispositivo_equipos", args=[self.dispositivo.pk])
+
+    # --- Acceso -----------------------------------------------------------
+
+    def test_usuario_sin_permiso_de_equipos_abre_el_detalle(self):
+        # Antes recibia acceso denegado; ahora es la URL del QR.
+        self.client.force_login(self.enfermera)
+
+        respuesta = self.client.get(self.url_detalle())
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertTemplateUsed(
+            respuesta, "equipos/detalle_dispositivo_reducido_equipos.html"
+        )
+
+    def test_el_anonimo_sigue_yendo_al_login(self):
+        respuesta = self.client.get(self.url_detalle())
+
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertNotIn(reverse("acceso_denegado"), respuesta["Location"])
+
+    def test_el_tecnico_sigue_viendo_la_ficha_completa(self):
+        self.client.force_login(self.tecnico)
+
+        respuesta = self.client.get(self.url_detalle())
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertTemplateUsed(
+            respuesta, "equipos/detalle_dispositivo_equipos.html"
+        )
+
+    # --- Que se muestra ---------------------------------------------------
+
+    def test_la_version_reducida_muestra_lo_necesario_para_identificar(self):
+        self.client.force_login(self.enfermera)
+
+        respuesta = self.client.get(self.url_detalle())
+
+        self.assertContains(respuesta, self.dispositivo.codigo)
+        self.assertContains(respuesta, "VENTILADOR")
+        self.assertContains(respuesta, "DRAGER")
+        self.assertContains(respuesta, "EVITA 4")
+        self.assertContains(respuesta, "SERIE-REDUCIDO")
+
+    # --- Que NO se muestra ------------------------------------------------
+
+    def test_la_version_reducida_no_filtra_datos_administrativos(self):
+        self.client.force_login(self.enfermera)
+
+        respuesta = self.client.get(self.url_detalle())
+
+        # Costo de adquisicion en cualquiera de sus formas.
+        self.assertNotContains(respuesta, "125000")
+        self.assertNotContains(respuesta, "125,000")
+        self.assertNotContains(respuesta, "Costo")
+        # Inventario de bienes nacionales y numero de ficha.
+        self.assertNotContains(respuesta, "BN-987654")
+        self.assertNotContains(respuesta, "FICHA-4321")
+
+    def test_la_version_reducida_no_ofrece_acciones_del_modulo(self):
+        self.client.force_login(self.enfermera)
+
+        respuesta = self.client.get(self.url_detalle())
+
+        self.assertNotContains(
+            respuesta,
+            reverse("editar_dispositivo_equipos", args=[self.dispositivo.pk]),
+        )
+        self.assertNotContains(
+            respuesta,
+            reverse("tramite_baja_dispositivo_equipos", args=[self.dispositivo.pk]),
+        )
+        self.assertNotContains(respuesta, reverse("listado_dispositivos_equipos"))
+        self.assertNotContains(
+            respuesta, reverse("ficha_activo_fijo_equipos", args=[self.dispositivo.pk])
+        )
+
+    def test_el_contexto_reducido_no_arrastra_la_baja_ni_la_ficha_firmada(self):
+        # Aunque la plantilla no los pinte, tampoco deben viajar en el
+        # contexto: de ahi es de donde se filtran las cosas sin querer.
+        self.client.force_login(self.enfermera)
+
+        respuesta = self.client.get(self.url_detalle())
+
+        for clave in (
+            "baja_dispositivo",
+            "orden_trabajo_baja",
+            "ficha_baja_firmada",
+            "imagenes_slots",
+        ):
+            self.assertNotIn(clave, respuesta.context, msg=f"sobra {clave}")
+
+    def test_el_resto_del_modulo_sigue_cerrado_para_quien_no_es_de_equipos(self):
+        # Abrir el detalle no debe abrir nada mas.
+        self.client.force_login(self.enfermera)
+
+        for nombre in (
+            "listado_dispositivos_equipos",
+            "buscar_dispositivo_equipos",
+            "inicio_equipos",
+        ):
+            with self.subTest(url=nombre):
+                respuesta = self.client.get(reverse(nombre))
+                self.assertRedirects(respuesta, reverse("acceso_denegado"))
+
+        for nombre in ("qr_dispositivo_equipos", "ficha_activo_fijo_equipos"):
+            with self.subTest(url=nombre):
+                respuesta = self.client.get(
+                    reverse(nombre, args=[self.dispositivo.pk])
+                )
+                self.assertRedirects(respuesta, reverse("acceso_denegado"))

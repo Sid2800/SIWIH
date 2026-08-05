@@ -1,0 +1,80 @@
+{% extends 'core/base_media.html' %}
+
+{% block title %}Equipo {{ dispositivo.codigo }}{% endblock title %}
+
+{% block content %}
+{% comment %}
+   Cara reducida del detalle, para quien no pertenece a Equipos. Es lo que ve
+   el personal que escanea el QR pegado al aparato: lo justo para saber que
+   equipo es, donde deberia estar y a quien avisar.
+
+   Los campos los elige la vista en _contexto_detalle_reducido(); aqui no se
+   accede a nada administrativo. Si hace falta mostrar un dato nuevo, se
+   agrega alli primero, a proposito.
+{% endcomment %}
+<div class="contenedor2 equipos-pagina equipos-pagina--detalle">
+    <div class="tituloFormulario">
+        <div class="tituloFormulario-texto">
+            <i class="bi bi-device-hdd"></i>
+            <h2 class="sin-margen">Equipo {{ dispositivo.codigo }}</h2>
+        </div>
+        <div class="tituloFormulario-subrallado"></div>
+    </div>
+
+    <section class="equipos-detalle__resumen">
+        <div class="equipos-detalle__imagen{% if imagen_general %} equipos-detalle__imagen--con-foto{% endif %}">
+            {% if imagen_general %}
+                <img src="{{ imagen_general.url }}"
+                     alt="Foto del equipo {{ dispositivo.codigo }}">
+            {% else %}
+                <i class="bi bi-device-hdd"></i>
+                <span>Sin fotografía</span>
+            {% endif %}
+        </div>
+
+        <div class="equipos-detalle__identidad">
+            <h3>{{ dispositivo.tipo }}</h3>
+            <dl class="equipos-detalle__datos">
+                <div>
+                    <dt>Código</dt>
+                    <dd>{{ dispositivo.codigo }}</dd>
+                </div>
+                <div>
+                    <dt>Marca</dt>
+                    <dd>{{ dispositivo.marca|default:"INDEFINIDO" }}</dd>
+                </div>
+                <div>
+                    <dt>Modelo</dt>
+                    <dd>{{ dispositivo.modelo|default:"INDEFINIDO" }}</dd>
+                </div>
+                <div>
+                    <dt>Número de serie</dt>
+                    <dd>{{ dispositivo.numero_serie|default:"INDEFINIDO" }}</dd>
+                </div>
+                <div>
+                    <dt>Estado</dt>
+                    <dd>
+                        <span class="equipos-estado">
+                            {{ dispositivo.get_estado_display }}
+                        </span>
+                    </dd>
+                </div>
+                <div>
+                    <dt>Ubicación</dt>
+                    <dd>{{ asignacion_actual.ubicacion|default:"Sin asignación" }}</dd>
+                </div>
+            </dl>
+        </div>
+    </section>
+
+    <section class="equipos-detalle__bloque">
+        <h3><i class="bi bi-info-circle"></i> ¿Falla este equipo?</h3>
+        <p>
+            Repórtalo al área de Equipos indicando el código
+            <strong>{{ dispositivo.codigo }}</strong>. No intentes repararlo
+            ni moverlo de su ubicación.
+        </p>
+    </section>
+
+</div>
+{% endblock content %}

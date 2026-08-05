@@ -47,6 +47,7 @@ from .decorators import (
     exige_formularios_equipos_json,
     exige_ver_equipos,
 )
+from .permisos import puede_visualizar_equipos
 from .services.ficha_baja_pdf_service import FichaBajaPdfService
 from .services.ficha_activo_fijo_pdf_service import FichaActivoFijoPdfService
 
@@ -557,10 +558,37 @@ def _obtener_contexto_imagenes_dispositivo(dispositivo_id):
     }
 
 
-@exige_ver_equipos
+def _contexto_detalle_reducido(dispositivo):
+    """Lista blanca de lo que ve quien no pertenece a Equipos.
+
+    Se enumera campo por campo a proposito. Si manana el formulario crece
+    (proveedor, procedencia, lo que sea), el campo nuevo no aparece aqui salvo
+    que alguien lo agregue con intencion. Al reves se filtraria solo.
+
+    Queda fuera todo lo administrativo: costo de adquisicion, inventario de
+    bienes nacionales, numero de ficha, constancia firmada, garantia, quien lo
+    registro y los datos de baja.
+    """
+    asignacion = _obtener_asignacion_actual(dispositivo)
+    imagenes, _ = MediaService.obtener_imagenes_dispositivo(dispositivo.id)
+    imagen_general = next(
+        (img for img in imagenes if img.get("tipo_imagen") == "GENERAL"), None
+    )
+
+    return {
+        "dispositivo": dispositivo,
+        "asignacion_actual": asignacion,
+        "imagen_general": imagen_general,
+    }
+
+
+@login_required
 @registrar_errores_vista("Error al abrir detalle de equipo")
 def detalle_dispositivo(request, dispositivo_id):
-    # Ficha solo lectura del equipo. El id llega desde la URL.
+    # Unico detalle del equipo, con dos caras. Es la URL que llevan los codigos
+    # QR pegados a los aparatos, asi que cualquiera del hospital debe poder
+    # abrirla: el tecnico ve la ficha completa y el resto una version reducida
+    # para identificar el equipo y saber a quien avisar.
     dispositivo = get_object_or_404(
         Dispositivo.objects.select_related(
             "tipo",
@@ -573,6 +601,14 @@ def detalle_dispositivo(request, dispositivo_id):
         ),
         pk=dispositivo_id,
     )
+
+    if not puede_visualizar_equipos(request.user):
+        return render(
+            request,
+            "equipos/detalle_dispositivo_reducido_equipos.html",
+            _contexto_detalle_reducido(dispositivo),
+        )
+
     asignacion_actual = _obtener_asignacion_actual(dispositivo)
     baja_dispositivo = _obtener_baja_dispositivo(dispositivo)
     orden_trabajo_baja = _obtener_orden_trabajo_baja(dispositivo)
