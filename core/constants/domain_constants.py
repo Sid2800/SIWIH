@@ -74,9 +74,26 @@ class LogApp:
     REPLICACION = "replicacion"
     EXPEDIENTE = "expediente"
     ATENCION = "atencion"
+    AGENDA = "agenda"
+    
     S_EXP = "s_exp"          # Solicitud/Préstamo de Expedientes
 
+class EstadoTemporalPeriodo(str, Enum):
+    FUTURO = "FUTURO"
+    EN_EJECUCION = "EN_EJECUCION"
+    FINALIZADO = "FINALIZADO"
 
+class AccionImpactoPeriodoLaboral(str, Enum):
+    FRAGMENTACION_PERIODO = "FRAGMENTACION_PERIODO"
+    REDUCCION_FINAL = "REDUCCION_FINAL"
+    REDUCCION_INICIAL = "REDUCCION_INICIAL"
+    ABSORSION_PERIODO = "ABSORSION_PERIODO"
+
+class TipoCambioFechaPeriodo:
+    SIN_CAMBIO = "SIN_CAMBIO"
+    AMPLIACION = "AMPLIACION"
+    REDUCCION = "REDUCCION"
+"""
 # Salas excluidas para reportes / lógica clínica
 SALAS_EXCLUIDAS = [
     714,  # aislado covid
@@ -102,7 +119,7 @@ SERVICIOS_AUX_EXTERNOS = [
     3,  # CESAMO
     4   # otros hospitales
 ]
-
+"""
 
 # Indicadores de edad
 INDICADOR_DIAS = "2"

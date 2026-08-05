@@ -709,7 +709,10 @@ function mapearAcompaniante(data) {
                         const titulo = `Desactivar ingreso`;
                         const mensaje = `¿ Realmente desea desactivar el ingreso, es un proceso irreversible ?`;
                         
-                        const resultado = await confirmarAccion(titulo, mensaje);
+                        const resultadoModal = await confirmarAccion({
+                                                                        titulo: titulo,
+                                                                        mensajes: [mensaje]
+                                                                    });
                         
                         if (resultado) {
                             // Desactiva el botón aquí para evitar múltiples clics

@@ -2,7 +2,7 @@
 html {
    box-sizing: border-box;
    font-size: 62.5%;
-   height: 100%;
+   /*  */
    /* 1 rem = 10px*/
 }
 
@@ -14,7 +14,7 @@ html {
 
 .cuerpo {
    /*cuer´p*/
-   background-color: darkcyan;
+   background-color: #005c63;
    height: 100%;
    width: 100%;
    font-size: 1.6rem;
@@ -63,7 +63,7 @@ main {
    display: flex;
    align-items: center;
    justify-content: center;
-   height: 100%;
+   min-height: 100vh;
    column-gap: 2rem;
 }
 

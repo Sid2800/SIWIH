@@ -41,8 +41,6 @@ const UnidadClinicaLoader = (function () {
          // limpiar select
          select.innerHTML = '';
 
-         // placeholder
-         select.appendChild(new Option("SELECCIONE UBICACIÓN", ""));
 
          if (Array.isArray(data) && data.length > 0) {
 

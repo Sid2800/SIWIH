@@ -1,10 +1,12 @@
 from django.db import models
 from core.constants.choices_constants import EstadoRegistro, TipoPersonalNoClinico
+from django.core.exceptions import ValidationError
 from django.contrib.auth.models import User
 from paciente.models import Paciente
 from servicio.models import Unidad as ServicioUnidad
 from clinico.models import Tipo_personal_salud, Especialidad
-
+from core.utils.utilidades_textos import formatear_nombre_completo
+from datetime import datetime, date
 
 class Empleado(models.Model):
     dni = models.CharField(max_length=50, unique=True, db_index=True)
@@ -59,15 +61,13 @@ class Empleado(models.Model):
 
     @property
     def nombre_completo(self):
-        return f"{self.primer_nombre} {self.primer_apellido}".strip()
+        return formatear_nombre_completo(self.primer_nombre,self.segundo_nombre,self.primer_apellido,self.segundo_apellido)
 
     class Meta:
         indexes = [
             models.Index(fields=["primer_apellido"]),
             models.Index(fields=["dni"]),
         ]
-
-
 
 class PersonalSalud(models.Model):
     empleado = models.OneToOneField(
@@ -108,20 +108,24 @@ class PersonalSalud(models.Model):
         on_delete=models.PROTECT,
         related_name='personal_salud_modificados'
     )
+    estado = models.SmallIntegerField(
+        choices=EstadoRegistro.choices,
+        default=EstadoRegistro.ACTIVO
+    )
 
     def __str__(self):
         return str(self.empleado)
 
     @property
-    def area_atencion_nombre(self):
-        return self.area_atencion.nombre_area_atencion if self.area_atencion else ""
+    def especialidad_nombre(self):
+        return self.especialidad.nombre_especialidad if self.especialidad else ""
+
+    
 
     class Meta:
         indexes = [
             models.Index(fields=["puede_agendar_citas"])
         ]
-
-
 
 class PersonalNoClinico(models.Model):
     empleado = models.OneToOneField(
@@ -154,4 +158,36 @@ class PersonalNoClinico(models.Model):
     def __str__(self):
         return str(self.empleado)
     
+class Jornada_laboral(models.Model):
+    nombre_jornada_laboral = models.CharField(max_length=100, unique=True, verbose_name="Nombre de la jornada")
+    hora_inicio = models.TimeField()
+    hora_fin = models.TimeField()
+    estado = models.SmallIntegerField(
+        choices=EstadoRegistro.choices,
+        default=EstadoRegistro.ACTIVO
+    )
 
+    @property
+    def duracion_minutos(self):
+
+        fecha_base = date.today()
+        hora_inicio = datetime.combine( fecha_base, self.hora_inicio )
+        hora_fin = datetime.combine( fecha_base, self.hora_fin )
+        diferencia = hora_fin - hora_inicio
+
+        return int(
+            diferencia.total_seconds() / 60
+        )
+
+    def clean(self):
+        if self.hora_inicio >= self.hora_fin:
+            raise ValidationError("La hora de inicio debe ser menor que la hora de fin.")
+        
+    def __str__(self):
+        return f"{self.nombre_jornada_laboral} ({self.hora_inicio.strftime('%H:%M')} - {self.hora_fin.strftime('%H:%M')})"
+    
+
+    class Meta:
+        verbose_name = "Jornada Laboral"
+        verbose_name_plural = "Jornadas Laborales"
+        ordering = ['nombre_jornada_laboral']

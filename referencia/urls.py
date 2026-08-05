@@ -9,7 +9,7 @@ urlpatterns = [
     path('seguimiento-agregar-editar', views.SeguimientoCreateUpdateView.as_view(), name='seguimiento_agregar_editar'),
     path("seguimiento-obtener/", views.obtener_seguimiento_tic, name="seguimiento_tic_obtener"),
     path('listar_referencias/', views.listarReferencias.as_view(), name='listar_referencias'),
-    path('listar-referencias-API/', views.listarEvaluacionrxAPI, name='listar_referencias_API'),
+    path('listar-referencias-API/', views.listarReferenciaAPI, name='listar_referencias_API'),
 
 
 ]
