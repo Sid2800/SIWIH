@@ -6,7 +6,7 @@
 
 <div class="contenedor2 contenedorFormulario"> 
 
-    <div class="tituloFormulario" style="margin-bottom: 3rem;">
+    <div class="tituloFormulario" style="margin-bottom: 1.5rem;">
         <div class="tituloFormularioReferencia-texto"> 
             <div class="tituloFormularioReferencia-icono">
                 <i class="bi bi-link-45deg"></i>
@@ -207,61 +207,73 @@
                             </table>
                         </div >
 
-                        <fieldset class="referenciaReferenciaObservaciones">
-                        <legend>Observaciones</legend>
-                            {{ form.observaciones }}  
-                        </fieldset >
 
-                        
-                    
-                        <div class="referenciaReferenciaEvaluacion" id="contenedor-evaluacion">
-                            <fieldset class="radio-fielset referenciaOportuna">
-                                <legend>Oportuna</legend>
-                                <div class="referencia-contenedor-radios-options">
-                                    <label class="radio-personalizado">
-                                        <input type="radio" name="oportuna" value="1" hidden 
-                                            {% if object.oportuna == 1 %}checked{% endif %}>
-                                        <span class="radio-boton">SI</span>
-                                    </label>
+                        <fieldset class="referenciaReferenciaCamposGestion" id="contenedor-evaluacion">
+                            <legend>Gestión institucional</legend>
 
-                                    <label class="radio-personalizado">
-                                        <input type="radio" name="oportuna" value="2" hidden 
-                                            {% if object.oportuna == 2 %}checked{% endif %}>
-                                        <span class="radio-boton">NO</span>
-                                    </label>
+                            {# Campo oculto de la unidad clínica responsable (Referencias recibidas) #}
+                            {{ form.unidad_clinica_responsable_id }}
 
-                                    <label class="radio-personalizado">
-                                        <input type="radio" name="oportuna" value="3" hidden 
-                                            {% if object.oportuna == 3 or MD == 1 %}checked{% endif %}>
-                                        <span class="radio-boton">NC</span>
-                                    </label>
-                                <div>
-                            </fieldset >
+                            <div class="formularioCampo" id="contenedor-unidad-clinica-responsable">
+                                <label>Responsable</label>
+                                <div id="vs-unidad-clinica-responsable"></div>
+                            </div>
 
-                            <fieldset class="radio-fielset referenciaJustificada">
-                                <legend>Justificada</legend>
-                                    
-                                    <div class="referencia-contenedor-radios-options">
-                                        <label class="radio-personalizado">
-                                            <input type="radio" name="justificada" value="1" hidden 
-                                                {% if object.justificada == 1 %}checked{% endif %}>
-                                            <span class="radio-boton">SI</span>
-                                        </label>
+                            <div class="referenciaReferenciaEvaluacion">
+                                <div class="radio-fielset referenciaOportuna">
 
-                                        <label class="radio-personalizado">
-                                            <input type="radio" name="justificada" value="2" hidden 
-                                                {% if object.justificada == 2 %}checked{% endif %}>
-                                            <span class="radio-boton">NO</span>
-                                        </label>
+                                        <span class="">Oportuna</span>
 
-                                        <label class="radio-personalizado">
-                                            <input type="radio" name="justificada" value="3" hidden 
-                                                {% if object.justificada == 3 or MD == 1 %}checked{% endif %}>
-                                            <span class="radio-boton">NC</span>
-                                        </label>
+
+                                        <div class="referencia-contenedor-radios-options">
+                                            <label class="radio-personalizado">
+                                                <input type="radio" name="oportuna" value="1" hidden 
+                                                    {% if object.oportuna == 1 %}checked{% endif %}>
+                                                <span class="radio-boton">SI</span>
+                                            </label>
+
+                                            <label class="radio-personalizado">
+                                                <input type="radio" name="oportuna" value="2" hidden 
+                                                    {% if object.oportuna == 2 %}checked{% endif %}>
+                                                <span class="radio-boton">NO</span>
+                                            </label>
+
+                                            <label class="radio-personalizado">
+                                                <input type="radio" name="oportuna" value="3" hidden 
+                                                    {% if object.oportuna == 3 or MD == 1 %}checked{% endif %}>
+                                                <span class="radio-boton">NC</span>
+                                            </label>
+                                        </div>
+                                </div >
+
+                                <div class="radio-fielset referenciaJustificada">
+           
+                                        <span class="">Justificada</span>
+                                        
+                                        <div class="referencia-contenedor-radios-options">
+                                            <label class="radio-personalizado">
+                                                <input type="radio" name="justificada" value="1" hidden 
+                                                    {% if object.justificada == 1 %}checked{% endif %}>
+                                                <span class="radio-boton">SI</span>
+                                            </label>
+
+                                            <label class="radio-personalizado">
+                                                <input type="radio" name="justificada" value="2" hidden 
+                                                    {% if object.justificada == 2 %}checked{% endif %}>
+                                                <span class="radio-boton">NO</span>
+                                            </label>
+
+                                            <label class="radio-personalizado">
+                                                <input type="radio" name="justificada" value="3" hidden 
+                                                    {% if object.justificada == 3 or MD == 1 %}checked{% endif %}>
+                                                <span class="radio-boton">NC</span>
+                                            </label>
+                                        </div>
                                     </div>
-                            </fieldset>
-                        </div>
+                                </div>
+                        </fieldset>
+
+
 
                         <fieldset class="referenciaReferenciaCamposInteractivo" id="contenedor-interactivo">
                             <legend>Destino de la Referencia</legend>
@@ -272,13 +284,60 @@
                             </div>
 
                             <div class="formularioCampo">
-                                <label>Especialidad Destino</label>
+                                <label>Especialidad</label>
                                 {{ form.especialidad_destino }}
                             </div>
 
                                                 
                         </fieldset >
 
+                        <fieldset class="referenciaReferenciaObservaciones">
+                        <legend>Observaciones</legend>
+                            {{ form.observaciones }}  
+                        </fieldset >
+
+                        <fieldset class="referenciaReferenciaControlCalidad" id="contenedor-control-calidad">
+                            <legend>Control de Calidad</legend>
+
+                            <div class="referenciaReferenciaControlCalidadCampos">
+
+                                {% for campo in campos_control_calidad %}
+
+                                <div class="radio-fielset referencia{{ campo.name|capfirst }}">
+                                    <span class="controlCalidadRadioLabel">{{ campo.label }}</span>
+
+                                    <div class="referencia-contenedor-radios-options">
+
+                                        <label class="radio-personalizado">
+                                            <input
+                                                type="radio"
+                                                name="{{ campo.name }}"
+                                                value="1"
+                                                hidden
+                                                {% if campo.value %}checked{% endif %}
+                                            >
+                                            <span class="radio-boton">SI</span>
+                                        </label>
+
+                                        <label class="radio-personalizado">
+                                            <input
+                                                type="radio"
+                                                name="{{ campo.name }}"
+                                                value="0"
+                                                hidden
+                                                {% if campo.value == False %}checked{% endif %}
+                                            >
+                                            <span class="radio-boton">NO</span>
+                                        </label>
+
+                                    </div>
+
+                                </div>
+
+                                {% endfor %}
+
+                            </div>
+                        </fieldset>
 
                     </div>
                 </div>

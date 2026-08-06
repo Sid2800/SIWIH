@@ -2,16 +2,18 @@ import json
 from django import forms
 from datetime import date
 from django.utils.timezone import localtime, localdate
-from .models import Referencia, Respuesta
+from .models import Referencia, Respuesta, ControlCalidadReferencia
 from clinico.models import Diagnostico
 from servicio.models import Institucion_salud, Area_atencion
 from referencia.models import Referencia_especialidad
 from core.services.paciente_service import PacienteService
 from core.services.servicio_service import ServicioService
+from core.constants.choices_constants import TipoControlCalidadReferencia
 from core.validators.fecha_validator import validar_fecha
 from core.validators.paciente import validar_paciente
+from servicio.validators import validar_instancia_area_atencion, validar_instancia_unidad_clinica_activa, validar_unidad_clinica_activa
 from .validators import validar_instituciones_origen_destino, validar_diagnosticos_json, validar_referencia_para_respuesta
-from core.validators.main_validator import validar_entero_positivo
+from core.validators.main_validator import validar_entero_positivo, validar_booleano
 from rrhh.validators import validar_personal_salud_activo
 from django.db.models import Q
 
@@ -30,7 +32,27 @@ class ReferenciaCreateForm(forms.ModelForm):
     idReferencia = forms.CharField(widget=forms.HiddenInput(), required=False)
     idSeguimiento = forms.CharField(widget=forms.HiddenInput(), required=False)
 
+    # control de calidad
+    formato_correcto = forms.BooleanField(required=False)
+    letra_legible = forms.BooleanField(required=False)
+    datos_completos = forms.BooleanField(required=False)
+    manchones_borrones = forms.BooleanField(required=False, label="Manchones Borrones")
+    firma_sello = forms.BooleanField(required=False, label="Firma y Sello")
+
+    CAMPOS_CONTROL_CALIDAD = (
+        "formato_correcto",
+        "letra_legible",
+        "datos_completos",
+        "manchones_borrones",
+        "firma_sello",
+    )
+
     personal_salud_refiere_id = forms.IntegerField(
+        required=False,
+        widget=forms.HiddenInput()
+    )
+
+    unidad_clinica_responsable_id = forms.IntegerField(
         required=False,
         widget=forms.HiddenInput()
     )
@@ -240,9 +262,11 @@ class ReferenciaCreateForm(forms.ModelForm):
         unidad_clinica = cleaned_data.get('unidad_clinica_refiere')
         atencion_requerida = cleaned_data.get("atencion_requerida")
         personal_salud_refiere_id = cleaned_data.get("personal_salud_refiere_id")
+        unidad_clinica_responsable_id = cleaned_data.get("unidad_clinica_responsable_id")
 
 
 
+       
 
         if atencion_requerida is None:
             raise forms.ValidationError("Debe indicar la atencion requerida")
@@ -290,6 +314,16 @@ class ReferenciaCreateForm(forms.ModelForm):
             cleaned_data["personal_salud_refiere"] = personal_salud
             cleaned_data["elaborada_por"] = personal_salud.tipo_personal_salud
 
+            # control de calidad
+            criterios_calidad = {}
+            for campo in self.CAMPOS_CONTROL_CALIDAD:
+                criterios_calidad[campo] = validar_booleano(
+                                                self.data.get(campo),
+                                                campo
+                                            )
+            cleaned_data["control_calidad"] = criterios_calidad
+
+
 
         else: #recibida
             cleaned_data['especialidad_destino'] = None
@@ -308,8 +342,9 @@ class ReferenciaCreateForm(forms.ModelForm):
                 raise forms.ValidationError("Debe indicar los datos de calidad (Justificada, Oportuna).")
 
 
-    
-
+            validar_entero_positivo(unidad_clinica_responsable_id, "Unidad Clinica Responsable")
+            unidad_clinica_responsable = validar_unidad_clinica_activa(unidad_clinica_responsable_id)
+            cleaned_data["unidad_clinica_responsable"] = unidad_clinica_responsable
 
         #verificamos si es un paciente aceptable 
         cleaned_data['paciente'] = validar_paciente(id_paciente)
@@ -350,6 +385,23 @@ class ReferenciaEditForm(ReferenciaCreateForm):
                     self.instance.personal_salud_refiere_id
                 )
 
+            # Inicializar el campo oculto de la unidad clínica responsable
+            if self.instance.unidad_clinica_responsable_id:
+                self.fields["unidad_clinica_responsable_id"].initial = (
+                    self.instance.unidad_clinica_responsable_id
+                )
+
+
+            # PASARA LA DATA DE CALIDAD SI SE ENCUETRA 
+            control = getattr(self.instance, "control_calidad", None)
+
+            if control:
+                self.fields["formato_correcto"].initial = control.formato_correcto
+                self.fields["letra_legible"].initial = control.letra_legible
+                self.fields["datos_completos"].initial = control.datos_completos
+                self.fields["manchones_borrones"].initial = control.manchones_borrones
+                self.fields["firma_sello"].initial = control.firma_sello
+
 
         self.fields['institucion_origen'].queryset = qs_activas.distinct()
         self.fields['institucion_origen'].widget.attrs.update({
@@ -369,8 +421,6 @@ class ReferenciaEditForm(ReferenciaCreateForm):
         id_paciente = cleaned_data.get('idPaciente')
         tipo = cleaned_data.get('tipo')
         referencia_vieja = self.instance
-
-        
 
         try:
             id_paciente = int(id_paciente)
@@ -701,23 +751,20 @@ class RespuestaCreateForm(forms.ModelForm):
         if tipo_referencia == 0 : # recibida
             if fecha_atencion and fecha_elaboracion and fecha_atencion > fecha_elaboracion:
                 raise forms.ValidationError("La fecha de atención no puede ser posterior a la fecha de elaboración.")
+            
 
-            if not area_capta:
-                raise forms.ValidationError("El área que capta la referencia es obligatoria.")
-            
-            if not unidad_clinica_responde:
-                raise forms.ValidationError("Debe indicar un área de respuesta para la respuesta.")
-            
-            if unidad_clinica_responde.estado != 1:
-                raise forms.ValidationError("Unidad clínica inactiva")
-            
+            cleaned_data["area_capta"] = validar_instancia_area_atencion(area_capta)
+            cleaned_data["unidad_clinica_responde"] = validar_instancia_unidad_clinica_activa(unidad_clinica_responde)
+
             # Validar el profesional de salud que elaboró la respuesta
             if not personal_salud_responde_id:
                 raise forms.ValidationError("Debe indicar el profesional de salud que elaboró la respuesta.") 
             validar_entero_positivo(personal_salud_responde_id, "personal_salud_responde")
             personal_salud = validar_personal_salud_activo(personal_salud_responde_id)
             cleaned_data["personal_salud_responde"] = personal_salud
-            cleaned_data["elaborada_por"] = personal_salud.tipo_personal_salud 
+            cleaned_data["elaborada_por"] = personal_salud.tipo_personal_salud
+
+            
 
 
             # BLOQUEO DE CAMBIO SI YA EXISTE UNA REFERENCIA ENVIADA

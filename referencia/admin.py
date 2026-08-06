@@ -1,5 +1,5 @@
 from django.contrib import admin
-from referencia.models import Motivo_envio, Referencia_diagnostico,Referencia, Referencia_especialidad, Respuesta_Area_Capta, Respuesta, SeguimientoTic
+from referencia.models import Motivo_envio, Referencia_diagnostico,Referencia, Referencia_especialidad, Respuesta_Area_Capta, Respuesta, SeguimientoTic  
 
 
 # Register your models here.
@@ -31,20 +31,18 @@ class ReferenciaAdmin(admin.ModelAdmin):
 
     def get_queryset(self, request):
         queryset = super().get_queryset(request)
-        def get_queryset(self, request):
-            queryset = super().get_queryset(request)
-            return queryset.select_related(
-                'paciente',
-                'institucion_origen',
-                'institucion_destino',
-                'motivo',
-                'elaborada_por',
-                'personal_salud_refiere',
-                'personal_salud_refiere__empleado',
-                'personal_salud_refiere__especialidad',
-                'creado_por',
-                'modificado_por',
-            )  # Optimizamos las consultas
+        return queryset.select_related(
+            'paciente',
+            'institucion_origen',
+            'institucion_destino',
+            'motivo',
+            'elaborada_por',
+            'personal_salud_refiere',
+            'personal_salud_refiere__empleado',
+            'personal_salud_refiere__especialidad',
+            'creado_por',
+            'modificado_por',
+        )
 
     def paciente(self, obj):
         return f"{obj.paciente.primer_nombre} {obj.paciente.primer_apellido}"  # Mostrar nombre completo del paciente relacionado
@@ -224,11 +222,73 @@ class RespuestaAdmin(admin.ModelAdmin):
     tipo.short_description = 'Tipo'
 
 
+# class ControlCalidadReferenciaAdmin(admin.ModelAdmin):
+#     list_display = (
+#         'referencia',
+#         'paciente',
+#         'formato_correcto',
+#         'letra_legible',
+#         'datos_completos',
+#         'manchones_borrones',
+#         'firma_sello',
+#     )
+
+#     autocomplete_fields = [
+#         'referencia',
+#         'creado_por',
+#         'modificado_por',
+#     ]
+
+#     search_fields = (
+#         'referencia__id',
+#         'referencia__paciente__primer_nombre',
+#         'referencia__paciente__primer_apellido',
+#         'referencia__paciente__identidad',
+#     )
+
+#     list_filter = (
+#         'formato_correcto',
+#         'letra_legible',
+#         'datos_completos',
+#         'manchones_borrones',
+#         'firma_sello',
+#     )
+
+#     readonly_fields = (
+#         'fecha_creado',
+#         'fecha_modificado',
+#     )
+
+#     def save_model(self, request, obj, form, change):
+#         if not obj.pk:
+#             obj.creado_por = request.user
+#         obj.modificado_por = request.user
+#         super().save_model(request, obj, form, change)
+
+#     def get_queryset(self, request):
+#         queryset = super().get_queryset(request)
+#         return queryset.select_related(
+#             'referencia',
+#             'referencia__paciente',
+#             'creado_por',
+#             'modificado_por',
+#         )
+
+#     def paciente(self, obj):
+#         return (
+#             f"{obj.referencia.paciente.primer_nombre} "
+#             f"{obj.referencia.paciente.primer_apellido}"
+#         )
+#     paciente.short_description = "Paciente"
+
+
+# admin.site.register(ControlCalidadReferencia, ControlCalidadReferenciaAdmin)
+
+
+
+
+
 admin.site.register(Respuesta, RespuestaAdmin)
-
-
-
-
 
 
 admin.site.register(Motivo_envio, MotivoAdmin)

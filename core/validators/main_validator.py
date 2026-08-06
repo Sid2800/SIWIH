@@ -26,3 +26,39 @@ def validar_entero_positivo(valor, nombre_campo="campo"):
     return valor
 
 
+
+def validar_booleano(valor, nombre_campo="campo"):
+    """
+    Valida que el valor represente un booleano válido.
+
+    Acepta:
+    - True / False
+    - 1 / 0
+    - "1" / "0"
+
+    Retorna:
+        bool
+    """
+
+    # 1. Validar que no sea nulo
+    if valor is None:
+        raise ValidationError(
+            f"{nombre_campo}: Este campo no puede ser nulo."
+        )
+
+    # 2. Si ya es booleano
+    if isinstance(valor, bool):
+        return valor
+
+    # 3. Convertir desde entero/string
+    if str(valor) == "1":
+        return True
+
+    if str(valor) == "0":
+        return False
+
+    raise ValidationError(
+        f"{nombre_campo}: Debe ser un valor booleano válido."
+    )
+
+
