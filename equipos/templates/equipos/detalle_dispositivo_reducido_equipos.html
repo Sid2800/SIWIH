@@ -67,14 +67,16 @@
         </div>
     </section>
 
-    <section class="equipos-detalle__bloque">
-        <h3><i class="bi bi-info-circle"></i> ¿Falla este equipo?</h3>
-        <p>
-            Repórtalo al área de Equipos indicando el código
-            <strong>{{ dispositivo.codigo }}</strong>. No intentes repararlo
-            ni moverlo de su ubicación.
-        </p>
-    </section>
+    <div class="equipos-detalle__secciones">
+        <section class="equipos-detalle__tarjeta">
+            <h3><i class="bi bi-info-circle"></i> ¿Falla este equipo?</h3>
+            <p>
+                Repórtalo al área de Equipos indicando el código
+                <strong>{{ dispositivo.codigo }}</strong>. No intentes repararlo
+                ni moverlo de su ubicación.
+            </p>
+        </section>
+    </div>
 
 </div>
 {% endblock content %}
