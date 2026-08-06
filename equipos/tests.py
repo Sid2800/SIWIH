@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from importlib import import_module
 from io import BytesIO
@@ -10,6 +10,7 @@ from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db.models import ProtectedError
+from django.db import IntegrityError, transaction
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -33,15 +34,21 @@ from .models import (
     ColorDispositivo,
     CriticidadDispositivo,
     Dispositivo,
-    DuracionGarantiaDispositivo,
+    DIAS_AVISO_GARANTIA,
     EstadoDispositivo,
+    EstadoGarantiaDispositivo,
     MarcaDispositivo,
     ModeloDispositivo,
     OrdenTrabajoBajaDispositivo,
+    PausaGarantia,
     TipoDispositivo,
     TipoTecnologiaDispositivo,
 )
 from .forms import CostoLempirasField, DispositivoCreateForm
+from .services.garantia_service import (
+    calcular_estado_garantia,
+    puede_pausarse,
+)
 from .permisos import (
     puede_administrar_catalogos_equipos,
     puede_dar_baja_equipos,
@@ -244,7 +251,7 @@ class EquiposViewsTests(TestCase):
             "criticidad": CriticidadDispositivo.MEDIA,
             "frecuencia_mantenimiento_meses": "",
             "fecha_instalacion": "",
-            "garantia_anios": DuracionGarantiaDispositivo.SIN_GARANTIA,
+            "fecha_fin_garantia": "",
             "costo_adquisicion": "",
             "observaciones": "",
             "tipo_area": "clinica",
@@ -848,43 +855,69 @@ class EquiposViewsTests(TestCase):
         )
         self.assertEqual(dispositivo.fecha_instalacion, fecha_futura)
 
-    def test_registro_guarda_garantia_como_duracion_en_anios(self):
+    def test_registro_guarda_la_garantia_como_fecha_del_contrato(self):
         respuesta = self.client.post(
             reverse("registrar_dispositivo_equipos"),
             self._datos_formulario_dispositivo(
-                numero_serie="SERIE-GARANTIA-DOS-ANIOS",
-                garantia_anios=DuracionGarantiaDispositivo.DOS_ANIOS,
+                numero_serie="SERIE-GARANTIA-FECHA",
+                fecha_fin_garantia="2028-03-15",
             ),
         )
 
-        dispositivo = Dispositivo.objects.get(
-            numero_serie="SERIE-GARANTIA-DOS-ANIOS"
-        )
+        dispositivo = Dispositivo.objects.get(numero_serie="SERIE-GARANTIA-FECHA")
         self.assertRedirects(
             respuesta,
             reverse("detalle_dispositivo_equipos", args=[dispositivo.id]),
         )
-        self.assertEqual(
-            dispositivo.garantia_anios,
-            DuracionGarantiaDispositivo.DOS_ANIOS,
-        )
+        self.assertEqual(dispositivo.fecha_fin_garantia, date(2028, 3, 15))
 
         detalle = self.client.get(
             reverse("detalle_dispositivo_equipos", args=[dispositivo.id])
         )
-        self.assertContains(detalle, "2 años")
+        self.assertContains(detalle, "15/03/2028")
 
-    def test_registro_rechaza_duracion_de_garantia_no_permitida(self):
+    def test_registro_admite_equipo_sin_garantia(self):
+        # Sin garantia se expresa dejando la fecha vacia, no con una opcion.
+        respuesta = self.client.post(
+            reverse("registrar_dispositivo_equipos"),
+            self._datos_formulario_dispositivo(
+                numero_serie="SERIE-SIN-GARANTIA",
+                fecha_fin_garantia="",
+            ),
+        )
+
+        dispositivo = Dispositivo.objects.get(numero_serie="SERIE-SIN-GARANTIA")
+        self.assertRedirects(
+            respuesta,
+            reverse("detalle_dispositivo_equipos", args=[dispositivo.id]),
+        )
+        self.assertIsNone(dispositivo.fecha_fin_garantia)
+
+    def test_registro_admite_garantia_ya_vencida(self):
+        # Hace falta para cargar inventario antiguo: el equipo existe y su
+        # garantia caduco, y eso tambien es un hecho que hay que poder anotar.
+        self.client.post(
+            reverse("registrar_dispositivo_equipos"),
+            self._datos_formulario_dispositivo(
+                numero_serie="SERIE-GARANTIA-VIEJA",
+                fecha_fin_garantia="2020-01-01",
+            ),
+        )
+
+        dispositivo = Dispositivo.objects.get(numero_serie="SERIE-GARANTIA-VIEJA")
+        self.assertEqual(dispositivo.fecha_fin_garantia, date(2020, 1, 1))
+
+    def test_registro_rechaza_una_fecha_de_garantia_invalida(self):
         respuesta = self.client.post(
             reverse("registrar_dispositivo_equipos"),
             self._datos_formulario_dispositivo(
                 numero_serie="SERIE-GARANTIA-INVALIDA",
-                garantia_anios=3,
+                fecha_fin_garantia="no-es-una-fecha",
             ),
         )
 
         self.assertEqual(respuesta.status_code, 200)
-        self.assertTrue(respuesta.context["form"].errors.get("garantia_anios"))
+        self.assertTrue(respuesta.context["form"].errors.get("fecha_fin_garantia"))
         self.assertFalse(
             Dispositivo.objects.filter(
                 numero_serie="SERIE-GARANTIA-INVALIDA"
@@ -1069,7 +1102,7 @@ class EquiposViewsTests(TestCase):
                 "criticidad": CriticidadDispositivo.ALTA,
                 "frecuencia_mantenimiento_meses": "",
                 "fecha_instalacion": "",
-                "garantia_anios": DuracionGarantiaDispositivo.DOS_ANIOS,
+                "fecha_fin_garantia": "2028-01-15",
                 "costo_adquisicion": "",
                 "observaciones": "Equipo actualizado en prueba.",
                 "tipo_area": "no_clinica",
@@ -1357,10 +1390,38 @@ class EquiposViewsTests(TestCase):
             "fecha_inicio_contrato",
             "fecha_fin_contrato",
             "tipo_contrato",
-            "duracion_garantia",
-            "fecha_fin_garantia",
         )
         self.assertTrue(all(datos[campo] == "" for campo in campos_manuales))
+
+    def test_la_ficha_rellena_la_garantia_con_el_vencimiento_real(self):
+        # Estas dos casillas estaban vacias hasta que la garantia paso a ser
+        # una fecha. Se imprime el vencimiento ya ajustado con las pausas,
+        # que es hasta cuando se le puede reclamar al proveedor.
+        self.dispositivo.fecha_fin_garantia = date(2028, 3, 15)
+        self.dispositivo.save(update_fields=["fecha_fin_garantia"])
+        # El equipo debe llevar tiempo registrado para admitir una pausa que
+        # empezo hace tres semanas.
+        registrar_equipo_el(self.dispositivo, date(2026, 1, 1))
+        PausaGarantia.objects.create(
+            dispositivo=self.dispositivo,
+            fecha_salida=timezone.localdate() - timedelta(days=20),
+            fecha_retorno=timezone.localdate() - timedelta(days=5),
+            registrado_por=self.usuario,
+        )
+
+        datos = FichaActivoFijoPdfService.construir_datos(self.dispositivo, None)
+
+        self.assertEqual(datos["fecha_fin_garantia"], "30/03/2028")
+        self.assertIn("mes", datos["duracion_garantia"])
+
+    def test_la_ficha_marca_la_garantia_como_indefinida_si_no_hay(self):
+        self.dispositivo.fecha_fin_garantia = None
+        self.dispositivo.save(update_fields=["fecha_fin_garantia"])
+
+        datos = FichaActivoFijoPdfService.construir_datos(self.dispositivo, None)
+
+        self.assertEqual(datos["fecha_fin_garantia"], "INDEFINIDO")
+        self.assertEqual(datos["duracion_garantia"], "INDEFINIDO")
 
     def test_otro_usuario_reutiliza_la_orden_del_mismo_equipo(self):
         url_ficha = reverse(
@@ -3007,3 +3068,731 @@ class DetalleReducidoTests(TestCase):
                     reverse(nombre, args=[self.dispositivo.pk])
                 )
                 self.assertRedirects(respuesta, reverse("acceso_denegado"))
+
+
+def registrar_equipo_el(equipo, cuando):
+    """Retrasa la fecha de registro de un equipo.
+
+    fecha_creado es auto_now_add, asi que en pruebas todo equipo nace hoy y no
+    admitiria pausas anteriores. Con update() se salta el automatismo y se
+    puede simular un equipo que lleva tiempo en el hospital.
+    """
+    marca = timezone.make_aware(datetime.combine(cuando, datetime.min.time()))
+    Dispositivo.objects.filter(pk=equipo.pk).update(fecha_creado=marca)
+    equipo.refresh_from_db()
+    return equipo
+
+
+class GarantiaCalculoTests(TestCase):
+    """El calculo del vencimiento, que es donde se juega la credibilidad."""
+
+    databases = {"default"}
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.usuario = get_user_model().objects.create_user(
+            username="tecnico-garantia", password="clave"
+        )
+        cls.tipo = TipoDispositivo.objects.create(nombre="VENTILADOR")
+        cls.marca = MarcaDispositivo.objects.create(nombre="DRAGER")
+        cls.area_gestora, _ = AreaGestora.objects.get_or_create(nombre="BIOMEDICA")
+        cls.color, _ = ColorDispositivo.objects.get_or_create(nombre="BLANCO")
+
+    def crear_equipo(self, fin_garantia=None, estado=EstadoDispositivo.OPERATIVO,
+                     serie=None):
+        equipo = Dispositivo.objects.create(
+            tipo=self.tipo,
+            tipo_tecnologia=TipoTecnologiaDispositivo.ELECTRONICO,
+            marca=self.marca,
+            area_gestora=self.area_gestora,
+            color=self.color,
+            numero_serie=serie or f"SG-{Dispositivo.objects.count() + 1:04d}",
+            fecha_fin_garantia=fin_garantia,
+            estado=estado,
+            criticidad=CriticidadDispositivo.MEDIA,
+            creado_por=self.usuario,
+            modificado_por=self.usuario,
+        )
+        # El equipo lleva en el hospital desde principios de 2026, para
+        # que admita pausas con fechas anteriores a hoy.
+        return registrar_equipo_el(equipo, date(2026, 1, 1))
+
+    def pausar(self, equipo, salida, retorno=None):
+        return PausaGarantia.objects.create(
+            dispositivo=equipo,
+            fecha_salida=salida,
+            fecha_retorno=retorno,
+            motivo="Enviado a reparación",
+            registrado_por=self.usuario,
+        )
+
+    # --- Sin pausas -------------------------------------------------------
+
+    def test_sin_fecha_es_sin_garantia(self):
+        equipo = self.crear_equipo(fin_garantia=None)
+
+        estado = calcular_estado_garantia(equipo, hoy=date(2026, 8, 6))
+
+        self.assertEqual(estado.estado, EstadoGarantiaDispositivo.SIN_GARANTIA)
+        self.assertIsNone(estado.fin_real)
+        self.assertIsNone(estado.dias_restantes)
+        self.assertFalse(estado.tiene_garantia)
+
+    def test_vigente_cuando_falta_mucho(self):
+        equipo = self.crear_equipo(fin_garantia=date(2027, 8, 6))
+
+        estado = calcular_estado_garantia(equipo, hoy=date(2026, 8, 6))
+
+        self.assertEqual(estado.estado, EstadoGarantiaDispositivo.VIGENTE)
+        self.assertEqual(estado.dias_restantes, 365)
+        self.assertTrue(estado.esta_vigente)
+
+    def test_vencida_cuando_ya_paso(self):
+        equipo = self.crear_equipo(fin_garantia=date(2026, 8, 1))
+
+        estado = calcular_estado_garantia(equipo, hoy=date(2026, 8, 6))
+
+        self.assertEqual(estado.estado, EstadoGarantiaDispositivo.VENCIDA)
+        self.assertEqual(estado.dias_restantes, -5)
+        self.assertFalse(estado.esta_vigente)
+
+    # --- El umbral de 30 dias --------------------------------------------
+
+    def test_a_31_dias_todavia_es_vigente(self):
+        equipo = self.crear_equipo(fin_garantia=date(2026, 9, 6))
+
+        estado = calcular_estado_garantia(equipo, hoy=date(2026, 8, 6))
+
+        self.assertEqual(estado.dias_restantes, 31)
+        self.assertEqual(estado.estado, EstadoGarantiaDispositivo.VIGENTE)
+
+    def test_a_30_dias_exactos_ya_es_por_vencer(self):
+        equipo = self.crear_equipo(fin_garantia=date(2026, 9, 5))
+
+        estado = calcular_estado_garantia(equipo, hoy=date(2026, 8, 6))
+
+        self.assertEqual(estado.dias_restantes, 30)
+        self.assertEqual(estado.estado, EstadoGarantiaDispositivo.POR_VENCER)
+
+    def test_el_ultimo_dia_sigue_cubierto(self):
+        equipo = self.crear_equipo(fin_garantia=date(2026, 8, 6))
+
+        estado = calcular_estado_garantia(equipo, hoy=date(2026, 8, 6))
+
+        self.assertEqual(estado.dias_restantes, 0)
+        self.assertEqual(estado.estado, EstadoGarantiaDispositivo.POR_VENCER)
+        self.assertTrue(estado.esta_vigente)
+
+    # --- Con pausas -------------------------------------------------------
+
+    def test_una_pausa_cerrada_corre_el_vencimiento(self):
+        equipo = self.crear_equipo(fin_garantia=date(2028, 3, 15))
+        self.pausar(equipo, date(2026, 6, 10), date(2026, 7, 25))  # 45 dias
+
+        estado = calcular_estado_garantia(equipo, hoy=date(2026, 8, 6))
+
+        self.assertEqual(estado.dias_pausados, 45)
+        self.assertEqual(estado.fin_contrato, date(2028, 3, 15))
+        self.assertEqual(estado.fin_real, date(2028, 4, 29))
+
+    def test_varias_pausas_se_acumulan(self):
+        equipo = self.crear_equipo(fin_garantia=date(2028, 1, 1))
+        self.pausar(equipo, date(2026, 3, 1), date(2026, 3, 11))   # 10
+        self.pausar(equipo, date(2026, 5, 1), date(2026, 5, 21))   # 20
+
+        estado = calcular_estado_garantia(equipo, hoy=date(2026, 8, 6))
+
+        self.assertEqual(estado.dias_pausados, 30)
+        self.assertEqual(estado.fin_real, date(2028, 1, 31))
+
+    def test_la_pausa_abierta_no_suma_todavia(self):
+        # Es la decision de disenio: los dias se suman al retorno, no dia a
+        # dia, porque hasta que no vuelve no se sabe cuanto estuvo fuera.
+        equipo = self.crear_equipo(fin_garantia=date(2028, 3, 15))
+        self.pausar(equipo, date(2026, 7, 1), retorno=None)
+
+        estado = calcular_estado_garantia(equipo, hoy=date(2026, 8, 6))
+
+        self.assertEqual(estado.dias_pausados, 0)
+        self.assertEqual(estado.fin_real, date(2028, 3, 15))
+        self.assertEqual(estado.estado, EstadoGarantiaDispositivo.PAUSADA)
+        self.assertIsNotNone(estado.pausa_abierta)
+
+    def test_al_cerrar_la_pausa_se_suman_los_dias(self):
+        equipo = self.crear_equipo(fin_garantia=date(2028, 3, 15))
+        pausa = self.pausar(equipo, date(2026, 7, 1), retorno=None)
+
+        pausa.fecha_retorno = date(2026, 7, 21)
+        pausa.save()
+
+        estado = calcular_estado_garantia(equipo, hoy=date(2026, 8, 6))
+
+        self.assertEqual(estado.dias_pausados, 20)
+        self.assertEqual(estado.fin_real, date(2028, 4, 4))
+        self.assertEqual(estado.estado, EstadoGarantiaDispositivo.VIGENTE)
+
+    def test_pausa_de_cero_dias_no_altera_nada(self):
+        # Es el remedio de una pausa registrada por error y corregida el mismo
+        # dia: sale gratis del propio modelo.
+        equipo = self.crear_equipo(fin_garantia=date(2028, 3, 15))
+        self.pausar(equipo, date(2026, 7, 1), date(2026, 7, 1))
+
+        estado = calcular_estado_garantia(equipo, hoy=date(2026, 8, 6))
+
+        self.assertEqual(estado.dias_pausados, 0)
+        self.assertEqual(estado.fin_real, date(2028, 3, 15))
+
+    def test_una_pausa_puede_rescatar_una_garantia_recien_vencida(self):
+        equipo = self.crear_equipo(fin_garantia=date(2026, 8, 1))
+        self.pausar(equipo, date(2026, 5, 1), date(2026, 5, 31))  # 30 dias
+
+        estado = calcular_estado_garantia(equipo, hoy=date(2026, 8, 6))
+
+        self.assertEqual(estado.fin_real, date(2026, 8, 31))
+        self.assertEqual(estado.estado, EstadoGarantiaDispositivo.POR_VENCER)
+
+    def test_un_equipo_fuera_se_muestra_pausado_aunque_la_fecha_pasara(self):
+        equipo = self.crear_equipo(fin_garantia=date(2026, 1, 1))
+        self.pausar(equipo, date(2026, 7, 1), retorno=None)
+
+        estado = calcular_estado_garantia(equipo, hoy=date(2026, 8, 6))
+
+        self.assertEqual(estado.estado, EstadoGarantiaDispositivo.PAUSADA)
+
+    # --- El dato del contrato nunca se toca -------------------------------
+
+    def test_las_pausas_no_modifican_la_fecha_guardada(self):
+        equipo = self.crear_equipo(fin_garantia=date(2028, 3, 15))
+        self.pausar(equipo, date(2026, 6, 10), date(2026, 7, 25))
+
+        calcular_estado_garantia(equipo, hoy=date(2026, 8, 6))
+        equipo.refresh_from_db()
+
+        self.assertEqual(equipo.fecha_fin_garantia, date(2028, 3, 15))
+
+
+class PausaGarantiaModeloTests(TestCase):
+    """Las reglas que protege la propia base de datos."""
+
+    databases = {"default"}
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.usuario = get_user_model().objects.create_user(
+            username="tecnico-pausas", password="clave"
+        )
+        cls.tipo = TipoDispositivo.objects.create(nombre="DESFIBRILADOR")
+        cls.marca = MarcaDispositivo.objects.create(nombre="ZOLL")
+        cls.area_gestora, _ = AreaGestora.objects.get_or_create(nombre="BIOMEDICA")
+        cls.color, _ = ColorDispositivo.objects.get_or_create(nombre="BLANCO")
+
+    def crear_equipo(self, estado=EstadoDispositivo.OPERATIVO, fin=None):
+        equipo = Dispositivo.objects.create(
+            tipo=self.tipo,
+            tipo_tecnologia=TipoTecnologiaDispositivo.ELECTRONICO,
+            marca=self.marca,
+            area_gestora=self.area_gestora,
+            color=self.color,
+            numero_serie=f"PZ-{Dispositivo.objects.count() + 1:04d}",
+            fecha_fin_garantia=fin or date(2028, 1, 1),
+            estado=estado,
+            criticidad=CriticidadDispositivo.MEDIA,
+            creado_por=self.usuario,
+            modificado_por=self.usuario,
+        )
+        # El equipo lleva en el hospital desde principios de 2026, para
+        # que admita pausas con fechas anteriores a hoy.
+        return registrar_equipo_el(equipo, date(2026, 1, 1))
+
+    def test_no_admite_dos_pausas_abiertas(self):
+        equipo = self.crear_equipo()
+        PausaGarantia.objects.create(
+            dispositivo=equipo,
+            fecha_salida=timezone.localdate(),
+            registrado_por=self.usuario,
+        )
+
+        with self.assertRaises(ValidationError):
+            PausaGarantia.objects.create(
+                dispositivo=equipo,
+                fecha_salida=timezone.localdate(),
+                registrado_por=self.usuario,
+            )
+
+    def test_la_base_impide_dos_pausas_abiertas_sin_pasar_por_python(self):
+        # Se salta full_clean() a proposito: si la unicidad viviera solo en la
+        # validacion, un doble clic o dos peticiones a la vez la esquivarian.
+        # MySQL ignora los UniqueConstraint con condicion, de ahi la columna
+        # equipo_con_pausa_abierta.
+        equipo = self.crear_equipo()
+        PausaGarantia.objects.create(
+            dispositivo=equipo,
+            fecha_salida=timezone.localdate(),
+            registrado_por=self.usuario,
+        )
+
+        intrusa = PausaGarantia(
+            dispositivo=equipo,
+            fecha_salida=timezone.localdate(),
+            registrado_por=self.usuario,
+        )
+        intrusa.equipo_con_pausa_abierta = equipo.pk
+
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                super(PausaGarantia, intrusa).save(force_insert=True)
+
+    def test_al_cerrar_la_pausa_se_libera_la_columna_de_unicidad(self):
+        equipo = self.crear_equipo()
+        pausa = PausaGarantia.objects.create(
+            dispositivo=equipo,
+            fecha_salida=timezone.localdate() - timedelta(days=3),
+            registrado_por=self.usuario,
+        )
+        self.assertEqual(pausa.equipo_con_pausa_abierta, equipo.pk)
+
+        pausa.fecha_retorno = timezone.localdate()
+        pausa.save()
+        pausa.refresh_from_db()
+
+        self.assertIsNone(pausa.equipo_con_pausa_abierta)
+
+    def test_si_admite_una_nueva_tras_cerrar_la_anterior(self):
+        equipo = self.crear_equipo()
+        primera = PausaGarantia.objects.create(
+            dispositivo=equipo,
+            fecha_salida=timezone.localdate() - timedelta(days=10),
+            registrado_por=self.usuario,
+        )
+        primera.fecha_retorno = timezone.localdate() - timedelta(days=5)
+        primera.save()
+
+        segunda = PausaGarantia.objects.create(
+            dispositivo=equipo,
+            fecha_salida=timezone.localdate(),
+            registrado_por=self.usuario,
+        )
+
+        self.assertTrue(segunda.esta_abierta)
+        self.assertEqual(equipo.pausas_garantia.count(), 2)
+
+    def test_el_retorno_no_puede_preceder_a_la_salida(self):
+        equipo = self.crear_equipo()
+
+        with self.assertRaises(ValidationError):
+            PausaGarantia.objects.create(
+                dispositivo=equipo,
+                fecha_salida=date(2026, 7, 20),
+                fecha_retorno=date(2026, 7, 10),
+                registrado_por=self.usuario,
+            )
+
+    def test_la_salida_no_puede_preceder_al_registro_del_equipo(self):
+        equipo = self.crear_equipo()
+
+        with self.assertRaises(ValidationError):
+            PausaGarantia.objects.create(
+                dispositivo=equipo,
+                fecha_salida=date(2020, 1, 1),
+                registrado_por=self.usuario,
+            )
+
+    def test_admite_salidas_retroactivas(self):
+        # El tecnico registra la salida dias despues; es la norma, no la
+        # excepcion.
+        equipo = self.crear_equipo()
+
+        pausa = PausaGarantia.objects.create(
+            dispositivo=equipo,
+            fecha_salida=timezone.localdate(),
+            registrado_por=self.usuario,
+        )
+
+        self.assertTrue(pausa.esta_abierta)
+
+
+class PuedePausarseTests(TestCase):
+    """Cuando tiene sentido ofrecer el boton de salida."""
+
+    databases = {"default"}
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.usuario = get_user_model().objects.create_user(
+            username="tecnico-puede", password="clave"
+        )
+        cls.tipo = TipoDispositivo.objects.create(nombre="INCUBADORA")
+        cls.marca = MarcaDispositivo.objects.create(nombre="GE")
+        cls.area_gestora, _ = AreaGestora.objects.get_or_create(nombre="BIOMEDICA")
+        cls.color, _ = ColorDispositivo.objects.get_or_create(nombre="BLANCO")
+
+    def crear_equipo(self, fin, estado=EstadoDispositivo.OPERATIVO):
+        equipo = Dispositivo.objects.create(
+            tipo=self.tipo,
+            tipo_tecnologia=TipoTecnologiaDispositivo.ELECTRONICO,
+            marca=self.marca,
+            area_gestora=self.area_gestora,
+            color=self.color,
+            numero_serie=f"PP-{Dispositivo.objects.count() + 1:04d}",
+            fecha_fin_garantia=fin,
+            estado=estado,
+            criticidad=CriticidadDispositivo.MEDIA,
+            creado_por=self.usuario,
+            modificado_por=self.usuario,
+        )
+        # El equipo lleva en el hospital desde principios de 2026, para
+        # que admita pausas con fechas anteriores a hoy.
+        return registrar_equipo_el(equipo, date(2026, 1, 1))
+
+    def test_equipo_operativo_con_garantia_vigente_si_puede(self):
+        equipo = self.crear_equipo(fin=date(2028, 1, 1))
+
+        permitido, motivo = puede_pausarse(equipo, hoy=date(2026, 8, 6))
+
+        self.assertTrue(permitido)
+        self.assertEqual(motivo, "")
+
+    def test_equipo_sin_garantia_no_puede(self):
+        equipo = self.crear_equipo(fin=None)
+
+        permitido, motivo = puede_pausarse(equipo, hoy=date(2026, 8, 6))
+
+        self.assertFalse(permitido)
+        self.assertIn("no tiene garantía", motivo)
+
+    def test_equipo_con_garantia_vencida_no_puede(self):
+        equipo = self.crear_equipo(fin=date(2026, 1, 1))
+
+        permitido, motivo = puede_pausarse(equipo, hoy=date(2026, 8, 6))
+
+        self.assertFalse(permitido)
+        self.assertIn("venció", motivo)
+
+    def test_equipo_dado_de_baja_no_puede(self):
+        equipo = self.crear_equipo(
+            fin=date(2028, 1, 1), estado=EstadoDispositivo.DADO_DE_BAJA
+        )
+
+        permitido, motivo = puede_pausarse(equipo, hoy=date(2026, 8, 6))
+
+        self.assertFalse(permitido)
+        self.assertIn("dado de baja", motivo)
+
+    def test_equipo_ya_pausado_no_puede_otra_vez(self):
+        equipo = self.crear_equipo(fin=date(2028, 1, 1))
+        PausaGarantia.objects.create(
+            dispositivo=equipo,
+            fecha_salida=timezone.localdate(),
+            registrado_por=self.usuario,
+        )
+
+        permitido, motivo = puede_pausarse(equipo, hoy=date(2026, 8, 6))
+
+        self.assertFalse(permitido)
+        self.assertIn("pausa abierta", motivo)
+
+
+class VistasGarantiaTests(TestCase):
+    """Panel de garantias y registro de salidas y retornos."""
+
+    databases = {"default"}
+
+    @classmethod
+    def setUpTestData(cls):
+        Usuario = get_user_model()
+        cls.tecnico = Usuario.objects.create_user(
+            username="tecnico-vistas-g", password="clave"
+        )
+        cls.directora = Usuario.objects.create_user(
+            username="directora-vistas-g", password="clave"
+        )
+        cls.ajeno = Usuario.objects.create_user(
+            username="ajeno-vistas-g", password="clave"
+        )
+        dar_acceso_equipos(cls.tecnico, RolUsuario.DIGITADOR)
+        dar_acceso_global(cls.directora, RolUsuario.DIRECTIVO)
+
+        cls.tipo = TipoDispositivo.objects.create(nombre="AUTOCLAVE")
+        cls.marca = MarcaDispositivo.objects.create(nombre="TUTTNAUER")
+        cls.area_gestora, _ = AreaGestora.objects.get_or_create(nombre="BIOMEDICA")
+        cls.color, _ = ColorDispositivo.objects.get_or_create(nombre="BLANCO")
+
+    def crear_equipo(self, fin, serie, estado=EstadoDispositivo.OPERATIVO):
+        equipo = Dispositivo.objects.create(
+            tipo=self.tipo,
+            tipo_tecnologia=TipoTecnologiaDispositivo.ELECTRONICO,
+            marca=self.marca,
+            area_gestora=self.area_gestora,
+            color=self.color,
+            numero_serie=serie,
+            fecha_fin_garantia=fin,
+            estado=estado,
+            criticidad=CriticidadDispositivo.MEDIA,
+            creado_por=self.tecnico,
+            modificado_por=self.tecnico,
+        )
+        return registrar_equipo_el(equipo, date(2026, 1, 1))
+
+    def setUp(self):
+        patch(
+            "equipos.views.MediaService.obtener_imagenes_dispositivo",
+            return_value=([], False),
+        ).start()
+        patch(
+            "equipos.views.MediaService.obtener_ficha_baja_dispositivo",
+            return_value=(None, False),
+        ).start()
+        self.addCleanup(patch.stopall)
+
+    # --- Permisos del panel ------------------------------------------------
+
+    def test_el_tecnico_entra_al_panel(self):
+        self.client.force_login(self.tecnico)
+
+        respuesta = self.client.get(reverse("panel_garantias_equipos"))
+
+        self.assertEqual(respuesta.status_code, 200)
+
+    def test_la_directora_entra_al_panel_aunque_no_pueda_editar(self):
+        # Es justo a quien le interesa saber que se pierde este mes.
+        self.client.force_login(self.directora)
+
+        respuesta = self.client.get(reverse("panel_garantias_equipos"))
+
+        self.assertEqual(respuesta.status_code, 200)
+
+    def test_quien_no_es_de_equipos_no_entra_al_panel(self):
+        self.client.force_login(self.ajeno)
+
+        respuesta = self.client.get(reverse("panel_garantias_equipos"))
+
+        self.assertRedirects(respuesta, reverse("acceso_denegado"))
+
+    # --- Que muestra el panel ---------------------------------------------
+
+    def test_por_defecto_solo_muestra_lo_accionable(self):
+        proximo = self.crear_equipo(
+            fin=timezone.localdate() + timedelta(days=10), serie="VG-PROXIMO"
+        )
+        tranquilo = self.crear_equipo(
+            fin=timezone.localdate() + timedelta(days=400), serie="VG-TRANQUILO"
+        )
+        self.client.force_login(self.tecnico)
+
+        respuesta = self.client.get(reverse("panel_garantias_equipos"))
+
+        self.assertContains(respuesta, proximo.codigo)
+        self.assertNotContains(respuesta, tranquilo.codigo)
+
+    def test_el_filtro_muestra_los_de_ese_estado(self):
+        tranquilo = self.crear_equipo(
+            fin=timezone.localdate() + timedelta(days=400), serie="VG-VIGENTE"
+        )
+        self.client.force_login(self.tecnico)
+
+        respuesta = self.client.get(
+            reverse("panel_garantias_equipos"),
+            {"estado": EstadoGarantiaDispositivo.VIGENTE},
+        )
+
+        self.assertContains(respuesta, tranquilo.codigo)
+
+    def test_el_panel_ignora_los_equipos_dados_de_baja(self):
+        baja = self.crear_equipo(
+            fin=timezone.localdate() + timedelta(days=10),
+            serie="VG-BAJA",
+            estado=EstadoDispositivo.DADO_DE_BAJA,
+        )
+        self.client.force_login(self.tecnico)
+
+        respuesta = self.client.get(reverse("panel_garantias_equipos"))
+
+        self.assertNotContains(respuesta, baja.codigo)
+
+    # --- Registrar salida --------------------------------------------------
+
+    def test_el_tecnico_registra_una_salida(self):
+        equipo = self.crear_equipo(
+            fin=timezone.localdate() + timedelta(days=200), serie="VG-SALIDA"
+        )
+        self.client.force_login(self.tecnico)
+
+        respuesta = self.client.post(
+            reverse("registrar_salida_garantia_equipos", args=[equipo.pk]),
+            {
+                "fecha_salida": timezone.localdate().isoformat(),
+                "motivo": "Enviado al proveedor, orden 4471.",
+            },
+        )
+
+        self.assertRedirects(
+            respuesta,
+            reverse("detalle_dispositivo_equipos", args=[equipo.pk]),
+        )
+        pausa = equipo.pausas_garantia.get()
+        self.assertTrue(pausa.esta_abierta)
+        self.assertEqual(pausa.registrado_por, self.tecnico)
+        self.assertIn("4471", pausa.motivo)
+
+    def test_la_directora_no_puede_registrar_salidas(self):
+        equipo = self.crear_equipo(
+            fin=timezone.localdate() + timedelta(days=200), serie="VG-SALIDA-DIR"
+        )
+        self.client.force_login(self.directora)
+
+        respuesta = self.client.post(
+            reverse("registrar_salida_garantia_equipos", args=[equipo.pk]),
+            {"fecha_salida": timezone.localdate().isoformat(), "motivo": ""},
+        )
+
+        self.assertRedirects(respuesta, reverse("acceso_denegado"))
+        self.assertEqual(equipo.pausas_garantia.count(), 0)
+
+    def test_no_admite_una_salida_futura(self):
+        equipo = self.crear_equipo(
+            fin=timezone.localdate() + timedelta(days=200), serie="VG-FUTURA"
+        )
+        self.client.force_login(self.tecnico)
+
+        self.client.post(
+            reverse("registrar_salida_garantia_equipos", args=[equipo.pk]),
+            {
+                "fecha_salida": (
+                    timezone.localdate() + timedelta(days=5)
+                ).isoformat(),
+                "motivo": "",
+            },
+        )
+
+        self.assertEqual(equipo.pausas_garantia.count(), 0)
+
+    def test_no_admite_salida_en_equipo_sin_garantia(self):
+        equipo = self.crear_equipo(fin=None, serie="VG-SIN-GARANTIA")
+        self.client.force_login(self.tecnico)
+
+        self.client.post(
+            reverse("registrar_salida_garantia_equipos", args=[equipo.pk]),
+            {"fecha_salida": timezone.localdate().isoformat(), "motivo": ""},
+        )
+
+        self.assertEqual(equipo.pausas_garantia.count(), 0)
+
+    # --- Registrar retorno -------------------------------------------------
+
+    def test_el_retorno_suma_los_dias_al_vencimiento(self):
+        fin = timezone.localdate() + timedelta(days=200)
+        equipo = self.crear_equipo(fin=fin, serie="VG-RETORNO")
+        salida = timezone.localdate() - timedelta(days=12)
+        PausaGarantia.objects.create(
+            dispositivo=equipo,
+            fecha_salida=salida,
+            registrado_por=self.tecnico,
+        )
+        self.client.force_login(self.tecnico)
+
+        respuesta = self.client.post(
+            reverse("registrar_retorno_garantia_equipos", args=[equipo.pk]),
+            {
+                "fecha_retorno": timezone.localdate().isoformat(),
+                "motivo": "Cambio de sensor.",
+            },
+        )
+
+        self.assertRedirects(
+            respuesta,
+            reverse("detalle_dispositivo_equipos", args=[equipo.pk]),
+        )
+        estado = calcular_estado_garantia(equipo)
+        self.assertEqual(estado.dias_pausados, 12)
+        self.assertEqual(estado.fin_real, fin + timedelta(days=12))
+        # El dato del contrato no se toca.
+        equipo.refresh_from_db()
+        self.assertEqual(equipo.fecha_fin_garantia, fin)
+
+    def test_no_admite_retorno_anterior_a_la_salida(self):
+        equipo = self.crear_equipo(
+            fin=timezone.localdate() + timedelta(days=200), serie="VG-RET-MALO"
+        )
+        salida = timezone.localdate() - timedelta(days=3)
+        PausaGarantia.objects.create(
+            dispositivo=equipo,
+            fecha_salida=salida,
+            registrado_por=self.tecnico,
+        )
+        self.client.force_login(self.tecnico)
+
+        self.client.post(
+            reverse("registrar_retorno_garantia_equipos", args=[equipo.pk]),
+            {
+                "fecha_retorno": (salida - timedelta(days=1)).isoformat(),
+                "motivo": "",
+            },
+        )
+
+        pausa = equipo.pausas_garantia.get()
+        self.assertTrue(pausa.esta_abierta)
+
+    def test_no_hay_retorno_sin_salida_pendiente(self):
+        equipo = self.crear_equipo(
+            fin=timezone.localdate() + timedelta(days=200), serie="VG-SIN-SALIDA"
+        )
+        self.client.force_login(self.tecnico)
+
+        respuesta = self.client.post(
+            reverse("registrar_retorno_garantia_equipos", args=[equipo.pk]),
+            {"fecha_retorno": timezone.localdate().isoformat(), "motivo": ""},
+        )
+
+        self.assertRedirects(
+            respuesta,
+            reverse("detalle_dispositivo_equipos", args=[equipo.pk]),
+        )
+        self.assertEqual(equipo.pausas_garantia.count(), 0)
+
+    # --- La tarjeta del detalle -------------------------------------------
+
+    def test_el_detalle_ofrece_el_boton_de_salida_al_tecnico(self):
+        equipo = self.crear_equipo(
+            fin=timezone.localdate() + timedelta(days=200), serie="VG-CARD-TEC"
+        )
+        self.client.force_login(self.tecnico)
+
+        respuesta = self.client.get(
+            reverse("detalle_dispositivo_equipos", args=[equipo.pk])
+        )
+
+        self.assertContains(
+            respuesta,
+            reverse("registrar_salida_garantia_equipos", args=[equipo.pk]),
+        )
+
+    def test_la_directora_ve_la_garantia_pero_sin_botones(self):
+        equipo = self.crear_equipo(
+            fin=timezone.localdate() + timedelta(days=200), serie="VG-CARD-DIR"
+        )
+        self.client.force_login(self.directora)
+
+        respuesta = self.client.get(
+            reverse("detalle_dispositivo_equipos", args=[equipo.pk])
+        )
+
+        self.assertContains(respuesta, "Garantía")
+        self.assertNotContains(
+            respuesta,
+            reverse("registrar_salida_garantia_equipos", args=[equipo.pk]),
+        )
+
+    def test_la_vista_reducida_no_menciona_la_garantia(self):
+        equipo = self.crear_equipo(
+            fin=timezone.localdate() + timedelta(days=200), serie="VG-REDUCIDA"
+        )
+        self.client.force_login(self.ajeno)
+
+        respuesta = self.client.get(
+            reverse("detalle_dispositivo_equipos", args=[equipo.pk])
+        )
+
+        self.assertTemplateUsed(
+            respuesta, "equipos/detalle_dispositivo_reducido_equipos.html"
+        )
+        self.assertNotContains(respuesta, "Garantía")

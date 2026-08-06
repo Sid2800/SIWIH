@@ -62,6 +62,34 @@ class FichaActivoFijoPdfService:
         return f"L {dispositivo.costo_formateado}"
 
     @classmethod
+    def _garantia(cls, dispositivo):
+        """Vencimiento y duracion de la garantia para la ficha.
+
+        Se imprime el vencimiento REAL, ya ajustado con las pausas: es la
+        fecha hasta la que se puede reclamar al proveedor, que es lo que
+        interesa a quien tenga el papel en la mano. La duracion se expresa en
+        meses porque las garantias reales no caen siempre en anios enteros.
+        """
+        from .garantia_service import calcular_estado_garantia
+
+        estado = calcular_estado_garantia(dispositivo)
+
+        if not estado.tiene_garantia:
+            return cls.INDEFINIDO, cls.INDEFINIDO
+
+        registro = dispositivo.fecha_creado
+        if registro is None:
+            return cls.INDEFINIDO, estado.fin_real.strftime("%d/%m/%Y")
+
+        if timezone.is_aware(registro):
+            registro = timezone.localtime(registro)
+
+        meses = round((estado.fin_real - registro.date()).days / 30.44)
+        duracion = f"{meses} mes{'es' if meses != 1 else ''}"
+
+        return duracion, estado.fin_real.strftime("%d/%m/%Y")
+
+    @classmethod
     def _departamento(cls, asignacion):
         ubicacion = asignacion.ubicacion if asignacion else None
         return cls._texto(ubicacion)
@@ -69,6 +97,8 @@ class FichaActivoFijoPdfService:
     @classmethod
     def construir_datos(cls, dispositivo, asignacion):
         """Mapea SIWIH al formato; las casillas manuales quedan vacias."""
+        duracion_garantia, fin_garantia = cls._garantia(dispositivo)
+
         return {
             "numero_inventario": cls._texto(
                 dispositivo.inventario_bienes_nacionales
@@ -107,8 +137,8 @@ class FichaActivoFijoPdfService:
             "fecha_inicio_contrato": "",
             "fecha_fin_contrato": "",
             "tipo_contrato": "",
-            "duracion_garantia": "",
-            "fecha_fin_garantia": "",
+            "duracion_garantia": duracion_garantia,
+            "fecha_fin_garantia": fin_garantia,
         }
 
     @classmethod

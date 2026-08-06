@@ -1,0 +1,119 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Garantías{% endblock title %}
+
+{% block content %}
+<div class="contenedor2 equipos-pagina equipos-pagina--ancha">
+    <div class="equipos-listado__encabezado">
+        <div class="equipos-listado__titulo">
+            <div class="tituloFormulario">
+                <div class="equipos-encabezado-superior">
+                    <div class="tituloFormulario-texto">
+                        <i class="bi bi-shield-check"></i>
+                        <h2 class="sin-margen">Garantías</h2>
+                    </div>
+                    <a class="equipos-volver equipos-volver--inline equipos-encabezado-volver"
+                       href="{% url 'inicio_equipos' %}">
+                        <i class="bi bi-arrow-left"></i>
+                        Equipos
+                    </a>
+                </div>
+                <div class="tituloFormulario-subrallado"></div>
+            </div>
+        </div>
+    </div>
+
+    {% comment %}
+       Los filtros son enlaces y no un formulario: son cinco estados fijos y
+       cada uno es una pregunta distinta que conviene poder compartir por URL.
+       La vista sin filtro muestra lo accionable: por vencer y pausados.
+    {% endcomment %}
+    <div class="equipos-listado__controles">
+        <div class="equipos-garantias__filtros">
+            <a class="equipos-garantias__filtro{% if not filtro %} equipos-garantias__filtro--activo{% endif %}"
+               href="{% url 'panel_garantias_equipos' %}">
+                Requieren atención
+                <span class="equipos-garantias__conteo">{{ atencion }}</span>
+            </a>
+            {% for pestana in pestanas %}
+                <a class="equipos-garantias__filtro{% if pestana.activa %} equipos-garantias__filtro--activo{% endif %}"
+                   href="?estado={{ pestana.valor }}">
+                    {{ pestana.etiqueta }}
+                    <span class="equipos-garantias__conteo">{{ pestana.conteo }}</span>
+                </a>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="equipos-listado__tabla-contenedor">
+        <table class="dataTable stripe hover row-border equipos-listado__tabla">
+            <thead>
+                <tr>
+                    <th>Código</th>
+                    <th>Equipo</th>
+                    <th>Estado</th>
+                    <th>Vence</th>
+                    <th>Días</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for equipo in equipos %}
+                    <tr class="equipos-listado__fila equipos-listado__fila--editable"
+                        data-edit-url="{% url 'detalle_dispositivo_equipos' equipo.id %}"
+                        title="Doble clic para ver {{ equipo.codigo }}">
+                        <td>
+                            <a class="equipos-listado__codigo"
+                               href="{% url 'detalle_dispositivo_equipos' equipo.id %}">
+                                {{ equipo.codigo }}
+                            </a>
+                        </td>
+                        <td title="{{ equipo.tipo }} {{ equipo.marca|default:'' }}">
+                            {{ equipo.tipo|truncatechars:22 }}
+                            <br><span>{{ equipo.marca|default:"INDEFINIDO" }}</span>
+                        </td>
+                        <td>
+                            <span class="equipos-estado {{ equipo.garantia_css }}">
+                                {{ equipo.garantia.etiqueta }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if equipo.garantia.fin_real %}
+                                {{ equipo.garantia.fin_real|date:"d/m/Y" }}
+                                {% if equipo.garantia.dias_pausados %}
+                                    <br><span>contrato: {{ equipo.garantia.fin_contrato|date:"d/m/Y" }}</span>
+                                {% endif %}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if equipo.garantia.esta_pausada %}
+                                <span>fuera hace {{ equipo.garantia.pausa_abierta.dias_transcurridos }}</span>
+                            {% elif equipo.garantia.dias_restantes is None %}
+                                —
+                            {% elif equipo.garantia.dias_restantes < 0 %}
+                                venció hace {{ equipo.garantia.dias_restantes|slice:"1:" }}
+                            {% else %}
+                                {{ equipo.garantia.dias_restantes }}
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td class="equipos-listado__vacio" colspan="5">
+                            <i class="bi bi-shield-check"></i>
+                            <strong>Nada que atender</strong>
+                            <span>
+                                Ningún equipo pierde la garantía en los próximos
+                                {{ dias_aviso }} días ni está fuera por reparación.
+                            </span>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% include "equipos/includes/listado_interacciones_js.html" %}
+{% endblock content %}

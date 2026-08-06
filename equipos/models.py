@@ -69,11 +69,18 @@ class TipoTecnologiaDispositivo(models.IntegerChoices):
     NO_ELECTRONICO = 2, "No electrónico"
 
 
-class DuracionGarantiaDispositivo(models.IntegerChoices):
-    # La garantia se registra como duracion, no como una fecha calculada.
-    SIN_GARANTIA = 0, "Sin garantía"
-    UN_ANIO = 1, "1 año"
-    DOS_ANIOS = 2, "2 años"
+class EstadoGarantiaDispositivo(models.TextChoices):
+    """Situacion de la garantia. No se guarda: la calcula garantia_service."""
+
+    SIN_GARANTIA = "sin_garantia", "Sin garantía"
+    PAUSADA = "pausada", "Pausada"
+    POR_VENCER = "por_vencer", "Por vencer"
+    VIGENTE = "vigente", "Vigente"
+    VENCIDA = "vencida", "Vencida"
+
+
+# Dias de antelacion con los que una garantia se considera "por vencer".
+DIAS_AVISO_GARANTIA = 30
 
 
 # Catalogos administrables desde Django admin.
@@ -323,10 +330,17 @@ class Dispositivo(models.Model):
         help_text="Cantidad de meses entre mantenimientos preventivos.",
     )
     fecha_instalacion = models.DateField(null=True, blank=True)
-    garantia_anios = models.PositiveSmallIntegerField(
-        choices=DuracionGarantiaDispositivo.choices,
-        default=DuracionGarantiaDispositivo.SIN_GARANTIA,
-        verbose_name="Garantía",
+    # La garantia se guarda como la fecha que dice el contrato, no como una
+    # duracion: las reales no vienen siempre en anios enteros. Este dato no se
+    # toca nunca; el vencimiento efectivo lo calcula garantia_service sumandole
+    # los dias que el equipo estuvo pausado, para poder mostrar por separado lo
+    # que firmo el proveedor y el ajuste posterior.
+    fecha_fin_garantia = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Fin de garantía",
+        help_text="Fecha en que vence la garantía según el contrato. "
+                  "Dejar vacío si el equipo no tiene garantía.",
     )
     costo_adquisicion = models.DecimalField(
         max_digits=12,
@@ -374,10 +388,6 @@ class Dispositivo(models.Model):
                 condition=Q(costo_adquisicion__isnull=True)
                 | Q(costo_adquisicion__gte=0),
                 name="bio_disp_costo_no_negativo",
-            ),
-            models.CheckConstraint(
-                condition=Q(garantia_anios__in=DuracionGarantiaDispositivo.values),
-                name="equipo_garantia_anios_valida",
             ),
         ]
 
@@ -723,3 +733,153 @@ class AsignacionDispositivo(models.Model):
 
     def __str__(self):
         return f"{self.dispositivo.codigo} - {self.ubicacion}"
+
+
+class PausaGarantia(models.Model):
+    """Periodo en que un equipo estuvo fuera y su garantia no debe correr.
+
+    Nace del caso real: el equipo se manda a reparar y los dias que pasa en
+    manos del proveedor no deberian consumir garantia. Se guarda como
+    intervalo, no como un interruptor, para poder reconstruir despues por que
+    una garantia vence cuando vence.
+
+    Los dias se suman al cerrar la pausa, no dia a dia: hasta que el equipo no
+    vuelve no se sabe cuanto estuvo fuera. Mientras la pausa sigue abierta el
+    vencimiento mostrado es el del contrato, y la pantalla avisa de que se
+    ajustara al retorno.
+    """
+
+    dispositivo = models.ForeignKey(
+        Dispositivo,
+        on_delete=models.CASCADE,
+        related_name="pausas_garantia",
+    )
+    fecha_salida = models.DateField(
+        verbose_name="Fecha de salida",
+        help_text="Día en que el equipo salió del hospital.",
+    )
+    fecha_retorno = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Fecha de retorno",
+        help_text="Día en que el equipo volvió. Vacío si sigue fuera.",
+    )
+    # Texto libre por ahora. Cuando exista el catalogo de proveedores este
+    # campo convivira con una referencia a quien tiene el equipo.
+    motivo = models.TextField(
+        blank=True,
+        verbose_name="Motivo",
+        help_text="A dónde fue y por qué. Número de orden del proveedor si lo hay.",
+    )
+    registrado_por = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="pausas_garantia_registradas",
+    )
+    # Columna tecnica que impone "una sola pausa abierta por equipo" en el
+    # motor. Vale el id del equipo mientras la pausa sigue abierta y NULL en
+    # cuanto se cierra; como MySQL admite varios NULL en un indice unico, solo
+    # puede haber una fila abierta por equipo.
+    #
+    # Se hace asi porque MySQL ignora los UniqueConstraint con condicion (aviso
+    # W036 de Django): la restriccion se declara pero no llega a crearse, y la
+    # regla quedaria solo en Python, donde un doble clic podria esquivarla.
+    equipo_con_pausa_abierta = models.BigIntegerField(
+        null=True,
+        blank=True,
+        unique=True,
+        editable=False,
+    )
+    fecha_creado = models.DateTimeField(auto_now_add=True)
+    fecha_modificado = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "equipo_pausa_garantia"
+        verbose_name = "Pausa de garantía"
+        verbose_name_plural = "Pausas de garantía"
+        ordering = ["-fecha_salida"]
+        indexes = [
+            models.Index(
+                fields=["dispositivo", "fecha_retorno"],
+                name="equipo_pausa_disp_retorno_idx",
+            ),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(fecha_retorno__isnull=True)
+                | Q(fecha_retorno__gte=models.F("fecha_salida")),
+                name="equipo_pausa_retorno_no_anterior",
+            ),
+            # La unicidad de la pausa abierta la impone equipo_con_pausa_abierta,
+            # no un UniqueConstraint con condicion: MySQL no los crea.
+        ]
+
+    @property
+    def esta_abierta(self):
+        return self.fecha_retorno is None
+
+    @property
+    def dias(self):
+        """Dias que suma al vencimiento. Una pausa abierta todavia no suma."""
+        if self.fecha_retorno is None:
+            return 0
+        return (self.fecha_retorno - self.fecha_salida).days
+
+    @property
+    def dias_transcurridos(self):
+        """Dias que lleva fuera. Solo informativo, no entra en el calculo."""
+        if self.fecha_retorno is not None:
+            return self.dias
+        return (timezone.localdate() - self.fecha_salida).days
+
+    def clean(self):
+        errores = {}
+
+        if self.fecha_retorno and self.fecha_salida:
+            if self.fecha_retorno < self.fecha_salida:
+                errores["fecha_retorno"] = (
+                    "El retorno no puede ser anterior a la salida."
+                )
+
+        if self.dispositivo_id and self.fecha_salida:
+            registro = self.dispositivo.fecha_creado
+            if registro and self.fecha_salida < timezone.localtime(registro).date():
+                errores["fecha_salida"] = (
+                    "La salida no puede ser anterior al registro del equipo."
+                )
+
+        if self.dispositivo_id and self.fecha_retorno is None:
+            abierta = PausaGarantia.objects.filter(
+                dispositivo_id=self.dispositivo_id,
+                fecha_retorno__isnull=True,
+            ).exclude(pk=self.pk)
+
+            if abierta.exists():
+                errores["dispositivo"] = (
+                    "El equipo ya tiene una pausa de garantía abierta."
+                )
+
+        if errores:
+            raise ValidationError(errores)
+
+    def save(self, *args, **kwargs):
+        # Mantiene la columna que hace cumplir la unicidad en el motor.
+        self.equipo_con_pausa_abierta = (
+            self.dispositivo_id if self.fecha_retorno is None else None
+        )
+        self.full_clean()
+
+        if "update_fields" in kwargs and kwargs["update_fields"] is not None:
+            kwargs["update_fields"] = set(kwargs["update_fields"]) | {
+                "equipo_con_pausa_abierta"
+            }
+
+        return super().save(*args, **kwargs)
+
+    def __str__(self):
+        if self.fecha_retorno:
+            return (
+                f"{self.dispositivo.codigo}: {self.fecha_salida} a "
+                f"{self.fecha_retorno} ({self.dias} días)"
+            )
+        return f"{self.dispositivo.codigo}: fuera desde {self.fecha_salida}"

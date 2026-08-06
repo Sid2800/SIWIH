@@ -22,6 +22,8 @@ from rrhh.models import Empleado
 from .forms import (
     BajaDispositivoForm,
     DispositivoCreateForm,
+    RetornoGarantiaForm,
+    SalidaGarantiaForm,
     ImagenDispositivoForm,
     MarcaCatalogoForm,
     ModeloCatalogoForm,
@@ -30,14 +32,17 @@ from .forms import (
 )
 from .models import (
     AreaGestora,
+    DIAS_AVISO_GARANTIA,
     AsignacionDispositivo,
     BajaDispositivo,
     CriticidadDispositivo,
     Dispositivo,
     EstadoDispositivo,
+    EstadoGarantiaDispositivo,
     MarcaDispositivo,
     ModeloDispositivo,
     OrdenTrabajoBajaDispositivo,
+    PausaGarantia,
     TipoDispositivo,
 )
 from .decorators import (
@@ -48,6 +53,7 @@ from .decorators import (
     exige_ver_equipos,
 )
 from .permisos import puede_visualizar_equipos
+from .services.garantia_service import calcular_estado_garantia, puede_pausarse
 from .services.ficha_baja_pdf_service import FichaBajaPdfService
 from .services.ficha_activo_fijo_pdf_service import FichaActivoFijoPdfService
 
@@ -61,6 +67,15 @@ ICONOS_TIPO_IMAGEN = {
     "ESTADO_FISICO": "bi bi-shield-check",
     "ACCESORIOS": "bi bi-plug",
     "OTRA": "bi bi-image",
+}
+
+# Reutiliza los colores de estado del modulo para no inventar una paleta nueva.
+CSS_ESTADO_GARANTIA = {
+    EstadoGarantiaDispositivo.VIGENTE: "equipos-estado--operativo",
+    EstadoGarantiaDispositivo.POR_VENCER: "equipos-estado--media",
+    EstadoGarantiaDispositivo.VENCIDA: "equipos-estado--alta",
+    EstadoGarantiaDispositivo.PAUSADA: "equipos-estado--repuesto",
+    EstadoGarantiaDispositivo.SIN_GARANTIA: "equipos-estado--inactivo",
 }
 
 
@@ -634,6 +649,9 @@ def detalle_dispositivo(request, dispositivo_id):
         CriticidadDispositivo.MEDIA: "equipos-estado--media",
         CriticidadDispositivo.ALTA: "equipos-estado--alta",
     }
+    pausas = list(dispositivo.pausas_garantia.all())
+    garantia = calcular_estado_garantia(dispositivo, pausas=pausas)
+    permite_pausa, motivo_sin_pausa = puede_pausarse(dispositivo, estado=garantia)
 
     return render(
         request,
@@ -647,6 +665,14 @@ def detalle_dispositivo(request, dispositivo_id):
             "ficha_baja_server_offline": ficha_baja_server_offline,
             "estado_css": estado_css.get(dispositivo.estado, ""),
             "criticidad_css": criticidad_css.get(dispositivo.criticidad, ""),
+            "garantia": garantia,
+            "garantia_css": CSS_ESTADO_GARANTIA.get(garantia.estado, ""),
+            "pausas": pausas,
+            "permite_pausa": permite_pausa,
+            "motivo_sin_pausa": motivo_sin_pausa,
+            # Limita los selectores de fecha para que el navegador impida
+            # elegir un dia futuro antes de enviar.
+            "hoy": timezone.localdate(),
             **contexto_imagenes,
         }
     )
@@ -1548,3 +1574,166 @@ def cambiar_estado_modelo(request, modelo_id):
         f"Modelo {modelo.nombre} {'reactivado' if modelo.activo else 'desactivado'}.",
     )
     return redirect(_url_catalogo(modelo.marca))
+
+
+@exige_ver_equipos
+@registrar_errores_vista("Error en el panel de garantías")
+def panel_garantias(request):
+    """Que equipos siguen cubiertos y cuales estan a punto de dejar de estarlo.
+
+    Abre mostrando lo accionable (por vencer y pausados) porque es la pregunta
+    que trae aqui a la gente: que puedo reclamarle todavia al proveedor. El
+    resto se consulta con el filtro.
+
+    Solo pide permiso de visualizacion: la jefatura entra a ver que vence sin
+    poder tocar nada. Registrar salidas y retornos exige permiso de edicion y
+    se hace desde la ficha del equipo.
+    """
+    filtro = request.GET.get("estado", "").strip()
+
+    # Los equipos dados de baja no entran: su garantia dejo de importar.
+    dispositivos = (
+        Dispositivo.objects.exclude(estado=EstadoDispositivo.DADO_DE_BAJA)
+        .select_related("tipo", "marca", "modelo")
+        .prefetch_related("pausas_garantia")
+    )
+
+    filas = []
+    conteo = {estado.value: 0 for estado in EstadoGarantiaDispositivo}
+
+    for dispositivo in dispositivos:
+        estado = calcular_estado_garantia(
+            dispositivo,
+            pausas=list(dispositivo.pausas_garantia.all()),
+        )
+        conteo[estado.estado] += 1
+        filas.append((dispositivo, estado))
+
+    if filtro in conteo:
+        filas = [par for par in filas if par[1].estado == filtro]
+    else:
+        # Vista por defecto: lo que requiere una decision.
+        filtro = ""
+        filas = [
+            par
+            for par in filas
+            if par[1].estado
+            in (
+                EstadoGarantiaDispositivo.POR_VENCER,
+                EstadoGarantiaDispositivo.PAUSADA,
+            )
+        ]
+
+    # Lo mas urgente primero; sin garantia al final.
+    filas.sort(
+        key=lambda par: (
+            par[1].dias_restantes is None,
+            par[1].dias_restantes if par[1].dias_restantes is not None else 0,
+        )
+    )
+
+    equipos = []
+    for dispositivo, estado in filas:
+        dispositivo.garantia = estado
+        dispositivo.garantia_css = CSS_ESTADO_GARANTIA.get(estado.estado, "")
+        equipos.append(dispositivo)
+
+    # Las plantillas de Django no indexan diccionarios, asi que el conteo de
+    # cada estado se resuelve aqui.
+    pestanas = [
+        {
+            "valor": valor,
+            "etiqueta": etiqueta,
+            "conteo": conteo.get(valor, 0),
+            "activa": filtro == valor,
+        }
+        for valor, etiqueta in EstadoGarantiaDispositivo.choices
+    ]
+
+    return render(
+        request,
+        "equipos/panel_garantias_equipos.html",
+        {
+            "equipos": equipos,
+            "filtro": filtro,
+            "pestanas": pestanas,
+            "atencion": (
+                conteo.get(EstadoGarantiaDispositivo.POR_VENCER, 0)
+                + conteo.get(EstadoGarantiaDispositivo.PAUSADA, 0)
+            ),
+            "dias_aviso": DIAS_AVISO_GARANTIA,
+        },
+    )
+
+
+@exige_editar_equipos
+@registrar_errores_vista("Error al registrar la salida del equipo")
+def registrar_salida_garantia(request, dispositivo_id):
+    """Anota que el equipo salio a reparacion y su garantia deja de correr."""
+    dispositivo = get_object_or_404(Dispositivo, pk=dispositivo_id)
+    destino = redirect("detalle_dispositivo_equipos", dispositivo_id=dispositivo.id)
+
+    permitido, motivo = puede_pausarse(dispositivo)
+    if not permitido:
+        messages.error(request, motivo)
+        return destino
+
+    if request.method != "POST":
+        return destino
+
+    formulario = SalidaGarantiaForm(request.POST, dispositivo=dispositivo)
+
+    if not formulario.is_valid():
+        for errores in formulario.errors.values():
+            for error in errores:
+                messages.error(request, error)
+        return destino
+
+    PausaGarantia.objects.create(
+        dispositivo=dispositivo,
+        fecha_salida=formulario.cleaned_data["fecha_salida"],
+        motivo=formulario.cleaned_data["motivo"],
+        registrado_por=request.user,
+    )
+    messages.success(
+        request,
+        f"Salida registrada. La garantía de {dispositivo.codigo} queda pausada.",
+    )
+    return destino
+
+
+@exige_editar_equipos
+@registrar_errores_vista("Error al registrar el retorno del equipo")
+def registrar_retorno_garantia(request, dispositivo_id):
+    """Cierra la pausa y suma al vencimiento los dias que estuvo fuera."""
+    dispositivo = get_object_or_404(Dispositivo, pk=dispositivo_id)
+    destino = redirect("detalle_dispositivo_equipos", dispositivo_id=dispositivo.id)
+
+    pausa = dispositivo.pausas_garantia.filter(fecha_retorno__isnull=True).first()
+
+    if pausa is None:
+        messages.error(request, "El equipo no tiene ninguna salida pendiente.")
+        return destino
+
+    if request.method != "POST":
+        return destino
+
+    formulario = RetornoGarantiaForm(request.POST, pausa=pausa)
+
+    if not formulario.is_valid():
+        for errores in formulario.errors.values():
+            for error in errores:
+                messages.error(request, error)
+        return destino
+
+    pausa.fecha_retorno = formulario.cleaned_data["fecha_retorno"]
+    if formulario.cleaned_data["motivo"]:
+        pausa.motivo = formulario.cleaned_data["motivo"]
+    pausa.save()
+
+    messages.success(
+        request,
+        f"Retorno registrado. Se sumaron {pausa.dias} día"
+        f"{'s' if pausa.dias != 1 else ''} a la garantía de {dispositivo.codigo}.",
+    )
+    return destino

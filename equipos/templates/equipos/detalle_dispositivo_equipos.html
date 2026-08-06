@@ -1,4 +1,5 @@
 {% extends 'core/base_media.html' %}
+{% load permisos_equipos %}
 
 {% block title %}Detalle del equipo{% endblock title %}
 
@@ -244,6 +245,135 @@
             </dl>
         </section>
 
+        {% comment %}
+           Garantia. La fecha del contrato no se toca nunca: el vencimiento
+           real se calcula sumandole los dias que el equipo estuvo fuera, y
+           aqui se muestran ambos por separado para que cualquiera pueda
+           reconstruir de donde sale la cifra.
+        {% endcomment %}
+        <section class="equipos-detalle__tarjeta">
+            <h3><i class="bi bi-shield-check"></i> Garantía</h3>
+
+            {% if not garantia.tiene_garantia %}
+                <p class="equipos-detalle__vacio">
+                    Este equipo no tiene garantía registrada.
+                </p>
+            {% else %}
+                <dl class="equipos-detalle__datos">
+                    <div>
+                        <dt>Estado</dt>
+                        <dd>
+                            <span class="equipos-estado {{ garantia_css }}">
+                                {{ garantia.etiqueta }}
+                            </span>
+                        </dd>
+                    </div>
+                    <div>
+                        <dt>Según contrato</dt>
+                        <dd>{{ garantia.fin_contrato|date:"d/m/Y" }}</dd>
+                    </div>
+                    {% if garantia.dias_pausados %}
+                        <div>
+                            <dt>Días pausados</dt>
+                            <dd>{{ garantia.dias_pausados }}</dd>
+                        </div>
+                        <div>
+                            <dt>Vence realmente</dt>
+                            <dd><strong>{{ garantia.fin_real|date:"d/m/Y" }}</strong></dd>
+                        </div>
+                    {% endif %}
+                    <div>
+                        <dt>{% if garantia.dias_restantes < 0 %}Venció hace{% else %}Faltan{% endif %}</dt>
+                        <dd>
+                            {% if garantia.dias_restantes < 0 %}
+                                {{ garantia.dias_restantes|slice:"1:" }} días
+                            {% else %}
+                                {{ garantia.dias_restantes }} días
+                            {% endif %}
+                        </dd>
+                    </div>
+                </dl>
+
+                {% if garantia.esta_pausada %}
+                    <p class="equipos-detalle__aviso">
+                        <i class="bi bi-pause-circle"></i>
+                        Fuera desde el
+                        {{ garantia.pausa_abierta.fecha_salida|date:"d/m/Y" }}
+                        ({{ garantia.pausa_abierta.dias_transcurridos }} días).
+                        El vencimiento se ajustará cuando se registre el retorno.
+                    </p>
+                {% endif %}
+            {% endif %}
+
+            {% comment %}
+               Las acciones exigen permiso de edicion. La jefatura ve la
+               tarjeta completa pero sin botones: consulta, no opera.
+            {% endcomment %}
+            {% if request.user|puede_editar_equipo %}
+                {% if garantia.esta_pausada %}
+                    <form method="post"
+                          action="{% url 'registrar_retorno_garantia_equipos' dispositivo.id %}"
+                          class="equipos-garantia__formulario">
+                        {% csrf_token %}
+                        <label for="fecha_retorno_garantia">Fecha de retorno</label>
+                        <input type="date" id="fecha_retorno_garantia"
+                               name="fecha_retorno" class="formularioCampo-date"
+                               max="{{ hoy|date:'Y-m-d' }}"
+                               min="{{ garantia.pausa_abierta.fecha_salida|date:'Y-m-d' }}"
+                               required>
+                        <label for="motivo_retorno_garantia">Observaciones</label>
+                        <textarea id="motivo_retorno_garantia" name="motivo" rows="2"
+                                  class="formularioCampo-text no-resize"
+                                  placeholder="Qué se hizo."></textarea>
+                        <button type="submit" class="formularioBotones-boton">
+                            <i class="bi bi-box-arrow-in-down"></i>
+                            Registrar retorno
+                        </button>
+                    </form>
+                {% elif permite_pausa %}
+                    <form method="post"
+                          action="{% url 'registrar_salida_garantia_equipos' dispositivo.id %}"
+                          class="equipos-garantia__formulario">
+                        {% csrf_token %}
+                        <label for="fecha_salida_garantia">Fecha de salida</label>
+                        <input type="date" id="fecha_salida_garantia"
+                               name="fecha_salida" class="formularioCampo-date"
+                               max="{{ hoy|date:'Y-m-d' }}" required>
+                        <label for="motivo_salida_garantia">Motivo</label>
+                        <textarea id="motivo_salida_garantia" name="motivo" rows="2"
+                                  class="formularioCampo-text no-resize"
+                                  placeholder="A dónde va y por qué."></textarea>
+                        <button type="submit" class="formularioBotones-boton">
+                            <i class="bi bi-box-arrow-up"></i>
+                            Registrar salida a reparación
+                        </button>
+                    </form>
+                {% elif motivo_sin_pausa %}
+                    <p class="equipos-detalle__vacio">{{ motivo_sin_pausa }}</p>
+                {% endif %}
+            {% endif %}
+
+            {% if pausas %}
+                <h4 class="equipos-detalle__subtitulo">Historial de pausas</h4>
+                <ul class="equipos-detalle__historial">
+                    {% for pausa in pausas %}
+                        <li>
+                            <strong>{{ pausa.fecha_salida|date:"d/m/Y" }}</strong>
+                            {% if pausa.fecha_retorno %}
+                                al {{ pausa.fecha_retorno|date:"d/m/Y" }}
+                                — {{ pausa.dias }} día{{ pausa.dias|pluralize }}
+                            {% else %}
+                                — sin retorno registrado
+                            {% endif %}
+                            {% if pausa.motivo %}
+                                <br><span>{{ pausa.motivo }}</span>
+                            {% endif %}
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        </section>
+
         <section class="equipos-detalle__tarjeta">
             <h3><i class="bi bi-geo-alt"></i> Ubicación y responsable</h3>
             <dl class="equipos-detalle__datos">
@@ -279,7 +409,13 @@
                 </div>
                 <div>
                     <dt>Garantía</dt>
-                    <dd>{{ dispositivo.get_garantia_anios_display }}</dd>
+                    <dd>
+                        {% if dispositivo.fecha_fin_garantia %}
+                            Hasta el {{ dispositivo.fecha_fin_garantia|date:"d/m/Y" }}
+                        {% else %}
+                            Sin garantía
+                        {% endif %}
+                    </dd>
                 </div>
                 <div>
                     <dt>Costo</dt>

@@ -1,6 +1,7 @@
 from django import forms
 from django.db.models import Q
 from django.urls import reverse
+from django.utils import timezone
 
 from core.constants.choices_constants import EstadoRegistro
 from core.validators.image_validator import validar_imagen_basica
@@ -13,7 +14,6 @@ from .models import (
     ColorDispositivo,
     CriticidadDispositivo,
     Dispositivo,
-    DuracionGarantiaDispositivo,
     EstadoDispositivo,
     MarcaDispositivo,
     ModeloDispositivo,
@@ -355,7 +355,7 @@ class DispositivoCreateForm(forms.ModelForm):
             "criticidad",
             "frecuencia_mantenimiento_meses",
             "fecha_instalacion",
-            "garantia_anios",
+            "fecha_fin_garantia",
             "costo_adquisicion",
             "observaciones",
         ]
@@ -446,11 +446,15 @@ class DispositivoCreateForm(forms.ModelForm):
                 },
                 format="%Y-%m-%d",
             ),
-            "garantia_anios": forms.Select(
+            # Se elige del calendario porque la garantia real es la fecha que
+            # dice el contrato, no siempre un numero redondo de anios.
+            "fecha_fin_garantia": forms.DateInput(
                 attrs={
-                    "class": "formularioCampo-select",
+                    "class": "formularioCampo-date",
                     "id": "garantia_dispositivo",
-                }
+                    "type": "date",
+                },
+                format="%Y-%m-%d",
             ),
             # El widget lo define CostoLempirasField mas abajo; aqui no se
             # declara para no pisarlo.
@@ -578,9 +582,8 @@ class DispositivoCreateForm(forms.ModelForm):
             ("", "Seleccione el tipo de tecnología"),
             *TipoTecnologiaDispositivo.choices,
         ]
-        self.fields["garantia_anios"].choices = [
-            *DuracionGarantiaDispositivo.choices,
-        ]
+        # Sin garantia se expresa dejando la fecha vacia, no con una opcion.
+        self.fields["fecha_fin_garantia"].required = False
         self.fields["estado"].choices = [
             (EstadoDispositivo.OPERATIVO, EstadoDispositivo.OPERATIVO.label),
             (
@@ -865,3 +868,104 @@ class ModeloCatalogoForm(forms.ModelForm):
             )
 
         return nombre
+
+
+class SalidaGarantiaForm(forms.Form):
+    """Registra que el equipo salio a reparacion.
+
+    Admite fechas retroactivas porque el tecnico suele anotar la salida dias
+    despues de que ocurra, pero nunca anteriores al registro del equipo ni
+    posteriores a hoy: una salida futura seria una prevision, no un hecho.
+    """
+
+    fecha_salida = forms.DateField(
+        label="Fecha de salida",
+        widget=forms.DateInput(
+            attrs={"class": "formularioCampo-date", "type": "date"},
+            format="%Y-%m-%d",
+        ),
+    )
+    motivo = forms.CharField(
+        label="Motivo",
+        required=False,
+        widget=forms.Textarea(
+            attrs={
+                "class": "formularioCampo-text no-resize",
+                "rows": 3,
+                "placeholder": "A dónde va y por qué. Número de orden si lo hay.",
+            }
+        ),
+    )
+
+    def __init__(self, *args, dispositivo=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.dispositivo = dispositivo
+
+    def clean_fecha_salida(self):
+        fecha = self.cleaned_data["fecha_salida"]
+        hoy = timezone.localdate()
+
+        if fecha > hoy:
+            raise forms.ValidationError(
+                "La salida no puede ser una fecha futura."
+            )
+
+        if self.dispositivo is not None:
+            registro = timezone.localtime(self.dispositivo.fecha_creado).date()
+            if fecha < registro:
+                raise forms.ValidationError(
+                    "La salida no puede ser anterior al registro del equipo "
+                    f"({registro.strftime('%d/%m/%Y')})."
+                )
+
+        return fecha
+
+    def clean_motivo(self):
+        return (self.cleaned_data.get("motivo") or "").strip()
+
+
+class RetornoGarantiaForm(forms.Form):
+    """Cierra la pausa. Los dias fuera se suman aqui al vencimiento."""
+
+    fecha_retorno = forms.DateField(
+        label="Fecha de retorno",
+        widget=forms.DateInput(
+            attrs={"class": "formularioCampo-date", "type": "date"},
+            format="%Y-%m-%d",
+        ),
+    )
+    motivo = forms.CharField(
+        label="Observaciones",
+        required=False,
+        widget=forms.Textarea(
+            attrs={
+                "class": "formularioCampo-text no-resize",
+                "rows": 3,
+                "placeholder": "Qué se hizo. Se añade a lo anotado en la salida.",
+            }
+        ),
+    )
+
+    def __init__(self, *args, pausa=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.pausa = pausa
+
+    def clean_fecha_retorno(self):
+        fecha = self.cleaned_data["fecha_retorno"]
+        hoy = timezone.localdate()
+
+        if fecha > hoy:
+            raise forms.ValidationError(
+                "El retorno no puede ser una fecha futura."
+            )
+
+        if self.pausa is not None and fecha < self.pausa.fecha_salida:
+            raise forms.ValidationError(
+                "El retorno no puede ser anterior a la salida "
+                f"({self.pausa.fecha_salida.strftime('%d/%m/%Y')})."
+            )
+
+        return fecha
+
+    def clean_motivo(self):
+        return (self.cleaned_data.get("motivo") or "").strip()

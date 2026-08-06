@@ -61,6 +61,24 @@ urlpatterns = [
         name='buscar_empleados_equipos'
     ),
 
+    # Garantias. El panel solo consulta, asi que lo abre cualquiera que pueda
+    # ver el inventario; registrar salidas y retornos exige poder editar.
+    path(
+        'garantias/',
+        views.panel_garantias,
+        name='panel_garantias_equipos'
+    ),
+    path(
+        'dispositivos/<int:dispositivo_id>/garantia/salida/',
+        views.registrar_salida_garantia,
+        name='registrar_salida_garantia_equipos'
+    ),
+    path(
+        'dispositivos/<int:dispositivo_id>/garantia/retorno/',
+        views.registrar_retorno_garantia,
+        name='registrar_retorno_garantia_equipos'
+    ),
+
     # Catalogo de marcas y modelos. Es el unico lugar donde se dan de alta:
     # el formulario de equipos solo permite elegir entre los existentes.
     path(

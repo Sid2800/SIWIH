@@ -7956,3 +7956,143 @@ button.equipos-imagenes__vista:hover img {
       grid-template-columns: 1fr;
    }
 }
+
+
+/* ============================================================
+   GARANTIAS
+   Tarjeta del detalle y panel propio. Reutiliza los colores de
+   estado del modulo; aqui solo se define lo que no existia.
+   ============================================================ */
+
+.equipos-detalle__vacio {
+   color: var(--colorTextoSololectura);
+   font-size: 1.4rem;
+   margin: 0;
+}
+
+/* Aviso de que el equipo esta fuera y el vencimiento se movera al volver. */
+.equipos-detalle__aviso {
+   align-items: flex-start;
+   background-color: var(--colorContendor);
+   border-left: .3rem solid var(--colorBoton);
+   border-radius: .6rem;
+   display: flex;
+   font-size: 1.35rem;
+   gap: .8rem;
+   line-height: 1.5;
+   margin: 1.2rem 0 0;
+   padding: 1rem 1.2rem;
+}
+
+.equipos-detalle__aviso i {
+   flex-shrink: 0;
+   margin-top: .2rem;
+}
+
+.equipos-detalle__subtitulo {
+   border-top: .1rem solid var(--colorLinea);
+   font-size: 1.4rem;
+   margin: 1.8rem 0 .8rem;
+   padding-top: 1.4rem;
+}
+
+.equipos-detalle__historial {
+   display: flex;
+   flex-direction: column;
+   gap: .8rem;
+   list-style: none;
+   margin: 0;
+   padding: 0;
+}
+
+.equipos-detalle__historial li {
+   border-left: .2rem solid var(--colorLinea);
+   font-size: 1.35rem;
+   line-height: 1.5;
+   padding-left: 1rem;
+}
+
+.equipos-detalle__historial span {
+   color: var(--colorTextoSololectura);
+}
+
+/* Formulario de salida y retorno dentro de la tarjeta de garantia. */
+.equipos-garantia__formulario {
+   border-top: .1rem solid var(--colorLinea);
+   display: flex;
+   flex-direction: column;
+   gap: .6rem;
+   margin-top: 1.6rem;
+   padding-top: 1.6rem;
+}
+
+.equipos-garantia__formulario label {
+   font-size: 1.3rem;
+   font-weight: 600;
+}
+
+.equipos-garantia__formulario button {
+   align-self: flex-start;
+   margin-top: .6rem;
+}
+
+/* Filtros del panel: enlaces y no un formulario, porque cada estado es una
+   pregunta distinta que conviene poder compartir por URL. */
+.equipos-garantias__filtros {
+   display: flex;
+   flex-wrap: wrap;
+   gap: .8rem;
+}
+
+.equipos-garantias__filtro {
+   align-items: center;
+   background-color: var(--blanco);
+   border: .1rem solid var(--colorLinea);
+   border-radius: 2rem;
+   color: inherit;
+   display: inline-flex;
+   font-size: 1.35rem;
+   gap: .6rem;
+   padding: .7rem 1.4rem;
+   text-decoration: none;
+   transition: background-color .15s ease, border-color .15s ease;
+}
+
+.equipos-garantias__filtro:hover {
+   background-color: var(--colorTablaHover);
+}
+
+.equipos-garantias__filtro--activo {
+   background-color: var(--colorBoton);
+   border-color: var(--colorBoton);
+   color: var(--colorTextoBoton);
+}
+
+.equipos-garantias__conteo {
+   background-color: var(--colorContendor);
+   border-radius: 1.2rem;
+   font-size: 1.2rem;
+   font-weight: 600;
+   min-width: 2.2rem;
+   padding: .1rem .6rem;
+   text-align: center;
+}
+
+.equipos-garantias__filtro--activo .equipos-garantias__conteo {
+   background-color: rgba(255, 255, 255, .25);
+}
+
+@media (max-width: 48rem) {
+   .equipos-garantias__filtros {
+      gap: .6rem;
+   }
+
+   .equipos-garantias__filtro {
+      font-size: 1.25rem;
+      padding: .6rem 1.1rem;
+   }
+
+   .equipos-garantia__formulario button {
+      align-self: stretch;
+   }
+}
