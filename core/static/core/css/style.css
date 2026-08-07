@@ -8096,3 +8096,17 @@ button.equipos-imagenes__vista:hover img {
       align-self: stretch;
    }
 }
+
+
+/* Tabla del panel de garantias. Con cinco columnas no se usa DataTables
+   Responsive: aquel se configura con las nueve del inventario y pedirle
+   columnas que no existen lanza "Requested unknown parameter". Aqui basta
+   con desplazar en horizontal cuando la pantalla es estrecha. */
+.equipos-garantias__tabla {
+   overflow-x: auto;
+   width: 100%;
+}
+
+.equipos-garantias__tabla .equipos-listado__tabla {
+   min-width: 52rem;
+}
