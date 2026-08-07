@@ -119,6 +119,9 @@ def buscar_expedientes_api(request):
             }
 
         resultados = []
+        # Para no repetir el mismo expediente cuando un paciente tiene más de una
+        # asignación (p. ej. una vigente y otra liberada).
+        expedientes_vistos = set()
 
         if tipo == 'expediente':
             # Buscar por número de expediente — Top 5 resultados
@@ -145,13 +148,23 @@ def buscar_expedientes_api(request):
                 resultados.append(_construir_resultado(exp, paciente))
 
         elif tipo == 'identidad':
-            query_limpio = query.replace("-", "").replace(" ", "")
-            pacientes = Paciente.objects.filter(dni__icontains=query_limpio, estado='A')[:5]
+            # Solo dígitos: así funciona aunque venga pegado con guiones o
+            # espacios (la máscara del front puede dejarlos).
+            query_limpio = ''.join(ch for ch in query if ch.isdigit())
+            # SIN filtrar por estado del paciente: deben salir TODOS (activos,
+            # egresados 'P', defunción, etc.), igual que la búsqueda por número
+            # de expediente. El estado del paciente no debe ocultar su expediente.
+            pacientes = Paciente.objects.filter(dni__icontains=query_limpio)[:5]
             for pac in pacientes:
+                # Todas las asignaciones del paciente (la vigente '1' primero),
+                # no solo la activa, para no ocultar el expediente.
                 asignaciones = PacienteAsignacion.objects.filter(
-                    paciente=pac, estado='1'
-                ).select_related('expediente')
+                    paciente=pac
+                ).select_related('expediente').order_by('-estado')
                 for asig in asignaciones:
+                    if asig.expediente_id in expedientes_vistos:
+                        continue
+                    expedientes_vistos.add(asig.expediente_id)
                     resultados.append(_construir_resultado(asig.expediente, pac))
                     if len(resultados) >= 5:
                         break
@@ -160,7 +173,9 @@ def buscar_expedientes_api(request):
 
         elif tipo == 'nombre':
             palabras = query.split()
-            filtro = Q(estado='A')
+            # Sin Q(estado='A'): igual que arriba, el estado del paciente no debe
+            # excluirlo de la búsqueda.
+            filtro = Q()
             for palabra in palabras:
                 filtro &= (
                     Q(primer_nombre__icontains=palabra) |
@@ -171,9 +186,12 @@ def buscar_expedientes_api(request):
             pacientes = Paciente.objects.filter(filtro)[:5]
             for pac in pacientes:
                 asignaciones = PacienteAsignacion.objects.filter(
-                    paciente=pac, estado='1'
-                ).select_related('expediente')
+                    paciente=pac
+                ).select_related('expediente').order_by('-estado')
                 for asig in asignaciones:
+                    if asig.expediente_id in expedientes_vistos:
+                        continue
+                    expedientes_vistos.add(asig.expediente_id)
                     resultados.append(_construir_resultado(asig.expediente, pac))
                     if len(resultados) >= 5:
                         break

@@ -17,12 +17,6 @@ $(document).ready(function () {
         if (e.key === 'Enter' || e.which === 13) {
             e.preventDefault();
             e.stopPropagation();
-            const tipo = $('#tipo-busqueda').val();
-            // Solo limpiar placeholders de máscara cuando es identidad
-            if (tipo === 'identidad') {
-                const valorActual = $(this).val().replace(/_/g, '').trim();
-                $(this).val(valorActual);
-            }
             buscarExpedientes();
         }
     });
@@ -202,6 +196,8 @@ function actualizarMascaraInput() {
     inputDom.removeAttribute('data-inputmask-placeholder');
     inputDom.removeAttribute('readonly');
     $input.val('');
+    // Quitar el handler de pegado de identidad; se re-agrega solo si aplica.
+    $input.off('paste.mascaraIdentidad');
 
     if (tipo === 'identidad') {
         // Solo aquí se aplica la máscara — misma del módulo Editar Pacientes
@@ -216,6 +212,21 @@ function actualizarMascaraInput() {
         });
         mascaraIdentidadInstance.mask(inputDom);
         $input.attr('placeholder', 'Ingrese identidad: ____-____-_____');
+
+        // Al PEGAR: tomar solo los dígitos y dejar que la máscara los formatee.
+        // Sin esto, pegar una identidad con guiones/espacios dejaba el campo con
+        // caracteres sueltos y no dejaba buscar. Evento con namespace para no
+        // acumular handlers al recrear la máscara.
+        $input.off('paste.mascaraIdentidad').on('paste.mascaraIdentidad', function (e) {
+            e.preventDefault();
+            const cb = (e.originalEvent || e).clipboardData || window.clipboardData;
+            const digitos = ((cb && cb.getData('text')) || '').replace(/\D/g, '');
+            if (inputDom.inputmask) {
+                inputDom.inputmask.setValue(digitos);
+            } else {
+                inputDom.value = digitos;
+            }
+        });
     } else if (tipo === 'nombre') {
         // Input libre, sin máscara
         $input.attr('placeholder', 'Ingrese nombre o apellido del paciente...');
@@ -261,9 +272,14 @@ function buscarExpedientes() {
     let query = $('#busqueda-input').val();
     const tipo = $('#tipo-busqueda').val();
 
-    // Solo en identidad limpiar placeholders de máscara
     if (tipo === 'identidad') {
-        query = query.replace(/_/g, '').trim();
+        // Solo dígitos: robusto ante lo pegado (guiones, espacios) y los
+        // placeholders "_" de la máscara. El backend busca por dígitos.
+        query = query.replace(/\D/g, '');
+        if (query.length < 6) {
+            toastr.warning('Ingrese al menos 6 dígitos de la identidad');
+            return;
+        }
     } else {
         query = query.trim();
     }
@@ -271,15 +287,6 @@ function buscarExpedientes() {
     if (!query) {
         toastr.warning('Ingrese un criterio de búsqueda');
         return;
-    }
-
-    // Para identidad, validar formato mínimo (con o sin guiones)
-    if (tipo === 'identidad') {
-        const sinGuiones = query.replace(/-/g, '');
-        if (sinGuiones.length < 6) {
-            toastr.warning('Ingrese al menos 6 dígitos de la identidad');
-            return;
-        }
     }
 
     $('#resultados-busqueda').html(
