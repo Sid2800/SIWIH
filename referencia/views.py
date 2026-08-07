@@ -18,6 +18,7 @@ from referencia.validators import validar_respuesta_vs_referencia, validar_refer
 from referencia.forms import ReferenciaCreateForm, ReferenciaEditForm, RespuestaCreateForm, RespuestaEditForm
 from types import SimpleNamespace
 import json
+from copy import deepcopy
 from django.core.serializers.json import DjangoJSONEncoder
 from core.constants import permisos
 from core.utils.utilidades_textos import generar_slug
@@ -108,7 +109,7 @@ class ReferenciaAddView(UnidadRolRequiredMixin, CreateView):
         paciente = form.cleaned_data.get('paciente')
         motivo_no_atencion = form.cleaned_data.get('motivo_no_atencion')
 
-
+        
         if usuario:
             form.instance.creado_por = usuario
             form.instance.modificado_por = usuario
@@ -281,10 +282,6 @@ class ReferenciaEditView(UnidadRolRequiredMixin, UpdateView):
         form.instance.motivo_no_atencion = motivo_no_atencion
 
 
-
-
-    
-
         try:
             # agregr el personal de salud que elaboro la referencia
             form.instance.personal_salud_refiere = form.cleaned_data.get("personal_salud_refiere")
@@ -334,9 +331,6 @@ class RespuestaCreateUpdateView(View):
         referencia = form.referencia
         seguimiento = form.cleaned_data.get("seguimiento")
 
-        
-
-
         if usuario:
             form.instance.creado_por = usuario
             form.instance.modificado_por = usuario
@@ -356,8 +350,8 @@ class RespuestaCreateUpdateView(View):
                     referencia.save(update_fields=["motivo_no_atencion"])
 
                 instance = form.save(commit=False)
-                
-                if seguimiento == 2:  # tipo 3 / seguimiento con referencia enviada
+
+                if seguimiento == 2:  # tipo 2 / seguimiento con referencia enviada
                     # SOLO crear referencia si no existe previamente
                     if not instance.seguimiento_referencia:
                         # crear la nueva referencia
@@ -370,20 +364,36 @@ class RespuestaCreateUpdateView(View):
                         "motivo": instance.motivo,
                         "motivo_detalle": instance.motivo_detalle,
                         "atencion_requerida": instance.atencion_requerida,
+                        #peronsla que la crea tamboien ,
+                        "personal_salud_refiere": instance.personal_salud_responde,
                         "elaborada_por": instance.elaborada_por,
                         #area que refiere paso el campo como tal para podemos mapear
                         "unidad_clinica_refiere": instance.unidad_clinica_responde,
                         "especialidad_destino": form.cleaned_data.get('seguimiento_referencia_especialidad_destino'),
                         "observaciones": instance.observaciones                    
-                        },diagnosticos, usuario)
+                        },
+                        deepcopy(diagnosticos),
+                        usuario,
+                        form.cleaned_data["control_calidad"])
                         instance.seguimiento_referencia = nueva_ref
                 instance.save()
+
+
 
                 #procesar diagnosticos 
                 RefDiagnosticoService.procesar_diagnosticos_respuesta(
                     respuesta_id=instance.id,
                     diagnosticos=diagnosticos
                 )
+
+                # control de calidad 
+                # Control de calidad (solo respuestas a referencias reciobidas)
+                if form.instance.referencia.tipo == 0:
+                    ReferenciaService.procesar_control_calidad_respuesta(
+                        respuesta=form.instance,
+                        criterios=form.cleaned_data["control_calidad"],
+                        usuario=usuario
+                    )
 
                 return JsonResponse({"success": True, "redirect_url": reverse_lazy('home')})
             

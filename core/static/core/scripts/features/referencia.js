@@ -1094,6 +1094,39 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
 
+    function agregarControlCalidadRespuesta(formData) {
+
+        const PREFIJO = "resp_"; // lo diferncia de los de referencia 
+
+        const grupos = document.querySelectorAll(
+            ".referenciaRespuestaControlCalidadCampos .radio-fielset"
+        );
+
+        for (const grupo of grupos) {
+
+            const seleccionado = grupo.querySelector("input:checked");
+
+            if (!seleccionado) {
+
+                const nombre = grupo.querySelector(
+                    ".controlCalidadRadioLabel"
+                ).textContent.trim();
+
+                throw new Error(
+                    `Debe indicar "${nombre}" en el control de calidad.`
+                );
+            }
+
+
+            formData.append(
+                seleccionado.name.substring(PREFIJO.length),
+                seleccionado.value
+            );
+        }
+    }
+
+
+
 //#endregion
 
 
@@ -1694,7 +1727,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
 
-        
+            try {
+                agregarControlCalidadRespuesta(formData);
+            } catch (e) {
+                toastr.error(e.message, "Formulario incompleto");
+                return;
+            }
+
             
         }
 
@@ -1703,6 +1742,8 @@ document.addEventListener('DOMContentLoaded', function () {
         botonGuardar.disabled = true;
         botonGuardar.innerHTML = `<span class="spinner"></span> Guardando Respues...`;
         
+
+    
         try{
             const response = await fetch(form.action, {
                 method: "POST",

@@ -1,4 +1,4 @@
-from referencia.models import Referencia, SeguimientoTic, ControlCalidadReferencia
+from referencia.models import Referencia, SeguimientoTic, ControlCalidadReferencia, ControlCalidadRespuesta
 from servicio.models import Institucion_salud
 from core.services.referencia.referencia_diagnostico_service import RefDiagnosticoService
 from core.constants.domain_constants import HEAC_INSTITUCION_ID
@@ -13,7 +13,7 @@ class ReferenciaService:
     
 
     @staticmethod
-    def crear_referencia_enviada_segun_repuesta(data: dict, diagnosticos, user=None):
+    def crear_referencia_enviada_segun_repuesta(data: dict, diagnosticos, user=None, control_calidad = None):
         
         try:
             with transaction.atomic():
@@ -27,6 +27,7 @@ class ReferenciaService:
                     "motivo": data.get("motivo"),
                     "motivo_detalle": data.get("motivo_detalle"),
                     "atencion_requerida": data.get("atencion_requerida"),
+                    "personal_salud_refiere": data.get("personal_salud_refiere"),
                     "elaborada_por": data.get("elaborada_por"),
                     "unidad_clinica_refiere": data.get("unidad_clinica_refiere"),
                     "especialidad_destino": data.get("especialidad_destino"),
@@ -50,6 +51,8 @@ class ReferenciaService:
                     referencia_id=referencia.id,
                     diagnosticos=diagnosticos
                 )
+
+                ReferenciaService.procesar_control_calidad_referencia(referencia, control_calidad, user)
                 return referencia
 
         except Exception:
@@ -186,6 +189,41 @@ class ReferenciaService:
         if hubo_cambios:
             control.modificado_por = usuario
             control.save()
+
+
+    @staticmethod
+    def procesar_control_calidad_respuesta(respuesta, criterios,usuario):
+        """
+        Crea o actualiza el control de calidad asociado a una referencia.
+
+        Si el control ya existe, únicamente se actualiza cuando
+        alguno de los criterios cambió.
+        """
+
+        try:
+            control = respuesta.control_calidad
+
+        except ControlCalidadRespuesta.DoesNotExist:
+            ControlCalidadRespuesta.objects.create(
+                respuesta=respuesta,
+                creado_por=usuario,
+                modificado_por=usuario,
+                **criterios
+            )
+            return
+
+        hubo_cambios = False
+
+        for campo, valor in criterios.items():
+
+            if getattr(control, campo) != valor:
+                setattr(control, campo, valor)
+                hubo_cambios = True
+
+        if hubo_cambios:
+            control.modificado_por = usuario
+            control.save()
+
 
 
         

@@ -266,7 +266,6 @@ class ReferenciaCreateForm(forms.ModelForm):
 
 
 
-       
 
         if atencion_requerida is None:
             raise forms.ValidationError("Debe indicar la atencion requerida")
@@ -317,10 +316,13 @@ class ReferenciaCreateForm(forms.ModelForm):
             # control de calidad
             criterios_calidad = {}
             for campo in self.CAMPOS_CONTROL_CALIDAD:
-                criterios_calidad[campo] = validar_booleano(
-                                                self.data.get(campo),
-                                                campo
-                                            )
+                valor = validar_booleano(
+                    self.data.get(campo),
+                    campo
+                )
+
+                cleaned_data[campo] = valor          # Reemplaza el True de BooleanField
+                criterios_calidad[campo] = valor     # Construye el objeto
             cleaned_data["control_calidad"] = criterios_calidad
 
 
@@ -549,6 +551,26 @@ class RespuestaCreateForm(forms.ModelForm):
         label="Especialidad Destino"
     )
 
+    # control de calidad
+    formato_correcto = forms.BooleanField(required=False)
+    letra_legible = forms.BooleanField(required=False)
+    datos_completos = forms.BooleanField(required=False)
+    manchones_borrones = forms.BooleanField(
+        required=False,
+        label="Manchones Borrones"
+    )
+    firma_sello = forms.BooleanField(
+        required=False,
+        label="Firma y Sello"
+    )
+
+    CAMPOS_CONTROL_CALIDAD_RESPUESTA = (
+        "formato_correcto",
+        "letra_legible",
+        "datos_completos",
+        "manchones_borrones",
+        "firma_sello",
+    )
 
     class Meta:
         model = Respuesta
@@ -594,6 +616,13 @@ class RespuestaCreateForm(forms.ModelForm):
         )
         qs_especialidades_referencia = Referencia_especialidad.objects.filter(estado=True)
 
+
+        #controles de calidad se agregan aca porque la vista no tiene constex vive dentrio de referencia
+        self.campos_control_calidad = [
+            self[campo]
+            for campo in self.CAMPOS_CONTROL_CALIDAD_RESPUESTA
+        ]
+
         initial_institucion = None
         initial_especialidad = None
         readonly = False  
@@ -621,6 +650,17 @@ class RespuestaCreateForm(forms.ModelForm):
                 self.instance.personal_salud_responde_id
             )
 
+
+            #inital para los controles de calidad 
+            control = getattr(self.instance, "control_calidad", None) # se usa referencia para apuntart al control de cliada no la respuesta
+
+            if control:
+
+                self.fields["formato_correcto"].initial = control.formato_correcto
+                self.fields["letra_legible"].initial = control.letra_legible
+                self.fields["datos_completos"].initial = control.datos_completos
+                self.fields["manchones_borrones"].initial = control.manchones_borrones
+                self.fields["firma_sello"].initial = control.firma_sello
             
 
         # Asignar querysets
@@ -722,6 +762,7 @@ class RespuestaCreateForm(forms.ModelForm):
     def clean(self):
         cleaned_data = super().clean()
 
+      
 
         # Campos clave
         tipo_referencia = int(self.data.get("tipo")) if self.data.get("tipo") is not None else None
@@ -765,8 +806,6 @@ class RespuestaCreateForm(forms.ModelForm):
             cleaned_data["elaborada_por"] = personal_salud.tipo_personal_salud
 
             
-
-
             # BLOQUEO DE CAMBIO SI YA EXISTE UNA REFERENCIA ENVIADA
             if self.instance.pk and self.instance.seguimiento_referencia:
                 if seguimiento != 2:  # solo válido si mantiene tipo "referencia enviada"
@@ -803,7 +842,22 @@ class RespuestaCreateForm(forms.ModelForm):
             else:
                 raise forms.ValidationError("Debe indicar al menos un tipo de seguimiento")
 
-                
+
+            # control de calidad
+            criterios_calidad = {}
+            for campo in self.CAMPOS_CONTROL_CALIDAD_RESPUESTA:
+                valor = validar_booleano(
+                    self.data.get(campo),
+                    campo
+                )
+
+                cleaned_data[campo] = valor             # Reemplaza el True de BooleanField
+                criterios_calidad[campo] = valor        # Construye el objeto
+            cleaned_data["control_calidad"] = criterios_calidad
+
+
+
+
         elif tipo_referencia == 1:  # enviada
             # Validaciones futuras para tipo enviada
             if not institucion_destino:
@@ -819,6 +873,7 @@ class RespuestaCreateForm(forms.ModelForm):
         except (TypeError, json.JSONDecodeError):
             raise forms.ValidationError("Los diagnósticos no son válidos.")
 
+        
         if not diagnosticos:
             raise forms.ValidationError("Debe enviar al menos un estudio.")
 
@@ -838,6 +893,7 @@ class RespuestaCreateForm(forms.ModelForm):
             if codigo not in estudios_existentes_ids:
                 raise forms.ValidationError(f"El código de diagnostico {codigo} no existe en la base de datos.")
 
+        print(f"sin validar {diagnosticos}") 
         self.diagnosticos_validados = diagnosticos
         
         return cleaned_data

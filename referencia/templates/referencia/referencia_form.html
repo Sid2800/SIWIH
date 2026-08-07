@@ -35,7 +35,7 @@
         <div class="frmReferenciaCampos">
             <span class="form-subtitulo-fieldset-falso"> {{ subtitulo }}</span> <!-- quitar al final-->
             <fieldset class="referenciaPacienteCampos">
-            <legend>Datos Paciente</legend>  
+                <legend>Datos Paciente</legend>  
 
 
                 <div class="formularioCampo">
@@ -399,6 +399,11 @@
                                 {% endif %}
                             </div>
 
+                            <fieldset class="referenciaRespuestaObservaciones">
+                                <legend>Observaciones</legend>
+                                {{ form_respuesta.observaciones }}  
+                            </fieldset >
+
 
                         </div>
                         
@@ -505,11 +510,52 @@
 
                             </fieldset>
 
-                            <fieldset class="referenciaRespuestaObservaciones">
-                                <legend>Observaciones</legend>
-                                {{ form_respuesta.observaciones }}  
-                            </fieldset >
+                            <fieldset class="referenciaRespuestaControlCalidad" id="contenedor-control-calidad">
+                                <legend>Control de Calidad</legend>
+
+                                <div class="referenciaRespuestaControlCalidadCampos">
+
+                                    {% for campo in form_respuesta.campos_control_calidad %}
+
+                                    <div class="radio-fielset respuesta{{ campo.name|capfirst }}">
+                                        <span class="controlCalidadRadioLabel">{{ campo.label }}</span>
+
+                                        <div class="respuesta-contenedor-radios-options">
+
+                                            <label class="radio-personalizado">
+                                                <input
+                                                    type="radio"
+                                                    name="resp_{{ campo.name }}"
+                                                    value="1"
+                                                    hidden
+                                                    {% if campo.value %}checked{% endif %}
+                                                >
+                                                <span class="radio-boton">SI</span>
+                                            </label>
+
+                                            <label class="radio-personalizado">
+                                                <input
+                                                    type="radio"
+                                                    name="resp_{{ campo.name }}"
+                                                    value="0"
+                                                    hidden
+                                                    {% if campo.value == False %}checked{% endif %}
+                                                >
+                                                <span class="radio-boton">NO</span>
+                                            </label>
+
+                                        </div>
+
+                                    </div>
+
+                                    {% endfor %}
+
+                                </div>
+                            </fieldset>
+                            
                         </div>
+
+                        
 
                     </div>
                 </div>
@@ -545,7 +591,7 @@
 
                             <div class="referenciaRespuestaCamposDiagnostico" >
                                 <label class= "form-subtitulo-fieldset-falso">DIAGNOSTICO</label>
-                      
+
                                 {% if form.tipo.value == 1  %}
                                     <table id="referencia-tabla-respuesta-diagnosticos"  class="display" style="width:100%">
                                         <thead>
