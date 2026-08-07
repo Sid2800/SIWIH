@@ -80,7 +80,9 @@ class EstadoGarantiaDispositivo(models.TextChoices):
 
 
 # Dias de antelacion con los que una garantia se considera "por vencer".
-DIAS_AVISO_GARANTIA = 30
+# Tres meses dan margen para gestionar con el proveedor y levantar el papeleo
+# antes de perder la cobertura. Subirlo o bajarlo solo requiere tocar aqui.
+DIAS_AVISO_GARANTIA = 90
 
 
 # Catalogos administrables desde Django admin.

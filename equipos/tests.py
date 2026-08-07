@@ -3156,22 +3156,31 @@ class GarantiaCalculoTests(TestCase):
         self.assertEqual(estado.dias_restantes, -5)
         self.assertFalse(estado.esta_vigente)
 
-    # --- El umbral de 30 dias --------------------------------------------
+    # --- El umbral de aviso ----------------------------------------------
+    # Se expresan en funcion de DIAS_AVISO_GARANTIA y no de un numero fijo:
+    # el umbral es una decision que puede cambiar, y lo que hay que proteger
+    # es que el limite caiga donde toca, no cuanto vale hoy.
 
-    def test_a_31_dias_todavia_es_vigente(self):
-        equipo = self.crear_equipo(fin_garantia=date(2026, 9, 6))
+    def test_justo_pasado_el_umbral_todavia_es_vigente(self):
+        hoy = date(2026, 8, 6)
+        equipo = self.crear_equipo(
+            fin_garantia=hoy + timedelta(days=DIAS_AVISO_GARANTIA + 1)
+        )
 
-        estado = calcular_estado_garantia(equipo, hoy=date(2026, 8, 6))
+        estado = calcular_estado_garantia(equipo, hoy=hoy)
 
-        self.assertEqual(estado.dias_restantes, 31)
+        self.assertEqual(estado.dias_restantes, DIAS_AVISO_GARANTIA + 1)
         self.assertEqual(estado.estado, EstadoGarantiaDispositivo.VIGENTE)
 
-    def test_a_30_dias_exactos_ya_es_por_vencer(self):
-        equipo = self.crear_equipo(fin_garantia=date(2026, 9, 5))
+    def test_en_el_umbral_exacto_ya_es_por_vencer(self):
+        hoy = date(2026, 8, 6)
+        equipo = self.crear_equipo(
+            fin_garantia=hoy + timedelta(days=DIAS_AVISO_GARANTIA)
+        )
 
-        estado = calcular_estado_garantia(equipo, hoy=date(2026, 8, 6))
+        estado = calcular_estado_garantia(equipo, hoy=hoy)
 
-        self.assertEqual(estado.dias_restantes, 30)
+        self.assertEqual(estado.dias_restantes, DIAS_AVISO_GARANTIA)
         self.assertEqual(estado.estado, EstadoGarantiaDispositivo.POR_VENCER)
 
     def test_el_ultimo_dia_sigue_cubierto(self):
