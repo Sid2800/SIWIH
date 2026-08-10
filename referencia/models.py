@@ -137,6 +137,12 @@ class Referencia(models.Model):
         (2, "NO"),
         (3, "N/C"),
     )
+
+    formato_sinar = models.BooleanField(
+        null=True,
+        blank=True
+    )
+    
     oportuna =  models.PositiveSmallIntegerField(
         choices=OPCIONES_CALIDAD, null=True, blank=True, verbose_name="Oportuna"
         )

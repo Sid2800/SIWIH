@@ -111,6 +111,7 @@ class ReferenciaCreateForm(forms.ModelForm):
                 # Calidad
                 "oportuna",
                 "justificada",
+                "formato_sinar",
 
                 # Destino
                 "especialidad_destino",
@@ -292,6 +293,7 @@ class ReferenciaCreateForm(forms.ModelForm):
         if tipo_ref == 1:  # Enviada
             cleaned_data['justificada'] = None
             cleaned_data['oportuna'] = None
+            cleaned_data['formato_sinar'] = None
             cleaned_data['fecha_recepcion'] = None
             cleaned_data['motivo_no_atencion'] = None
 
@@ -343,7 +345,11 @@ class ReferenciaCreateForm(forms.ModelForm):
             else:
                 raise forms.ValidationError("Debe indicar los datos de calidad (Justificada, Oportuna).")
 
-
+            cleaned_data["formato_sinar"] = validar_booleano(
+                self.data.get("formato_sinar"),
+                "Formato SINAR"
+            )
+            
             validar_entero_positivo(unidad_clinica_responsable_id, "Unidad Clinica Responsable")
             unidad_clinica_responsable = validar_unidad_clinica_activa(unidad_clinica_responsable_id)
             cleaned_data["unidad_clinica_responsable"] = unidad_clinica_responsable
