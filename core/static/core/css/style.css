@@ -4001,6 +4001,7 @@ select[disabled] {
 }
 
 .radio-fielset.referenciaOportuna,
+.radio-fielset.referenciaFormato_sinar,
 .radio-fielset.referenciaJustificada{
    border: 0;
 }
@@ -4032,10 +4033,7 @@ select[disabled] {
    
 }
 
-.referenciaOportuna,
-.referenciaJustificada{
-   width: 90%;
-}
+
 
 
 .referencia-referencia-tipo.bloqueado {
@@ -4217,9 +4215,11 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
 
 
 .referenciaOportuna,
+.referenciaFormato_sinar,
 .referenciaJustificada{
    column-gap: 1rem;
-   justify-content: flex-end;
+   justify-content: space-between;
+   width: 90%;
 }
 
 
@@ -4498,14 +4498,7 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
       
    }
 
-   .referenciaReferenciaEvaluacion{
-      flex-direction: row;
-   }
-
-   .radio-fielset.referenciaOportuna,
-   .radio-fielset.referenciaJustificada{
-      width: 100%;
-   }
+  
 
    .referencia-respuesta-seguimiento-texto{
       width: 10rem;
@@ -4580,6 +4573,24 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
       width: 100%;
       row-gap: .4rem;
    }
+
+   .referenciaReferenciaEvaluacion{
+      flex-direction: row;
+      justify-content: space-between;
+      align-items: center;
+      column-gap: 2rem;
+   }
+
+   .radio-fielset.referenciaOportuna,
+   .radio-fielset.referenciaFormato_sinar,
+   .radio-fielset.referenciaJustificada{
+      width: 100%;
+      flex-direction: column;
+      align-items: flex-start;
+      row-gap: .4rem;
+   }
+
+
 
    .referenciaRespuestaSeguimiento{
       display: grid;
@@ -4703,6 +4714,8 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
    .referenciaReferenciaControlCalidadCampos{
       grid-template-columns: 1fr 1fr 1fr;
    }
+
+
 
 }
 
