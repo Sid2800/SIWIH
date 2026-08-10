@@ -1,5 +1,7 @@
+from django.conf import settings
 from django.db import models
 from django.db.models import Q
+from django.core.validators import MinValueValidator
 from django.utils import timezone
 
 
@@ -159,9 +161,10 @@ class PuntoSolicitud(models.Model):
 class Solicitud(models.Model):
     class Estado(models.TextChoices):
         PENDIENTE = "PENDIENTE", "Pendiente"
-        EN_PROCESO = "EN_PROCESO", "En proceso"
+        PROGRAMADA = "PROGRAMADA", "Programada"
+        EN_EJECUCION = "EN_EJECUCION", "En ejecución"
         FINALIZADA = "FINALIZADA", "Finalizada"
-        CANCELADA = "CANCELADA", "Cancelada"
+        ANULADA = "ANULADA", "Anulada"
 
     numero_solicitud = models.CharField(max_length=30, unique=True, db_index=True)
     fecha_solicitud = models.DateTimeField(default=timezone.now, db_index=True)
@@ -197,6 +200,16 @@ class Solicitud(models.Model):
     )
     motivo = models.TextField()
     observaciones = models.TextField(blank=True, null=True)
+    motivo_anulacion = models.TextField(blank=True, null=True)
+    observacion_anulacion = models.TextField(blank=True, null=True)
+    anulada_en = models.DateTimeField(blank=True, null=True)
+    anulada_por = models.ForeignKey(
+        "auth.User",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="solicitudes_anuladas",
+    )
     estado = models.CharField(
         max_length=30,
         choices=Estado.choices,
@@ -218,10 +231,30 @@ class Solicitud(models.Model):
 
     @property
     def esta_asociada_autorizacion(self):
+        tiene_viaje_solicitud_activa = getattr(self, "tiene_viaje_solicitud_activa", None)
+        if tiene_viaje_solicitud_activa is not None:
+            return bool(tiene_viaje_solicitud_activa)
         return self.viaje_solicitudes.filter(activo=True).exists()
 
     @property
+    def proceso_funcional(self):
+        if self.estado == self.Estado.ANULADA:
+            return "Anulada"
+        if self.estado == self.Estado.FINALIZADA:
+            return "Finalizada"
+        if self.estado == self.Estado.EN_EJECUCION:
+            return "En ejecución"
+        if self.estado == self.Estado.PROGRAMADA:
+            return "Programada"
+        if self.esta_asociada_autorizacion:
+            return "En proceso"
+        return "Pendiente"
+
+    @property
     def puede_editar(self):
+        return self.estado == self.Estado.PENDIENTE and not self.esta_asociada_autorizacion
+        if self.estado != self.Estado.PENDIENTE:
+            return False
         return not self.esta_asociada_autorizacion
 
 
@@ -287,29 +320,31 @@ class SolicitudPersonal(models.Model):
 
 
 class Viaje(models.Model):
+    class TipoProgramacion(models.IntegerChoices):
+        REGIONAL = 1, "Regional"
+        NACIONAL = 2, "Nacional"
+
     numero_viaje = models.CharField(max_length=30, unique=True, db_index=True)
     fecha_programacion = models.DateTimeField(default=timezone.now, db_index=True)
     motorista = models.ForeignKey(
         Motorista,
         on_delete=models.PROTECT,
+        null=True,
+        blank=True,
         related_name="viajes",
     )
     vehiculo = models.ForeignKey(
         Vehiculo,
         on_delete=models.PROTECT,
-        related_name="viajes",
-    )
-    tipo_viaje = models.ForeignKey(
-        TipoViaje,
-        on_delete=models.PROTECT,
-        related_name="viajes",
-    )
-    viatico = models.ForeignKey(
-        Viatico,
-        on_delete=models.PROTECT,
         null=True,
         blank=True,
         related_name="viajes",
+    )
+    centro_costo = models.PositiveIntegerField(null=True, blank=True, validators=[MinValueValidator(1)])
+    tipo_viaje = models.PositiveSmallIntegerField(
+        choices=TipoProgramacion.choices,
+        default=TipoProgramacion.REGIONAL,
+        db_index=True,
     )
     estado = models.CharField(max_length=30, db_index=True)
     activo = models.BooleanField(default=True, db_index=True)
@@ -330,12 +365,21 @@ class ViajeSolicitud(models.Model):
     viaje = models.ForeignKey(
         Viaje,
         on_delete=models.PROTECT,
+        null=True,
+        blank=True,
         related_name="viaje_solicitudes",
     )
     solicitud = models.ForeignKey(
         Solicitud,
         on_delete=models.PROTECT,
         related_name="viaje_solicitudes",
+    )
+    creado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="viajes_solicitud_creados",
+        null=True,
+        blank=True,
     )
     fecha_asignacion = models.DateTimeField(default=timezone.now, db_index=True)
     activo = models.BooleanField(default=True, db_index=True)
@@ -347,8 +391,8 @@ class ViajeSolicitud(models.Model):
         verbose_name_plural = "Viajes solicitud"
         constraints = [
             models.UniqueConstraint(
-                fields=["viaje", "solicitud"],
-                name="uq_th_viaje_solicitud",
+                fields=["solicitud"],
+                name="uq_th_viaje_solicitud_solicitud",
             )
         ]
 
@@ -385,12 +429,17 @@ class EjecucionViaje(models.Model):
         on_delete=models.PROTECT,
         related_name="ejecucion_viaje",
     )
-    fecha_salida = models.DateTimeField(db_index=True)
-    fecha_retorno = models.DateTimeField(db_index=True)
-    kilometraje_salida = models.DecimalField(max_digits=10, decimal_places=2)
-    kilometraje_retorno = models.DecimalField(max_digits=10, decimal_places=2)
-    combustible_salida = models.DecimalField(max_digits=10, decimal_places=2)
-    combustible_retorno = models.DecimalField(max_digits=10, decimal_places=2)
+    fecha_salida = models.DateTimeField(db_index=True, blank=True, null=True)
+    fecha_retorno = models.DateTimeField(db_index=True, blank=True, null=True)
+    kilometraje_salida = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    kilometraje_retorno = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    combustible_salida = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    combustible_retorno = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    precio_litro_salida = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    litros_cargados_salida = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    total_combustible = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
+    observaciones_salida = models.TextField(blank=True, null=True)
+    observaciones_retorno = models.TextField(blank=True, null=True)
     observaciones = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -403,3 +452,19 @@ class EjecucionViaje(models.Model):
 
     def __str__(self):
         return f"Ejecucion viaje {self.viaje_id}"
+
+    @property
+    def salida_registrada(self):
+        return bool(self.fecha_salida)
+
+    @property
+    def retorno_registrado(self):
+        return bool(self.fecha_retorno)
+
+    @property
+    def etapa_ejecucion(self):
+        if not self.fecha_salida:
+            return "PROGRAMADO"
+        if not self.fecha_retorno:
+            return "EN_EJECUCION"
+        return "FINALIZADO"

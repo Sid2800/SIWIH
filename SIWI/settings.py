@@ -130,7 +130,9 @@ DATABASES = {
         'PORT': os.getenv('DB_SALMI_PORT'),
     },
     	'BIT_LESP': {
-        'ENGINE': 'mssql',
+    # 2026-08-03 - Mantener la conexión accesible para pyodbc sin exigir
+    # un backend Django MSSQL que no forma parte de este entorno local.
+    'ENGINE': 'django.db.backends.dummy',
         'NAME': os.getenv('DB_BITLESP_NAME'),
         'USER': os.getenv('DB_BITLESP_USER'),
         'PASSWORD': os.getenv('DB_BITLESP_PASSWORD'),

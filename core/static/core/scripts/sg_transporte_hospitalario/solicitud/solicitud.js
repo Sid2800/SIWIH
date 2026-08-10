@@ -14,35 +14,45 @@
 	const destinosInfo = safeParse(container.dataset.destinosInfo, {});
 	const puntosInfo = safeParse(container.dataset.puntosInfo, {});
 
-	const form = document.getElementById('solicitud-form');
-	const inputArea = document.getElementById('id_area_solicitante');
-	const puntoSelect = document.getElementById('id_punto_solicitud');
-	const areaLabel = document.getElementById('th-area-solicitante');
-	const tipoSolicitudSelect = document.getElementById('id_tipo_solicitud');
-	const destinoSelect = document.getElementById('id_lugar_destino');
-	const pacientesInput = document.getElementById('id_pacientes_json');
-	const empleadosInput = document.getElementById('id_empleados_json');
-	const pacientesResultados = document.getElementById('th-pacientes-resultados');
-	const pacientesSeleccionadosTbody = document.getElementById('th-pacientes-seleccionados');
-	const empleadosSeleccionadosTbody = document.getElementById('th-empleados-seleccionados');
-	const buscarPacienteInput = document.getElementById('th-buscar-paciente');
-	const buscarPacienteBtn = document.getElementById('th-btn-buscar-paciente');
-	const pacientesSearch = document.getElementById('th-pacientes-search');
-	const criterioPaciente = document.getElementById('th-criterio-paciente');
-	const limpiarPacienteBtn = document.getElementById('th-btn-limpiar-paciente');
-	const criterioEmpleado = document.getElementById('th-criterio-empleado');
-	const empleadoSearchSelect = document.getElementById('th-buscar-empleado-select');
-	const limpiarEmpleadoBtn = document.getElementById('th-btn-limpiar-empleado');
-	const btnCancelar = document.getElementById('th-btn-cancelar-solicitud');
+	const dom = {
+		form: document.getElementById('solicitud-form'),
+		areaSolicitanteInput: document.getElementById('id_area_solicitante'),
+		puntoSelect: document.getElementById('id_punto_solicitud'),
+		areaSolicitanteLabel: document.getElementById('th-area-solicitante'),
+		tipoSolicitudSelect: document.getElementById('id_tipo_solicitud'),
+		lugarSalidaSelect: document.getElementById('id_lugar_salida'),
+		destinoSelect: document.getElementById('id_lugar_destino'),
+		pacientesPayload: document.getElementById('id_pacientes_json'),
+		empleadosPayload: document.getElementById('id_empleados_json'),
+		pacientesCard: document.getElementById('th-pacientes-seleccionados') ? document.getElementById('th-pacientes-seleccionados').closest('.th-card') : null,
+		pacientesResultadosTbody: document.getElementById('th-pacientes-resultados'),
+		pacientesSeleccionadosTbody: document.getElementById('th-pacientes-seleccionados'),
+		empleadosSeleccionadosTbody: document.getElementById('th-empleados-seleccionados'),
+		pacientesSearch: {
+			input: document.getElementById('th-buscar-paciente'),
+			button: document.getElementById('th-btn-buscar-paciente'),
+			panel: document.getElementById('th-pacientes-search'),
+			criterio: document.getElementById('th-criterio-paciente'),
+			limpiar: document.getElementById('th-btn-limpiar-paciente'),
+		},
+		empleadosSearch: {
+			criterio: document.getElementById('th-criterio-empleado'),
+			select: document.getElementById('th-buscar-empleado-select'),
+			limpiar: document.getElementById('th-btn-limpiar-empleado'),
+		},
+		cancelarButton: document.getElementById('th-btn-cancelar-solicitud'),
+	};
 
-	if (!pacientesInput || !empleadosInput || !pacientesResultados || !pacientesSeleccionadosTbody || !empleadosSeleccionadosTbody) {
+	if (!dom.pacientesPayload || !dom.empleadosPayload || !dom.pacientesResultadosTbody || !dom.pacientesSeleccionadosTbody || !dom.empleadosSeleccionadosTbody) {
 		return;
 	}
 
-	let pacientesSeleccionados = safeParse(pacientesInput.value, []);
-	let empleadosSeleccionados = safeParse(empleadosInput.value, []);
-	let empleadoSearchTom = null;
-	const empleadosBusquedaMap = {};
+	const state = {
+		pacientesSeleccionados: safeParse(dom.pacientesPayload.value, []),
+		empleadosSeleccionados: safeParse(dom.empleadosPayload.value, []),
+		empleadoSearchTom: null,
+		empleadosBusquedaMap: {},
+	};
 
 	function safeParse(raw, defaultValue) {
 		if (!raw) return defaultValue;
@@ -53,20 +63,51 @@
 		if (!info) {
 			return '';
 		}
-		const parts = [info.nombre || '-'];
-		if (info.alias) {
-			parts.push('Alias: ' + info.alias);
-		}
-		parts.push('Nivel: ' + (info.nivel || '-'));
-		parts.push('Región: ' + (info.region || '-'));
-		return parts.join(' | ');
+		return joinDisplayParts([
+			info.nombre,
+			normalizeDisplayValue(info.nivel),
+			info.region,
+		]);
+	}
+
+	function normalizeDisplayValue(value) {
+		return String(value || '')
+			.replace(/^Nivel\s*/i, '')
+			.trim();
 	}
 
 	function formatPointText(info) {
 		if (!info) {
 			return '';
 		}
-		return [info.nombre || '-', info.nombre_corto || '-', info.tipo || '-'].join(' | ');
+		return joinDisplayParts([
+			info.nombre,
+			//info.nombre_corto,
+			info.tipo,
+			info.servicio,
+			//info.servicio_corto,
+			info.nivel,
+			info.region,
+		]);
+	}
+
+	function joinDisplayParts(parts) {
+		const seen = new Set();
+		return parts
+			.map(function (part) {
+				return String(part || '').trim();
+			})
+			.filter(function (part) {
+				if (!part || part === '-') {
+					return false;
+				}
+				if (seen.has(part)) {
+					return false;
+				}
+				seen.add(part);
+				return true;
+			})
+			.join(' | ');
 	}
 
 	function formatEmployeeSearchText(item) {
@@ -103,17 +144,26 @@
 	}
 
 	function esTipoPacientesSeleccionado() {
-		if (!tipoSolicitudSelect || !tipoPacientesId) {
+		if (!dom.tipoSolicitudSelect || !tipoPacientesId) {
 			return true;
 		}
-		return String(tipoSolicitudSelect.value || '') === tipoPacientesId;
+		return String(dom.tipoSolicitudSelect.value || '') === tipoPacientesId;
 	}
 
 	function puedeGestionarPacientes() {
 		return !isReadOnly && esTipoPacientesSeleccionado();
 	}
 
-	function initTomSelect(selector, placeholder) {
+	function initTomSelect(selector, options) {
+		const baseOptions = {
+			valueField: 'value',
+			labelField: 'text',
+			searchField: ['text'],
+			create: false,
+			allowEmptyOption: false,
+			sortField: [{ field: 'text', direction: 'asc' }],
+		};
+		const tomSelectOptions = Object.assign({}, baseOptions, options || {});
 		const node = document.querySelector(selector);
 		if (!node || !window.TomSelect) {
 			return null;
@@ -121,25 +171,18 @@
 		if (node.tomselect) {
 			return node.tomselect;
 		}
-		return new TomSelect(selector, {
-			valueField: 'value',
-			labelField: 'text',
-			searchField: ['text'],
-			create: false,
-			placeholder: placeholder,
-			allowEmptyOption: true,
-			sortField: [{ field: 'text', direction: 'asc' }],
-		});
+		return new TomSelect(selector, tomSelectOptions);
 	}
 
-	hydrateSelectText(destinoSelect, destinosInfo, formatInstitutionText);
-	hydrateSelectText(puntoSelect, puntosInfo, formatPointText);
+	hydrateSelectText(dom.destinoSelect, destinosInfo, formatInstitutionText);
+	hydrateSelectText(dom.lugarSalidaSelect, destinosInfo, formatInstitutionText);
+	hydrateSelectText(dom.puntoSelect, puntosInfo, formatPointText);
 
-	initTomSelect('#id_punto_solicitud', 'Punto solicitud');
-	initTomSelect('#id_tipo_solicitud', 'Tipo solicitud');
-	initTomSelect('#id_prioridad', 'Prioridad');
-	initTomSelect('#id_lugar_salida', 'Lugar salida');
-	initTomSelect('#id_lugar_destino', 'Lugar destino');
+	initTomSelect('#id_punto_solicitud', { placeholder: 'Punto solicitud' });
+	initTomSelect('#id_tipo_solicitud', { placeholder: 'Tipo solicitud' });
+	initTomSelect('#id_prioridad', { placeholder: 'Prioridad' });
+	initTomSelect('#id_lugar_salida', { placeholder: 'Lugar salida' });
+	initTomSelect('#id_lugar_destino', { placeholder: 'Lugar destino' });
 
 	function setButtonLoading(button, isLoading) {
 		if (!button) {
@@ -170,6 +213,38 @@
 		errorNode.textContent = message || 'Este campo es obligatorio.';
 	}
 
+	function setSectionError(section, message) {
+		if (!section) {
+			return;
+		}
+		section.classList.add('th-card--error');
+		let errorNode = section.querySelector('.th-card-errors--client');
+		if (!errorNode) {
+			errorNode = document.createElement('div');
+			errorNode.className = 'th-card-errors th-card-errors--client';
+			const title = section.querySelector('.th-card__title');
+			if (title && title.parentNode) {
+				title.insertAdjacentElement('afterend', errorNode);
+			} else {
+				section.appendChild(errorNode);
+			}
+		}
+		errorNode.textContent = message || 'Este campo es obligatorio.';
+	}
+
+	function clearSectionError(section) {
+		if (!section) {
+			return;
+		}
+		const errorNode = section.querySelector('.th-card-errors--client');
+		if (errorNode) {
+			errorNode.remove();
+		}
+		if (!section.querySelector('.th-card-errors')) {
+			section.classList.remove('th-card--error');
+		}
+	}
+
 	function clearFieldError(control) {
 		const field = control ? control.closest('.th-field') : null;
 		if (!field) {
@@ -196,74 +271,117 @@
 	}
 
 	function syncAreaSolicitante() {
-		if (!puntoSelect || !areaLabel || !inputArea) return;
-		const selectedInfo = puntosInfo[String(puntoSelect.value || '')] || null;
+		if (!dom.puntoSelect || !dom.areaSolicitanteLabel || !dom.areaSolicitanteInput) return;
+		const selectedInfo = puntosInfo[String(dom.puntoSelect.value || '')] || null;
 		const txt = selectedInfo ? selectedInfo.nombre : '';
-		areaLabel.textContent = txt || '';
-		inputArea.value = txt || '';
+		dom.areaSolicitanteLabel.textContent = txt || '';
+		dom.areaSolicitanteInput.value = txt || '';
 	}
 
 	function syncHiddenInputs() {
-		pacientesInput.value = JSON.stringify(pacientesSeleccionados);
-		empleadosInput.value = JSON.stringify(empleadosSeleccionados);
+		dom.pacientesPayload.value = JSON.stringify(state.pacientesSeleccionados);
+		dom.empleadosPayload.value = JSON.stringify(state.empleadosSeleccionados);
+	}
+
+	function buildEmptyRow(colspan, message) {
+		return '<tr><td colspan="' + colspan + '">' + escapeHtml(message) + '</td></tr>';
+	}
+
+	function buildTableCell(label, content) {
+		return '<td data-label="' + escapeHtml(label) + '">' + content + '</td>';
+	}
+
+	function buildPacienteRow(paciente, idx) {
+		const accion = puedeGestionarPacientes()
+			? '<button type="button" class="th-btn" data-remove-paciente="' + idx + '"><i class="bi bi-dash-circle"></i> Quitar</button>'
+			: '<span class="th-subtitle">-</span>';
+		return '\n                <tr>'
+			+ buildTableCell('Nombre', escapeHtml(paciente.nombre || '-'))
+			+ buildTableCell('Expediente', escapeHtml(paciente.expediente || '-'))
+			+ buildTableCell('Ingreso', escapeHtml(paciente.ingreso || '-'))
+			+ buildTableCell('Acción', accion)
+			+ '\n                </tr>';
+	}
+
+	function buildPacienteResultadoRow(paciente, idx) {
+		const yaEnOtraSolicitud = Boolean(paciente.solicitud_numero);
+		const estadoSolicitud = paciente.solicitud_estado ? ' (' + escapeHtml(paciente.solicitud_estado) + ')' : '';
+		const referenciaSolicitud = yaEnOtraSolicitud
+			? '<small class="th-subtitle">Ya está en otra solicitud: <strong>' + escapeHtml(paciente.solicitud_numero) + '</strong>' + estadoSolicitud + '</small>'
+			: '';
+		const accion = yaEnOtraSolicitud
+			? '<span class="th-subtitle">Bloqueado</span>'
+			: '<button type="button" class="th-btn" data-add-paciente="' + idx + '"><i class="bi bi-plus-circle"></i> Agregar</button>';
+		return '\n                <tr>'
+			+ buildTableCell('Nombre', escapeHtml(paciente.nombre || '-') + (referenciaSolicitud ? '<br>' + referenciaSolicitud : ''))
+			+ buildTableCell('Expediente', escapeHtml(paciente.expediente || '-'))
+			+ buildTableCell('Ingreso', escapeHtml(paciente.ingreso || '-'))
+			+ buildTableCell('Acción', accion)
+			+ '\n                </tr>';
+	}
+
+	function buildEmpleadoRow(empleado, idx) {
+		const accion = isReadOnly
+			? '<span class="th-subtitle">-</span>'
+			: '<button type="button" class="th-btn" data-remove-empleado="' + idx + '"><i class="bi bi-dash-circle"></i> Quitar</button>';
+		return '\n                <tr>'
+			+ buildTableCell('Nombre', escapeHtml(empleado.nombre || '-'))
+			+ buildTableCell('Cargo', escapeHtml(empleado.cargo || '-'))
+			+ buildTableCell('Acción', accion)
+			+ '\n                </tr>';
 	}
 
 	function renderPacientesSeleccionados() {
-		if (!pacientesSeleccionados.length) {
-			pacientesSeleccionadosTbody.innerHTML = '<tr><td colspan="4">No hay pacientes seleccionados.</td></tr>';
+		clearSectionError(dom.pacientesCard);
+		if (!state.pacientesSeleccionados.length) {
+			dom.pacientesSeleccionadosTbody.innerHTML = buildEmptyRow(4, 'No hay pacientes seleccionados.');
 			syncHiddenInputs();
 			return;
 		}
 
-		pacientesSeleccionadosTbody.innerHTML = pacientesSeleccionados.map(function (p, idx) {
-			const accion = puedeGestionarPacientes()
-				? '<button type="button" class="th-btn" data-remove-paciente="' + idx + '"><i class="bi bi-dash-circle"></i> Quitar</button>'
-				: '<span class="th-subtitle">-</span>';
-			return '\n                <tr>\n                    <td>' + escapeHtml(p.nombre || '-') + '</td>\n                    <td>' + escapeHtml(p.expediente || '-') + '</td>\n                    <td>' + escapeHtml(p.ingreso || '-') + '</td>\n                    <td>' + accion + '</td>\n                </tr>';
-		}).join('');
+		dom.pacientesSeleccionadosTbody.innerHTML = state.pacientesSeleccionados.map(buildPacienteRow).join('');
 		syncHiddenInputs();
 	}
 
 	function renderEmpleadosSeleccionados() {
-		if (!empleadosSeleccionados.length) {
-			empleadosSeleccionadosTbody.innerHTML = '<tr><td colspan="3">No hay personal seleccionado.</td></tr>';
+		if (!state.empleadosSeleccionados.length) {
+			dom.empleadosSeleccionadosTbody.innerHTML = buildEmptyRow(3, 'No hay personal seleccionado.');
 			syncHiddenInputs();
 			return;
 		}
 
-		empleadosSeleccionadosTbody.innerHTML = empleadosSeleccionados.map(function (e, idx) {
-			const accion = isReadOnly
-				? '<span class="th-subtitle">-</span>'
-				: '<button type="button" class="th-btn" data-remove-empleado="' + idx + '"><i class="bi bi-dash-circle"></i> Quitar</button>';
-			return '\n                <tr>\n                    <td>' + escapeHtml(e.nombre || '-') + '</td>\n                    <td>' + escapeHtml(e.cargo || '-') + '</td>\n                    <td>' + accion + '</td>\n                </tr>';
-		}).join('');
+		dom.empleadosSeleccionadosTbody.innerHTML = state.empleadosSeleccionados.map(buildEmpleadoRow).join('');
 		syncHiddenInputs();
 	}
 
 	function agregarPaciente(item) {
-		const exists = pacientesSeleccionados.some(function (p) {
+		if (item && item.solicitud_numero) {
+			toastr.warning('El paciente ya pertenece a la solicitud ' + item.solicitud_numero + '.', 'Validación');
+			return;
+		}
+		const exists = state.pacientesSeleccionados.some(function (p) {
 			return String(p.paciente_id || '') === String(item.paciente_id || '') && String(p.ingreso_id || '') === String(item.ingreso_id || '');
 		});
 		if (exists) return;
-		pacientesSeleccionados.push(item);
+		state.pacientesSeleccionados.push(item);
 		renderPacientesSeleccionados();
 	}
 
 	function agregarEmpleado(item) {
-		const exists = empleadosSeleccionados.some(function (e) {
+		const exists = state.empleadosSeleccionados.some(function (e) {
 			return String(e.empleado_id || '') === String(item.empleado_id || '');
 		});
 		if (exists) return;
-		empleadosSeleccionados.push(item);
+		state.empleadosSeleccionados.push(item);
 		renderEmpleadosSeleccionados();
 	}
 
 	async function buscarPacientes() {
 		if (!puedeGestionarPacientes()) return;
-		const q = (buscarPacienteInput.value || '').trim();
+		const q = (dom.pacientesSearch.input.value || '').trim();
 		if (q.length < 2 || !urls.buscarPacientes) return;
-		setButtonLoading(buscarPacienteBtn, true);
-		const tipo = (criterioPaciente && criterioPaciente.value) ? criterioPaciente.value : 'nombre';
+		setButtonLoading(dom.pacientesSearch.button, true);
+		const tipo = (dom.pacientesSearch.criterio && dom.pacientesSearch.criterio.value) ? dom.pacientesSearch.criterio.value : 'nombre';
 		const params = new URLSearchParams();
 		params.append('q', q);
 		params.append('tipo', tipo);
@@ -272,14 +390,14 @@
 			const payload = await resp.json();
 			const rows = payload.data || [];
 			if (!rows.length) {
-				pacientesResultados.innerHTML = '<tr><td colspan="4">Sin resultados.</td></tr>';
+				dom.pacientesResultadosTbody.innerHTML = buildEmptyRow(4, 'Sin resultados.');
 				toastr.info('No se encontraron pacientes con ese criterio.', 'Información');
 				return;
 			}
-			pacientesResultados.innerHTML = rows.map(function (p, idx) {
-				return '\n                <tr>\n                    <td>' + escapeHtml(p.nombre || '-') + '</td>\n                    <td>' + escapeHtml(p.expediente || '-') + '</td>\n                    <td>' + escapeHtml(p.ingreso || '-') + '</td>\n                    <td><button type="button" class="th-btn" data-add-paciente="' + idx + '"><i class="bi bi-plus-circle"></i> Agregar</button></td>\n                </tr>';
+			dom.pacientesResultadosTbody.innerHTML = rows.map(function (p, idx) {
+				return buildPacienteResultadoRow(p, idx);
 			}).join('');
-			pacientesResultados.querySelectorAll('[data-add-paciente]').forEach(function (btn) {
+			dom.pacientesResultadosTbody.querySelectorAll('[data-add-paciente]').forEach(function (btn) {
 				btn.addEventListener('click', function () {
 					if (!puedeGestionarPacientes()) return;
 					agregarPaciente(rows[Number(btn.dataset.addPaciente)]);
@@ -288,30 +406,25 @@
 		} catch (_) {
 			toastr.warning('Ocurrió un problema al buscar pacientes.', 'Aviso');
 		} finally {
-			setButtonLoading(buscarPacienteBtn, false);
+			setButtonLoading(dom.pacientesSearch.button, false);
 		}
 	}
 
 	function initEmpleadoSearchSelect() {
-		if (!empleadoSearchSelect || !window.TomSelect || empleadoSearchSelect.tomselect || isReadOnly) {
-			return empleadoSearchSelect ? empleadoSearchSelect.tomselect : null;
+		if (!dom.empleadosSearch.select || !window.TomSelect || dom.empleadosSearch.select.tomselect || isReadOnly) {
+			return dom.empleadosSearch.select ? dom.empleadosSearch.select.tomselect : null;
 		}
-		empleadoSearchSelect.innerHTML = '<option value="">Buscar empleado</option>';
-		return new TomSelect('#th-buscar-empleado-select', {
-			valueField: 'value',
-			labelField: 'text',
-			searchField: ['text'],
-			create: false,
-			allowEmptyOption: true,
+		return initTomSelect('#th-buscar-empleado-select', {
 			placeholder: 'Buscar empleado por nombre',
-			loadThrottle: 250,
+			maxItems: 1,
 			maxOptions: 10,
+			loadThrottle: 250,
 			load: function (query, callback) {
 				if (!query || query.trim().length < 2 || !urls.buscarEmpleados) {
 					callback([]);
 					return;
 				}
-				const tipo = (criterioEmpleado && criterioEmpleado.value) ? criterioEmpleado.value : 'nombre';
+				const tipo = (dom.empleadosSearch.criterio && dom.empleadosSearch.criterio.value) ? dom.empleadosSearch.criterio.value : 'nombre';
 				const params = new URLSearchParams();
 				params.append('q', query.trim());
 				params.append('tipo', tipo);
@@ -323,7 +436,7 @@
 							toastr.info('No se encontraron empleados con ese criterio.', 'Información');
 						}
 						rows.forEach(function (row) {
-							empleadosBusquedaMap[String(row.empleado_id)] = row;
+							state.empleadosBusquedaMap[String(row.empleado_id)] = row;
 						});
 						callback(rows.map(function (row) {
 							return {
@@ -338,7 +451,7 @@
 					});
 			},
 			onChange: function (value) {
-				const item = empleadosBusquedaMap[String(value || '')];
+					const item = state.empleadosBusquedaMap[String(value || '')];
 				if (!item) {
 					return;
 				}
@@ -355,20 +468,21 @@
 	}
 
 	function updateEmpleadoSearchPlaceholder(texto) {
-		if (!empleadoSearchTom) {
+		if (!state.empleadoSearchTom) {
 			return;
 		}
-		empleadoSearchTom.settings.placeholder = texto;
-		if (empleadoSearchTom.control_input) {
-			empleadoSearchTom.control_input.placeholder = texto;
+		state.empleadoSearchTom.settings.placeholder = texto;
+		if (state.empleadoSearchTom.control_input) {
+			state.empleadoSearchTom.control_input.placeholder = texto;
 		}
 	}
 
 	function validarFormularioAntesDeEnviar(event) {
-		if (!form || isReadOnly) {
+		if (!dom.form || isReadOnly) {
 			return;
 		}
-		const controles = Array.from(form.querySelectorAll('input, select, textarea')).filter(function (control) {
+		clearSectionError(dom.pacientesCard);
+		const controles = Array.from(dom.form.querySelectorAll('input, select, textarea')).filter(function (control) {
 			return control.type !== 'hidden' && !control.disabled;
 		});
 		let primerInvalido = null;
@@ -381,6 +495,10 @@
 				}
 			}
 		});
+		if (!primerInvalido && esTipoPacientesSeleccionado() && !state.pacientesSeleccionados.length) {
+			setSectionError(dom.pacientesCard, 'Debe seleccionar al menos un paciente para este tipo de solicitud.');
+			primerInvalido = dom.pacientesSearch.input || dom.pacientesSearch.button || dom.tipoSolicitudSelect;
+		}
 		if (!primerInvalido) {
 			return;
 		}
@@ -389,11 +507,24 @@
 		primerInvalido.scrollIntoView({ behavior: 'smooth', block: 'center' });
 	}
 
-	function focusFirstServerError() {
-		if (!form) {
+	function bloquearEnterEnFormulario(event) {
+		if (!dom.form || isReadOnly) {
 			return;
 		}
-		const firstErrorField = form.querySelector('.th-field--error');
+		if (event.key !== 'Enter') {
+			return;
+		}
+		if (event.target && event.target.tagName === 'TEXTAREA') {
+			return;
+		}
+		event.preventDefault();
+	}
+
+	function focusFirstServerError() {
+		if (!dom.form) {
+			return;
+		}
+		const firstErrorField = dom.form.querySelector('.th-field--error');
 		if (!firstErrorField) {
 			return;
 		}
@@ -405,94 +536,95 @@
 		firstErrorField.scrollIntoView({ behavior: 'smooth', block: 'center' });
 	}
 
-	pacientesSeleccionadosTbody.addEventListener('click', function (e) {
+	dom.pacientesSeleccionadosTbody.addEventListener('click', function (e) {
 		if (!puedeGestionarPacientes()) return;
 		const btn = e.target.closest('[data-remove-paciente]');
 		if (!btn) return;
 		const idx = Number(btn.dataset.removePaciente);
-		pacientesSeleccionados.splice(idx, 1);
+		state.pacientesSeleccionados.splice(idx, 1);
 		renderPacientesSeleccionados();
 	});
 
-	empleadosSeleccionadosTbody.addEventListener('click', function (e) {
+	dom.empleadosSeleccionadosTbody.addEventListener('click', function (e) {
 		if (isReadOnly) return;
 		const btn = e.target.closest('[data-remove-empleado]');
 		if (!btn) return;
 		const idx = Number(btn.dataset.removeEmpleado);
-		empleadosSeleccionados.splice(idx, 1);
+		state.empleadosSeleccionados.splice(idx, 1);
 		renderEmpleadosSeleccionados();
 	});
 
 	if (!isReadOnly) {
-		if (buscarPacienteBtn) buscarPacienteBtn.addEventListener('click', buscarPacientes);
-		if (buscarPacienteInput) buscarPacienteInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); buscarPacientes(); } });
-		if (form) {
-			form.addEventListener('submit', validarFormularioAntesDeEnviar);
-			form.querySelectorAll('input, select, textarea').forEach(function (control) {
+		if (dom.pacientesSearch.button) dom.pacientesSearch.button.addEventListener('click', buscarPacientes);
+		if (dom.pacientesSearch.input) dom.pacientesSearch.input.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); buscarPacientes(); } });
+		if (dom.form) {
+			dom.form.addEventListener('keydown', bloquearEnterEnFormulario);
+			dom.form.addEventListener('submit', validarFormularioAntesDeEnviar);
+			dom.form.querySelectorAll('input, select, textarea').forEach(function (control) {
 				control.addEventListener('input', function () { clearFieldError(control); });
 				control.addEventListener('change', function () { clearFieldError(control); });
 			});
 		}
 	}
 
-	if (!isReadOnly && limpiarPacienteBtn) {
-		limpiarPacienteBtn.addEventListener('click', function () {
-			if (criterioPaciente) {
-				criterioPaciente.value = 'nombre';
+	if (!isReadOnly && dom.pacientesSearch.limpiar) {
+		dom.pacientesSearch.limpiar.addEventListener('click', function () {
+			if (dom.pacientesSearch.criterio) {
+				dom.pacientesSearch.criterio.value = 'nombre';
 			}
-			if (buscarPacienteInput) {
-				buscarPacienteInput.value = '';
-				buscarPacienteInput.focus();
+			if (dom.pacientesSearch.input) {
+				dom.pacientesSearch.input.value = '';
+				dom.pacientesSearch.input.focus();
 			}
-			pacientesResultados.innerHTML = '';
+			dom.pacientesResultadosTbody.innerHTML = '';
 		});
 	}
 
-	if (!isReadOnly && criterioPaciente) {
-		criterioPaciente.addEventListener('change', function () {
-			if (!buscarPacienteInput) {
+	if (!isReadOnly && dom.pacientesSearch.criterio) {
+		dom.pacientesSearch.criterio.addEventListener('change', function () {
+			if (!dom.pacientesSearch.input) {
 				return;
 			}
-			buscarPacienteInput.placeholder = criterioPaciente.value === 'identidad'
+			dom.pacientesSearch.input.placeholder = dom.pacientesSearch.criterio.value === 'identidad'
 				? 'Buscar paciente por identidad'
 				: 'Buscar paciente por nombre';
-			buscarPacienteInput.value = '';
-			pacientesResultados.innerHTML = '';
+			dom.pacientesSearch.input.value = '';
+			dom.pacientesResultadosTbody.innerHTML = '';
 		});
 	}
 
-	empleadoSearchTom = initEmpleadoSearchSelect();
+	state.empleadoSearchTom = initEmpleadoSearchSelect();
 
-	if (!isReadOnly && limpiarEmpleadoBtn) {
-		limpiarEmpleadoBtn.addEventListener('click', function () {
-			if (criterioEmpleado) {
-				criterioEmpleado.value = 'nombre';
+	if (!isReadOnly && dom.empleadosSearch.limpiar) {
+		dom.empleadosSearch.limpiar.addEventListener('click', function () {
+			if (dom.empleadosSearch.criterio) {
+				dom.empleadosSearch.criterio.value = 'nombre';
 			}
-			if (empleadoSearchTom) {
-				empleadoSearchTom.clear(true);
-				empleadoSearchTom.clearOptions();
+			if (state.empleadoSearchTom) {
+				state.empleadoSearchTom.clear(true);
+				state.empleadoSearchTom.clearOptions();
 				updateEmpleadoSearchPlaceholder('Buscar empleado por nombre');
 			}
 		});
 	}
 
-	if (!isReadOnly && criterioEmpleado) {
-		criterioEmpleado.addEventListener('change', function () {
-			if (!empleadoSearchTom) {
+	if (!isReadOnly && dom.empleadosSearch.criterio) {
+		dom.empleadosSearch.criterio.addEventListener('change', function () {
+			if (!state.empleadoSearchTom) {
 				return;
 			}
-			empleadoSearchTom.clear(true);
-			empleadoSearchTom.clearOptions();
+			state.empleadoSearchTom.clear(true);
+			state.empleadoSearchTom.clearOptions();
 			updateEmpleadoSearchPlaceholder(
-				criterioEmpleado.value === 'identidad'
+				dom.empleadosSearch.criterio.value === 'identidad'
 					? 'Buscar empleado por identidad'
 					: 'Buscar empleado por nombre'
 			);
 		});
 	}
 
-	if (btnCancelar && urls.cancelar) {
-		btnCancelar.addEventListener('click', function () {
+	if (dom.cancelarButton && urls.cancelar) {
+		dom.cancelarButton.addEventListener('click', function () {
 			window.location.href = urls.cancelar;
 		});
 	}
@@ -501,26 +633,26 @@
 		const opts = options || {};
 		const clearOnDisable = Boolean(opts.clearOnDisable);
 		const habilitado = puedeGestionarPacientes();
-		if (pacientesSearch) {
-			pacientesSearch.style.display = habilitado ? '' : 'none';
+		if (dom.pacientesSearch.panel) {
+			dom.pacientesSearch.panel.style.display = habilitado ? '' : 'none';
 		}
 		if (!habilitado) {
-			pacientesResultados.innerHTML = '';
+			dom.pacientesResultadosTbody.innerHTML = '';
 			if (clearOnDisable && !isReadOnly) {
-				pacientesSeleccionados = [];
+				state.pacientesSeleccionados = [];
 			}
 		}
 		renderPacientesSeleccionados();
 	}
 
-	if (tipoSolicitudSelect && !isReadOnly) {
-		tipoSolicitudSelect.addEventListener('change', function () {
+	if (dom.tipoSolicitudSelect && !isReadOnly) {
+		dom.tipoSolicitudSelect.addEventListener('change', function () {
 			syncModoPacientes({ clearOnDisable: true });
 		});
 	}
 
-	if (isReadOnly && form) {
-		form.querySelectorAll('input, select, textarea, button').forEach(function (control) {
+	if (isReadOnly && dom.form) {
+		dom.form.querySelectorAll('input, select, textarea, button').forEach(function (control) {
 			if (control.id === 'th-btn-cancelar-solicitud') {
 				return;
 			}
@@ -531,8 +663,8 @@
 		});
 	}
 
-	if (puntoSelect) {
-		puntoSelect.addEventListener('change', syncAreaSolicitante);
+	if (dom.puntoSelect) {
+		dom.puntoSelect.addEventListener('change', syncAreaSolicitante);
 	}
 	syncAreaSolicitante();
 	syncModoPacientes({ clearOnDisable: false });

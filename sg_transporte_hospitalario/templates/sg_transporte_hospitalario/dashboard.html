@@ -37,35 +37,21 @@
 
     <div class="th-grid">
       <article class="th-card th-span-12">
-        <h4 class="th-card__title"><i class="bi bi-list-ul"></i> Solicitudes activas</h4>
+        <h4 class="th-card__title"><i class="bi bi-list-ul"></i> Seguimiento de solicitudes activas</h4>
         <div class="th-toolbar">
           <div class="th-toolbar__group">
+            {% if puede_escribir %}
             <a href="{% url 'sg_transporte_hospitalario_solicitud_nueva' %}" class="th-btn th-btn--primary">
               <i class="bi bi-plus-circle"></i>
               Nueva solicitud
             </a>
+            {% endif %}
           </div>
           <div class="th-toolbar__group">
-            <select id="th-solicitud-criterio" class="formularioCampo-select">
-              <option value="0">Numero</option>
-              <option value="2">Area solicitante</option>
-              <option value="3">Tipo solicitud</option>
-              <option value="4">Prioridad</option>
-              <option value="5">Estado</option>
-            </select>
-            <input type="text" id="th-solicitud-busqueda" class="formularioCampo-text" placeholder="Busqueda">
-            <a id="th-solicitud-buscar" class="formularioBotones-boton">
-              <i class="bi bi-search"></i><span>Buscar</span>
-            </a>
-            <a id="th-solicitud-limpiar" class="formularioBotones-boton">
-              <i class="bi bi-eraser"></i><span>Limpiar</span>
-            </a>
-          </div>
-          <div class="th-toolbar__group">
-            <select id="th-filtro-estado" class="th-input">
-              <option value="">Todos los estados</option>
-              {% for code, label in filtro_estados %}
-              <option value="{{ code }}">{{ label }}</option>
+            <select id="th-filtro-proceso" class="th-input">
+              <option value="">Todos los procesos</option>
+              {% for proceso, label in filtro_procesos %}
+              <option value="{{ proceso }}">{{ label }}</option>
               {% endfor %}
             </select>
             <select id="th-filtro-area" class="th-input">
@@ -91,26 +77,34 @@
                 <th>Área solicitante</th>
                 <th>Tipo solicitud</th>
                 <th>Prioridad</th>
-                <th>Estado</th>
+                <th>Proceso</th>
                 <th>Acción</th>
               </tr>
             </thead>
             <tbody>
               {% for s in solicitudes_activas %}
-              <tr>
-                <td>{{ s.numero_solicitud }}</td>
-                <td>{{ s.fecha_solicitud|date:"d/m/Y H:i" }}</td>
-                <td>{{ s.punto_solicitud }}</td>
-                <td>{{ s.tipo_solicitud.nombre }}</td>
-                <td>{{ s.prioridad.nombre }}</td>
-                <td><span class="th-badge">{{ s.estado }}</span></td>
-                <td>
-                  <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
-                    <a href="{% url 'sg_transporte_hospitalario_solicitud_ver' s.pk %}" class="th-btn th-btn--ghost">Ver</a>
-                    {% if s.puede_editar %}
-                    <a href="{% url 'sg_transporte_hospitalario_solicitud_editar' s.pk %}" class="th-btn th-btn--ghost">Editar</a>
-                    {% else %}
-                    <button type="button" class="th-btn th-btn--ghost" disabled>Editar</button>
+              <tr data-solicitud-id="{{ s.pk }}">
+                <td data-label="Número solicitud">{{ s.numero_solicitud }}</td>
+                <td data-label="Fecha">{{ s.fecha_solicitud|date:"d/m/Y H:i" }}</td>
+                <td data-label="Área solicitante">{{ s.punto_solicitud }}</td>
+                <td data-label="Tipo solicitud">{{ s.tipo_solicitud.nombre }}</td>
+                <td data-label="Prioridad">{{ s.prioridad.nombre }}</td>
+                <td data-label="Proceso"><span class="th-badge">{{ s.proceso_funcional }}</span></td>
+                <td data-label="Acción">
+                  <div class="th-row-actions">
+                    <a href="{% url 'sg_transporte_hospitalario_solicitud_ver' s.pk %}" class="th-btn th-btn--ghost th-row-actions__btn">Ver</a>
+                    {% if s.puede_editar_propia %}
+                    <a href="{% url 'sg_transporte_hospitalario_solicitud_editar' s.pk %}" class="th-btn th-btn--ghost th-row-actions__btn">
+                      <i class="bi bi-pencil"></i>
+                      Editar
+                    </a>
+                    <form method="post" action="{% url 'sg_transporte_hospitalario_solicitud_eliminar' s.pk %}" class="th-row-actions__form" onsubmit="return confirm('¿Eliminar esta solicitud?');">
+                      {% csrf_token %}
+                      <button type="submit" class="th-btn th-btn--danger th-row-actions__btn">
+                        <i class="bi bi-trash"></i>
+                        Eliminar
+                      </button>
+                    </form>
                     {% endif %}
                   </div>
                 </td>
@@ -121,18 +115,314 @@
         </div>
       </article>
     </div>
+    {% elif active_tab == 'autorizacion' %}
+    <div class="th-workspace__hero">
+      <div>
+        <h3>Autorización</h3>
+        <p>Bandeja de solicitudes pendientes para revisión individual.</p>
+      </div>
+      <div class="th-pill">
+        <i class="bi bi-check2-circle"></i>
+        {{ autorizacion_total }} solicitudes disponibles
+      </div>
+    </div>
+
+    <div class="th-grid">
+      <article class="th-card th-span-12">
+        <h4 class="th-card__title"><i class="bi bi-list-check"></i> Solicitudes pendientes</h4>
+        {% if autorizacion_total %}
+        <div class="th-toolbar">
+          <div class="th-toolbar__group">
+            <select id="th-autorizacion-criterio" class="th-input">
+              <option value="0">Número</option>
+              <option value="1">Fecha</option>
+              <option value="2">Prioridad</option>
+              <option value="3">Punto de solicitud</option>
+              <option value="4">Tipo</option>
+              <option value="5">Pacientes</option>
+              <option value="6">Destino</option>
+            </select>
+            <input type="text" id="th-autorizacion-busqueda" class="th-input" placeholder="Buscar solicitudes">
+            <button type="button" id="th-autorizacion-buscar" class="th-btn th-btn--primary">
+              <i class="bi bi-search"></i>
+              Buscar
+            </button>
+            <button type="button" id="th-autorizacion-limpiar" class="th-btn th-btn--ghost">
+              <i class="bi bi-eraser"></i>
+              Limpiar
+            </button>
+          </div>
+        </div>
+        <div class="th-table-wrap">
+          <table class="th-table" id="th-autorizacion-pendientes-table">
+            <thead>
+              <tr>
+                <th>Número</th>
+                <th>Fecha</th>
+                <th>Prioridad</th>
+                <th>Punto de solicitud</th>
+                <th>Tipo</th>
+                <th>Pacientes</th>
+                <th>Destino</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for solicitud in solicitudes_autorizacion %}
+              <tr data-solicitud-id="{{ solicitud.id }}" data-pacientes-count="{{ solicitud.cantidad_pacientes|default:0 }}" data-priority-level="{{ solicitud.prioridad.nivel }}" data-destino="{{ solicitud.lugar_destino.nombre_institucion_salud }}">
+                <td data-label="Número">{{ solicitud.numero_solicitud }}</td>
+                <td data-label="Fecha">{{ solicitud.fecha_solicitud|date:"d/m/Y H:i" }}</td>
+                <td data-label="Prioridad"><span class="th-badge">{{ solicitud.prioridad.nombre }}</span></td>
+                <td data-label="Punto de solicitud">{{ solicitud.punto_solicitud }}</td>
+                <td data-label="Tipo">{{ solicitud.tipo_solicitud.nombre }}</td>
+                <td data-label="Pacientes">{{ solicitud.cantidad_pacientes|default:0 }}</td>
+                <td data-label="Destino">{{ solicitud.lugar_destino.nombre_institucion_salud }}</td>
+                <td data-label="Acciones">
+                  <div class="th-row-actions">
+                    <button type="button" class="th-btn th-btn--ghost th-row-actions__btn" data-ver-solicitud="{{ solicitud.id }}" onclick="return window.sgThAutorizacion.verSolicitud(this, event)">Ver</button>
+                  </div>
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="8">No hay solicitudes pendientes disponibles para autorización.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="th-viaje-empty th-autorizacion-empty">
+          <i class="bi bi-inbox"></i>
+          <strong>No hay solicitudes pendientes de autorización</strong>
+          <p>Todas las solicitudes han sido procesadas o actualmente no existen solicitudes pendientes.</p>
+        </div>
+        {% endif %}
+      </article>
+    </div>
+
+    <div id="th-solicitud-modal" class="th-modal" aria-hidden="true">
+      <div class="th-modal__backdrop" data-modal-close></div>
+      <div class="th-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="th-solicitud-modal-title">
+        <div class="th-modal__header">
+          <div>
+            <h4 id="th-solicitud-modal-title">Detalle de solicitud</h4>
+            <p id="th-solicitud-modal-subtitle">Revisión individual en modo solo lectura</p>
+          </div>
+          <button type="button" class="th-btn th-btn--ghost th-modal__close" data-modal-close aria-label="Cerrar modal">
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </div>
+        <div class="th-modal__body">
+          <div id="th-solicitud-modal-content" class="th-solicitud-modal__content">
+            <div class="th-solicitud-modal__empty">Seleccione una solicitud para ver su detalle.</div>
+          </div>
+        </div>
+        <div class="th-modal__footer">
+          <div class="th-modal__actions">
+            <button type="button" class="th-btn th-btn--success" id="th-solicitud-modal-autorizar" onclick="return window.sgThAutorizacion.autorizarDesdeModal(this, event)">
+              <i class="bi bi-check2-circle"></i>
+              Autorizar
+            </button>
+            <button type="button" class="th-btn th-btn--danger" id="th-solicitud-modal-anular" onclick="return window.sgThAutorizacion.anularDesdeModal(this, event)">
+              <i class="bi bi-x-circle"></i>
+              Anular
+            </button>
+            <button type="button" class="th-btn th-btn--ghost" data-modal-close>
+              <i class="bi bi-x-lg"></i>
+              Cerrar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% elif active_tab == 'ejecucion' %}
+      <div class="th-workspace__hero">
+        <div>
+          <h3>Ejecución del Viaje</h3>
+          <p>Bandejas operativas para registrar salida y entrada del mismo viaje programado.</p>
+        </div>
+        <div class="th-pill">
+          <i class="bi bi-truck"></i>
+          {{ viajes_ejecucion_total }} viajes disponibles
+        </div>
+      </div>
+
+      <div class="th-grid">
+        <article class="th-card th-span-12">
+          <div class="th-viaje-panel__header">
+            <div>
+              <h4 class="th-card__title"><i class="bi bi-box-arrow-right"></i> Marcar Salida</h4>
+              <p class="th-viaje-panel__description">Registre la salida del viaje sin perder visibilidad en la bandeja.</p>
+            </div>
+          </div>
+          <div class="th-table-wrap">
+            <table class="th-table" id="th-ejecucion-salida-table">
+              <thead>
+                <tr>
+                  <th>Número viaje</th>
+                  <th>Fecha</th>
+                  <th>Vehículo</th>
+                  <th>Motorista</th>
+                  <th>Etapa</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for viaje in viajes_ejecucion_items %}
+                <tr
+                  data-viaje-id="{{ viaje.id }}"
+                  data-viaje-numero="{{ viaje.numero }}"
+                  data-viaje-fecha="{{ viaje.fecha }}"
+                  data-viaje-vehiculo="{{ viaje.vehiculo }}"
+                  data-viaje-motorista="{{ viaje.motorista }}"
+                  data-viaje-estado="{{ viaje.estado_ejecucion }}"
+                  data-viaje-etapa="{{ viaje.estado_etiqueta }}"
+                  data-viaje-detalle="{{ viaje.detalle_json|escapejs }}"
+                  data-viaje-salida-registrada="{{ viaje.salida_registrada|yesno:'1,0' }}"
+                  data-viaje-entrada-registrada="{{ viaje.entrada_registrada|yesno:'1,0' }}"
+                  data-viaje-fecha-salida-input="{{ viaje.fecha_salida_input }}"
+                  data-viaje-fecha-salida="{{ viaje.fecha_salida }}"
+                  data-viaje-kilometraje-salida="{{ viaje.kilometraje_salida }}"
+                  data-viaje-precio-litro-salida="{{ viaje.precio_litro_salida }}"
+                  data-viaje-litros-cargados-salida="{{ viaje.litros_cargados_salida }}"
+                  data-viaje-total-combustible="{{ viaje.total_combustible }}"
+                  data-viaje-observaciones-salida="{{ viaje.observaciones_salida|escape }}"
+                  data-viaje-fecha-retorno-input="{{ viaje.fecha_retorno_input }}"
+                  data-viaje-fecha-retorno="{{ viaje.fecha_retorno }}"
+                  data-viaje-kilometraje-retorno="{{ viaje.kilometraje_retorno }}"
+                  data-viaje-observaciones-retorno="{{ viaje.observaciones_retorno|escape }}"
+                >
+                  <td data-label="Número viaje">{{ viaje.numero }}</td>
+                  <td data-label="Fecha">{{ viaje.fecha }}</td>
+                  <td data-label="Vehículo">{{ viaje.vehiculo }}</td>
+                  <td data-label="Motorista">{{ viaje.motorista }}</td>
+                  <td data-label="Etapa"><span class="th-badge">{{ viaje.estado_etiqueta }}</span></td>
+                  <td data-label="Acciones">
+                    <div class="th-row-actions">
+                      <button type="button" class="th-btn th-btn--ghost th-row-actions__btn" data-ejecucion-ver="1" onclick="return window.sgThEjecucion.ver(this, event)">Ver</button>
+                      {% if viaje.puede_marcar_salida %}
+                      <button type="button" class="th-btn th-btn--success th-row-actions__btn" data-ejecucion-salida="1" onclick="return window.sgThEjecucion.marcarSalida(this, event)">Marcar salida</button>
+                      {% else %}
+                      <button type="button" class="th-btn th-btn--ghost th-row-actions__btn" disabled>Salida registrada</button>
+                      {% endif %}
+                    </div>
+                  </td>
+                </tr>
+                {% empty %}
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="th-card th-span-12">
+          <div class="th-viaje-panel__header">
+            <div>
+              <h4 class="th-card__title"><i class="bi bi-box-arrow-in-left"></i> Marcar Entrada</h4>
+              <p class="th-viaje-panel__description">Registre el retorno del mismo viaje y conserve la trazabilidad completa.</p>
+            </div>
+          </div>
+          <div class="th-table-wrap">
+            <table class="th-table" id="th-ejecucion-entrada-table">
+              <thead>
+                <tr>
+                  <th>Número viaje</th>
+                  <th>Fecha</th>
+                  <th>Vehículo</th>
+                  <th>Motorista</th>
+                  <th>Etapa</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for viaje in viajes_ejecucion_items %}
+                <tr
+                  data-viaje-id="{{ viaje.id }}"
+                  data-viaje-numero="{{ viaje.numero }}"
+                  data-viaje-fecha="{{ viaje.fecha }}"
+                  data-viaje-vehiculo="{{ viaje.vehiculo }}"
+                  data-viaje-motorista="{{ viaje.motorista }}"
+                  data-viaje-estado="{{ viaje.estado_ejecucion }}"
+                  data-viaje-etapa="{{ viaje.estado_etiqueta }}"
+                  data-viaje-detalle="{{ viaje.detalle_json|escapejs }}"
+                  data-viaje-salida-registrada="{{ viaje.salida_registrada|yesno:'1,0' }}"
+                  data-viaje-entrada-registrada="{{ viaje.entrada_registrada|yesno:'1,0' }}"
+                  data-viaje-fecha-salida-input="{{ viaje.fecha_salida_input }}"
+                  data-viaje-fecha-salida="{{ viaje.fecha_salida }}"
+                  data-viaje-kilometraje-salida="{{ viaje.kilometraje_salida }}"
+                  data-viaje-precio-litro-salida="{{ viaje.precio_litro_salida }}"
+                  data-viaje-litros-cargados-salida="{{ viaje.litros_cargados_salida }}"
+                  data-viaje-total-combustible="{{ viaje.total_combustible }}"
+                  data-viaje-observaciones-salida="{{ viaje.observaciones_salida|escape }}"
+                  data-viaje-fecha-retorno-input="{{ viaje.fecha_retorno_input }}"
+                  data-viaje-fecha-retorno="{{ viaje.fecha_retorno }}"
+                  data-viaje-kilometraje-retorno="{{ viaje.kilometraje_retorno }}"
+                  data-viaje-observaciones-retorno="{{ viaje.observaciones_retorno|escape }}"
+                >
+                  <td data-label="Número viaje">{{ viaje.numero }}</td>
+                  <td data-label="Fecha">{{ viaje.fecha }}</td>
+                  <td data-label="Vehículo">{{ viaje.vehiculo }}</td>
+                  <td data-label="Motorista">{{ viaje.motorista }}</td>
+                  <td data-label="Etapa"><span class="th-badge">{{ viaje.estado_etiqueta }}</span></td>
+                  <td data-label="Acciones">
+                    <div class="th-row-actions">
+                      <button type="button" class="th-btn th-btn--ghost th-row-actions__btn" data-ejecucion-ver="1" onclick="return window.sgThEjecucion.ver(this, event)">Ver</button>
+                      {% if viaje.puede_marcar_entrada %}
+                      <button type="button" class="th-btn th-btn--success th-row-actions__btn" data-ejecucion-entrada="1" onclick="return window.sgThEjecucion.marcarEntrada(this, event)">Marcar entrada</button>
+                      {% else %}
+                      <button type="button" class="th-btn th-btn--ghost th-row-actions__btn" disabled>{% if viaje.entrada_registrada %}Entrada registrada{% else %}Pendiente de salida{% endif %}</button>
+                      {% endif %}
+                    </div>
+                  </td>
+                </tr>
+                {% empty %}
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </article>
+      </div>
+
+      <div id="th-ejecucion-modal" class="th-modal" aria-hidden="true">
+        <div class="th-modal__backdrop" data-modal-close></div>
+        <div class="th-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="th-ejecucion-modal-title">
+          <div class="th-modal__header">
+            <div>
+              <h4 id="th-ejecucion-modal-title">Ejecución del viaje</h4>
+              <p id="th-ejecucion-modal-subtitle">Detalle y registro operativo</p>
+            </div>
+            <button type="button" class="th-btn th-btn--ghost th-modal__close" data-modal-close aria-label="Cerrar modal" onclick="return window.sgThEjecucion.cerrarModal(this, event)">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
+          <div class="th-modal__body">
+            <div id="th-ejecucion-modal-content" class="th-solicitud-modal__content">
+              <div class="th-solicitud-modal__empty">Seleccione un viaje para ver o registrar su ejecución.</div>
+            </div>
+          </div>
+          <div class="th-modal__footer">
+            <div class="th-modal__decision">
+              <strong>Acción</strong>
+              <p id="th-ejecucion-modal-decision">Seleccione una opción de la bandeja.</p>
+            </div>
+            <div class="th-modal__actions">
+              <button type="button" class="th-btn th-btn--primary" id="th-ejecucion-modal-guardar" onclick="return window.sgThEjecucion.guardarModal(this, event)">
+                <i class="bi bi-check2-circle"></i>
+                Guardar
+              </button>
+              <button type="button" class="th-btn th-btn--ghost" data-modal-close onclick="return window.sgThEjecucion.cerrarModal(this, event)">
+                <i class="bi bi-x-circle"></i>
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     {% else %}
     <div class="th-workspace__box">
       <strong>Sección no disponible</strong>
     </div>
-    {% endif %}
-  </section>
-
-  <section class="th-actions" aria-label="Barra inferior de acciones">
-    {% if active_tab == 'solicitud' %}
-    
-    {% else %}
-    
     {% endif %}
   </section>
 </div>
@@ -142,8 +432,452 @@
 <script>
   window.sgTransporteHospitalarioDashboard = {
     activeTab: "{{ active_tab }}",
-    emptyTable: "No hay solicitudes activas registradas."
+      emptyTable: "No hay solicitudes activas registradas.",
+      emptyAutorizacionTable: "No hay solicitudes pendientes disponibles para autorización.",
+      emptyEjecucionTable: "No hay viajes programados disponibles.",
+    urlAutorizarSolicitud: "{% url 'sg_transporte_hospitalario_solicitud_autorizar' %}",
+      urlDetalleSolicitud: "{% url 'sg_transporte_hospitalario_solicitud_detalle' %}",
+      urlBuscarEmpleados: "{% url 'sg_transporte_hospitalario_buscar_empleados' %}",
+      urlProgramacionAnular: "{% url 'sg_transporte_hospitalario_programacion_anular' %}",
+      urlProgramacionConfirmar: "{% url 'sg_transporte_hospitalario_programacion_confirmar' %}",
+      urlEjecucionGuardar: "{% url 'sg_transporte_hospitalario_ejecucion_guardar' %}"
   };
 </script>
 <script src="{% static 'core/scripts/sg_transporte_hospitalario/dashboard/dashboard.js' %}"></script>
+<script>
+  if (window.__sgThDashboardBoot) {
+    window.__sgThDashboardBoot();
+  }
+</script>
+<script>
+(function () {
+  if (window.sgThEjecucion) {
+    return;
+  }
+
+  const config = window.sgTransporteHospitalarioDashboard || {};
+  const modalNode = document.getElementById('th-ejecucion-modal');
+  const modalContent = document.getElementById('th-ejecucion-modal-content');
+  const modalTitulo = document.getElementById('th-ejecucion-modal-title');
+  const modalSubtitulo = document.getElementById('th-ejecucion-modal-subtitle');
+  const modalDecision = document.getElementById('th-ejecucion-modal-decision');
+  const modalGuardar = document.getElementById('th-ejecucion-modal-guardar');
+  let currentRow = null;
+  let currentMode = 'ver';
+
+  function escapeHtml(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, function (character) {
+      return ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      })[character];
+    });
+  }
+
+  function parseJson(value) {
+    if (!value) {
+      return {};
+    }
+    try {
+      const decoded = String(value)
+        .replace(/\\u0022/g, '"')
+        .replace(/\\u002D/g, '-')
+        .replace(/\\u003C/g, '<')
+        .replace(/\\u003E/g, '>')
+        .replace(/\\u0026/g, '&');
+      return JSON.parse(decoded);
+    } catch (error) {
+      return {};
+    }
+  }
+
+  function getRowData(row) {
+    if (!row) {
+      return null;
+    }
+    return {
+      id: String(row.dataset.viajeId || ''),
+      numero: String(row.dataset.viajeNumero || '-'),
+      fecha: String(row.dataset.viajeFecha || '-'),
+      vehiculo: String(row.dataset.viajeVehiculo || '-'),
+      motorista: String(row.dataset.viajeMotorista || '-'),
+      estado: String(row.dataset.viajeEstado || 'PROGRAMADO'),
+      etapa: String(row.dataset.viajeEtapa || 'Programado'),
+      salidaRegistrada: String(row.dataset.viajeSalidaRegistrada || '0') === '1',
+      entradaRegistrada: String(row.dataset.viajeEntradaRegistrada || '0') === '1',
+      fechaSalidaInput: String(row.dataset.viajeFechaSalidaInput || ''),
+      fechaSalida: String(row.dataset.viajeFechaSalida || ''),
+      kilometrajeSalida: String(row.dataset.viajeKilometrajeSalida || ''),
+      precioLitroSalida: String(row.dataset.viajePrecioLitroSalida || ''),
+      litrosCargadosSalida: String(row.dataset.viajeLitrosCargadosSalida || ''),
+      totalCombustible: String(row.dataset.viajeTotalCombustible || ''),
+      observacionesSalida: String(row.dataset.viajeObservacionesSalida || ''),
+      fechaRetornoInput: String(row.dataset.viajeFechaRetornoInput || ''),
+      fechaRetorno: String(row.dataset.viajeFechaRetorno || ''),
+      kilometrajeRetorno: String(row.dataset.viajeKilometrajeRetorno || ''),
+      observacionesRetorno: String(row.dataset.viajeObservacionesRetorno || ''),
+      detalle: parseJson(row.dataset.viajeDetalle || ''),
+    };
+  }
+
+  function renderField(id, label, value, options) {
+    const attrs = options || {};
+    const disabled = attrs.disabled ? ' disabled' : '';
+    const readonly = attrs.readonly ? ' readonly' : '';
+    const tipo = attrs.type || 'text';
+    const placeholder = attrs.placeholder ? ' placeholder="' + escapeHtml(attrs.placeholder) + '"' : '';
+    const min = attrs.min != null ? ' min="' + escapeHtml(attrs.min) + '"' : '';
+    const step = attrs.step != null ? ' step="' + escapeHtml(attrs.step) + '"' : '';
+    const extra = attrs.extraClass ? ' ' + attrs.extraClass : '';
+    if (tipo === 'textarea') {
+      return '<div class="th-field th-viaje-programacion__field' + extra + '" id="' + id + '-field">'
+        + '<label for="' + id + '">' + label + '</label>'
+        + '<textarea id="' + id + '" class="th-input" rows="2"' + disabled + readonly + placeholder + '>' + escapeHtml(value || '') + '</textarea>'
+        + '<div class="th-field-errors" id="' + id + '-error"></div>'
+        + '</div>';
+    }
+    return '<div class="th-field th-viaje-programacion__field' + extra + '" id="' + id + '-field">'
+      + '<label for="' + id + '">' + label + '</label>'
+      + '<input id="' + id + '" type="' + tipo + '" class="th-input" value="' + escapeHtml(value || '') + '"' + disabled + readonly + placeholder + min + step + ' />'
+      + '<div class="th-field-errors" id="' + id + '-error"></div>'
+      + '</div>';
+  }
+
+  function renderCard(label, value) {
+    return '<article class="th-solicitud-modal__summary-card">'
+      + '<span>' + escapeHtml(label) + '</span>'
+      + '<strong>' + escapeHtml(value == null || value === '' ? '-' : value) + '</strong>'
+      + '</article>';
+  }
+
+  function renderSection(title, content) {
+    return '<section class="th-solicitud-modal__section"><h5>' + escapeHtml(title) + '</h5>' + content + '</section>';
+  }
+
+  function renderList(items, renderer, emptyText) {
+    if (!items.length) {
+      return '<div class="th-solicitud-modal__empty">' + escapeHtml(emptyText) + '</div>';
+    }
+    return '<div class="th-solicitud-modal__summary">' + items.map(renderer).join('') + '</div>';
+  }
+
+  function updateTotalCombustible() {
+    const precioNode = document.getElementById('th-ejecucion-precio-litro-salida');
+    const litrosNode = document.getElementById('th-ejecucion-litros-cargados-salida');
+    const totalNode = document.getElementById('th-ejecucion-total-combustible');
+    if (!precioNode || !litrosNode || !totalNode) {
+      return;
+    }
+    const precio = parseFloat(precioNode.value || '');
+    const litros = parseFloat(litrosNode.value || '');
+    totalNode.value = Number.isFinite(precio) && Number.isFinite(litros) ? (precio * litros).toFixed(2) : '';
+  }
+
+  function renderModal(data, mode) {
+    const detalle = data.detalle || {};
+    const info = detalle.info_general || {};
+    const personal = detalle.personal_operativo || [];
+    const pacientes = detalle.pacientes || [];
+    const solicitudes = detalle.solicitudes || [];
+    const motivos = detalle.motivos || [];
+    const salidaRegistrada = Boolean(data.salidaRegistrada || data.fechaSalida);
+    const hero = ''
+      + '<div class="th-solicitud-modal__hero">'
+      + '<div class="th-solicitud-modal__hero-main">'
+      + '<span class="th-solicitud-modal__eyebrow">Ejecución del viaje</span>'
+      + '<h5>Viaje #' + escapeHtml(data.numero || '-') + '</h5>'
+      + '<div class="th-solicitud-modal__focus">'
+      + '<span class="th-badge">' + escapeHtml(info.estado_etiqueta || data.etapa || 'Programado') + '</span>'
+      + '<span class="th-badge">' + escapeHtml(data.salidaRegistrada ? 'Salida registrada' : 'Salida pendiente') + '</span>'
+      + '<span class="th-badge">' + escapeHtml(data.entradaRegistrada ? 'Entrada registrada' : 'Entrada pendiente') + '</span>'
+      + '</div>'
+      + '<p>' + escapeHtml(mode === 'ver' ? 'Consulta consolidada del viaje programado.' : mode === 'salida' ? 'Registre la salida del viaje sin perder visibilidad en la bandeja.' : 'Registre el retorno del mismo viaje y mantenga la trazabilidad completa.') + '</p>'
+      + '</div>'
+      + '<div class="th-solicitud-modal__hero-chips">'
+      + [info.ambulancia || data.vehiculo || '-', info.motorista || data.motorista || '-', info.estado_etiqueta || data.etapa || 'Programado'].map(function (chip) {
+        return '<span class="th-solicitud-modal__chip">' + escapeHtml(chip) + '</span>';
+      }).join('')
+      + '</div>'
+      + '</div>';
+
+    function renderEjecucionResumen() {
+      const secciones = [];
+      if (data.fechaSalidaInput || data.fechaSalida || data.kilometrajeSalida || data.precioLitroSalida || data.litrosCargadosSalida || data.totalCombustible || data.observacionesSalida) {
+        secciones.push(renderSection('Salida', '<div class="th-solicitud-modal__meta">'
+          + renderCard('Fecha y hora de salida', data.fechaSalida || data.fechaSalidaInput || '-')
+          + renderCard('Kilometraje inicial', data.kilometrajeSalida || '-')
+          + renderCard('Precio por litro', data.precioLitroSalida || '-')
+          + renderCard('Litros cargados', data.litrosCargadosSalida || '-')
+          + renderCard('Total combustible', data.totalCombustible || '-')
+          + renderCard('Observaciones de salida', data.observacionesSalida || '-')
+          + '</div>'));
+      }
+      if (data.fechaRetornoInput || data.fechaRetorno || data.kilometrajeRetorno || data.observacionesRetorno) {
+        secciones.push(renderSection('Retorno', '<div class="th-solicitud-modal__meta">'
+          + renderCard('Fecha y hora de retorno', data.fechaRetorno || data.fechaRetornoInput || '-')
+          + renderCard('Kilometraje final', data.kilometrajeRetorno || '-')
+          + renderCard('Observaciones de retorno', data.observacionesRetorno || '-')
+          + '</div>'));
+      }
+      if (!secciones.length) {
+        secciones.push(renderSection('Salida', '<div class="th-solicitud-modal__empty">No hay registros de ejecución disponibles.</div>'));
+      }
+      return renderSection('Ejecución del Viaje', secciones.join(''));
+    }
+
+    if (mode === 'salida') {
+      return hero + '<div class="th-solicitud-modal__grid">' + renderSection('Salida', ''
+        + '<div class="th-viaje-programacion__grid">'
+        + renderField('th-ejecucion-fecha-salida', 'Fecha y hora de salida', data.fechaSalidaInput || '', { type: 'datetime-local' })
+        + renderField('th-ejecucion-kilometraje-salida', 'Kilometraje inicial', data.kilometrajeSalida || '', { type: 'number', min: '0', step: '0.01', extraClass: 'th-viaje-programacion__field' })
+        + renderField('th-ejecucion-precio-litro-salida', 'Precio por litro', data.precioLitroSalida || '', { type: 'number', min: '0', step: '0.01', extraClass: 'th-viaje-programacion__field' })
+        + renderField('th-ejecucion-litros-cargados-salida', 'Litros cargados', data.litrosCargadosSalida || '', { type: 'number', min: '0', step: '0.01', extraClass: 'th-viaje-programacion__field' })
+        + renderField('th-ejecucion-total-combustible', 'Total combustible', data.totalCombustible || '', { type: 'number', min: '0', step: '0.01', disabled: true, readonly: true, extraClass: 'th-viaje-programacion__field' })
+        + renderField('th-ejecucion-observaciones-salida', 'Observaciones de salida', data.observacionesSalida || '', { type: 'textarea', extraClass: 'th-span-12' })
+        + '</div>') + '</div>';
+    }
+
+    if (mode === 'entrada') {
+      const salidaReferencia = salidaRegistrada
+        ? renderSection('Salida registrada', '<div class="th-solicitud-modal__meta">'
+          + renderCard('Fecha y hora', data.fechaSalida || '-')
+          + renderCard('Kilometraje inicial', data.kilometrajeSalida || '-')
+          + renderCard('Total combustible', data.totalCombustible || '-')
+          + renderCard('Observaciones', data.observacionesSalida || '-')
+          + '</div>')
+        : '';
+      return hero + '<div class="th-solicitud-modal__grid">' + salidaReferencia + renderSection('Entrada', ''
+        + '<div class="th-viaje-programacion__grid">'
+        + renderField('th-ejecucion-fecha-retorno', 'Fecha y hora de retorno', data.fechaRetornoInput || '', { type: 'datetime-local' })
+        + renderField('th-ejecucion-kilometraje-retorno', 'Kilometraje final', data.kilometrajeRetorno || '', { type: 'number', min: '0', step: '0.01', extraClass: 'th-viaje-programacion__field' })
+        + renderField('th-ejecucion-observaciones-retorno', 'Observaciones de retorno', data.observacionesRetorno || '', { type: 'textarea', extraClass: 'th-span-12' })
+        + '</div>') + '</div>';
+    }
+
+    if (mode === 'ver') {
+      return hero + '<div class="th-solicitud-modal__grid">'
+        + renderEjecucionResumen()
+        + renderSection('Información general', '<div class="th-solicitud-modal__meta">'
+          + renderCard('Número de viaje', info.numero || data.numero || '-')
+          + renderCard('Estado', info.estado_etiqueta || data.etapa || '-')
+          + renderCard('Tipo de viaje', info.tipo_viaje || '-')
+          + renderCard('Ambulancia', info.ambulancia || data.vehiculo || '-')
+          + renderCard('Motorista', info.motorista || data.motorista || '-')
+          + '</div>')
+        + renderSection('Personal Operativo', renderList(personal, function (item) {
+          return '<article class="th-solicitud-modal__summary-card">'
+            + '<span>' + escapeHtml(item.participacion || 'Asignación') + '</span>'
+            + '<strong>' + escapeHtml(item.nombre || '-') + '</strong>'
+            + '<small>' + escapeHtml((item.cargo || '-') + ' · ' + (item.unidad || '-')) + '</small>'
+            + '</article>';
+        }, 'No hay personal operativo asignado.'))
+        + renderSection('Pacientes', renderList(pacientes, function (item) {
+          return '<article class="th-solicitud-modal__summary-card">'
+            + '<span>' + escapeHtml(item.solicitud || '-') + '</span>'
+            + '<strong>' + escapeHtml(item.paciente || '-') + '</strong>'
+            + '<small>' + escapeHtml((item.expediente || '-') + ' · ' + (item.ingreso || '-') + ' · ' + (item.sala || '-')) + '</small>'
+            + '</article>';
+        }, 'No hay pacientes consolidados en el viaje.'))
+        + renderSection('Solicitudes', renderList(solicitudes, function (item) {
+          return '<article class="th-solicitud-modal__summary-card">'
+            + '<span>' + escapeHtml(item.numero || '-') + '</span>'
+            + '<strong>' + escapeHtml(item.punto || '-') + '</strong>'
+            + '<small>' + escapeHtml(item.prioridad || '-') + '</small>'
+            + '</article>';
+        }, 'No hay solicitudes asociadas al viaje.'))
+        + renderSection('Motivos de las Solicitudes', renderList(motivos, function (item) {
+          return '<article class="th-solicitud-modal__summary-card th-solicitud-modal__summary-card--wide">'
+            + '<span>' + escapeHtml(item.numero || '-') + '</span>'
+            + '<strong>Motivos</strong>'
+            + (item.items && item.items.length ? '<ul class="th-solicitud-modal__bullet-list">' + item.items.map(function (motivo) {
+              return '<li>' + escapeHtml(motivo) + '</li>';
+            }).join('') + '</ul>' : '<small>Sin motivo registrado.</small>')
+            + '</article>';
+        }, 'No hay motivos registrados.'))
+        + '</div>';
+    }
+
+    return hero + '<div class="th-solicitud-modal__grid">'
+      + renderSection('Salida', ''
+        + '<div class="th-viaje-programacion__grid">'
+        + renderField('th-ejecucion-fecha-salida', 'Fecha y hora de salida', data.fechaSalidaInput || '', { type: 'datetime-local', disabled: true })
+        + renderField('th-ejecucion-kilometraje-salida', 'Kilometraje inicial', data.kilometrajeSalida || '', { type: 'number', min: '0', step: '0.01', disabled: true, extraClass: 'th-viaje-programacion__field' })
+        + renderField('th-ejecucion-precio-litro-salida', 'Precio por litro', data.precioLitroSalida || '', { type: 'number', min: '0', step: '0.01', disabled: true, extraClass: 'th-viaje-programacion__field' })
+        + renderField('th-ejecucion-litros-cargados-salida', 'Litros cargados', data.litrosCargadosSalida || '', { type: 'number', min: '0', step: '0.01', disabled: true, extraClass: 'th-viaje-programacion__field' })
+        + renderField('th-ejecucion-total-combustible', 'Total combustible', data.totalCombustible || '', { type: 'number', min: '0', step: '0.01', disabled: true, readonly: true, extraClass: 'th-viaje-programacion__field' })
+        + renderField('th-ejecucion-observaciones-salida', 'Observaciones de salida', data.observacionesSalida || '', { type: 'textarea', disabled: true, extraClass: 'th-span-12' })
+        + '</div>')
+      + renderSection('Entrada', ''
+        + '<div class="th-viaje-programacion__grid">'
+        + renderField('th-ejecucion-fecha-retorno', 'Fecha y hora de retorno', data.fechaRetornoInput || '', { type: 'datetime-local', disabled: true })
+        + renderField('th-ejecucion-kilometraje-retorno', 'Kilometraje final', data.kilometrajeRetorno || '', { type: 'number', min: '0', step: '0.01', disabled: true, extraClass: 'th-viaje-programacion__field' })
+        + renderField('th-ejecucion-observaciones-retorno', 'Observaciones de retorno', data.observacionesRetorno || '', { type: 'textarea', disabled: true, extraClass: 'th-span-12' })
+        + '</div>')
+      + '</div>';
+  }
+
+  function obtenerPaneles() {
+    return Array.from(document.querySelectorAll('#th-ejecucion-salida-table tbody tr, #th-ejecucion-entrada-table tbody tr'));
+  }
+
+  function abrirModal(row, mode) {
+    const data = getRowData(row);
+    if (!data || !modalNode || !modalContent) {
+      return;
+    }
+    currentRow = row;
+    currentMode = mode;
+    modalTitulo.textContent = 'Ejecución de viaje #' + data.numero;
+    modalSubtitulo.textContent = mode === 'ver' ? 'Consulta consolidada del viaje' : 'Registro operativo del viaje';
+    modalDecision.textContent = mode === 'salida' ? 'Registre la salida del viaje.' : mode === 'entrada' ? 'Registre la entrada del viaje.' : 'Consulte la ejecución consolidada del viaje.';
+    modalContent.innerHTML = renderModal(data, mode);
+    modalGuardar.textContent = mode === 'salida' ? 'Registrar salida' : mode === 'entrada' ? 'Registrar entrada' : 'Guardar cambios';
+    modalGuardar.style.display = mode === 'ver' ? 'none' : '';
+    modalNode.classList.add('is-open');
+    modalNode.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('th-modal-open');
+    if (mode === 'salida') {
+      ['th-ejecucion-precio-litro-salida', 'th-ejecucion-litros-cargados-salida'].forEach(function (id) {
+        const node = document.getElementById(id);
+        if (node) {
+          node.addEventListener('input', updateTotalCombustible);
+        }
+      });
+      updateTotalCombustible();
+    }
+  }
+
+  function cerrarModal() {
+    if (!modalNode || !modalContent) {
+      return false;
+    }
+    modalNode.classList.remove('is-open');
+    modalNode.setAttribute('aria-hidden', 'true');
+    modalContent.innerHTML = '<div class="th-solicitud-modal__empty">Seleccione un viaje para ver o registrar su ejecución.</div>';
+    document.body.classList.remove('th-modal-open');
+    if (modalGuardar) {
+      modalGuardar.style.display = '';
+    }
+    return false;
+  }
+
+  async function guardarModal() {
+    if (!window.sgTransporteHospitalarioDashboard || !window.sgTransporteHospitalarioDashboard.urlEjecucionGuardar) {
+      return false;
+    }
+    const currentData = currentRow ? getRowData(currentRow) : null;
+    const payload = {
+      viaje_id: currentData ? currentData.id : '',
+      modo: currentMode,
+      fecha_salida: (document.getElementById('th-ejecucion-fecha-salida') || {}).value || '',
+      kilometraje_salida: (document.getElementById('th-ejecucion-kilometraje-salida') || {}).value || '',
+      precio_litro_salida: (document.getElementById('th-ejecucion-precio-litro-salida') || {}).value || '',
+      litros_cargados_salida: (document.getElementById('th-ejecucion-litros-cargados-salida') || {}).value || '',
+      total_combustible: (document.getElementById('th-ejecucion-total-combustible') || {}).value || '',
+      observaciones_salida: (document.getElementById('th-ejecucion-observaciones-salida') || {}).value || '',
+      fecha_retorno: (document.getElementById('th-ejecucion-fecha-retorno') || {}).value || '',
+      kilometraje_retorno: (document.getElementById('th-ejecucion-kilometraje-retorno') || {}).value || '',
+      observaciones_retorno: (document.getElementById('th-ejecucion-observaciones-retorno') || {}).value || '',
+    };
+    const response = await fetch(window.sgTransporteHospitalarioDashboard.urlEjecucionGuardar, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || ''
+      },
+      credentials: 'same-origin',
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json().catch(function () { return {}; });
+    if (!response.ok || data.ok === false) {
+      throw new Error(data.error || 'No se pudo completar la operación.');
+    }
+    window.location.reload();
+    return false;
+  }
+
+  obtenerPaneles().forEach(function (row) {
+    row.addEventListener('click', function (event) {
+      const verButton = event.target.closest('[data-ejecucion-ver]');
+      if (verButton) {
+        return abrirModal(row, 'ver');
+      }
+      const editarButton = event.target.closest('[data-ejecucion-editar]');
+      if (editarButton) {
+        return abrirModal(row, 'editar');
+      }
+      const salidaButton = event.target.closest('[data-ejecucion-salida]');
+      if (salidaButton) {
+        return abrirModal(row, 'salida');
+      }
+      const entradaButton = event.target.closest('[data-ejecucion-entrada]');
+      if (entradaButton) {
+        return abrirModal(row, 'entrada');
+      }
+      return false;
+    });
+  });
+
+  if (modalNode) {
+    modalNode.addEventListener('click', function (event) {
+      if (event.target && event.target.matches('[data-modal-close]')) {
+        cerrarModal();
+      }
+    });
+  }
+
+  window.sgThEjecucion = {
+    ver: function (button, event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      abrirModal(button ? button.closest('tr') : null, 'ver');
+      return false;
+    },
+    editar: function (button, event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      abrirModal(button ? button.closest('tr') : null, 'editar');
+      return false;
+    },
+    marcarSalida: function (button, event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      abrirModal(button ? button.closest('tr') : null, 'salida');
+      return false;
+    },
+    marcarEntrada: function (button, event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      abrirModal(button ? button.closest('tr') : null, 'entrada');
+      return false;
+    },
+    cerrarModal: function (button, event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      return cerrarModal();
+    },
+    guardarModal: function (button, event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      void guardarModal();
+      return false;
+    }
+  };
+})();
+</script>
 {% endblock extra_js %}

@@ -60,20 +60,20 @@
         </thead>
             <tbody>
               {% for s in solicitudes_activas %}
-              <tr>
-                <td>{{ s.numero_solicitud }}</td>
-                <td>{{ s.fecha_solicitud|date:"d/m/Y H:i" }}</td>
-                <td>{{ s.punto_solicitud }}</td>
-                <td>{{ s.tipo_solicitud.nombre }}</td>
-                <td>{{ s.prioridad.nombre }}</td>
-                <td><span class="th-badge">{{ s.estado }}</span></td>
-                <td>
-                  <div class="d-flex gap-2">
-                    <a href="{% url 'sg_transporte_hospitalario_solicitud_ver' s.pk %}" class="btn btn-sm btn-outline-dark"><i class="bi bi-eye"></i> Ver</a>
+              <tr data-solicitud-id="{{ s.pk }}">
+                <td data-label="Número de solicitud">{{ s.numero_solicitud }}</td>
+                <td data-label="Fecha">{{ s.fecha_solicitud|date:"d/m/Y H:i" }}</td>
+                <td data-label="Área solicitante">{{ s.punto_solicitud }}</td>
+                <td data-label="Tipo de solicitud">{{ s.tipo_solicitud.nombre }}</td>
+                <td data-label="Prioridad">{{ s.prioridad.nombre }}</td>
+                <td data-label="Proceso"><span class="th-badge">{{ s.estado }}</span></td>
+                <td data-label="Acciones">
+                  <div class="th-row-actions">
+                    <a href="{% url 'sg_transporte_hospitalario_solicitud_ver' s.pk %}" class="th-btn th-btn--ghost th-row-actions__btn"><i class="bi bi-eye"></i> Ver</a>
                     {% if s.puede_editar %}
-                    <a href="{% url 'sg_transporte_hospitalario_solicitud_editar' s.pk %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i> Editar</a>
+                    <a href="{% url 'sg_transporte_hospitalario_solicitud_editar' s.pk %}" class="th-btn th-btn--ghost th-row-actions__btn"><i class="bi bi-pencil"></i> Editar</a>
                     {% else %}
-                    <button type="button" class="btn btn-sm btn-outline-secondary" disabled><i class="bi bi-lock"></i> Editar</button>
+                    <button type="button" class="th-btn th-btn--ghost th-row-actions__btn" disabled><i class="bi bi-lock"></i> Editar</button>
                     {% endif %}
                   </div>
                 </td>

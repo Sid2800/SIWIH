@@ -91,7 +91,7 @@
             </li>
 
 
-            
+
 
                {% if request.user|tiene_unidad:"ADMI:" %}
                <li>
@@ -130,7 +130,7 @@
                </li>
                {% endif %}
 
-            
+
             <!--
             <li>
                <a href="{% url 'home' %}" class="bn-navegacion__enlace">
@@ -512,6 +512,17 @@
    <!-- DataTables -->
    <script src="{% static 'core/datatables/js/dataTables.js' %}"></script>
    <script src="{% static 'core/datatables/js/dataTables.responsive.js' %}"></script>
+   <script>
+      if (window.jQuery && jQuery.fn && jQuery.fn.dataTable && jQuery.fn.dataTable.ext) {
+         var dtExt = jQuery.fn.dataTable.ext;
+         dtExt.features = dtExt.features || dtExt.feature || {};
+         if (!dtExt.features.register && jQuery.fn.dataTable.feature && typeof jQuery.fn.dataTable.feature.register === 'function') {
+            dtExt.features.register = function (name, callback, legacy) {
+               return jQuery.fn.dataTable.feature.register(name, callback, legacy);
+            };
+         }
+      }
+   </script>
 
    <!-- Botones -->
    <script src="{% static 'core/datatables/js/buttons.min.js' %}"></script>
