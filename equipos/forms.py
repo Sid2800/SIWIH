@@ -873,26 +873,17 @@ class ModeloCatalogoForm(forms.ModelForm):
 class SalidaGarantiaForm(forms.Form):
     """Registra que el equipo salio a reparacion.
 
-    Admite fechas retroactivas porque el tecnico suele anotar la salida dias
-    despues de que ocurra, pero nunca anteriores al registro del equipo ni
-    posteriores a hoy: una salida futura seria una prevision, no un hecho.
+    No pide la fecha: la pausa se anota el dia que se ejecuta. Se decidio asi
+    porque el inventario arranca de cero y no hay historico que reconstruir;
+    un campo de fecha solo abriria la puerta a equivocarse al teclearla.
     """
 
-    fecha_salida = forms.DateField(
-        label="Fecha de salida",
-        widget=forms.DateInput(
-            attrs={"class": "formularioCampo-date", "type": "date"},
-            format="%Y-%m-%d",
-        ),
-    )
     motivo = forms.CharField(
         label="Motivo",
-        required=False,
         widget=forms.Textarea(
             attrs={
                 "class": "formularioCampo-text no-resize",
                 "rows": 3,
-                "placeholder": "A dónde va y por qué. Número de orden si lo hay.",
             }
         ),
     )
@@ -901,47 +892,22 @@ class SalidaGarantiaForm(forms.Form):
         super().__init__(*args, **kwargs)
         self.dispositivo = dispositivo
 
-    def clean_fecha_salida(self):
-        fecha = self.cleaned_data["fecha_salida"]
-        hoy = timezone.localdate()
-
-        if fecha > hoy:
-            raise forms.ValidationError(
-                "La salida no puede ser una fecha futura."
-            )
-
-        if self.dispositivo is not None:
-            registro = timezone.localtime(self.dispositivo.fecha_creado).date()
-            if fecha < registro:
-                raise forms.ValidationError(
-                    "La salida no puede ser anterior al registro del equipo "
-                    f"({registro.strftime('%d/%m/%Y')})."
-                )
-
-        return fecha
-
     def clean_motivo(self):
         return (self.cleaned_data.get("motivo") or "").strip()
 
 
 class RetornoGarantiaForm(forms.Form):
-    """Cierra la pausa. Los dias fuera se suman aqui al vencimiento."""
+    """Cierra la pausa. Los dias fuera se suman aqui al vencimiento.
 
-    fecha_retorno = forms.DateField(
-        label="Fecha de retorno",
-        widget=forms.DateInput(
-            attrs={"class": "formularioCampo-date", "type": "date"},
-            format="%Y-%m-%d",
-        ),
-    )
-    motivo = forms.CharField(
+    Tampoco pide la fecha: el retorno se anota el dia que el equipo vuelve.
+    """
+
+    observaciones_retorno = forms.CharField(
         label="Observaciones",
-        required=False,
         widget=forms.Textarea(
             attrs={
                 "class": "formularioCampo-text no-resize",
                 "rows": 3,
-                "placeholder": "Qué se hizo. Se añade a lo anotado en la salida.",
             }
         ),
     )
@@ -950,22 +916,5 @@ class RetornoGarantiaForm(forms.Form):
         super().__init__(*args, **kwargs)
         self.pausa = pausa
 
-    def clean_fecha_retorno(self):
-        fecha = self.cleaned_data["fecha_retorno"]
-        hoy = timezone.localdate()
-
-        if fecha > hoy:
-            raise forms.ValidationError(
-                "El retorno no puede ser una fecha futura."
-            )
-
-        if self.pausa is not None and fecha < self.pausa.fecha_salida:
-            raise forms.ValidationError(
-                "El retorno no puede ser anterior a la salida "
-                f"({self.pausa.fecha_salida.strftime('%d/%m/%Y')})."
-            )
-
-        return fecha
-
-    def clean_motivo(self):
-        return (self.cleaned_data.get("motivo") or "").strip()
+    def clean_observaciones_retorno(self):
+        return (self.cleaned_data.get("observaciones_retorno") or "").strip()

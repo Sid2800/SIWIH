@@ -306,52 +306,10 @@
             {% endif %}
 
             {% comment %}
-               Las acciones exigen permiso de edicion. La jefatura ve la
-               tarjeta completa pero sin botones: consulta, no opera.
+               La ficha solo informa de la garantia: estado, fechas e
+               historial. Pausar y reanudar se maneja enteramente desde
+               Garantias, para no repartir la misma operacion por dos sitios.
             {% endcomment %}
-            {% if request.user|puede_editar_equipo %}
-                {% if garantia.esta_pausada %}
-                    <form method="post"
-                          action="{% url 'registrar_retorno_garantia_equipos' dispositivo.id %}"
-                          class="equipos-garantia__formulario">
-                        {% csrf_token %}
-                        <label for="fecha_retorno_garantia">Fecha de retorno</label>
-                        <input type="date" id="fecha_retorno_garantia"
-                               name="fecha_retorno" class="formularioCampo-date"
-                               max="{{ hoy|date:'Y-m-d' }}"
-                               min="{{ garantia.pausa_abierta.fecha_salida|date:'Y-m-d' }}"
-                               required>
-                        <label for="motivo_retorno_garantia">Observaciones</label>
-                        <textarea id="motivo_retorno_garantia" name="motivo" rows="2"
-                                  class="formularioCampo-text no-resize"
-                                  placeholder="Qué se hizo."></textarea>
-                        <button type="submit" class="formularioBotones-boton">
-                            <i class="bi bi-box-arrow-in-down"></i>
-                            Registrar retorno
-                        </button>
-                    </form>
-                {% elif permite_pausa %}
-                    <form method="post"
-                          action="{% url 'registrar_salida_garantia_equipos' dispositivo.id %}"
-                          class="equipos-garantia__formulario">
-                        {% csrf_token %}
-                        <label for="fecha_salida_garantia">Fecha de salida</label>
-                        <input type="date" id="fecha_salida_garantia"
-                               name="fecha_salida" class="formularioCampo-date"
-                               max="{{ hoy|date:'Y-m-d' }}" required>
-                        <label for="motivo_salida_garantia">Motivo</label>
-                        <textarea id="motivo_salida_garantia" name="motivo" rows="2"
-                                  class="formularioCampo-text no-resize"
-                                  placeholder="A dónde va y por qué."></textarea>
-                        <button type="submit" class="formularioBotones-boton">
-                            <i class="bi bi-box-arrow-up"></i>
-                            Registrar salida a reparación
-                        </button>
-                    </form>
-                {% elif motivo_sin_pausa %}
-                    <p class="equipos-detalle__vacio">{{ motivo_sin_pausa }}</p>
-                {% endif %}
-            {% endif %}
 
             {% if pausas %}
                 <h4 class="equipos-detalle__subtitulo">Historial de pausas</h4>
@@ -366,7 +324,10 @@
                                 — sin retorno registrado
                             {% endif %}
                             {% if pausa.motivo %}
-                                <br><span>{{ pausa.motivo }}</span>
+                                <br><span><strong>Salida:</strong> {{ pausa.motivo }}</span>
+                            {% endif %}
+                            {% if pausa.observaciones_retorno %}
+                                <br><span><strong>Retorno:</strong> {{ pausa.observaciones_retorno }}</span>
                             {% endif %}
                         </li>
                     {% endfor %}

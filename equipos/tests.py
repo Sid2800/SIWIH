@@ -1406,6 +1406,8 @@ class EquiposViewsTests(TestCase):
             dispositivo=self.dispositivo,
             fecha_salida=timezone.localdate() - timedelta(days=20),
             fecha_retorno=timezone.localdate() - timedelta(days=5),
+            motivo="Enviado a reparación.",
+            observaciones_retorno="Reparación completada.",
             registrado_por=self.usuario,
         )
 
@@ -3123,6 +3125,9 @@ class GarantiaCalculoTests(TestCase):
             fecha_salida=salida,
             fecha_retorno=retorno,
             motivo="Enviado a reparación",
+            observaciones_retorno=(
+                "Reparación completada" if retorno is not None else ""
+            ),
             registrado_por=self.usuario,
         )
 
@@ -3232,6 +3237,7 @@ class GarantiaCalculoTests(TestCase):
         pausa = self.pausar(equipo, date(2026, 7, 1), retorno=None)
 
         pausa.fecha_retorno = date(2026, 7, 21)
+        pausa.observaciones_retorno = "Reparación completada."
         pausa.save()
 
         estado = calcular_estado_garantia(equipo, hoy=date(2026, 8, 6))
@@ -3318,6 +3324,7 @@ class PausaGarantiaModeloTests(TestCase):
         PausaGarantia.objects.create(
             dispositivo=equipo,
             fecha_salida=timezone.localdate(),
+            motivo="Enviado a reparación.",
             registrado_por=self.usuario,
         )
 
@@ -3325,8 +3332,33 @@ class PausaGarantiaModeloTests(TestCase):
             PausaGarantia.objects.create(
                 dispositivo=equipo,
                 fecha_salida=timezone.localdate(),
+                motivo="Enviado nuevamente a reparación.",
                 registrado_por=self.usuario,
             )
+
+    def test_no_admite_una_salida_sin_motivo(self):
+        equipo = self.crear_equipo()
+
+        with self.assertRaises(ValidationError):
+            PausaGarantia.objects.create(
+                dispositivo=equipo,
+                fecha_salida=timezone.localdate(),
+                motivo="   ",
+                registrado_por=self.usuario,
+            )
+
+    def test_no_admite_cerrar_sin_observaciones_de_retorno(self):
+        equipo = self.crear_equipo()
+        pausa = PausaGarantia.objects.create(
+            dispositivo=equipo,
+            fecha_salida=timezone.localdate() - timedelta(days=2),
+            motivo="Enviado a reparación.",
+            registrado_por=self.usuario,
+        )
+        pausa.fecha_retorno = timezone.localdate()
+
+        with self.assertRaises(ValidationError):
+            pausa.save()
 
     def test_la_base_impide_dos_pausas_abiertas_sin_pasar_por_python(self):
         # Se salta full_clean() a proposito: si la unicidad viviera solo en la
@@ -3337,12 +3369,14 @@ class PausaGarantiaModeloTests(TestCase):
         PausaGarantia.objects.create(
             dispositivo=equipo,
             fecha_salida=timezone.localdate(),
+            motivo="Enviado a reparación.",
             registrado_por=self.usuario,
         )
 
         intrusa = PausaGarantia(
             dispositivo=equipo,
             fecha_salida=timezone.localdate(),
+            motivo="Enviado nuevamente a reparación.",
             registrado_por=self.usuario,
         )
         intrusa.equipo_con_pausa_abierta = equipo.pk
@@ -3356,11 +3390,13 @@ class PausaGarantiaModeloTests(TestCase):
         pausa = PausaGarantia.objects.create(
             dispositivo=equipo,
             fecha_salida=timezone.localdate() - timedelta(days=3),
+            motivo="Enviado a reparación.",
             registrado_por=self.usuario,
         )
         self.assertEqual(pausa.equipo_con_pausa_abierta, equipo.pk)
 
         pausa.fecha_retorno = timezone.localdate()
+        pausa.observaciones_retorno = "Reparación completada."
         pausa.save()
         pausa.refresh_from_db()
 
@@ -3371,14 +3407,17 @@ class PausaGarantiaModeloTests(TestCase):
         primera = PausaGarantia.objects.create(
             dispositivo=equipo,
             fecha_salida=timezone.localdate() - timedelta(days=10),
+            motivo="Primera salida a reparación.",
             registrado_por=self.usuario,
         )
         primera.fecha_retorno = timezone.localdate() - timedelta(days=5)
+        primera.observaciones_retorno = "Primera reparación completada."
         primera.save()
 
         segunda = PausaGarantia.objects.create(
             dispositivo=equipo,
             fecha_salida=timezone.localdate(),
+            motivo="Segunda salida a reparación.",
             registrado_por=self.usuario,
         )
 
@@ -3393,6 +3432,8 @@ class PausaGarantiaModeloTests(TestCase):
                 dispositivo=equipo,
                 fecha_salida=date(2026, 7, 20),
                 fecha_retorno=date(2026, 7, 10),
+                motivo="Enviado a reparación.",
+                observaciones_retorno="Reparación completada.",
                 registrado_por=self.usuario,
             )
 
@@ -3403,6 +3444,7 @@ class PausaGarantiaModeloTests(TestCase):
             PausaGarantia.objects.create(
                 dispositivo=equipo,
                 fecha_salida=date(2020, 1, 1),
+                motivo="Enviado a reparación.",
                 registrado_por=self.usuario,
             )
 
@@ -3414,6 +3456,7 @@ class PausaGarantiaModeloTests(TestCase):
         pausa = PausaGarantia.objects.create(
             dispositivo=equipo,
             fecha_salida=timezone.localdate(),
+            motivo="Enviado a reparación.",
             registrado_por=self.usuario,
         )
 
@@ -3492,6 +3535,7 @@ class PuedePausarseTests(TestCase):
         PausaGarantia.objects.create(
             dispositivo=equipo,
             fecha_salida=timezone.localdate(),
+            motivo="Enviado a reparación.",
             registrado_por=self.usuario,
         )
 
@@ -3628,15 +3672,13 @@ class VistasGarantiaTests(TestCase):
 
         respuesta = self.client.post(
             reverse("registrar_salida_garantia_equipos", args=[equipo.pk]),
-            {
-                "fecha_salida": timezone.localdate().isoformat(),
-                "motivo": "Enviado al proveedor, orden 4471.",
-            },
+            {"motivo": "Enviado al proveedor, orden 4471."},
         )
 
+        # Se vuelve a la pantalla de garantia, donde se ve el resultado.
         self.assertRedirects(
             respuesta,
-            reverse("detalle_dispositivo_equipos", args=[equipo.pk]),
+            reverse("gestionar_garantia_equipos", args=[equipo.pk]),
         )
         pausa = equipo.pausas_garantia.get()
         self.assertTrue(pausa.esta_abierta)
@@ -3651,28 +3693,10 @@ class VistasGarantiaTests(TestCase):
 
         respuesta = self.client.post(
             reverse("registrar_salida_garantia_equipos", args=[equipo.pk]),
-            {"fecha_salida": timezone.localdate().isoformat(), "motivo": ""},
+            {"motivo": ""},
         )
 
         self.assertRedirects(respuesta, reverse("acceso_denegado"))
-        self.assertEqual(equipo.pausas_garantia.count(), 0)
-
-    def test_no_admite_una_salida_futura(self):
-        equipo = self.crear_equipo(
-            fin=timezone.localdate() + timedelta(days=200), serie="VG-FUTURA"
-        )
-        self.client.force_login(self.tecnico)
-
-        self.client.post(
-            reverse("registrar_salida_garantia_equipos", args=[equipo.pk]),
-            {
-                "fecha_salida": (
-                    timezone.localdate() + timedelta(days=5)
-                ).isoformat(),
-                "motivo": "",
-            },
-        )
-
         self.assertEqual(equipo.pausas_garantia.count(), 0)
 
     def test_no_admite_salida_en_equipo_sin_garantia(self):
@@ -3681,10 +3705,26 @@ class VistasGarantiaTests(TestCase):
 
         self.client.post(
             reverse("registrar_salida_garantia_equipos", args=[equipo.pk]),
-            {"fecha_salida": timezone.localdate().isoformat(), "motivo": ""},
+            {"motivo": ""},
         )
 
         self.assertEqual(equipo.pausas_garantia.count(), 0)
+
+    def test_no_registra_salida_sin_motivo(self):
+        equipo = self.crear_equipo(
+            fin=timezone.localdate() + timedelta(days=200),
+            serie="VG-SIN-MOTIVO",
+        )
+        self.client.force_login(self.tecnico)
+
+        respuesta = self.client.post(
+            reverse("registrar_salida_garantia_equipos", args=[equipo.pk]),
+            {"motivo": ""},
+        )
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(equipo.pausas_garantia.count(), 0)
+        self.assertContains(respuesta, "Este campo es obligatorio")
 
     # --- Registrar retorno -------------------------------------------------
 
@@ -3695,21 +3735,20 @@ class VistasGarantiaTests(TestCase):
         PausaGarantia.objects.create(
             dispositivo=equipo,
             fecha_salida=salida,
+            motivo="Enviado a reparación.",
             registrado_por=self.tecnico,
         )
         self.client.force_login(self.tecnico)
 
         respuesta = self.client.post(
             reverse("registrar_retorno_garantia_equipos", args=[equipo.pk]),
-            {
-                "fecha_retorno": timezone.localdate().isoformat(),
-                "motivo": "Cambio de sensor.",
-            },
+            {"observaciones_retorno": "Cambio de sensor."},
         )
 
+        # Se vuelve a la pantalla de garantia, donde se ve el resultado.
         self.assertRedirects(
             respuesta,
-            reverse("detalle_dispositivo_equipos", args=[equipo.pk]),
+            reverse("gestionar_garantia_equipos", args=[equipo.pk]),
         )
         estado = calcular_estado_garantia(equipo)
         self.assertEqual(estado.dias_pausados, 12)
@@ -3718,28 +3757,60 @@ class VistasGarantiaTests(TestCase):
         equipo.refresh_from_db()
         self.assertEqual(equipo.fecha_fin_garantia, fin)
 
-    def test_no_admite_retorno_anterior_a_la_salida(self):
+        pausa = equipo.pausas_garantia.get()
+        self.assertEqual(pausa.motivo, "Enviado a reparación.")
+        self.assertEqual(pausa.observaciones_retorno, "Cambio de sensor.")
+
+    def test_el_retorno_conserva_el_motivo_de_salida(self):
         equipo = self.crear_equipo(
-            fin=timezone.localdate() + timedelta(days=200), serie="VG-RET-MALO"
+            fin=timezone.localdate() + timedelta(days=200),
+            serie="VG-CONSERVA-MOTIVO",
         )
-        salida = timezone.localdate() - timedelta(days=3)
-        PausaGarantia.objects.create(
+        pausa = PausaGarantia.objects.create(
             dispositivo=equipo,
-            fecha_salida=salida,
+            fecha_salida=timezone.localdate() - timedelta(days=4),
+            motivo="Enviado al proveedor por falla de encendido.",
             registrado_por=self.tecnico,
         )
         self.client.force_login(self.tecnico)
 
         self.client.post(
             reverse("registrar_retorno_garantia_equipos", args=[equipo.pk]),
-            {
-                "fecha_retorno": (salida - timedelta(days=1)).isoformat(),
-                "motivo": "",
-            },
+            {"observaciones_retorno": "Se reemplazó la fuente de poder."},
         )
 
-        pausa = equipo.pausas_garantia.get()
+        pausa.refresh_from_db()
+        self.assertEqual(
+            pausa.motivo,
+            "Enviado al proveedor por falla de encendido.",
+        )
+        self.assertEqual(
+            pausa.observaciones_retorno,
+            "Se reemplazó la fuente de poder.",
+        )
+
+    def test_no_cierra_el_retorno_sin_observaciones(self):
+        equipo = self.crear_equipo(
+            fin=timezone.localdate() + timedelta(days=200),
+            serie="VG-SIN-OBS-RETORNO",
+        )
+        pausa = PausaGarantia.objects.create(
+            dispositivo=equipo,
+            fecha_salida=timezone.localdate() - timedelta(days=3),
+            motivo="Enviado a reparación.",
+            registrado_por=self.tecnico,
+        )
+        self.client.force_login(self.tecnico)
+
+        respuesta = self.client.post(
+            reverse("registrar_retorno_garantia_equipos", args=[equipo.pk]),
+            {"observaciones_retorno": ""},
+        )
+
+        pausa.refresh_from_db()
+        self.assertEqual(respuesta.status_code, 200)
         self.assertTrue(pausa.esta_abierta)
+        self.assertContains(respuesta, "Este campo es obligatorio")
 
     def test_no_hay_retorno_sin_salida_pendiente(self):
         equipo = self.crear_equipo(
@@ -3749,18 +3820,21 @@ class VistasGarantiaTests(TestCase):
 
         respuesta = self.client.post(
             reverse("registrar_retorno_garantia_equipos", args=[equipo.pk]),
-            {"fecha_retorno": timezone.localdate().isoformat(), "motivo": ""},
+            {"observaciones_retorno": ""},
         )
 
+        # Se vuelve a la pantalla de garantia, donde se ve el resultado.
         self.assertRedirects(
             respuesta,
-            reverse("detalle_dispositivo_equipos", args=[equipo.pk]),
+            reverse("gestionar_garantia_equipos", args=[equipo.pk]),
         )
         self.assertEqual(equipo.pausas_garantia.count(), 0)
 
     # --- La tarjeta del detalle -------------------------------------------
 
-    def test_el_detalle_ofrece_el_boton_de_salida_al_tecnico(self):
+    def test_el_detalle_informa_de_la_garantia_pero_no_deja_operarla(self):
+        # Pausar y reanudar se maneja enteramente desde Garantias: la ficha
+        # muestra el estado y el historial, y nada mas.
         equipo = self.crear_equipo(
             fin=timezone.localdate() + timedelta(days=200), serie="VG-CARD-TEC"
         )
@@ -3770,12 +3844,17 @@ class VistasGarantiaTests(TestCase):
             reverse("detalle_dispositivo_equipos", args=[equipo.pk])
         )
 
-        self.assertContains(
+        self.assertContains(respuesta, "Garantía")
+        self.assertNotContains(
+            respuesta, reverse("gestionar_garantia_equipos", args=[equipo.pk])
+        )
+        self.assertNotContains(
             respuesta,
             reverse("registrar_salida_garantia_equipos", args=[equipo.pk]),
         )
+        self.assertNotContains(respuesta, 'name="motivo"')
 
-    def test_la_directora_ve_la_garantia_pero_sin_botones(self):
+    def test_la_directora_ve_la_garantia_pero_sin_enlace(self):
         equipo = self.crear_equipo(
             fin=timezone.localdate() + timedelta(days=200), serie="VG-CARD-DIR"
         )
@@ -3787,9 +3866,138 @@ class VistasGarantiaTests(TestCase):
 
         self.assertContains(respuesta, "Garantía")
         self.assertNotContains(
+            respuesta, reverse("gestionar_garantia_equipos", args=[equipo.pk])
+        )
+
+    # --- La pantalla propia -----------------------------------------------
+
+    def test_la_pantalla_muestra_el_formulario_de_salida(self):
+        equipo = self.crear_equipo(
+            fin=timezone.localdate() + timedelta(days=200), serie="VG-PANT-SAL"
+        )
+        self.client.force_login(self.tecnico)
+
+        respuesta = self.client.get(
+            reverse("gestionar_garantia_equipos", args=[equipo.pk])
+        )
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertContains(respuesta, "Pausar la garantía")
+        self.assertContains(
             respuesta,
             reverse("registrar_salida_garantia_equipos", args=[equipo.pk]),
         )
+
+    def test_la_salida_se_anota_con_la_fecha_del_dia(self):
+        # No hay campo de fecha: la pone el servidor al ejecutar.
+        equipo = self.crear_equipo(
+            fin=timezone.localdate() + timedelta(days=200), serie="VG-PANT-HOY"
+        )
+        self.client.force_login(self.tecnico)
+
+        self.client.post(
+            reverse("registrar_salida_garantia_equipos", args=[equipo.pk]),
+            {"motivo": "Al proveedor."},
+        )
+
+        pausa = equipo.pausas_garantia.get()
+        self.assertEqual(pausa.fecha_salida, timezone.localdate())
+
+    def test_el_retorno_se_anota_con_la_fecha_del_dia(self):
+        equipo = self.crear_equipo(
+            fin=timezone.localdate() + timedelta(days=200), serie="VG-PANT-HOY2"
+        )
+        PausaGarantia.objects.create(
+            dispositivo=equipo,
+            fecha_salida=timezone.localdate() - timedelta(days=8),
+            motivo="Enviado a reparación.",
+            registrado_por=self.tecnico,
+        )
+        self.client.force_login(self.tecnico)
+
+        self.client.post(
+            reverse("registrar_retorno_garantia_equipos", args=[equipo.pk]),
+            {"observaciones_retorno": "Reparación completada."},
+        )
+
+        pausa = equipo.pausas_garantia.get()
+        self.assertEqual(pausa.fecha_retorno, timezone.localdate())
+        self.assertEqual(pausa.dias, 8)
+
+    def test_la_pantalla_anuncia_con_que_fecha_va_a_registrar(self):
+        # Que no se pida la fecha no debe hacerla invisible.
+        equipo = self.crear_equipo(
+            fin=timezone.localdate() + timedelta(days=200), serie="VG-PANT-AVISO"
+        )
+        self.client.force_login(self.tecnico)
+
+        respuesta = self.client.get(
+            reverse("gestionar_garantia_equipos", args=[equipo.pk])
+        )
+
+        self.assertContains(respuesta, "Se registrará con fecha de hoy")
+        self.assertContains(respuesta, timezone.localdate().strftime("%d/%m/%Y"))
+
+    def test_la_pantalla_muestra_el_formulario_de_retorno_si_esta_fuera(self):
+        equipo = self.crear_equipo(
+            fin=timezone.localdate() + timedelta(days=200), serie="VG-PANT-RET"
+        )
+        PausaGarantia.objects.create(
+            dispositivo=equipo,
+            fecha_salida=timezone.localdate() - timedelta(days=4),
+            motivo="Enviado a reparación.",
+            registrado_por=self.tecnico,
+        )
+        self.client.force_login(self.tecnico)
+
+        respuesta = self.client.get(
+            reverse("gestionar_garantia_equipos", args=[equipo.pk])
+        )
+
+        self.assertContains(respuesta, "Reanudar la garantía")
+        self.assertContains(respuesta, "Registrar retorno")
+
+    def test_la_directora_ve_la_pantalla_pero_sin_formulario(self):
+        # Llega desde el panel de garantias, asi que debe poder entrar; lo que
+        # no puede es registrar movimientos.
+        equipo = self.crear_equipo(
+            fin=timezone.localdate() + timedelta(days=200), serie="VG-PANT-DIR"
+        )
+        self.client.force_login(self.directora)
+
+        respuesta = self.client.get(
+            reverse("gestionar_garantia_equipos", args=[equipo.pk])
+        )
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertNotContains(respuesta, "Registrar salida")
+        self.assertContains(respuesta, "No tienes permiso")
+
+    def test_quien_no_es_de_equipos_no_abre_la_pantalla(self):
+        equipo = self.crear_equipo(
+            fin=timezone.localdate() + timedelta(days=200), serie="VG-PANT-AJENO"
+        )
+        self.client.force_login(self.ajeno)
+
+        respuesta = self.client.get(
+            reverse("gestionar_garantia_equipos", args=[equipo.pk])
+        )
+
+        self.assertRedirects(respuesta, reverse("acceso_denegado"))
+
+    def test_la_pantalla_explica_por_que_no_se_puede_pausar(self):
+        # Antes rebotaba al detalle. Ahora informa y se queda, porque es el
+        # destino del menu de acciones y del panel.
+        equipo = self.crear_equipo(fin=None, serie="VG-PANT-SIN")
+        self.client.force_login(self.tecnico)
+
+        respuesta = self.client.get(
+            reverse("gestionar_garantia_equipos", args=[equipo.pk])
+        )
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertContains(respuesta, "no tiene garantía")
+        self.assertNotContains(respuesta, "Registrar salida")
 
     def test_la_vista_reducida_no_menciona_la_garantia(self):
         equipo = self.crear_equipo(

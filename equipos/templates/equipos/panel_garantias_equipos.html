@@ -23,30 +23,29 @@
         </div>
     </div>
 
-    {% comment %}
-       Los filtros son enlaces y no un formulario: son cinco estados fijos y
-       cada uno es una pregunta distinta que conviene poder compartir por URL.
-       La vista sin filtro muestra lo accionable: por vencer y pausados.
-    {% endcomment %}
+    {# Cada estado conserva su URL, pero visualmente usa los controles del listado. #}
     <div class="equipos-listado__controles">
-        <div class="equipos-garantias__filtros">
-            <a class="equipos-garantias__filtro{% if not filtro %} equipos-garantias__filtro--activo{% endif %}"
-               href="{% url 'panel_garantias_equipos' %}">
-                Requieren atención
-                <span class="equipos-garantias__conteo">{{ atencion }}</span>
+        <nav class="equipos-listado__filtros equipos-garantias__filtros"
+             aria-label="Filtrar equipos por estado de garantía">
+            <a class="formularioBotones-boton equipos-listado__boton-filtro equipos-garantias__boton-filtro{% if filtro %} equipos-listado__boton-filtro--secundario{% endif %}"
+               href="{% url 'panel_garantias_equipos' %}"
+               {% if not filtro %}aria-current="page"{% endif %}>
+                <span>Requieren atención</span>
+                <strong>{{ atencion }}</strong>
             </a>
             {% for pestana in pestanas %}
-                <a class="equipos-garantias__filtro{% if pestana.activa %} equipos-garantias__filtro--activo{% endif %}"
-                   href="?estado={{ pestana.valor }}">
-                    {{ pestana.etiqueta }}
-                    <span class="equipos-garantias__conteo">{{ pestana.conteo }}</span>
+                <a class="formularioBotones-boton equipos-listado__boton-filtro equipos-garantias__boton-filtro{% if not pestana.activa %} equipos-listado__boton-filtro--secundario{% endif %}"
+                   href="?estado={{ pestana.valor }}"
+                   {% if pestana.activa %}aria-current="page"{% endif %}>
+                    <span>{{ pestana.etiqueta }}</span>
+                    <strong>{{ pestana.conteo }}</strong>
                 </a>
             {% endfor %}
-        </div>
+        </nav>
     </div>
 
-    <div class="equipos-garantias__tabla">
-        <table class="equipos-listado__tabla">
+    <div class="equipos-listado__tabla-contenedor">
+        <table class="dataTable stripe hover row-border equipos-listado__tabla equipos-garantias__tabla">
             <thead>
                 <tr>
                     <th>Código</th>
@@ -59,11 +58,11 @@
             <tbody>
                 {% for equipo in equipos %}
                     <tr class="equipos-listado__fila equipos-listado__fila--editable"
-                        data-edit-url="{% url 'detalle_dispositivo_equipos' equipo.id %}"
-                        title="Doble clic para ver {{ equipo.codigo }}">
+                        data-edit-url="{% url 'gestionar_garantia_equipos' equipo.id %}"
+                        title="Doble clic para abrir la garantía de {{ equipo.codigo }}">
                         <td>
                             <a class="equipos-listado__codigo"
-                               href="{% url 'detalle_dispositivo_equipos' equipo.id %}">
+                               href="{% url 'gestionar_garantia_equipos' equipo.id %}">
                                 {{ equipo.codigo }}
                             </a>
                         </td>
@@ -115,5 +114,7 @@
     </div>
 </div>
 
-{% include "equipos/includes/doble_clic_filas_js.html" %}
 {% endblock content %}
+{% block extra_js %}
+{% include "equipos/includes/garantias_interacciones_js.html" %}
+{% endblock extra_js %}

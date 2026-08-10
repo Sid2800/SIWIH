@@ -8016,14 +8016,14 @@ button.equipos-imagenes__vista:hover img {
    color: var(--colorTextoSololectura);
 }
 
-/* Formulario de salida y retorno dentro de la tarjeta de garantia. */
+/* Formulario de salida y retorno. Vive en su propia pantalla, no en la
+   tarjeta del detalle: alli la tarjeta solo informa. */
 .equipos-garantia__formulario {
-   border-top: .1rem solid var(--colorLinea);
    display: flex;
    flex-direction: column;
    gap: .6rem;
    margin-top: 1.6rem;
-   padding-top: 1.6rem;
+   max-width: 46rem;
 }
 
 .equipos-garantia__formulario label {
@@ -8031,82 +8031,75 @@ button.equipos-imagenes__vista:hover img {
    font-weight: 600;
 }
 
-.equipos-garantia__formulario button {
-   align-self: flex-start;
-   margin-top: .6rem;
-}
-
-/* Filtros del panel: enlaces y no un formulario, porque cada estado es una
-   pregunta distinta que conviene poder compartir por URL. */
-.equipos-garantias__filtros {
-   display: flex;
-   flex-wrap: wrap;
-   gap: .8rem;
-}
-
-.equipos-garantias__filtro {
-   align-items: center;
-   background-color: var(--blanco);
-   border: .1rem solid var(--colorLinea);
-   border-radius: 2rem;
-   color: inherit;
-   display: inline-flex;
-   font-size: 1.35rem;
-   gap: .6rem;
-   padding: .7rem 1.4rem;
-   text-decoration: none;
-   transition: background-color .15s ease, border-color .15s ease;
-}
-
-.equipos-garantias__filtro:hover {
-   background-color: var(--colorTablaHover);
-}
-
-.equipos-garantias__filtro--activo {
-   background-color: var(--colorBoton);
-   border-color: var(--colorBoton);
-   color: var(--colorTextoBoton);
-}
-
-.equipos-garantias__conteo {
-   background-color: var(--colorContendor);
-   border-radius: 1.2rem;
-   font-size: 1.2rem;
-   font-weight: 600;
-   min-width: 2.2rem;
-   padding: .1rem .6rem;
-   text-align: center;
-}
-
-.equipos-garantias__filtro--activo .equipos-garantias__conteo {
-   background-color: rgba(255, 255, 255, .25);
-}
-
-@media (max-width: 48rem) {
-   .equipos-garantias__filtros {
-      gap: .6rem;
-   }
-
-   .equipos-garantias__filtro {
-      font-size: 1.25rem;
-      padding: .6rem 1.1rem;
-   }
-
-   .equipos-garantia__formulario button {
-      align-self: stretch;
-   }
-}
-
-
-/* Tabla del panel de garantias. Con cinco columnas no se usa DataTables
-   Responsive: aquel se configura con las nueve del inventario y pedirle
-   columnas que no existen lanza "Requested unknown parameter". Aqui basta
-   con desplazar en horizontal cuando la pantalla es estrecha. */
-.equipos-garantias__tabla {
-   overflow-x: auto;
+.equipos-garantia__formulario textarea,
+.equipos-garantia__formulario input {
    width: 100%;
 }
 
-.equipos-garantias__tabla .equipos-listado__tabla {
-   min-width: 52rem;
+/* Los botones no usan solo .formularioBotones-boton porque aquel fija
+   width: 16rem y height: 3rem para etiquetas cortas, y "Registrar salida a
+   reparacion" se sale de la caja. Se combina con .equipos-detalle__boton,
+   que ya suelta ambas medidas. */
+.equipos-garantia__acciones {
+   display: flex;
+   flex-wrap: wrap;
+   gap: .8rem;
+   margin-top: 1.2rem;
+}
+
+.equipos-garantia__cancelar {
+   background-color: var(--colorContendor);
+   color: inherit;
+}
+
+/* Enlace desde la tarjeta del detalle hacia esa pantalla. */
+.equipos-garantia__accion {
+   border-top: .1rem solid var(--colorLinea);
+   margin-top: 1.6rem;
+   padding-top: 1.6rem;
+}
+
+/* El panel de garantias reutiliza la cuadricula y los botones del listado. */
+.equipos-garantias__filtros {
+   grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+}
+
+.equipos-garantias__boton-filtro {
+   border-radius: .4rem;
+   min-width: 0;
+   width: 100%;
+}
+
+/* DataTables alinea a la derecha las columnas que solo contienen numeros.
+   Se mantiene una distribucion visual uniforme en todas las garantias. */
+.equipos-garantias__tabla thead th,
+.equipos-garantias__tabla tbody td {
+   text-align: left !important;
+}
+
+
+/* Motivo por el que no se puede operar la garantia: equipo sin garantia, ya
+   vencida, o usuario sin permiso. Va separado del texto explicativo de arriba
+   y en negrita, porque es la respuesta a "por que no puedo pulsar nada". */
+.equipos-garantia__bloqueo {
+   align-items: center;
+   display: flex;
+   font-size: 1.45rem;
+   font-weight: 700;
+   gap: .8rem;
+   margin: 1.4rem 0 0;
+}
+
+/* La linea separadora solo tiene sentido si hay un parrafo encima. Cuando el
+   equipo no admite pausa la explicacion se calla y el motivo queda justo bajo
+   el titulo, donde una raya sobraria. */
+p + .equipos-garantia__bloqueo {
+   border-top: .1rem solid var(--colorLinea);
+   margin-top: 1.8rem;
+   padding-top: 1.8rem;
+}
+
+.equipos-garantia__bloqueo i {
+   flex-shrink: 0;
+   font-size: 1.7rem;
 }

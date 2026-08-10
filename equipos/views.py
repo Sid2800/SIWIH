@@ -52,7 +52,7 @@ from .decorators import (
     exige_formularios_equipos_json,
     exige_ver_equipos,
 )
-from .permisos import puede_visualizar_equipos
+from .permisos import puede_editar_equipos, puede_visualizar_equipos
 from .services.garantia_service import calcular_estado_garantia, puede_pausarse
 from .services.ficha_baja_pdf_service import FichaBajaPdfService
 from .services.ficha_activo_fijo_pdf_service import FichaActivoFijoPdfService
@@ -649,9 +649,10 @@ def detalle_dispositivo(request, dispositivo_id):
         CriticidadDispositivo.MEDIA: "equipos-estado--media",
         CriticidadDispositivo.ALTA: "equipos-estado--alta",
     }
+    # La ficha solo informa de la garantia. Pausar y reanudar se maneja desde
+    # Garantias, asi que aqui no viaja nada para operar.
     pausas = list(dispositivo.pausas_garantia.all())
     garantia = calcular_estado_garantia(dispositivo, pausas=pausas)
-    permite_pausa, motivo_sin_pausa = puede_pausarse(dispositivo, estado=garantia)
 
     return render(
         request,
@@ -668,11 +669,6 @@ def detalle_dispositivo(request, dispositivo_id):
             "garantia": garantia,
             "garantia_css": CSS_ESTADO_GARANTIA.get(garantia.estado, ""),
             "pausas": pausas,
-            "permite_pausa": permite_pausa,
-            "motivo_sin_pausa": motivo_sin_pausa,
-            # Limita los selectores de fecha para que el navegador impida
-            # elegir un dia futuro antes de enviar.
-            "hoy": timezone.localdate(),
             **contexto_imagenes,
         }
     )
@@ -1666,12 +1662,79 @@ def panel_garantias(request):
     )
 
 
+def _contexto_gestion_garantia(dispositivo, formulario, pausa_abierta):
+    """Contexto comun de la pantalla de salida y retorno."""
+    pausas = list(dispositivo.pausas_garantia.all())
+    garantia = calcular_estado_garantia(dispositivo, pausas=pausas)
+
+    if pausa_abierta:
+        url_envio = reverse(
+            "registrar_retorno_garantia_equipos", args=[dispositivo.id]
+        )
+    else:
+        url_envio = reverse(
+            "registrar_salida_garantia_equipos", args=[dispositivo.id]
+        )
+
+    return {
+        "dispositivo": dispositivo,
+        "form": formulario,
+        "garantia": garantia,
+        "garantia_css": CSS_ESTADO_GARANTIA.get(garantia.estado, ""),
+        "hoy": timezone.localdate(),
+        "pausa_abierta": pausa_abierta,
+        "pausas": pausas,
+        "titulo": f"Garantía de {dispositivo.codigo}",
+        "url_envio": url_envio,
+    }
+
+
+@exige_ver_equipos
+@registrar_errores_vista("Error al abrir la garantía del equipo")
+def gestionar_garantia(request, dispositivo_id):
+    """La pantalla de garantia de un equipo: estado, historial y operacion.
+
+    Es el destino unico desde el menu de acciones del listado, desde el panel
+    de garantias y desde la ficha. Siempre muestra la situacion, aunque no
+    haya nada que hacer: si el equipo no tiene garantia o ya vencio, se dice
+    y punto, en vez de rebotar al usuario a otra pantalla.
+
+    Verla solo exige permiso de consulta, para que la jefatura pueda llegar
+    desde el panel. Pausar y reanudar exigen permiso de edicion, y de eso se
+    encargan las vistas que reciben el formulario.
+    """
+    dispositivo = get_object_or_404(
+        Dispositivo.objects.select_related("tipo", "marca", "modelo"),
+        pk=dispositivo_id,
+    )
+    pausa = dispositivo.pausas_garantia.filter(fecha_retorno__isnull=True).first()
+    permitido, motivo_sin_pausa = puede_pausarse(dispositivo)
+
+    # El formulario solo se arma para quien puede usarlo y cuando hay algo que
+    # registrar: reanudar si esta fuera, pausar si se puede pausar.
+    formulario = None
+    if puede_editar_equipos(request.user):
+        if pausa is not None:
+            formulario = RetornoGarantiaForm(pausa=pausa)
+        elif permitido:
+            formulario = SalidaGarantiaForm(dispositivo=dispositivo)
+
+    contexto = _contexto_gestion_garantia(dispositivo, formulario, pausa)
+    contexto["motivo_sin_pausa"] = "" if pausa else motivo_sin_pausa
+
+    return render(
+        request, "equipos/gestionar_garantia_equipos.html", contexto
+    )
+
+
 @exige_editar_equipos
 @registrar_errores_vista("Error al registrar la salida del equipo")
 def registrar_salida_garantia(request, dispositivo_id):
     """Anota que el equipo salio a reparacion y su garantia deja de correr."""
     dispositivo = get_object_or_404(Dispositivo, pk=dispositivo_id)
-    destino = redirect("detalle_dispositivo_equipos", dispositivo_id=dispositivo.id)
+    # Se vuelve a la pantalla de garantia del equipo: alli se ve el
+    # resultado del movimiento. La ficha ya no interviene en garantias.
+    destino = redirect("gestionar_garantia_equipos", dispositivo_id=dispositivo.id)
 
     permitido, motivo = puede_pausarse(dispositivo)
     if not permitido:
@@ -1679,19 +1742,23 @@ def registrar_salida_garantia(request, dispositivo_id):
         return destino
 
     if request.method != "POST":
-        return destino
+        return redirect("gestionar_garantia_equipos", dispositivo_id=dispositivo.id)
 
     formulario = SalidaGarantiaForm(request.POST, dispositivo=dispositivo)
 
     if not formulario.is_valid():
-        for errores in formulario.errors.values():
-            for error in errores:
-                messages.error(request, error)
-        return destino
+        # Se vuelve a pintar la pantalla con lo escrito y el error al lado del
+        # campo, en lugar de redirigir y perder lo que el tecnico habia puesto.
+        return render(
+            request,
+            "equipos/gestionar_garantia_equipos.html",
+            _contexto_gestion_garantia(dispositivo, formulario, None),
+        )
 
+    # La fecha la pone el servidor: la pausa se anota el dia que se ejecuta.
     PausaGarantia.objects.create(
         dispositivo=dispositivo,
-        fecha_salida=formulario.cleaned_data["fecha_salida"],
+        fecha_salida=timezone.localdate(),
         motivo=formulario.cleaned_data["motivo"],
         registrado_por=request.user,
     )
@@ -1707,7 +1774,9 @@ def registrar_salida_garantia(request, dispositivo_id):
 def registrar_retorno_garantia(request, dispositivo_id):
     """Cierra la pausa y suma al vencimiento los dias que estuvo fuera."""
     dispositivo = get_object_or_404(Dispositivo, pk=dispositivo_id)
-    destino = redirect("detalle_dispositivo_equipos", dispositivo_id=dispositivo.id)
+    # Se vuelve a la pantalla de garantia del equipo: alli se ve el
+    # resultado del movimiento. La ficha ya no interviene en garantias.
+    destino = redirect("gestionar_garantia_equipos", dispositivo_id=dispositivo.id)
 
     pausa = dispositivo.pausas_garantia.filter(fecha_retorno__isnull=True).first()
 
@@ -1716,19 +1785,21 @@ def registrar_retorno_garantia(request, dispositivo_id):
         return destino
 
     if request.method != "POST":
-        return destino
+        return redirect("gestionar_garantia_equipos", dispositivo_id=dispositivo.id)
 
     formulario = RetornoGarantiaForm(request.POST, pausa=pausa)
 
     if not formulario.is_valid():
-        for errores in formulario.errors.values():
-            for error in errores:
-                messages.error(request, error)
-        return destino
+        return render(
+            request,
+            "equipos/gestionar_garantia_equipos.html",
+            _contexto_gestion_garantia(dispositivo, formulario, pausa),
+        )
 
-    pausa.fecha_retorno = formulario.cleaned_data["fecha_retorno"]
-    if formulario.cleaned_data["motivo"]:
-        pausa.motivo = formulario.cleaned_data["motivo"]
+    pausa.fecha_retorno = timezone.localdate()
+    pausa.observaciones_retorno = formulario.cleaned_data[
+        "observaciones_retorno"
+    ]
     pausa.save()
 
     messages.success(

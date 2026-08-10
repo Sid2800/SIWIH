@@ -769,9 +769,13 @@ class PausaGarantia(models.Model):
     # Texto libre por ahora. Cuando exista el catalogo de proveedores este
     # campo convivira con una referencia a quien tiene el equipo.
     motivo = models.TextField(
-        blank=True,
         verbose_name="Motivo",
         help_text="A dónde fue y por qué. Número de orden del proveedor si lo hay.",
+    )
+    observaciones_retorno = models.TextField(
+        blank=True,
+        verbose_name="Observaciones del retorno",
+        help_text="Trabajo realizado o novedades informadas al devolver el equipo.",
     )
     registrado_por = models.ForeignKey(
         User,
@@ -812,6 +816,15 @@ class PausaGarantia(models.Model):
                 | Q(fecha_retorno__gte=models.F("fecha_salida")),
                 name="equipo_pausa_retorno_no_anterior",
             ),
+            models.CheckConstraint(
+                condition=~Q(motivo=""),
+                name="equipo_pausa_motivo_no_vacio",
+            ),
+            models.CheckConstraint(
+                condition=Q(fecha_retorno__isnull=True)
+                | ~Q(observaciones_retorno=""),
+                name="equipo_pausa_retorno_con_observacion",
+            ),
             # La unicidad de la pausa abierta la impone equipo_con_pausa_abierta,
             # no un UniqueConstraint con condicion: MySQL no los crea.
         ]
@@ -836,6 +849,21 @@ class PausaGarantia(models.Model):
 
     def clean(self):
         errores = {}
+
+        # Se normalizan aqui tambien para proteger altas hechas desde Python,
+        # el admin o futuras APIs, no solo las enviadas por los formularios.
+        self.motivo = (self.motivo or "").strip()
+        self.observaciones_retorno = (
+            self.observaciones_retorno or ""
+        ).strip()
+
+        if not self.motivo:
+            errores["motivo"] = "Debe indicar el motivo de la salida."
+
+        if self.fecha_retorno is not None and not self.observaciones_retorno:
+            errores["observaciones_retorno"] = (
+                "Debe indicar las observaciones del retorno."
+            )
 
         if self.fecha_retorno and self.fecha_salida:
             if self.fecha_retorno < self.fecha_salida:

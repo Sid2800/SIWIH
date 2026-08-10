@@ -1,0 +1,200 @@
+{% extends 'core/base.html' %}
+
+{% block title %}{{ titulo }}{% endblock title %}
+
+{% block content %}
+{% comment %}
+   Pantalla propia para registrar la salida a reparacion o el retorno, igual
+   que el tramite de baja. La ficha del equipo solo informa del estado; la
+   operacion vive aqui para no llenar la tarjeta de campos.
+
+   Que formulario se muestra lo decide el servidor segun haya o no una pausa
+   abierta: no son dos pantallas, son dos momentos del mismo hecho.
+{% endcomment %}
+<div class="contenedor2 equipos-pagina equipos-pagina--detalle">
+    <div class="tituloFormulario">
+        <div class="equipos-encabezado-superior">
+            <div class="tituloFormulario-texto">
+                <i class="bi bi-shield-check"></i>
+                <h2 class="sin-margen">{{ titulo }}</h2>
+            </div>
+            {% comment %}
+               Se vuelve al panel, que es de donde se llega y donde se sigue
+               trabajando. La ficha del equipo ya no interviene en garantias.
+            {% endcomment %}
+            <a class="equipos-volver equipos-volver--inline equipos-encabezado-volver"
+               href="{% url 'panel_garantias_equipos' %}">
+                <i class="bi bi-arrow-left"></i>
+                Garantías
+            </a>
+        </div>
+        <div class="tituloFormulario-subrallado"></div>
+    </div>
+
+    <section class="equipos-detalle__tarjeta">
+        <h3><i class="bi bi-device-hdd"></i> {{ dispositivo.codigo }}</h3>
+        <dl class="equipos-detalle__datos">
+            <div>
+                <dt>Equipo</dt>
+                <dd>{{ dispositivo.tipo }}</dd>
+            </div>
+            <div>
+                <dt>Marca y modelo</dt>
+                <dd>
+                    {{ dispositivo.marca|default:"INDEFINIDO" }}
+                    {{ dispositivo.modelo|default:"" }}
+                </dd>
+            </div>
+            <div>
+                <dt>Estado</dt>
+                <dd>
+                    <span class="equipos-estado {{ garantia_css }}">
+                        {{ garantia.etiqueta }}
+                    </span>
+                </dd>
+            </div>
+            <div>
+                <dt>Garantía según contrato</dt>
+                <dd>
+                    {% if garantia.fin_contrato %}
+                        {{ garantia.fin_contrato|date:"d/m/Y" }}
+                    {% else %}
+                        Sin garantía registrada
+                    {% endif %}
+                </dd>
+            </div>
+            {% if garantia.dias_pausados %}
+                <div>
+                    <dt>Días ya pausados</dt>
+                    <dd>{{ garantia.dias_pausados }}</dd>
+                </div>
+                <div>
+                    <dt>Vence realmente</dt>
+                    <dd><strong>{{ garantia.fin_real|date:"d/m/Y" }}</strong></dd>
+                </div>
+            {% endif %}
+        </dl>
+    </section>
+
+    <section class="equipos-detalle__tarjeta">
+        {% if pausa_abierta %}
+            <h3><i class="bi bi-box-arrow-in-down"></i> Reanudar la garantía</h3>
+            <p class="equipos-detalle__aviso">
+                <i class="bi bi-pause-circle"></i>
+                Fuera desde el {{ pausa_abierta.fecha_salida|date:"d/m/Y" }}
+                ({{ pausa_abierta.dias_transcurridos }} días).
+                Al registrar el retorno esos días se sumarán al vencimiento.
+            </p>
+            {% if pausa_abierta.motivo %}
+                <p class="equipos-detalle__vacio">
+                    Motivo anotado en la salida: {{ pausa_abierta.motivo }}
+                </p>
+            {% endif %}
+        {% elif form %}
+            <h3><i class="bi bi-box-arrow-up"></i> Pausar la garantía</h3>
+            <p class="equipos-detalle__vacio">
+                Mientras el equipo esté fuera por reparación, su garantía deja
+                de correr. Los días se sumarán al vencimiento cuando registres
+                el retorno.
+            </p>
+        {% else %}
+            {% comment %}
+               Sin formulario no hay nada que pausar, asi que el titulo va
+               neutro y se calla la explicacion: prometer una accion que no se
+               puede ejecutar solo confunde. Debajo queda el motivo.
+            {% endcomment %}
+            <h3><i class="bi bi-shield-check"></i> Garantía</h3>
+        {% endif %}
+
+        {% if form %}
+            {% comment %}
+               La fecha no se pide: la pone el servidor al ejecutar. Se anuncia
+               para que quede claro que dia va a quedar anotado.
+            {% endcomment %}
+            <p class="equipos-detalle__aviso">
+                <i class="bi bi-calendar-check"></i>
+                Se registrará con fecha de hoy, {{ hoy|date:"d/m/Y" }}.
+            </p>
+        {% endif %}
+
+        {% comment %}
+           Sin formulario hay dos motivos posibles: el usuario solo consulta,
+           o el equipo no admite pausa. Se distingue para no dejar la tarjeta
+           muda.
+        {% endcomment %}
+        {% if not form %}
+            <p class="equipos-garantia__bloqueo">
+                <i class="bi bi-slash-circle"></i>
+                {% if motivo_sin_pausa %}
+                    {{ motivo_sin_pausa }}
+                {% else %}
+                    No tienes permiso para registrar movimientos de garantía.
+                {% endif %}
+            </p>
+        {% else %}
+        <form method="post" action="{{ url_envio }}" class="equipos-garantia__formulario">
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+                <p class="formularioCampo-error">{{ form.non_field_errors }}</p>
+            {% endif %}
+
+            {% for campo in form %}
+                <label for="{{ campo.id_for_label }}">
+                    {{ campo.label }}{% if campo.field.required %} *{% endif %}
+                </label>
+                {{ campo }}
+                {% if campo.help_text %}
+                    <span class="equipos-detalle__vacio">{{ campo.help_text }}</span>
+                {% endif %}
+                {% if campo.errors %}
+                    <p class="formularioCampo-error">{{ campo.errors|striptags }}</p>
+                {% endif %}
+            {% endfor %}
+
+            <div class="equipos-garantia__acciones">
+                <a class="formularioBotones-boton equipos-detalle__boton equipos-garantia__cancelar"
+                   href="{% url 'panel_garantias_equipos' %}">
+                    Cancelar
+                </a>
+                <button type="submit"
+                        class="formularioBotones-boton equipos-detalle__boton">
+                    {% if pausa_abierta %}
+                        <i class="bi bi-box-arrow-in-down"></i>
+                        Registrar retorno
+                    {% else %}
+                        <i class="bi bi-box-arrow-up"></i>
+                        Registrar salida
+                    {% endif %}
+                </button>
+            </div>
+        </form>
+        {% endif %}
+    </section>
+
+    {% if pausas %}
+        <section class="equipos-detalle__tarjeta">
+            <h3><i class="bi bi-clock-history"></i> Historial de pausas</h3>
+            <ul class="equipos-detalle__historial">
+                {% for pausa in pausas %}
+                    <li>
+                        <strong>{{ pausa.fecha_salida|date:"d/m/Y" }}</strong>
+                        {% if pausa.fecha_retorno %}
+                            al {{ pausa.fecha_retorno|date:"d/m/Y" }}
+                            — {{ pausa.dias }} día{{ pausa.dias|pluralize }}
+                        {% else %}
+                            — sin retorno registrado
+                        {% endif %}
+                        {% if pausa.motivo %}
+                            <br><span><strong>Salida:</strong> {{ pausa.motivo }}</span>
+                        {% endif %}
+                        {% if pausa.observaciones_retorno %}
+                            <br><span><strong>Retorno:</strong> {{ pausa.observaciones_retorno }}</span>
+                        {% endif %}
+                    </li>
+                {% endfor %}
+            </ul>
+        </section>
+    {% endif %}
+</div>
+{% endblock content %}
