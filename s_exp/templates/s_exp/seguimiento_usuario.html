@@ -1,6 +1,7 @@
 {% extends 'core/base.html' %}
 {% load static %}
 {% load permisos_unidad %}
+{% load s_exp_permisos %}
 
 {% block title %}Mis Solicitudes{% endblock title %}
 
@@ -37,6 +38,13 @@
         </a>
         <a href="{% url 's_exp_reportes' %}" class="sexp-nav-link">
             <i class="bi bi-bar-chart-line"></i> Reportes
+        </a>
+        {% endif %}
+        <!-- Fuera del gate de admin: Recuperacion tiene su propio permiso (Admision,
+             que incluye el rol digitador) y no debe depender de tiene_rol admin:ADMI. -->
+        {% if request.user|puede_recuperar %}
+        <a href="{% url 's_exp_recuperacion' %}" class="sexp-nav-link">
+            <i class="bi bi-exclamation-octagon"></i> Recuperación
         </a>
         {% endif %}
     </div>

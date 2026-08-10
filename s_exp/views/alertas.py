@@ -13,7 +13,10 @@ from django.views.decorators.http import require_POST, require_GET
 from django.views.decorators.csrf import csrf_exempt
 
 
-from s_exp.models import SolicitudPrestamo, Prestamo, LogHistorico
+from s_exp.models import (
+    SolicitudPrestamo, Prestamo, LogHistorico,
+    EstadoSolicitud, EstadoPrestamo, TipoAccionLog,
+)
 
 
 from core.utils.utilidades_logging import log_info, log_warning, log_error
@@ -71,9 +74,11 @@ def changes_check_api(request):
     def _max_log(acciones, excluir_self=True):
         """MAX(timestamp) de logs filtrados por tipo. Opcional: excluir al user actual.
 
-        'acciones' son CÓDIGOS de texto; la FK accion guarda un id entero, por
-        eso filtramos por accion__codigo__in (no accion__in)."""
-        qs = LogHistorico.objects.filter(accion__codigo__in=acciones)
+        'acciones' son CÓDIGOS de texto y la FK accion guarda un id entero, así
+        que se traducen con ids_de() (cacheado) y se filtra por accion_id__in.
+        Filtrar por accion__codigo__in obligaría a un JOIN contra el catálogo y a
+        comparar texto en cada fila."""
+        qs = LogHistorico.objects.filter(accion_id__in=TipoAccionLog.ids_de(acciones))
         if excluir_self:
             qs = qs.exclude(usuario=user)
         return qs.aggregate(ts=Max('timestamp'))['ts']
@@ -120,7 +125,7 @@ def alertas_usuario_api(request):
         # Alertas para solicitantes: préstamos a punto de vencer
         prestamos_usuario = Prestamo.objects.filter(
             solicitud__usuario=request.user,
-            estado__codigo='Entregado'
+            estado_id=EstadoPrestamo.id_de('Entregado')
         )
 
         for p in prestamos_usuario:
@@ -164,7 +169,7 @@ def alertas_usuario_api(request):
         # Alertas de Vencimiento Recurrentes (Sticky cada 5 min)
         prestamos_vencidos = Prestamo.objects.filter(
             solicitud__usuario=request.user,
-            estado__codigo='Vencido'
+            estado_id=EstadoPrestamo.id_de('Vencido')
         )
         ahora = timezone.now()
         for p in prestamos_vencidos:
@@ -189,7 +194,7 @@ def alertas_usuario_api(request):
         # Solicitudes aprobadas listas para retirar (Persistentes hasta que el usuario las acepte)
         solicitudes_aprobadas = SolicitudPrestamo.objects.filter(
             usuario=request.user,
-            estado_flujo__codigo='SOL_LISTO_RECOGER',
+            estado_flujo_id=EstadoSolicitud.id_de('SOL_LISTO_RECOGER'),
             notificado_listo=False
         )
         for s in solicitudes_aprobadas:
@@ -201,10 +206,39 @@ def alertas_usuario_api(request):
                 "sticky": True
             })
 
+        # Expedientes RECUPERADOS de urgencia por Admisión.
+        # Admisión exigió un expediente que este usuario tenía prestado y ya se
+        # devolvió a la fuerza. Se le avisa para que sepa que ya no lo tiene.
+        # La alerta es sticky y se repite hasta que la lea (recuperacion_leida),
+        # porque es información que no puede pasar por alto.
+        from s_exp.models import SolicitudExpedienteDetalle
+        recuperados = SolicitudExpedienteDetalle.objects.select_related(
+            'expediente_prestamo__expediente'
+        ).filter(
+            solicitud__usuario=request.user,
+            recuperado_admision=True,
+            recuperacion_leida=False,
+        )
+        for d in recuperados:
+            numero = d.expediente_prestamo.expediente.numero
+            alertas.append({
+                "tipo": "danger",
+                "titulo": "Expediente requerido por Admisión",
+                "mensaje": (
+                    f"El expediente #{numero} de su solicitud #{d.solicitud_id} fue "
+                    f"requerido de URGENCIA por Admisión y ya fue devuelto al archivo. "
+                    f"Motivo: {d.motivo_recuperacion or '—'}"
+                ),
+                "solicitud_id": d.solicitud_id,
+                "detalle_id": d.id,
+                "sticky": True,
+                "tipo_alerta": "recuperacion",
+            })
+
         # Solicitudes rechazadas recientes
         solicitudes_rechazadas = SolicitudPrestamo.objects.filter(
             usuario=request.user,
-            estado_flujo__codigo='SOL_RECHAZADA'
+            estado_flujo_id=EstadoSolicitud.id_de('SOL_RECHAZADA')
         ).order_by('-fecha_creacion')[:5]
         for s in solicitudes_rechazadas:
             try:
@@ -250,6 +284,42 @@ def marcar_notificacion_leida_api(request):
         return JsonResponse({"error": "Solicitud no encontrada"}, status=404)
     except Exception as e:
         log_error(f"Error en marcar_notificacion_leida_api: {e}", app=LogApp.S_EXP)
+        return JsonResponse({"error": "Error interno"}, status=500)
+
+
+@csrf_exempt
+@require_POST
+def marcar_recuperacion_leida_api(request):
+    """
+    Marca como leído el aviso de que Admisión recuperó un expediente de urgencia.
+
+    Solo puede marcarlo el dueño de la solicitud (filtro por solicitud__usuario),
+    para que un usuario no pueda silenciar el aviso de otro.
+    """
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "No autenticado"}, status=401)
+
+    try:
+        import json
+        from s_exp.models import SolicitudExpedienteDetalle
+        body = json.loads(request.body)
+        detalle_id = body.get('detalle_id')
+
+        if not detalle_id:
+            return JsonResponse({"error": "Falta ID de detalle"}, status=400)
+
+        detalle = SolicitudExpedienteDetalle.objects.get(
+            id=detalle_id, solicitud__usuario=request.user
+        )
+        detalle.recuperacion_leida = True
+        detalle.save(update_fields=['recuperacion_leida'])
+
+        return JsonResponse({"success": True})
+
+    except SolicitudExpedienteDetalle.DoesNotExist:
+        return JsonResponse({"error": "Expediente no encontrado"}, status=404)
+    except Exception as e:
+        log_error(f"Error en marcar_recuperacion_leida_api: {e}", app=LogApp.S_EXP)
         return JsonResponse({"error": "Error interno"}, status=500)
 
 

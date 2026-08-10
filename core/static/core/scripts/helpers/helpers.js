@@ -53,14 +53,48 @@ function concatenarLimpio(...args) {
 
 //#region  Busquedas publicas
 
-async function confirmarAccion(titulo, mensaje, botonAfirmativo = "Aceptar", botonNegativo="Cancelar") {
+async function confirmarAccion(config = {}) {
+
+   const {
+      titulo = "Confirmar acción",
+      mensajes = [],
+      icono = "question",
+      botonAfirmativo = "Aceptar",
+      botonNegativo = "Cancelar"
+   } = config;
+
+   const iconos = {
+      question: "bi-question-circle",
+      warning: "bi-exclamation-triangle",
+      danger: "bi-exclamation-octagon",
+      success: "bi-check-circle",
+      info: "bi-info-circle"
+   };
+
+   const claseIcono =
+   iconos[icono] || "bi-question-circle";
+
+   const htmlMensajes = mensajes
+      .map(mensaje => `<li>${mensaje}</li>`)
+      .join("");
+
    const resultado = await Swal.fire({
-      title: titulo,
-      html: mensaje,
-      icon: 'question',
+      title: `<i class="bi ${claseIcono}"></i>${titulo}`,
+      html: `
+         <div class="tituloFormulario-subrallado"></div>
+         <div class="contener-modal-mensajes-confirmacion">
+            <ul class="contener-modal-lista-confirmacion">
+               ${htmlMensajes}
+            </ul>
+         </div>
+      `,
       showCancelButton: true,
-      confirmButtonText: `<i class="bi bi-check-circle-fill"></i> ${botonAfirmativo}`,
-      cancelButtonText: `<i class="bi bi-x-circle-fill"></i> ${botonNegativo}`,
+      confirmButtonText:
+         `<i class="bi bi-check-circle-fill"></i> ${botonAfirmativo}`,
+
+      cancelButtonText:
+         `<i class="bi bi-x-circle-fill"></i> ${botonNegativo}`,
+
       customClass: {
          icon: 'contenedor-modal-icon',
          popup: 'contenedor-modal',
@@ -68,15 +102,27 @@ async function confirmarAccion(titulo, mensaje, botonAfirmativo = "Aceptar", bot
          confirmButton: 'contener-modal-boton-confirmar',
          cancelButton: 'contener-modal-boton-cancelar',
       },
+
       didOpen: () => {
-         const actionsContainer = document.querySelector('.swal2-actions');
+
+         const actionsContainer =
+            document.querySelector('.swal2-actions');
+
          if (actionsContainer) {
-            actionsContainer.classList.add('contener-modal-contenedor-botones-min');
+            actionsContainer.classList.add(
+               'contener-modal-contenedor-botones-min'
+            );
          }
-         const htmlContainer = document.querySelector('.swal2-html-container');
+
+         const htmlContainer =
+            document.querySelector('.swal2-html-container');
+
          if (htmlContainer) {
-            htmlContainer.classList.add('contener-modal-contenedor-html');
+            htmlContainer.classList.add(
+               'contener-modal-contenedor-html'
+            );
          }
+
       }
    });
 
@@ -84,7 +130,7 @@ async function confirmarAccion(titulo, mensaje, botonAfirmativo = "Aceptar", bot
 }
 
 
-function renderDatosPaciente(containerId, datos = {}) {
+function renderDatosContexto(containerId, datos = {}) {
 
    const header = document.getElementById(containerId);
 
@@ -132,6 +178,18 @@ const API_URLS = {
    obtenerSeguimientoTIC: urls["seguimientoTicObtener"],
    listarObitosPaciente: urls["listarObitosPaciente"],
    listarUnidadClinica: urls["listarUnidadClinica"],
+   listarAgendaMedicaAPI: urls["listarAgendaMedicaAPI"],
+   listarPersonalClinicoAPI: urls["listarPersonalClinicoAPI"],
+   listarJornadaLaboralAPI: urls["listarJornadaLaboralAPI"],
+   guardarPeriodoLaboral: urls["guardarPeriodoLaboral"],
+   validarImpactoPeriodoLaboral: urls["validarImpactoPeriodoLaboral"],
+   validarImpactoDiaLaboral: urls["validarImpactoDiaLaboral"],
+   obtenerPeriodoLaboral: urls["obtenerPeriodoLaboral"],
+   listarTiposAtencion: urls["listarTiposAtencion"],
+   guardarDiaPeriodoLaboral: urls["guardarDiaPeriodoLaboral"],
+   obtenerDiaLaboral: urls["obtenerDiaLaboral"],
+   editarPeriodoLaboral: urls["editarPeriodoLaboral"],
+
 };
 
 /**
@@ -1170,7 +1228,7 @@ async function AgregarAtencionModal(paciente=null, zona=null, atencionId=null) {
       confirmButtonText: '<i class="bi bi-floppy-fill"></i> Guardar',
       cancelButtonText: '<i class="bi bi-x-circle-fill"></i> Cancelar',
       customClass: {
-         popup: 'contener-modal-defuncion', //usa la misma de defuncion por similitud
+         popup: 'contener-modal-atencion', 
          title: 'contener-modal-titulo',
          confirmButton: 'contener-modal-boton-confirmar',
          cancelButton: 'contener-modal-boton-cancelar'
@@ -1218,7 +1276,7 @@ async function AgregarAtencionModal(paciente=null, zona=null, atencionId=null) {
          if (paciente) {
             const { id, ...pacienteSinId } = paciente;
 
-            renderDatosPaciente(
+            renderDatosContexto(
                "modalAgregarAtencionHeader",
                pacienteSinId
             );

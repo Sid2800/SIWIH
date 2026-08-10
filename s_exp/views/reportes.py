@@ -13,7 +13,10 @@ from django.views.decorators.http import require_GET
 
 from django.db.models import Count, F
 
-from s_exp.models import SolicitudPrestamo, SolicitudExpedienteDetalle, Prestamo
+from s_exp.models import (
+    SolicitudPrestamo, SolicitudExpedienteDetalle, Prestamo,
+    EstadoSolicitud, EstadoPrestamo,
+)
 
 
 # Servicio de exportacion de reportes (Excel/PDF). Se importa con alias para
@@ -82,33 +85,41 @@ def reportes_data_api(request):
             solicitud__in=qs_solicitudes
         ).count()
         total_aprobadas = qs_solicitudes.filter(
-            estado_flujo__codigo__in=['SOL_APROBADA_ORGANIZANDO', 'SOL_LISTO_RECOGER',
-                                      'SOL_EN_PRESTAMO', 'SOL_EN_DEVOLUCION',
-                                      'SOL_FINALIZADA', 'SOL_INCOMPLETA']
+            estado_flujo_id__in=EstadoSolicitud.ids_de([
+                'SOL_APROBADA_ORGANIZANDO', 'SOL_LISTO_RECOGER',
+                'SOL_EN_PRESTAMO', 'SOL_EN_DEVOLUCION',
+                'SOL_FINALIZADA', 'SOL_INCOMPLETA',
+            ])
         ).count()
         total_rechazadas = qs_solicitudes.filter(
-            estado_flujo__codigo='SOL_RECHAZADA'
+            estado_flujo_id=EstadoSolicitud.id_de('SOL_RECHAZADA')
         ).count()
         total_pendientes = qs_solicitudes.filter(
-            estado_flujo__codigo='SOL_PENDIENTE'
+            estado_flujo_id=EstadoSolicitud.id_de('SOL_PENDIENTE')
         ).count()
 
         # --- DEMANDA POR ÁREA ---
         # La unidad ahora es relacional (servicio_unidad FK). Agrupamos por el
         # nombre de la unidad consultado en vivo, en lugar del antiguo texto
         # area_destino (eliminado en el refactor relacional).
+        # 'total' = nº de solicitudes; 'expedientes' = nº de expedientes pedidos
+        # (detalles). Al agrupar y unir con 'detalles', cada solicitud aparece una
+        # vez por cada expediente, por eso el conteo de solicitudes va con
+        # distinct=True (si no, quedaría inflado); el de detalles sí es directo.
         demanda_area = list(
             qs_solicitudes.values(
                 area_destino=F('servicio_unidad__nombre_unidad')
             ).annotate(
-                total=Count('id')
+                total=Count('id', distinct=True),
+                expedientes=Count('detalles')
             ).order_by('-total')
         )
 
         # --- MOTIVOS DE USO ---
         motivos = list(
             qs_solicitudes.values(nombre=F('motivo__nombre')).annotate(
-                total=Count('id')
+                total=Count('id', distinct=True),
+                expedientes=Count('detalles')
             ).order_by('-total')[:10]
         )
 
@@ -138,7 +149,7 @@ def reportes_data_api(request):
 
         # --- RECHAZOS CON DETALLE ---
         rechazos_qs = qs_solicitudes.filter(
-            estado_flujo__codigo='SOL_RECHAZADA'
+            estado_flujo_id=EstadoSolicitud.id_de('SOL_RECHAZADA')
         ).select_related('usuario')
         rechazos = []
         for s in rechazos_qs:
@@ -162,7 +173,7 @@ def reportes_data_api(request):
             filtros_prestamo['fecha_aprobacion__lte'] = dt_fin
 
         morosos = Prestamo.objects.filter(
-            estado__codigo__in=['Entregado', 'Vencido'],
+            estado_id__in=EstadoPrestamo.ids_de(['Entregado', 'Vencido']),
             fecha_limite__lt=ahora,
             **filtros_prestamo
         ).select_related('solicitud__usuario', 'solicitud__servicio_unidad')
@@ -181,7 +192,7 @@ def reportes_data_api(request):
 
         # --- INCONSISTENCIAS (devoluciones parciales) ---
         parciales = Prestamo.objects.filter(
-            estado__codigo='DevolucionParcial',
+            estado_id=EstadoPrestamo.id_de('DevolucionParcial'),
             **filtros_prestamo
         ).select_related('solicitud__usuario')
 

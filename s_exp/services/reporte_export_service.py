@@ -43,11 +43,38 @@ from core.utils.utilidades_logging import log_info, log_warning, log_error
 from core.constants.domain_constants import LogApp
 
 
-def obtener_datos_reporte_areas_motivos(fecha_inicio='', fecha_fin=''):
+# Tipos de reporte de matriz área × motivo. La estructura es idéntica; solo
+# cambia QUÉ se cuenta en cada celda, por eso se reutiliza todo el resto del
+# código (matriz, totales, Excel y PDF).
+METRICA_SOLICITUDES = 'solicitudes'   # nº de solicitudes por área y motivo
+METRICA_EXPEDIENTES = 'expedientes'   # nº de expedientes solicitados por área y motivo
+
+# Etiquetas para los títulos/encabezados de los archivos exportados.
+ETIQUETA_METRICA = {
+    METRICA_SOLICITUDES: 'Cantidad de Solicitudes',
+    METRICA_EXPEDIENTES: 'Cantidad de Expedientes Solicitados',
+}
+
+
+def normalizar_metrica(valor):
+    """Devuelve una métrica válida; ante cualquier valor desconocido, solicitudes."""
+    return valor if valor in ETIQUETA_METRICA else METRICA_SOLICITUDES
+
+
+def obtener_datos_reporte_areas_motivos(fecha_inicio='', fecha_fin='', metrica=METRICA_SOLICITUDES):
     """
     Construye una matriz de áreas (filas) x motivos (columnas) con conteos.
 
+    'metrica' decide QUÉ cuenta cada celda:
+      - 'solicitudes' : número de solicitudes de esa área con ese motivo.
+      - 'expedientes' : número de expedientes solicitados (detalles) de esas
+                        solicitudes. "Solicitados" = todos los pedidos, sin
+                        importar si luego se aprobaron.
+    El resto (áreas, motivos, totales, formato) es idéntico para ambos.
+
     Retorna: {
+        'metrica': 'solicitudes' | 'expedientes',
+        'etiqueta_metrica': str,   // p. ej. 'Cantidad de Expedientes Solicitados'
         'areas': ['Area1', 'Area2', ...],
         'motivos': ['Motivo1', 'Motivo2', ...],
         'datos': [[count, count, ...], ...],  // filas = áreas, columnas = motivos
@@ -56,6 +83,7 @@ def obtener_datos_reporte_areas_motivos(fecha_inicio='', fecha_fin=''):
         'total_general': int
     }
     """
+    metrica = normalizar_metrica(metrica)
     # Filtrar solicitudes por rango de fechas (timezone-aware)
     sol_filtros = {}
     if fecha_inicio:
@@ -86,6 +114,22 @@ def obtener_datos_reporte_areas_motivos(fecha_inicio='', fecha_fin=''):
     motivos_raw = qs_solicitudes.values_list('motivo__nombre', flat=True).distinct()
     motivos = sorted(set(m or 'Sin Motivo' for m in motivos_raw))
 
+    # Contador de cada celda según la métrica elegida.
+    #   - solicitudes: cuenta directamente sobre el queryset de solicitudes.
+    #   - expedientes: cuenta los detalles (expedientes pedidos) de esas mismas
+    #     solicitudes; los filtros de área/motivo se aplican vía 'solicitud__'.
+    if metrica == METRICA_EXPEDIENTES:
+        from s_exp.models import SolicitudExpedienteDetalle
+        base_detalles = SolicitudExpedienteDetalle.objects.filter(solicitud__in=qs_solicitudes)
+
+        def _contar(filtros):
+            return base_detalles.filter(
+                **{f'solicitud__{k}': v for k, v in filtros.items()}
+            ).count()
+    else:
+        def _contar(filtros):
+            return qs_solicitudes.filter(**filtros).count()
+
     # Construir matriz de conteos
     datos = {}
     for area in areas:
@@ -103,8 +147,7 @@ def obtener_datos_reporte_areas_motivos(fecha_inicio='', fecha_fin=''):
             else:
                 filtros['motivo__nombre'] = motivo
 
-            count = qs_solicitudes.filter(**filtros).count()
-            datos[area][motivo] = count
+            datos[area][motivo] = _contar(filtros)
 
     # Construir filas de datos y calcular totales
     matriz_datos = []
@@ -123,6 +166,8 @@ def obtener_datos_reporte_areas_motivos(fecha_inicio='', fecha_fin=''):
     total_general = sum(totales_filas)
 
     return {
+        'metrica': metrica,
+        'etiqueta_metrica': ETIQUETA_METRICA[metrica],
         'areas': areas,
         'motivos': motivos,
         'datos': matriz_datos,
@@ -143,9 +188,10 @@ def exportar_reporte_excel(request):
     try:
         fecha_inicio = request.GET.get('fecha_inicio', '')
         fecha_fin = request.GET.get('fecha_fin', '')
+        metrica = normalizar_metrica(request.GET.get('tipo', ''))
 
-        # Obtener datos
-        datos_reporte = obtener_datos_reporte_areas_motivos(fecha_inicio, fecha_fin)
+        # Obtener datos (según el tipo de reporte elegido en la pantalla)
+        datos_reporte = obtener_datos_reporte_areas_motivos(fecha_inicio, fecha_fin, metrica)
 
         # Crear workbook
         wb = Workbook()
@@ -166,8 +212,8 @@ def exportar_reporte_excel(request):
         )
         center_align = Alignment(horizontal='center', vertical='center', wrap_text=True)
 
-        # Título
-        ws['A1'] = "REPORTE EXPEDIENTES PRESTADOS"
+        # Título (según el tipo de reporte: solicitudes o expedientes)
+        ws['A1'] = datos_reporte['etiqueta_metrica'].upper() + " POR ÁREA Y MOTIVO"
         ws['A1'].font = titulo_font
         ws.merge_cells('A1:F1')
         ws['A1'].alignment = center_align
@@ -235,7 +281,7 @@ def exportar_reporte_excel(request):
         )
         tz = timezone.get_current_timezone()
         ts = timezone.now().astimezone(tz).strftime('%Y%m%d_%H%M%S')
-        response['Content-Disposition'] = f'attachment; filename="reporte_expedientes_prestados_{ts}.xlsx"'
+        response['Content-Disposition'] = f'attachment; filename="reporte_{metrica}_por_area_motivo_{ts}.xlsx"'
         return response
 
     except Exception as e:
@@ -249,16 +295,17 @@ def exportar_reporte_pdf(request):
         return JsonResponse({"error": "Sin permisos"}, status=403)
 
     try:
-        from reportlab.lib.units import inch
+        from reportlab.lib.pagesizes import landscape
         from .pdf_solicitud_service import (
-            IMG_GOB_SESAL, IMG_HEAC, IMG_FUNDAGES, IMG_SIWIH
+            IMG_GOB_SESAL, IMG_HEAC, IMG_FUNDAGES, IMG_SIWIH, OFICIO
         )
 
         fecha_inicio = request.GET.get('fecha_inicio', '')
         fecha_fin = request.GET.get('fecha_fin', '')
+        metrica = normalizar_metrica(request.GET.get('tipo', ''))
 
-        # Obtener datos desde la BD
-        datos_reporte = obtener_datos_reporte_areas_motivos(fecha_inicio, fecha_fin)
+        # Obtener datos desde la BD (según el tipo de reporte elegido)
+        datos_reporte = obtener_datos_reporte_areas_motivos(fecha_inicio, fecha_fin, metrica)
 
         # Datos del usuario que genera el reporte.
         # get_unidad_usuario ya hace la cascada PerfilUnidad → RRHH.
@@ -266,8 +313,9 @@ def exportar_reporte_pdf(request):
         usuario_nombre = (f"{user.first_name} {user.last_name}".strip()) or user.username
         usuario_area = get_unidad_usuario(user) or '—'
 
-        # Tamaño de página: 8.5 x 13 pulgadas horizontal (13 ancho x 8.5 alto)
-        page_size = (13 * inch, 8.5 * inch)
+        # Tamaño de página: OFICIO horizontal (13 ancho x 8.5 alto). Comparte la
+        # constante OFICIO con el PDF de solicitud (fuente única de la verdad).
+        page_size = landscape(OFICIO)
         margen_top = 3 * cm
         margen_bot = 2.5 * cm
         margen_lat = 1.5 * cm
@@ -404,8 +452,9 @@ def exportar_reporte_pdf(request):
 
         elementos = []
 
-        # Título
-        elementos.append(Paragraph('Reporte Expedientes Prestados', st_titulo))
+        # Título (según el tipo de reporte: solicitudes o expedientes solicitados)
+        elementos.append(Paragraph(
+            datos_reporte['etiqueta_metrica'] + ' por Área y Motivo', st_titulo))
 
         # Período
         fecha_texto = f"Período: del {fecha_inicio or 'inicio'} al {fecha_fin or 'hoy'}"
@@ -494,7 +543,7 @@ def exportar_reporte_pdf(request):
         response = HttpResponse(pdf_bytes, content_type='application/pdf')
         tz = timezone.get_current_timezone()
         ts = timezone.now().astimezone(tz).strftime('%Y%m%d_%H%M%S')
-        response['Content-Disposition'] = f'attachment; filename="reporte_expedientes_prestados_{ts}.pdf"'
+        response['Content-Disposition'] = f'attachment; filename="reporte_{metrica}_por_area_motivo_{ts}.pdf"'
         return response
 
     except Exception as e:

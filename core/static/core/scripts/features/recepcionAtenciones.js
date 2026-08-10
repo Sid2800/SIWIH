@@ -294,10 +294,13 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
 
-        const confirmado = await confirmarAccion(
-            '¿Estás seguro?',
-            `Estás a punto confirmar la recepcion de ${porRecibir.length} atenciones`
-        );
+        const confirmado = await confirmarAccion({
+            titulo: '¿Estás seguro?',
+            mensajes: [
+                `Estás a punto confirmar la recepción de ${porRecibir.length} atenciones`
+            ]
+        });
+        
         if (confirmado) {
             await enviarRecepcion();
         }

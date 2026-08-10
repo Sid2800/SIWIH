@@ -129,6 +129,20 @@ body.darkmode .sexp-exp-tag--pendiente {
     border-color: rgba(234, 179, 8, 0.55);
 }
 
+/* Préstamo pendiente (morado): encontrado pero aún no entregado; reservado. */
+.sexp-exp-tag--prestamo-pendiente {
+    background: rgba(139, 92, 246, 0.18);
+    color: var(--negro);
+    border: 1px solid rgba(139, 92, 246, 0.6);
+    font-weight: 700;
+}
+
+body.darkmode .sexp-exp-tag--prestamo-pendiente {
+    color: #c4b5fd;
+    background: rgba(139, 92, 246, 0.25);
+    border-color: rgba(139, 92, 246, 0.65);
+}
+
 
 /* ======= Estado Badges para DataTable (Gestión Solicitudes) =======
    Colores que funcionan correctamente en modo claro Y oscuro.
@@ -141,43 +155,46 @@ body.darkmode .sexp-exp-tag--pendiente {
     font-weight: 600;
     display: inline-block;
     white-space: nowrap;
+    /* Letra negra para que siempre contraste; el color va en fondo + borde. */
+    color: var(--negro);
+    border: 1px solid transparent;
 }
 
 .sexp-estado-badge--pendiente {
-    background: rgba(99, 102, 241, 0.2);
-    color: #818cf8;
+    background: rgba(99, 102, 241, 0.25);
+    border-color: #6366f1;
 }
 .sexp-estado-badge--aprobada_organizando {
-    background: rgba(34, 197, 94, 0.2);
-    color: #22c55e;
+    background: rgba(34, 197, 94, 0.25);
+    border-color: #22c55e;
 }
 .sexp-estado-badge--rechazada {
-    background: rgba(239, 68, 68, 0.2);
-    color: #f87171;
+    background: rgba(239, 68, 68, 0.25);
+    border-color: #ef4444;
 }
 .sexp-estado-badge--listo_recoger {
-    background: rgba(16, 185, 129, 0.2);
-    color: #34d399;
+    background: rgba(16, 185, 129, 0.25);
+    border-color: #10b981;
 }
 .sexp-estado-badge--en_prestamo {
-    background: rgba(245, 158, 11, 0.2);
-    color: #fbbf24;
+    background: rgba(245, 158, 11, 0.3);
+    border-color: #f59e0b;
 }
 .sexp-estado-badge--en_devolucion {
-    background: rgba(139, 92, 246, 0.2);
-    color: #a78bfa;
+    background: rgba(139, 92, 246, 0.25);
+    border-color: #8b5cf6;
 }
 .sexp-estado-badge--incompleta {
-    background: rgba(249, 115, 22, 0.2);
-    color: #fb923c;
+    background: rgba(249, 115, 22, 0.25);
+    border-color: #f97316;
 }
 .sexp-estado-badge--finalizada {
-    background: rgba(100, 116, 139, 0.2);
-    color: #94a3b8;
+    background: rgba(100, 116, 139, 0.25);
+    border-color: #64748b;
 }
 .sexp-estado-badge--anulada {
-    background: rgba(100, 116, 139, 0.15);
-    color: #64748b;
+    background: rgba(100, 116, 139, 0.2);
+    border-color: #64748b;
 }
 
 
@@ -252,6 +269,19 @@ body.darkmode .sexp-exp-tag--pendiente {
     background: rgba(13, 148, 136, 0.2);
     color: #0d9488;
     border: 1px solid rgba(13, 148, 136, 0.4);
+}
+
+/* Acciones de préstamos pendientes (morado = pendiente, rojo = cancelar) */
+.sexp-action-btn--entregar-pend {
+    background: rgba(139, 92, 246, 0.2);
+    color: #6d28d9;
+    border: 1px solid rgba(139, 92, 246, 0.45);
+}
+
+.sexp-action-btn--cancelar-pend {
+    background: rgba(239, 68, 68, 0.15);
+    color: #b91c1c;
+    border: 1px solid rgba(239, 68, 68, 0.4);
 }
 
 
@@ -667,6 +697,8 @@ Usa colores del sistema (colorBoton, colorContendor, etc.)
     text-align: left;
 }
 
+/* Mismo criterio que .sexp-auditoria-help: NADA de display:flex, o cada
+   <strong> del texto se vuelve flex item y la frase se parte en columnas. */
 .sexp-revision-help {
     margin: 0 0 1rem 0;
     padding: 0.7rem 0.9rem;
@@ -675,16 +707,16 @@ Usa colores del sistema (colorBoton, colorContendor, etc.)
     border-radius: 0.6rem;
     font-size: 1.4rem !important;
     color: var(--colorTablacelda);
-    display: flex;
-    align-items: flex-start;
-    gap: 0.5rem;
+    display: block;
+    text-align: left;
+    line-height: 1.5;
 }
 
 .sexp-revision-help i {
     color: var(--colorBoton);
     font-size: 1.5rem;
-    margin-top: 0.1rem;
-    flex: 0 0 auto;
+    margin-right: 0.5rem;
+    vertical-align: -0.15rem;
 }
 
 /* Grid 3 cols (PC), 2 cols (tablet), 1 col (móvil) */
@@ -818,6 +850,36 @@ Usa colores del sistema (colorBoton, colorContendor, etc.)
 .sexp-revision-card--rechazado .sexp-revision-comentario {
     border-color: #ef4444 !important;
     background-color: var(--blanco) !important;
+}
+
+/* ---- Préstamo pendiente (morado) ----
+   Se encontró el expediente pero no se entrega todavía: queda reservado.
+   Usa el mismo morado del estado "en devolución" para mantener la paleta. */
+.sexp-revision-card--pendiente {
+    background-color: rgba(139, 92, 246, 0.14);
+    border-color: #8b5cf6;
+}
+.sexp-revision-card--pendiente .sexp-exp-tag {
+    background: rgba(139, 92, 246, 0.2) !important;
+    color: var(--negro) !important;
+    border: 1px solid rgba(139, 92, 246, 0.6) !important;
+    font-weight: 700 !important;
+}
+.sexp-revision-card--pendiente .sexp-revision-comentario {
+    border-color: #8b5cf6 !important;
+}
+/* Check "Marcar como préstamo pendiente" (va encima del comentario) */
+.sexp-revision-pend-check {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 0.4rem;
+    cursor: pointer;
+}
+.sexp-revision-pend-label {
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: var(--negro);
 }
 
 /* Mantener compatibilidad con clases antiguas */
@@ -986,6 +1048,12 @@ Usa colores del sistema (colorBoton, colorContendor, etc.)
     font-weight: 700;
 }
 
+/* Préstamo pendiente (morado) en el popup de info del expediente */
+.sexp-exp-info-popup .sexp-exp-info-estado--prest-pend {
+    color: #7c3aed;
+    font-weight: 700;
+}
+
 .sexp-exp-info-popup .sexp-exp-info-estado--late {
     color: #d97706;
     font-weight: 700;
@@ -1002,6 +1070,11 @@ Usa colores del sistema (colorBoton, colorContendor, etc.)
    MODAL AUDITORÍA DE DEVOLUCIÓN — Tarjetas en grid responsive
    ============================================================ */
 
+/* Aviso informativo de los modales.
+   IMPORTANTE: NO usar display:flex aquí. Al ser flex, cada <strong>/<span> del
+   texto se convertía en un flex item y la frase se partía en columnas (el texto
+   salía ilegible). Con display:block el texto fluye normal y el icono queda
+   inline al inicio. */
 .sexp-auditoria-help {
     margin: 0 0 1rem 0;
     padding: 0.8rem 1rem;
@@ -1010,15 +1083,16 @@ Usa colores del sistema (colorBoton, colorContendor, etc.)
     border-radius: 0.6rem;
     font-size: 1.5rem !important;
     color: var(--colorTablacelda);
-    display: flex;
-    align-items: flex-start;
-    gap: 0.6rem;
+    display: block;
+    text-align: left;
+    line-height: 1.5;
 }
 
 .sexp-auditoria-help i {
     color: var(--colorBoton);
     font-size: 1.7rem;
-    flex: 0 0 auto;
+    margin-right: 0.6rem;
+    vertical-align: -0.15rem;
 }
 
 /* Grid responsive: 3 cols (PC), 2 (tablet), 1 (móvil) */
@@ -1126,6 +1200,7 @@ Usa colores del sistema (colorBoton, colorContendor, etc.)
 .sexp-auditoria-coment {
     font-size: 1.4rem !important;
 }
+.sexp-auditoria-coment:disabled { background-color: rgba(0, 0, 0, 0.05); cursor: not-allowed; }
 
 /* Resaltado de tarjetas según estado seleccionado */
 .sexp-auditoria-card--no {
@@ -1645,6 +1720,115 @@ body.darkmode .sexp-entregar-faltantes-btn:hover {
     background-color: #fdba74 !important;
 }
 
+/* ============================================================
+   Devolución del usuario: grupo de 3 botones (completa / parcial / fuera horario)
+   ============================================================ */
+.sexp-devolucion-botones {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.8rem;
+    margin-top: 1rem;
+}
+.sexp-devolucion-botones .sexp-devolver-btn {
+    margin-top: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+/* Completa — verde (devolver todo) */
+.sexp-devolver-btn--completa {
+    background-color: #16a34a !important;
+    color: #fff !important;
+}
+.sexp-devolver-btn--completa:hover { background-color: #15803d !important; opacity: 1; }
+/* Parcial — ámbar (mantiene el color de devolución) */
+.sexp-devolver-btn--parcial {
+    background-color: #f59e0b !important;
+    color: #000 !important;
+}
+.sexp-devolver-btn--parcial:hover { background-color: #d97706 !important; opacity: 1; }
+
+/* ============================================================
+   Modal "Devolución parcial" (usuario) — tarjetas por expediente
+   ============================================================ */
+.sexp-devparcial-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    text-align: left;
+}
+.sexp-devparcial-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+    padding: 0.9rem 1rem;
+    background-color: var(--blanco);
+    border: 1px solid var(--colorLinea);
+    border-radius: 0.7rem;
+    color: var(--colorTablacelda);
+}
+.sexp-devparcial-head {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+}
+.sexp-devparcial-pac {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.2;
+}
+.sexp-devparcial-id { font-weight: 700; font-size: 1.4rem; }
+.sexp-devparcial-nom { font-size: 1.3rem; opacity: 0.85; }
+.sexp-devparcial-radios {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.8rem 1.2rem;
+    padding: 0.4rem 0;
+    border-top: 1px dashed var(--colorLinea);
+    border-bottom: 1px dashed var(--colorLinea);
+}
+.sexp-devparcial-radio {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    cursor: pointer;
+    font-size: 1.4rem;
+    color: var(--colorTablacelda);
+    user-select: none;
+}
+.sexp-devparcial-radio input[type="radio"] {
+    width: 1.7rem;
+    height: 1.7rem;
+    cursor: pointer;
+    accent-color: var(--colorBoton);
+}
+.sexp-devparcial-radio--ok { color: #16a34a; font-weight: 600; }
+.sexp-devparcial-radio--no { color: #d97706; font-weight: 600; }
+.sexp-devparcial-coment { font-size: 1.4rem !important; }
+.sexp-devparcial-coment:disabled { background-color: rgba(0, 0, 0, 0.05); cursor: not-allowed; }
+
+/* Grid de 3 columnas para aprovechar el ancho del modal */
+.sexp-devparcial-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.8rem;
+    max-height: 60vh;
+    overflow-y: auto;
+    padding: 0.2rem;
+}
+@media (max-width: 1024px) { .sexp-devparcial-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px)  { .sexp-devparcial-grid { grid-template-columns: 1fr; } }
+
+/* Resaltado según selección: amarillo = No devolver, verde suave = Devolver */
+.sexp-devparcial-card--no {
+    background-color: rgba(234, 179, 8, 0.16);
+    border-color: #d97706;
+}
+.sexp-devparcial-card--ok {
+    background-color: rgba(22, 163, 74, 0.10);
+    border-color: #16a34a;
+}
+
 
 /* ============================================================
    GESTIÓN DE SOLICITUDES
@@ -1804,6 +1988,22 @@ body.darkmode .sexp-entregar-faltantes-btn:hover {
 
 .sexp-filtro-btn--export       { background: #22c55e; color: #fff; }
 .sexp-filtro-btn--export:hover { opacity: 0.85; }
+
+/* Botones de exportar bloqueados hasta que se elijan las fechas */
+.sexp-filtro-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    filter: grayscale(35%);
+}
+.sexp-filtro-btn:disabled:hover { opacity: 0.45; }
+
+/* Empuja el grupo "Tipo de Reporte" y los botones de exportar a la derecha,
+   para que queden juntos y separados de los filtros de fecha. */
+.sexp-filtro-grupo--export { margin-left: auto; }
+@media (max-width: 900px) {
+    /* En pantallas chicas no se empuja: fluye debajo de los demás filtros. */
+    .sexp-filtro-grupo--export { margin-left: 0; }
+}
 
 .sexp-reportes-grid {
     display: grid;
@@ -2305,6 +2505,19 @@ body.darkmode .sexp-exp-tag.sexp-exp-tag--pendiente {
     color: #fbbf24 !important;
     background: rgba(234, 179, 8, 0.25) !important;
     border-color: rgba(234, 179, 8, 0.6) !important;
+}
+
+/* Préstamo pendiente (morado) — misma especificidad que el resto de tags */
+.sexp-exp-tag.sexp-exp-tag--prestamo-pendiente {
+    background: rgba(139, 92, 246, 0.22) !important;
+    color: var(--negro) !important;
+    border: 1px solid rgba(139, 92, 246, 0.65) !important;
+    font-weight: 700 !important;
+}
+body.darkmode .sexp-exp-tag.sexp-exp-tag--prestamo-pendiente {
+    color: #c4b5fd !important;
+    background: rgba(139, 92, 246, 0.28) !important;
+    border-color: rgba(139, 92, 246, 0.65) !important;
 }
 
 .sexp-exp-tag.sexp-exp-tag--late {
@@ -2815,3 +3028,316 @@ body.darkmode .sexp-sugerir-tiempo {
 .sexp-sticky-btn i {
     font-size: 1.5rem !important;
 }
+
+
+/* ============================================================
+   Recuperación de expedientes de urgencia (solo Admisión)
+   -----------------------------------------------------------
+   UNA fila por expediente. Se usan las MISMAS reglas de color que
+   el listbox de la Recepción SDGI (.listbox li:hover / li.selected):
+   hover gris y, al marcar, fondo var(--negro) con texto
+   var(--blanco). Como son tokens de tema, en modo oscuro se
+   invierten solos, que es justo el comportamiento pedido.
+   NO se define color propio aquí para no pisar esas reglas.
+
+   Tampoco hay cabecera fija: una fila sticky dentro de un <ul> con
+   scroll horizontal se despegaba y se encimaba sobre los datos.
+   ============================================================ */
+.sexp-recup-item {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    /* .listbox li trae white-space:pre; aquí las columnas son spans. */
+    white-space: nowrap;
+    /* .listbox usa 1.7rem: demasiado para varios datos en línea. */
+    font-size: 1.25rem;
+    line-height: 1.7;
+    /* CLAVE: las columnas suman más que el ancho del panel, así que el
+       contenido desbordaba el <li>. Un fondo solo pinta el ancho del elemento,
+       por lo que el hover/selección se cortaban a media fila. Con max-content
+       el <li> crece hasta abarcar todas sus columnas y el resaltado cubre la
+       fila completa; min-width:100% evita que se encoja si sobra espacio. */
+    min-width: max-content;
+    box-sizing: border-box;
+}
+
+/* Columnas: anchos fijos para que las filas se lean alineadas entre sí. */
+.sexp-recup-c {
+    flex: 0 0 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.sexp-recup-c--exp  { width: 7rem;  font-weight: 700; }
+.sexp-recup-c--id   { width: 12rem; font-weight: 600; }
+.sexp-recup-c--nom  { width: 19rem; }
+.sexp-recup-c--sol  { width: 5.5rem; }
+.sexp-recup-c--per  { width: 14rem; font-weight: 600; }
+.sexp-recup-c--area { width: 13rem; }
+
+/* Hover y marcado heredan el color del <li> (reglas de .listbox),
+   por eso las columnas no fijan color propio. */
+.listbox li:hover .sexp-recup-c,
+.listbox li.selected .sexp-recup-c { color: inherit; }
+
+.sexp-recup-vacio {
+    list-style: none;
+    padding: 1.2rem;
+    text-align: center;
+    opacity: 0.55;
+    font-size: 1.4rem;
+    text-transform: none;
+    white-space: normal;
+    cursor: default;
+}
+.sexp-recup-vacio:hover { background-color: transparent !important; color: inherit !important; }
+
+/* El boton de confirmar necesita ancho propio: la regla de SDGI apunta a
+   #recepcionIngresoBoton y aqui el id es otro, por eso el texto se desbordaba. */
+.recepcionIngresoBotones #recup-confirmar {
+    justify-content: center;
+    text-align: center;
+}
+@media (min-width: 30rem) {
+    .recepcionIngresoBotones #recup-confirmar { width: 30rem; }
+}
+/* En movil las listas van una sobre otra (flex column heredado de SDGI);
+   se le da algo mas de alto util al listado para que se vean varios items. */
+@media (max-width: 60rem) {
+    .contenedorListaRecepcion .listbox { height: 26rem; }
+}
+
+/* El listado desplaza en horizontal: las filas son más anchas que el panel. */
+.contenedorListaRecepcion .listbox { overflow-x: auto; }
+/* .listbox li:hover trae border-radius, que con la fila desplazada recorta el
+   fondo en los bordes. En estas filas el resaltado va de lado a lado. */
+.listbox li.sexp-recup-item:hover { border-radius: 0; }
+
+/* ============================================================
+   Modal de confirmación de la recuperación
+   -----------------------------------------------------------
+   Los expedientes se agrupan por RESPONSABLE y se muestran como
+   tarjetas en grid. Antes se listaban como números apilados a la
+   derecha del nombre, que se acumulaban y no permitían revisar
+   qué paciente era cada uno antes de confirmar.
+   ============================================================ */
+.sexp-recup-conf {
+    text-align: left;
+    max-height: 55vh;
+    overflow-y: auto;
+    padding: 0.2rem;
+}
+
+.sexp-recup-grupo { margin-bottom: 1.4rem; }
+.sexp-recup-grupo:last-child { margin-bottom: 0; }
+
+/* Encabezado del grupo: a quién se le van a quitar */
+.sexp-recup-grupo-tit {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    padding: 0.5rem 0.8rem;
+    margin-bottom: 0.6rem;
+    border-radius: 0.5rem;
+    background-color: rgba(0, 139, 139, 0.12);
+    border-left: 3px solid var(--colorBoton);
+    font-size: 1.45rem;
+}
+.sexp-recup-grupo-tit i { color: var(--colorBoton); font-size: 1.7rem; }
+.sexp-recup-grupo-area { opacity: 0.75; font-size: 1.3rem; }
+/* Contador de expedientes de ese responsable */
+.sexp-recup-grupo-n {
+    margin-left: auto;
+    background-color: var(--colorBoton);
+    color: var(--blanco);
+    border-radius: 999px;
+    padding: 0.1rem 0.8rem;
+    font-weight: 700;
+    font-size: 1.25rem;
+}
+
+/* 3 columnas en PC, 2 en tablet, 1 en móvil */
+.sexp-recup-cards {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.7rem;
+}
+@media (max-width: 62rem) { .sexp-recup-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 40rem) { .sexp-recup-cards { grid-template-columns: 1fr; } }
+
+.sexp-recup-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    padding: 0.6rem 0.8rem;
+    border: 1px solid var(--colorLinea);
+    border-radius: 0.5rem;
+    background-color: var(--blanco);
+    min-width: 0;
+}
+.sexp-recup-card-id {
+    font-weight: 700;
+    font-size: 1.3rem;
+}
+.sexp-recup-card-nom {
+    font-size: 1.25rem;
+    opacity: 0.85;
+    line-height: 1.35;
+    /* El nombre completo se ve; si es muy largo, parte en 2 líneas. */
+    word-break: break-word;
+}
+
+/* ============================================================
+   RESPONSIVE del módulo s_exp (solo clases sexp-*)
+   ============================================================ */
+
+/* ---- Avisos colapsables en móvil ----------------------------
+   En PC el aviso se lee completo. En teléfono ese texto ocupa
+   media pantalla antes de llegar a lo que importa (la lista o
+   los botones), así que se recorta a 2 líneas y se toca para
+   ampliar. En PC no se recorta ni se vuelve pulsable.
+   ------------------------------------------------------------ */
+@media (max-width: 768px) {
+    .sexp-auditoria-help,
+    .sexp-revision-help {
+        position: relative;
+        cursor: pointer;
+        padding-right: 3.2rem;   /* espacio para el chevron */
+        font-size: 1.3rem !important;
+    }
+
+    /* Recorte a 2 líneas mientras esté cerrado */
+    .sexp-auditoria-help:not(.sexp-help--abierto),
+    .sexp-revision-help:not(.sexp-help--abierto) {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    /* Indicador de "tocar para ampliar" */
+    .sexp-auditoria-help::after,
+    .sexp-revision-help::after {
+        content: "\F282";                 /* bi-chevron-down */
+        font-family: "bootstrap-icons";
+        position: absolute;
+        top: 0.7rem;
+        right: 1rem;
+        font-size: 1.4rem;
+        color: var(--colorBoton);
+        transition: transform 0.2s ease;
+    }
+    .sexp-auditoria-help.sexp-help--abierto::after,
+    .sexp-revision-help.sexp-help--abierto::after {
+        transform: rotate(180deg);
+    }
+}
+
+/* ---- Botones de acción de las tablas ------------------------ */
+@media (max-width: 768px) {
+    /* Se apilan a lo ancho para que el texto no se corte ni
+       desborde la celda. */
+    .sexp-action-group {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.4rem;
+    }
+    .sexp-action-btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    /* Filtros de estado: se envuelven en vez de desbordar. */
+    .sexp-filtros { flex-direction: column; align-items: stretch; gap: 0.6rem; }
+    .sexp-flex-gap-1 { flex-wrap: wrap; justify-content: center; }
+    .sexp-filtro-btn { flex: 1 1 auto; }
+
+    /* Barra de sub-módulos: centrada y envolviendo. */
+    .sexp-nav-modulos { flex-wrap: wrap; justify-content: center; gap: 0.5rem; }
+    .sexp-nav-link { font-size: 1.3rem; padding: 0.6rem 1rem; }
+
+    /* Devolución (usuario): botones a ancho completo. */
+    .sexp-devolucion-botones { flex-direction: column; align-items: stretch; }
+    .sexp-devolver-btn { width: 100%; justify-content: center; }
+
+    /* Modales: botones apilados y a ancho completo, sin desbordar. */
+    .contener-modal-contenedor-botones {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.6rem !important;
+    }
+    .sexp-modal-grande .contener-modal-boton-confirmar,
+    .sexp-modal-grande .contener-modal-boton-cancelar {
+        min-width: 0;
+        width: 100%;
+        font-size: 1.4rem !important;
+        height: 4.2rem;
+    }
+    /* El de confirmar de Recuperación tiene ancho fijo en PC. */
+    .recepcionIngresoBotones #recup-confirmar { width: 100%; }
+    .recepcionIngresoBotones { flex-direction: column; align-items: stretch; }
+}
+
+/* ---- Recuperación: la fila es ancha; en móvil se prioriza --- */
+@media (max-width: 768px) {
+    /* Se ocultan las columnas menos decisivas: para identificar el
+       expediente bastan número, identidad y nombre. El resto sigue
+       en el tooltip y en el modal de confirmación. */
+    .sexp-recup-c--sol,
+    .sexp-recup-c--per,
+    .sexp-recup-c--area { display: none; }
+    .sexp-recup-c--nom { width: 16rem; }
+}
+
+/* ---- Página de Recuperación: alineación como el resto del módulo ----
+   Reusa .contenedorListaRecepcion (de la Recepción SDGI) para heredar el
+   layout de la doble lista, pero ese contenedor trae align-items/justify-content
+   en center y centraba TODO: el título y la barra de sub-módulos salían
+   centrados, a diferencia de las demás pantallas del módulo. En SDGI no se nota
+   porque sus hijos llevan width:100%.
+   Se corrige solo aquí (clase propia); no se toca la pantalla de SDGI. */
+.sexp-recup-page.contenedorListaRecepcion {
+    align-items: stretch;
+    justify-content: flex-start;
+}
+
+/* ============================================================
+   Modales "Entregar / Cancelar pendientes" — lista seleccionable
+   Cada fila: checkbox + expediente + paciente, y (solo cancelar)
+   un comentario obligatorio por expediente debajo.
+   ============================================================ */
+.sexp-pend-lista {
+    text-align: left;
+    max-height: 55vh;
+    overflow-y: auto;
+    padding: 0.2rem;
+}
+.sexp-pend-row {
+    padding: 0.6rem 0.8rem;
+    border: 1px solid var(--colorLinea);
+    border-radius: 0.5rem;
+    margin-bottom: 0.6rem;
+    background-color: var(--blanco);
+}
+.sexp-pend-row:last-child { margin-bottom: 0; }
+.sexp-pend-cab {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+}
+.sexp-pend-pac {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+.sexp-pend-id { font-weight: 700; font-size: 1.4rem; }
+.sexp-pend-nom { font-size: 1.25rem; opacity: 0.85; }
+.sexp-pend-coment {
+    width: 100%;
+    margin-top: 0.6rem;
+    padding: 0.5rem 0.7rem;
+    font-size: 1.35rem;
+    border: 1px solid var(--colorLinea);
+    border-radius: 0.4rem;
+}
+.sexp-pend-coment:disabled { background-color: rgba(0, 0, 0, 0.05); cursor: not-allowed; }

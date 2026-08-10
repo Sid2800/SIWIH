@@ -194,20 +194,38 @@ $(document).ready(function () {
                     columns: [
                         { data: 'numero_expediente' },
                         { data: 'fecha_solicitud' },
+                        {
+                            // Fecha/hora en que se ENTREGÓ este expediente.
+                            data: 'fecha_entrega',
+                            render: function (data) {
+                                return data || '<span class="sexp-opacity-5">Sin entregar</span>';
+                            }
+                        },
+                        {
+                            // Fecha/hora en que se DEVOLVIÓ este expediente. Es por
+                            // expediente (no del préstamo completo), así que en una
+                            // devolución parcial cada uno muestra su fecha real.
+                            data: 'fecha_devolucion',
+                            render: function (data) {
+                                return data || '<span class="sexp-opacity-5">Sin devolver</span>';
+                            }
+                        },
                         { data: 'motivo' },
                         { data: 'solicitante' },
                         { data: 'area_destino' },
                         {
                             data: 'estado',
                             render: function (data) {
+                                // Estados del EXPEDIENTE en ese préstamo (no de la
+                                // solicitud): los da _estado_del_expediente() en el
+                                // backend. Antes las claves eran de la solicitud y
+                                // por eso casi ningún badge tomaba color.
                                 const colores = {
-                                    'Pendiente': 'background:rgba(99,102,241,0.2);color:var(--negro);',
-                                    'Aprobado': 'background:rgba(34,197,94,0.2);color:var(--negro);',
-                                    'Rechazado': 'background:rgba(239,68,68,0.2);color:var(--negro);',
-                                    'EnPrestamo': 'background:rgba(245,158,11,0.2);color:var(--negro);',
-                                    'Devuelto': 'background:rgba(100,116,139,0.2);color:var(--negro);',
-                                    'DevolucionParcial': 'background:rgba(249,115,22,0.2);color:var(--negro);',
-                                    'Anulado': 'background:rgba(107,114,128,0.2);color:var(--negro);'
+                                    'En preparación': 'background:rgba(99,102,241,0.2);color:var(--negro);',
+                                    'Pendiente de entrega': 'background:rgba(139,92,246,0.25);color:var(--negro);',
+                                    'En préstamo': 'background:rgba(245,158,11,0.3);color:var(--negro);',
+                                    'Finalizado': 'background:rgba(100,116,139,0.25);color:var(--negro);',
+                                    'Recuperado por Admisión': 'background:rgba(239,68,68,0.2);color:var(--negro);'
                                 };
                                 const estilo = colores[data] || '';
                                 return `<span style="padding:0.2rem 0.5rem;border-radius:12px;font-size:1.2rem;font-weight:600;${estilo}">${data}</span>`;

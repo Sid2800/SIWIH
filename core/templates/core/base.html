@@ -31,6 +31,9 @@
 
    <link rel="stylesheet" href="{% static 'core/tom-select/css/tom-select.css' %}">
    <link rel="stylesheet" href="{% static 'core/select2/css/select2.min.css' %}">
+   <link rel="stylesheet" href="{% static 'core/virtual-select/css/virtual-select.min.css' %}">
+   {% comment %} Flatpickr {% endcomment %}
+   <link rel="stylesheet" href="{% static 'core/flatpickr/css/flatpickr.min.css' %}">
    <!-- DataTables -->
    <link rel="stylesheet" href="{% static 'core/datatables/css/dataTables.dataTables.css' %}">
    <link rel="stylesheet" href="{% static 'core/datatables/css/responsive.dataTables.css' %}">
@@ -131,17 +134,6 @@
                {% endif %}
 
 
-            <!--
-            <li>
-               <a href="{% url 'home' %}" class="bn-navegacion__enlace">
-                  <i class="bi bi-archive bn-navegacion-enlace__logo"></i>
-                  <span class="bn-navegacion-enlace__texto">Atencion</span>
-               </a>
-            </li>
-            -->
-
-
-
             {% if request.user|tiene_unidades_config:"IMAGENOLOGIA_VISUALIZACION_UNIDADES" %}
 
             <li>
@@ -158,6 +150,18 @@
                <a href="{% url 'listar_referencias' %}" class="bn-navegacion__enlace">
                   <i class="bi bi-link-45deg bn-navegacion-enlace__logo"></i>
                   <span class="bn-navegacion-enlace__texto">Referencia</span>
+               </a>
+            </li>
+            {% endif %}
+
+
+            {% if request.user|tiene_rol:"ADMIN:Admision" %}
+            <li>
+               <a href="{% url 'listar_agenda_medica' %}" class="bn-navegacion__enlace">
+                  <i class="bi bi-calendar-check bn-navegacion-enlace__logo"></i>
+                  <span class="bn-navegacion-enlace__texto">
+                     Agenda Médica
+                  </span>
                </a>
             </li>
             {% endif %}
@@ -467,6 +471,23 @@
          /* ---------------- MEDIA ---------------- */
          obtenerImagenesEvaluacion: "{% url 'obtener_imagenes_evaluacion'%}",
 
+
+
+         /* ---------------- CLINICA ---------------- */
+         listarTiposAtencion: "{% url 'listar_tipos_atencion' %}",
+
+         /* ---------------- AGENDA MEDICA ---------------- */
+         listarAgendaMedicaAPI: "{% url 'listar_agenda_medica_API' %}",
+         listarPersonalClinicoAPI: "{% url 'listar_personal_clinico' %}",
+         listarJornadaLaboralAPI: "{% url 'listar_jornada_laboral' %}",
+         guardarPeriodoLaboral: "{% url 'guardar_periodo_laboral' %}",
+         editarPeriodoLaboral: "{% url 'editar_periodo_laboral' %}",
+         validarImpactoPeriodoLaboral: "{% url 'validar_impacto-periodo_laboral' %}",
+         validarImpactoDiaLaboral: "{% url 'validar_impacto_dia_laboral' %}",
+         obtenerPeriodoLaboral: "{% url 'obtener_periodo_laboral' %}",
+         guardarDiaPeriodoLaboral: "{% url 'guardar_dia_periodo_laboral' %}",
+         obtenerDiaLaboral: "{% url 'obtener_dia_laboral' %}",
+
          /* ---------------- S_EXP (Préstamos de Expedientes) ---------------- */
          s_exp_dashboard: "{% url 's_exp_dashboard' %}",
          s_exp_buscador: "{% url 's_exp_buscador' %}",
@@ -482,6 +503,11 @@
          s_exp_rechazar_solicitud_api: "{% url 's_exp_rechazar_solicitud_api' %}",
          s_exp_prestamos_activos_api: "{% url 's_exp_prestamos_activos_api' %}",
          s_exp_marcar_entregado_api: "{% url 's_exp_marcar_entregado_api' %}",
+         s_exp_entregar_pendientes_api: "{% url 's_exp_entregar_pendientes_api' %}",
+         s_exp_cancelar_pendientes_api: "{% url 's_exp_cancelar_pendientes_api' %}",
+         s_exp_expedientes_recuperables_api: "{% url 's_exp_expedientes_recuperables_api' %}",
+         s_exp_recuperar_expedientes_api: "{% url 's_exp_recuperar_expedientes_api' %}",
+         s_exp_recuperacion_leida_api: "{% url 's_exp_recuperacion_leida_api' %}",
          s_exp_prestamos_devolucion_api: "{% url 's_exp_prestamos_devolucion_api' %}",
          s_exp_procesar_devolucion_api: "{% url 's_exp_procesar_devolucion_api' %}",
          s_exp_reportes_data_api: "{% url 's_exp_reportes_data_api' %}",
@@ -538,6 +564,11 @@
 
    <script src="{% static 'core/tom-select/js/tom-select.complete.min.js' %}"></script>
 
+   <script src="{% static 'core/virtual-select/js/virtual-select.min.js' %}"></script>
+
+   <script src="{% static 'core/flatpickr/js/es.js' %}"></script>
+   <script src="{% static 'core/flatpickr/js/flatpickr.js' %}"></script>
+
    <!-- ALERTAS -->
 
    <!-- SweetAlert2 -->
@@ -551,6 +582,7 @@
    <!-- SCRIPTS PROPIOS -->
    <script src="{% static 'core/scripts/helpers/fechaUtilidades.js' %}"></script>
    <script src="{% static 'core/scripts/helpers/servicio_helpers.js' %}"></script>
+   <script src="{% static 'core/scripts/helpers/rrhh_helpers.js' %}"></script>
    <script src="{% static 'core/scripts/helpers/helpers.js' %}"></script>
 
 
@@ -564,6 +596,8 @@
    <!-- Realtime + Notificaciones globales s_exp -->
    {% if user.is_authenticated %}
    <script src="{% static 'core/scripts/s_exp/realtime.js' %}"></script>
+   <script src="{% static 'core/scripts/s_exp/expediente_info.js' %}"></script>
+   <script src="{% static 'core/scripts/s_exp/ui_responsive.js' %}"></script>
    <script src="{% static 'core/scripts/s_exp/notificaciones_globales.js' %}"></script>
    {% endif %}
 
@@ -573,8 +607,3 @@
    {% block extra_js %}
    {% endblock extra_js %}
 
-
-
-</body>
-
-</html>

@@ -1,0 +1,218 @@
+{% extends 'core/base.html'%}
+
+
+{% block title %}Agenda {% endblock title %}
+
+{% block content %}
+    <div class="contenedor2"> 
+
+        <div class="tituloFormulario" style="margin-bottom: 1rem;">
+            <div class="tituloFormulario-texto"> 
+                <i class="bi bi-calendar-range"></i>
+                <h2 class="sin-margen">Configuración de Agenda</h2>
+            </div>
+        </div>
+
+        <div class="tituloFormulario-subrallado"></div>
+
+    
+        <div class="contenedor-fielsets-configurar-periodo">
+            <span class="form-subtitulo-fieldset-falso"> Periodo Laboral</span> 
+        
+            <fieldset class="configurarPeriodoPersonalCampos">
+                <legend>Personal de Salud</legend>  
+                    <div class="formularioCampoModal">
+                        <label>Nombre </label>
+                        <input type="text" value="{{ periodo.personal_salud.empleado.nombre_completo}}" class="formularioCampo-text" tabindex="-1" readonly="">
+                    </div>
+
+                    <div class="formularioCampoModal">
+                        <label>Especialidad</label>
+                        <input type="text" value="{{ periodo.personal_salud.especialidad_nombre }}" class="formularioCampo-text" tabindex="-1" readonly="">
+                        
+                    </div>
+            </fieldset>
+
+
+            <fieldset class="configurarPeriodoPeriodoCampos">
+                <legend>Periodo</legend>  
+                    <div class="formularioCampoModal">
+                        <label>Periodo </label>
+                        <input type="text" value="{{ periodo.periodo_formateado}}" class="formularioCampo-text" tabindex="-1" readonly="">
+                    </div>
+
+                    <div class="formularioCampoModal">
+                        <label>Jornada</label>
+                        <input type="text" value="{{ periodo.jornada_laboral}}" class="formularioCampo-text" tabindex="-1" readonly="">
+                        
+                    </div>
+
+                    <div class="formularioCampoModal">
+                        <label>Cupos</label>
+                        <input type="text" value="100" class="formularioCampo-text" tabindex="-1" readonly="">
+                        
+                    </div>
+
+                    <div class="estado-indicador">
+
+                        {% if periodo.estado_temporal == 'FUTURO' %}
+                            <i class="bi bi-circle-fill icon-amarillo"></i>
+                            <span>FUTURO</span>
+
+                        {% elif periodo.estado_temporal == 'EN_EJECUCION' %}
+                            <i class="bi bi-circle-fill icon-verde"></i>
+                            <span>EN EJECUCIÓN</span>
+
+                        {% elif periodo.estado_temporal == 'FINALIZADO' %}
+                            <i class="bi bi-circle-fill icon-gris"></i>
+                            <span>FINALIZADO</span>
+                        {% endif %}
+
+                    </div>
+
+
+            </fieldset>
+
+            <fieldset class="configurarPeriodoContenedorTarjetaDiasSemana">
+            <legend>Días de la Semana</legend>
+
+            <div class="contenedor-dias-semana">
+                {% for dia in dias_configurados %}
+                    {% if dia.configurado %}
+                        <div class="configurar-periodo-dia-tarjeta"  data-dia-semana="{{ dia.numero_dia }}"
+                                    data-id-dia-laboral="{{ dia.id }}">
+
+                            <div class="configurar-periodo-dia-tarjeta-header">
+                                <div class="configurar-periodo-dia-tarjeta-header-titulo">
+                                    {{ dia.nombre_dia }}
+                                </div>
+
+                                <div class="configurar-periodo-dia-tarjeta-header-estado" >
+
+                                    <i class="bi bi-circle-fill icon-verde" title="Día configurado"></i>
+                                </div>
+                            </div>
+
+                            <div class="configurar-periodo-dia-tarjeta-body">
+
+                                <div class="dia-info-item">
+                                    <i class="bi bi-clock-fill"></i>
+                                    <span>{{ dia.hora_inicio|time:"H:i" }} - {{ dia.hora_fin|time:"H:i" }}</span>
+                                </div>
+
+                                <div class="dia-info-item">
+                                    <i class="bi bi-people-fill"></i>
+                                    <span>{{ dia.total_cupos }} Cupos</span>
+                                </div>
+
+                                <div class="dia-info-item">
+                                    <i class="bi bi-grid-fill"></i>
+                                    <span>{{ dia.total_tipos }} Tipos Atención</span>
+                                </div>
+
+                            </div>
+
+                            <div class="configurar-periodo-dia-tarjeta-footer">
+                                <button type="button"
+                                        class="configurar-periodo-dia-tarjeta-boton">
+                                    <i class="bi bi-pencil-fill"></i>
+                                    <span>Editar</span>
+                                </button>
+                            </div>
+
+                        </div>
+                    {% else %}
+                        <!-- TARJETA VACIA -->
+                        <div class="configurar-periodo-dia-tarjeta tarjeta-no-configurada" data-dia-semana="{{ dia.numero_dia }}"
+                                    data-id-dia-laboral="">
+
+                            <div class="configurar-periodo-dia-tarjeta-header">
+                                <div class="configurar-periodo-dia-tarjeta-header-titulo">
+                                    {{ dia.nombre_dia }}
+                                </div>
+
+                                <div class="configurar-periodo-dia-tarjeta-header-estado">
+                                    <i class="bi bi-circle-fill icon-amarillo" title="Día configurado"></i>
+                                </div>
+                            </div>
+
+                            <div class="configurar-periodo-dia-tarjeta-body tarjeta-no-configurada">
+
+                                <div class="dia-info-item">
+                                    <i class="bi bi-exclamation-triangle-fill"></i>
+                                    <span>SIN CONFIGURAR</span>
+                                </div>
+
+                            
+                            </div>
+
+                            <div class="configurar-periodo-dia-tarjeta-footer">
+                                <button type="button"
+                                        class="configurar-periodo-dia-tarjeta-boton">
+                                    <i class="bi bi-gear-fill"></i>
+                                    <span>Definir</span>
+                                </button>
+                            </div>
+
+                        </div>
+                        
+
+                    {% endif %}
+
+
+
+                {% endfor %}
+                <!-- TARJETA -->
+                
+
+                
+
+    
+
+            </div>
+        </fieldset>
+            
+        
+        </div>
+
+
+
+        <div class="formularioBotones">
+            <a href="javascript:history.back()" class="formularioBotones-boton" style="width: fit-content; margin: 10px auto;">
+                <i class="bi bi-arrow-left-circle formularioBotones-icono"></i>
+            <span>Volver</span>
+        </a>
+        </div>
+            
+
+    </div>
+    
+{% endblock content %}
+
+{% load static %}
+
+
+{% block extra_js %}
+
+
+
+
+<script>
+    const contextoAgenda = {
+    periodoId: "{{ periodo.id|escapejs }}",
+    personalClinicoNombre: "{{ periodo.personal_salud.empleado.nombre_completo|escapejs }}",
+    periodoTexto: "{{ periodo.periodo_formateado|escapejs }}",
+    jornada: {
+        nombre: "{{ periodo.jornada_laboral.nombre_jornada_laboral|escapejs }}",
+        horaInicio: "{{ periodo.jornada_laboral.hora_inicio }}",
+        horaFin: "{{ periodo.jornada_laboral.hora_fin }}",
+        duracion: "{{ periodo.jornada_laboral.duracion_minutos }}"
+    }
+};
+</script>
+<script src="{% static 'core/scripts/helpers/clinico_helpers.js' %}"></script>
+<script src="{% static 'core/scripts/modals/agenda_medica_modals.js' %}"></script>
+<script src="{% static 'core/scripts/features/configurarDialaboral.js' %}"></script>
+
+
+{% endblock extra_js %}

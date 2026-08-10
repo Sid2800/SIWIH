@@ -294,6 +294,30 @@ def filtro_rango_fecha(campo, inicio, fin):
     """
     return {f"{campo}__range": (inicio, fin)}
 
+
+
+
+def obtener_fechas_por_dia_semana(fecha_inicio, fecha_fin, dia_semana ):
+    """
+    Retorna todas las fechas de un día específico
+    dentro de un rango de fechas.
+    """
+
+    fechas = []
+
+    # Python:
+    # 0 = lunes
+    # 6 = domingo
+    dia_python = int(dia_semana) - 1
+
+    fecha_actual = fecha_inicio
+
+    while fecha_actual <= fecha_fin:
+        if fecha_actual.weekday() == dia_python:
+            fechas.append(fecha_actual)
+        fecha_actual += timedelta(days=1)
+
+    return fechas
 # 2026-05-29: extraido de mapeo_camas/views.py (refactor B). Helpers globales
 def hora_local_iso(dt):
     """Convierte un datetime aware a ISO en zona horaria local; '' si es falsy."""
@@ -316,3 +340,40 @@ def parse_fecha_filtro_dia(fecha_texto, fin_del_dia=False):
         fecha = fecha.replace(hour=0, minute=0, second=0, microsecond=0)
     return timezone.make_aware(fecha, timezone.get_current_timezone())
 
+
+
+def parsear_fecha_iso(fecha):
+    """
+    Convierte una fecha ISO enviada por JavaScript a datetime.
+    Retorna None si la fecha es vacía.
+    """
+    if not fecha:
+        return None
+
+    if isinstance(fecha, datetime):
+        return fecha
+
+    return datetime.fromisoformat(
+        fecha.replace("Z", "+00:00")
+    )
+
+
+
+def fechas_iguales(fecha1, fecha2):
+    """
+    Compara dos datetime ignorando la precisión superior a milisegundos.
+    """
+
+    if fecha1 is None or fecha2 is None:
+        return False
+
+    fecha1 = fecha1.replace(
+        microsecond=(fecha1.microsecond // 1000) * 1000
+    )
+
+    fecha2 = fecha2.replace(
+        microsecond=(fecha2.microsecond // 1000) * 1000
+    )
+
+
+    return fecha1 == fecha2

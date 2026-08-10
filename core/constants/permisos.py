@@ -300,6 +300,14 @@ ROLES_GLOBALES = ['directivo', 'admin']
 
 
 
+# -----------------------------
+# PERMISOS APP AGENDA MEDICA
+# -----------------------------
+AGENDA_MEDICA_EDITOR_ROLES = ['admin', ]
+AGENDA_MEDICA_EDITOR_UNIDADES = ['ADMI']
+
+AGENDA_MEDICA_VISUALIZACION_ROLES = ["admin", "digitador", "directivo"]
+AGENDA_MEDICA_VISUALIZACION_UNIDADES = ["ADMI"]
 
 # -----------------------------
 # PERMISOS APP S_EXP    solo estan declarados no se usan
@@ -308,6 +316,18 @@ ROLES_GLOBALES = ['directivo', 'admin']
 # Acceso de administración (aprobar, rechazar, monitorear, devoluciones, reportes)
 S_EXP_ADMIN_ROLES = ['admin']
 S_EXP_ADMIN_UNIDADES = ['ADMI']
+
+# Recuperación de expedientes de URGENCIA: forzar la devolución inmediata de un
+# expediente prestado, saltándose el flujo normal (emergencias).
+# Es exclusivo de Admisión: son quienes reciben físicamente el expediente.
+# Se separa de S_EXP_ADMIN_ROLES a propósito:
+#   - S_EXP_ADMIN_ROLES = ['admin'] dejaría fuera al personal real de Admisión,
+#     que en la práctica tiene rol 'digitador' en la unidad ADMI.
+#   - es_exp_admin() sería demasiado amplio: incluye digitador/directivo de
+#     CUALQUIER unidad, y esta acción no le corresponde a otras áreas.
+# staff/superuser tienen acceso siempre (se resuelve en el servicio).
+S_EXP_RECUPERACION_ROLES = ['admin', 'digitador']
+S_EXP_RECUPERACION_UNIDADES = ['ADMI']
 
 # Acceso de usuario solicitante (buscar, solicitar, seguimiento)
 S_EXP_SOLICITANTE_ROLES = ['admin', 'digitador', 'directivo']
@@ -324,6 +344,7 @@ S_EXP_SOLICITANTE_UNIDADES = [
    "EST",   # Estadística
    "GCL",   #gestion clinica / medicos 
    "TS",    #trabajo social 
+   "RRHH",
 
 ]
 # remapeir todo los usaurios visitante admision a sus repectivos unidades 

@@ -32,6 +32,10 @@ urlpatterns = [
     path('mapeo-camas/', include('mapeo_camas.urls')),
     path('sg-transporte-hospitalario/', include('sg_transporte_hospitalario.urls')),
     path('clinico/',include('clinico.urls')),
+    path('agenda-medica/',include('agenda_medica.urls')),
+    path('rrhh/',include('rrhh.urls')),
+
+
     path('s_exp/',include('s_exp.urls')),
     path('admin/', admin.site.urls),
 ]

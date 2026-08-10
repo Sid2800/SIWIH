@@ -9,8 +9,8 @@ from datetime import timedelta, datetime
 from django.conf import settings
 from django.utils import timezone
 
-from reportlab.lib.pagesizes import LETTER, landscape
-from reportlab.lib.units import cm
+from reportlab.lib.pagesizes import landscape
+from reportlab.lib.units import cm, inch
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
@@ -29,6 +29,19 @@ IMG_GOB_SESAL = os.path.join(IMG_DIR, 'GOB_SESAL_COLOR.png')
 IMG_HEAC = os.path.join(IMG_DIR, 'logo_HEAC.png')
 IMG_FUNDAGES = os.path.join(IMG_DIR, 'logo_FUNDAGES2.png')
 IMG_SIWIH = os.path.join(IMG_DIR, 'SIWIFINAL_3.png')
+
+# =============================================================================
+# Tamaño de hoja OFICIO (legal/folio hondureño): 8.5 x 13 pulgadas (vertical).
+# -----------------------------------------------------------------------------
+# Se define UNA sola vez y se comparte entre el PDF de solicitud y el de
+# reportes. Todo el layout (anchos de columna, posición de logos, márgenes) se
+# calcula de forma PROPORCIONAL a doc.width / doc.height y a los bordes de la
+# hoja, por lo que si algún día se cambia este tamaño (p. ej. a carta), ambos
+# documentos se reacomodan automáticamente sin tocar el resto del código.
+# Los PDF se generan en horizontal (landscape) porque las tablas son anchas:
+#   landscape(OFICIO) -> 13" de ancho x 8.5" de alto.
+# =============================================================================
+OFICIO = (8.5 * inch, 13 * inch)
 
 
 def _checkbox_pdf(marcado=False, size=11):
@@ -235,7 +248,9 @@ def generar_pdf_solicitud(solicitud, admin_actual=None):
         ya_entregado = False
     con_hora_footer = not ya_entregado
 
-    page_size = landscape(LETTER)
+    # Hoja oficio horizontal (13" x 8.5"). Antes era landscape(LETTER) (11x8.5);
+    # se amplió a oficio para dar más área a la tabla de expedientes al imprimir.
+    page_size = landscape(OFICIO)
     ancho_pg, alto_pg = page_size
 
     # Márgenes: top 3cm, bottom 2.5cm
@@ -355,11 +370,38 @@ def generar_pdf_solicitud(solicitud, admin_actual=None):
     ]
 
     filas = [cabeceras]
+
+    # Se importa aquí (antes del orden) porque la clave de ordenamiento usa el
+    # servicio para leer la identidad.
+    from s_exp.services.datos_solicitud import DatosDetalleSolicitud
+
     # Optimizamos joins: traemos expediente_prestamo + expediente + paciente
     # de un solo, evita N+1 queries dentro del loop.
     detalles_list = list(solicitud.detalles.select_related(
         'expediente_prestamo__expediente', 'paciente'
-    ).order_by('id'))
+    ))
+
+    def _clave_identidad(detalle):
+        """
+        Clave de orden por IDENTIDAD del paciente (ASCENDENTE).
+
+        Se ordena en Python y no con order_by('paciente__dni') a propósito: así
+        se usa EXACTAMENTE el mismo valor que se imprime en la columna (el que
+        devuelve el servicio), incluyendo el caso de un detalle sin paciente, que
+        en la tabla sale vacío pero en la BD es NULL y ordenaría distinto.
+
+        La clave es (sin_identidad, valor_numérico, texto):
+          - sin_identidad va PRIMERO en la tupla y vale 1 cuando no hay DNI, de
+            modo que en orden ascendente esos registros quedan AL FINAL (no al
+            principio, que es lo que pasaría ordenando solo por el DNI vacío).
+          - El DNI es numérico: se compara por su VALOR, no como texto, para que
+            el orden no dependa del largo de la cadena.
+          - Si no es numérico, cae al texto.
+        """
+        dni = (DatosDetalleSolicitud.paciente_dni(detalle) or '').strip()
+        return (0 if dni else 1, int(dni) if dni.isdigit() else 0, dni)
+
+    detalles_list.sort(key=_clave_identidad)
 
     # Estado del flujo: si la solicitud está finalizada/incompleta/etc., los comentarios
     # de devolución y rechazo individual ya tienen sentido y deben imprimirse.
@@ -375,8 +417,6 @@ def generar_pdf_solicitud(solicitud, admin_actual=None):
 
     # Filas que NO se prestaron — para resaltar en rojo pastel
     filas_no_prestadas = []  # índices de fila (1-based porque cabecera es fila 0)
-
-    from s_exp.services.datos_solicitud import DatosDetalleSolicitud
 
     # Agregar filas de detalles.
     # IMPORTANTE: número de expediente, identidad y nombre del paciente se

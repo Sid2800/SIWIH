@@ -415,6 +415,21 @@ class SExpAdminMixin(LoginRequiredMixin):
         return super().dispatch(request, *args, **kwargs)
 
 
+class SExpRecuperacionMixin(LoginRequiredMixin):
+    """
+    Acceso solo para quien puede recuperar expedientes de urgencia (Admisión).
+
+    NO reusa SExpAdminMixin porque _es_exp_admin admite digitador/directivo de
+    CUALQUIER unidad, y forzar la devolución de un expediente es exclusivo de
+    Admisión (+ staff/superuser). Ver puede_recuperar_expedientes.
+    """
+    def dispatch(self, request, *args, **kwargs):
+        from s_exp.services.permisos import puede_recuperar_expedientes
+        if not puede_recuperar_expedientes(request.user):
+            return redirect('acceso_denegado')
+        return super().dispatch(request, *args, **kwargs)
+
+
 class SExpUsuarioMixin(LoginRequiredMixin):
     """Acceso para cualquier usuario con acceso al módulo (Solicitantes + Admin)."""
     def dispatch(self, request, *args, **kwargs):

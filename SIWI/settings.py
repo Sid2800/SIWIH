@@ -35,7 +35,7 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True if os.getenv("DEBUG", "0") == "1" else False
 
-ALLOWED_HOSTS = ['SIWIH', '127.0.0.1', '192.168.88.8', '192.168.88.28', '192.168.88.173', '100.84.35.113']
+ALLOWED_HOSTS = ['SIWIH', '127.0.0.1', '192.168.88.8', '192.168.88.28', '192.168.88.173', '100.84.35.113','192.168.99.82']
 
 # Application definition
 
@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     'referencia',
     'clinico',
     'usuario',
+    'agenda_medica',
     's_exp',
     'mapeo_camas',
     'sg_transporte_hospitalario',

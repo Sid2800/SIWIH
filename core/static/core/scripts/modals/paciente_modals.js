@@ -131,7 +131,7 @@ const ModalPacienteProcesos = (function () {
 
 
     function renderDatos() {
-        renderDatosPaciente("modalOtrosProcesosHeader",datos);
+        renderDatosContexto("modalOtrosProcesosHeader",datos);
     }
 
     function renderProcesos(){
@@ -157,7 +157,7 @@ const ModalPacienteProcesos = (function () {
 
                 estadoTexto = `
                     <span class="mp-estado is-ok">
-                        <i class="bi bi-check-circle-fill registrado"></i> ${fecha}
+                        <i class="bi bi-check-circle-fill icon-verde"></i> ${fecha}
                     </span>
                 `;
 
@@ -592,7 +592,7 @@ async function AgregarDefuncionModal(paciente, lectura) {
             const fieldsetRegistro = document.getElementById("modal-campos-defuncion-registros");
 
             //header paciente
-            renderDatosPaciente("modalDefuncionHeader",{
+            renderDatosContexto("modalDefuncionHeader",{
                 "Paciente": paciente.nombre,
                 "DNI": paciente.dni,
                 "Expediente": paciente.numero
@@ -668,14 +668,17 @@ async function AgregarDefuncionModal(paciente, lectura) {
                 unidadSelect.disable();
             }
 
-            tipo.addEventListener("change", function() {
-                if (this.value === "2") { // extrahospitalaria
+            tipo.onchange = function () {
+
+                if (this.value === "2") { 
                 unidadSelect.disable();
+
+                
                 unidadSelect.clear();
                 } else {
                 unidadSelect.enable();
                 }
-            });
+            };
 
 
 
@@ -851,7 +854,7 @@ async function registrarObito(IdObito,idPaciente, datosMadre) {
             const dniResponsable = document.getElementById("modal-cadaver-dni-responsable");
             const nombreResponsable = document.getElementById("modal-cadaver-nombre-responsable");
 
-            renderDatosPaciente("modalObitoHeader",{
+            renderDatosContexto("modalObitoHeader",{
                 "Nombre Madre: ": datosMadre.Paciente,
                 "DNI Madre: ": datosMadre.DNI,
                 "Expediente Madre: ": datosMadre.Expediente
@@ -941,14 +944,15 @@ async function registrarObito(IdObito,idPaciente, datosMadre) {
                 }
             }
 
-            tipo.addEventListener("change", function() {
+            tipo.onchange = function () {
+
                 if (this.value === "2") { 
                 unidaClinicaSelect.disable();
                 unidaClinicaSelect.clear();
                 } else {
                 unidaClinicaSelect.enable();
                 }
-            });
+            };
 
         }
 

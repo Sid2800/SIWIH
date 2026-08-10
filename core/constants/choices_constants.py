@@ -67,10 +67,49 @@ class FuenteSeguimiento(models.IntegerChoices):
     PROFESIONAL_SALUD = 4, "PROFESIONAL DE SALUD"
     OTRO = 5, "OTRO"
 
+class TipoControlCalidadReferencia(models.IntegerChoices):
+    REFERENCIA = 1, "REFERENCIA"
+    RESPUESTA = 2, "RESPUESTA"
+
 
 class TipoDefuncion(models.IntegerChoices):
     INTRAHOSPITALARIA = 1, "Intrahospitalaria"
     EXTRAHOSPITALARIA = 2, "Extrahospitalaria"
+    
+class DiaSemana(models.IntegerChoices):
+    LUNES = 1, "LUNES"
+    MARTES = 2, "MARTES"
+    MIERCOLES = 3, "MIÉRCOLES"
+    JUEVES = 4, "JUEVES"
+    VIERNES = 5, "VIERNES"
+    SABADO = 6, "SÁBADO"
+    DOMINGO = 7, "DOMINGO"
+
+class PrioridadAtencion(models.IntegerChoices):
+    ORDINARIA = 1, "ORDINARIA"
+    PREFERENTE = 2, "PREFERENTE"
+
+
+class EstadoCupoAgenda(models.IntegerChoices):
+    # Cupo libre y disponible para asignar una cita
+    DISPONIBLE = 1, "DISPONIBLE"
+    # Cupo asociado actualmente a una cita activa
+    ASIGNADO = 2, "ASIGNADO"
+    # Cupo bloqueado por ausencia, permiso o restricción operativa
+    BLOQUEADO = 3, "BLOQUEADO"
+    # Cupo deshabilitado por cambios administrativos:
+    # reducción de cupos, modificación de agenda,
+    # eliminación de configuración o cambios de horario
+    INACTIVO = 4, "INACTIVO"
+
+
+class TipoAusencia(models.IntegerChoices):
+    VACACIONES = 1, "VACACIONES"
+    INCAPACIDAD = 2, "INCAPACIDAD"
+    PERMISO = 3, "PERMISO"
+    CAPACITACION = 4, "CAPACITACIÓN"
+    CONGRESO = 5, "CONGRESO"
+    OTROS = 6, "OTROS"
 
 
 class EstadoMapeoCategoria(models.TextChoices):
