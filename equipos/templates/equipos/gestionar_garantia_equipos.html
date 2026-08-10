@@ -45,6 +45,21 @@
                     {{ dispositivo.modelo|default:"" }}
                 </dd>
             </div>
+            {% comment %}
+               Serie y ubicacion son lo que distingue un aparato de otro del
+               mismo tipo y marca. Van aqui para que quien va a pausar confirme
+               que tiene delante el equipo correcto sin salir de la pantalla:
+               pausar el equivocado corre el vencimiento de otro y no se nota
+               hasta que se reclama al proveedor.
+            {% endcomment %}
+            <div>
+                <dt>Número de serie</dt>
+                <dd>{{ dispositivo.numero_serie|default:"INDEFINIDO" }}</dd>
+            </div>
+            <div>
+                <dt>Ubicación</dt>
+                <dd>{{ asignacion_actual.ubicacion|default:"Sin asignación" }}</dd>
+            </div>
             <div>
                 <dt>Estado</dt>
                 <dd>

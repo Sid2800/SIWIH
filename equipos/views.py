@@ -1678,6 +1678,9 @@ def _contexto_gestion_garantia(dispositivo, formulario, pausa_abierta):
 
     return {
         "dispositivo": dispositivo,
+        # Serie y ubicacion sirven para confirmar que es el equipo correcto
+        # antes de pulsar; la ubicacion vive en la asignacion vigente.
+        "asignacion_actual": _obtener_asignacion_actual(dispositivo),
         "form": formulario,
         "garantia": garantia,
         "garantia_css": CSS_ESTADO_GARANTIA.get(garantia.estado, ""),
