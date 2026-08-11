@@ -8331,3 +8331,69 @@ p + .equipos-garantia__bloqueo {
    flex-shrink: 0;
    font-size: 1.7rem;
 }
+
+/* ============================================================
+   PROCEDENCIAS: cada entidad como ficha
+   Marcas y modelos solo llevan nombre y la fila basta. Una
+   procedencia trae nombre, tipo, RTN, telefono y equipos, y
+   apilada en filas cuesta ver donde acaba una y empieza otra.
+   Solo se aplica bajo --fichas para no alterar los demas
+   catalogos, que comparten .equipos-catalogo__item.
+   ============================================================ */
+
+/* Mas anchas que las columnas de marcas: aqui la linea de datos lleva un RTN
+   de 14 digitos mas el telefono y el numero de equipos, y con la medida
+   original el RTN se partia en dos lineas. */
+.equipos-catalogo__lista--fichas {
+   border-top: 0;
+   gap: 1rem;
+   grid-template-columns: repeat(auto-fill, minmax(34rem, 1fr));
+   padding: .2rem;
+}
+
+.equipos-catalogo__lista--fichas .equipos-catalogo__item {
+   align-items: stretch;
+   background-color: var(--blanco);
+   border: .1rem solid var(--colorLinea);
+   border-radius: 1rem;
+   border-bottom: .1rem solid var(--colorLinea);
+   padding: 1.2rem 1.4rem;
+   transition: border-color .15s ease, box-shadow .15s ease;
+}
+
+.equipos-catalogo__lista--fichas .equipos-catalogo__item:hover {
+   background-color: var(--blanco);
+   border-color: var(--colorBoton);
+   box-shadow: 0 .2rem .8rem rgba(0, 0, 0, .08);
+}
+
+/* La ficha en edicion se marca con el borde entero, no con una barra
+   lateral: dentro de un recuadro la barra se confunde con el propio borde. */
+.equipos-catalogo__lista--fichas .equipos-catalogo__item--activo {
+   border-color: var(--colorBoton);
+   border-left-width: .1rem;
+   box-shadow: 0 0 0 .2rem var(--colorBoton);
+}
+
+.equipos-catalogo__lista--fichas .equipos-catalogo__enlace {
+   flex-direction: column;
+   gap: .5rem;
+}
+
+.equipos-catalogo__lista--fichas .equipos-catalogo__nombre {
+   font-size: 1.5rem;
+   font-weight: 700;
+}
+
+/* La lista de marcas fuerza nowrap y empuja el dato a la derecha, porque alli
+   es una fila. Dentro de una ficha eso hace que el RTN se salga del recuadro
+   en lugar de pasar a la linea siguiente. */
+.equipos-catalogo__lista--fichas .equipos-catalogo__conteo {
+   line-height: 1.6;
+   margin-left: 0;
+   white-space: normal;
+}
+
+.equipos-catalogo__lista--fichas .equipos-catalogo__item--inactivo {
+   opacity: .7;
+}

@@ -39,6 +39,27 @@ def normalizar_nombre_catalogo(valor):
     return (valor or "").strip().upper()
 
 
+def normalizar_telefono(valor):
+    """Deja los telefonos hondurenos como 3348-4816, mas faciles de leer.
+
+    Solo se reformatea cuando hay exactamente ocho digitos, que es el largo de
+    un numero en Honduras. Cualquier otra cosa se devuelve tal cual: un numero
+    con prefijo de pais o con extension no debe mutilarse por encajarlo en un
+    formato, y es preferible guardarlo como lo escribio el usuario.
+    """
+    valor = (valor or "").strip()
+
+    if not valor:
+        return ""
+
+    digitos = "".join(caracter for caracter in valor if caracter.isdigit())
+
+    if len(digitos) == 8:
+        return f"{digitos[:4]}-{digitos[4:]}"
+
+    return valor
+
+
 def obtener_catalogo_indefinido(modelo_catalogo):
     # Marca/modelo pueden venir vacios; se usa un registro comun de catalogo
     # para no guardar textos sueltos ni dejar la FK en blanco.
@@ -286,7 +307,7 @@ class Procedencia(models.Model):
         # MySQL permite varios NULL en una columna UNIQUE, pero no varias
         # cadenas vacias. Por eso un RTN omitido se persiste siempre como NULL.
         self.rtn = (self.rtn or "").strip() or None
-        self.telefono = (self.telefono or "").strip()
+        self.telefono = normalizar_telefono(self.telefono)
         self.contacto = (self.contacto or "").strip()
         self.correo = (self.correo or "").strip()
 

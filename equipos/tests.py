@@ -2154,6 +2154,39 @@ class ProcedenciaTests(TestCase):
 
         self.assertEqual(procedencia.nombre, "DISTRIBUIDORA CENTRAL")
 
+    def test_telefono_hondureno_se_guarda_con_guion(self):
+        # Ocho digitos es el largo de un numero en Honduras; se separa para
+        # que se lea de un vistazo.
+        for escrito in ["33484816", "3348 4816", "3348-4816", " 3348  4816 "]:
+            with self.subTest(escrito=escrito):
+                procedencia = Procedencia.objects.create(
+                    nombre=f"EMPRESA {escrito}",
+                    tipo=TipoProcedencia.EMPRESA,
+                    telefono=escrito,
+                )
+                self.assertEqual(procedencia.telefono, "3348-4816")
+
+    def test_un_numero_que_no_es_hondureno_se_respeta(self):
+        # Un prefijo de pais o una extension no deben mutilarse por encajarlos
+        # en el formato local: es preferible guardarlos como se escribieron.
+        for escrito in ["+504 3348-4816", "2234-5678 ext. 21", "911"]:
+            with self.subTest(escrito=escrito):
+                procedencia = Procedencia.objects.create(
+                    nombre=f"CONTACTO {escrito}",
+                    tipo=TipoProcedencia.EMPRESA,
+                    telefono=escrito,
+                )
+                self.assertEqual(procedencia.telefono, escrito.strip())
+
+    def test_telefono_vacio_sigue_vacio(self):
+        procedencia = Procedencia.objects.create(
+            nombre="SIN TELEFONO",
+            tipo=TipoProcedencia.PERSONA,
+            telefono="   ",
+        )
+
+        self.assertEqual(procedencia.telefono, "")
+
     def test_rtn_vacio_se_guarda_como_null_y_no_choca_con_otro_vacio(self):
         primera = Procedencia.objects.create(
             nombre="EMPRESA UNO",

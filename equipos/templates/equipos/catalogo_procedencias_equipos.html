@@ -85,7 +85,12 @@
                 </form>
             {% endif %}
 
-            <ul class="equipos-catalogo__lista equipos-catalogo__lista--columnas">
+            {% comment %}
+               El modificador --fichas es propio de procedencias: cada entidad
+               se dibuja como un recuadro con su borde. Marcas y modelos siguen
+               con la lista de filas, que ahi basta porque solo llevan nombre.
+            {% endcomment %}
+            <ul class="equipos-catalogo__lista equipos-catalogo__lista--columnas equipos-catalogo__lista--fichas">
                 {% for procedencia in procedencias %}
                     <li class="equipos-catalogo__item{% if procedencia_editada and procedencia.pk == procedencia_editada.pk %} equipos-catalogo__item--activo{% endif %}{% if not procedencia.activo %} equipos-catalogo__item--inactivo{% endif %}">
                         {% if request.user|puede_administrar_catalogo_equipos %}
@@ -138,3 +143,30 @@
     </div>
 </div>
 {% endblock content %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // Formatea el telefono mientras se escribe: 33484816 -> 3348-4816.
+    // El servidor normaliza igual al guardar, asi que esto es solo para que
+    // el numero se lea bien en el momento; si alguien pega un numero con
+    // prefijo de pais o extension, se respeta tal cual.
+    const campo = document.getElementById('telefono_procedencia_catalogo');
+
+    if (!campo) return;
+
+    function formatear() {
+        const digitos = campo.value.replace(/\D/g, '');
+
+        if (digitos.length !== 8 || campo.value.trim().startsWith('+')) {
+            return;
+        }
+
+        campo.value = digitos.slice(0, 4) + '-' + digitos.slice(4);
+    }
+
+    campo.addEventListener('input', formatear);
+    campo.addEventListener('blur', formatear);
+});
+</script>
+{% endblock extra_js %}
