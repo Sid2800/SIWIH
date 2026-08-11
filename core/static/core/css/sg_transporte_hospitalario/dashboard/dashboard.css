@@ -272,8 +272,8 @@
 .th-viaje-item {
    position: relative;
    display: grid;
-   gap: 0.2rem;
-   padding: 0.85rem 1rem 0.75rem;
+   gap: 0.12rem;
+   padding: 0.7rem 1rem 0.65rem;
    border: 1px solid #dce6f2;
    border-radius: 14px;
    background: #f8fafc;
@@ -289,7 +289,7 @@
    display: flex;
    align-items: center;
    gap: 0.45rem;
-   padding-right: 3.2rem;
+   padding-right: 3.35rem;
 }
 
 .th-viaje-item__head strong {
@@ -327,19 +327,31 @@
 
 .th-viaje-item__remove {
    position: absolute !important;
-   top: 0.55rem;
-   right: 0.55rem;
+   top: 0.45rem;
+   right: 0.45rem;
    flex: 0 0 auto;
    justify-content: center;
-   width: 3rem;
-   min-width: 3rem;
-   height: 3rem;
+   width: 2.7rem;
+   min-width: 2.7rem;
+   height: 2.7rem;
    padding: 0;
    border-radius: 999px;
 }
 
 .th-viaje-item__remove i {
    font-size: 1.4rem;
+}
+
+.th-input.is-invalid,
+.formularioCampo-select.is-invalid {
+   border-color: #ef4444 !important;
+   background: #fff7f7;
+   box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.12);
+}
+
+.th-viaje-item__remove:focus-visible {
+   outline: 2px solid #2563eb;
+   outline-offset: 2px;
 }
 
 .th-autorizacion-anular-btn {
@@ -1124,6 +1136,58 @@ body.th-modal-open {
    color: #6b7280;
    font-style: italic;
    opacity: 1;
+}
+
+.th-viaje-select.ts-wrapper.formularioCampo-select {
+   padding: 0 !important;
+   margin: 0;
+   border: 0;
+   background: transparent;
+   text-transform: none;
+   min-height: 0;
+   width: 100%;
+   min-width: 0;
+}
+
+.th-viaje-select.ts-wrapper.formularioCampo-select .ts-control {
+   min-height: 4.4rem;
+   padding: 0.65rem 0.75rem !important;
+   font-size: 1.7rem !important;
+   line-height: 1.2;
+   box-sizing: border-box;
+   border: 1px solid #cbd5e1;
+   border-radius: 10px;
+   background: #fff;
+   color: var(--negro);
+   font-family: var(--fuenteTablaCuerpo);
+   box-shadow: none;
+}
+
+.th-viaje-select.ts-wrapper.formularioCampo-select .ts-control input {
+   font-family: var(--fuenteTablaCuerpo);
+   font-size: 1.7rem !important;
+   color: var(--negro);
+}
+
+.th-viaje-select.ts-wrapper.formularioCampo-select.has-items .ts-control .item[data-value=""] {
+   display: none !important;
+}
+
+.th-viaje-select.ts-wrapper.formularioCampo-select .ts-control:hover {
+   border-color: #888;
+}
+
+.th-viaje-select.ts-wrapper.formularioCampo-select.focus .ts-control,
+.th-viaje-select.ts-wrapper.formularioCampo-select .ts-control:focus-within {
+   border-color: var(--negro);
+   box-shadow: 0 0 .5rem var(--colorTablacelda);
+   outline: none;
+}
+
+.th-viaje-select.ts-wrapper.formularioCampo-select .ts-dropdown {
+   font-family: var(--fuenteTablaCuerpo);
+   border-radius: .5rem;
+   color: var(--negro);
 }
 
 .th-btn {

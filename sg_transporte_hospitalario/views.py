@@ -20,7 +20,7 @@ from paciente.models import Paciente
 from rrhh.models import Empleado
 
 from .forms import EjecucionViajeForm, SolicitudCreateForm, SolicitudForm, ViajeProgramacionForm, _empleados_operativos_disponibles_qs
-from .models import EjecucionViaje, Solicitud, SolicitudPaciente, SolicitudPersonal, TipoSolicitud, Viaje, ViajeSolicitud, ViajePersonal, Vehiculo, Motorista
+from .models import EjecucionViaje, Solicitud, SolicitudPaciente, SolicitudPersonal, TipoSolicitud, Viaje, ViajeSolicitud, ViajePersonal, ViajeViatico, Vehiculo, Motorista, Viatico
 
 
 def puede_ver_modulo(usuario):
@@ -157,7 +157,7 @@ def _obtener_qs_solicitudes_activas(usuario):
         .order_by("-fecha_solicitud")
     )
 
-    if usuario.is_superuser or UsuarioService.es_admin_global(usuario) or UsuarioService.es_directivo(usuario):
+    if _puede_ver_todas_solicitudes(usuario):
         return qs
 
     empleado_id = getattr(getattr(usuario, "empleado", None), "id", None)
@@ -165,6 +165,17 @@ def _obtener_qs_solicitudes_activas(usuario):
         return qs.none()
 
     return qs.filter(solicitante_empleado_id=empleado_id)
+
+
+def _puede_ver_todas_solicitudes(usuario):
+    return bool(
+        usuario
+        and (
+            usuario.is_superuser
+            or UsuarioService.es_admin_global(usuario)
+            or UsuarioService.es_directivo(usuario)
+        )
+    )
 
 
 def _obtener_qs_solicitudes_propias(usuario):
@@ -274,6 +285,28 @@ def _serializar_viaje_solicitud(viaje_solicitud):
         }
         for item in solicitud.solicitud_personal.select_related("empleado")
     ]
+    pacientes = []
+    for item in solicitud.solicitud_pacientes.select_related("paciente", "ingreso__sala"):
+        nombre_paciente = "-"
+        if item.paciente:
+            nombre_paciente = " ".join(
+                x for x in [
+                    item.paciente.primer_nombre,
+                    item.paciente.segundo_nombre,
+                    item.paciente.primer_apellido,
+                    item.paciente.segundo_apellido,
+                ] if x
+            ) or "-"
+        pacientes.append(
+            {
+                "id": item.paciente_id,
+                "nombre": nombre_paciente,
+                "identidad": str(getattr(item.paciente, "dni", "-") or "-"),
+                "expediente": str(getattr(item.paciente, "expediente_numero", "-") or "-"),
+                "ingreso": f"ING-{item.ingreso_id}" if item.ingreso_id else "-",
+                "sala": item.ingreso.sala.nombre_sala if item.ingreso and item.ingreso.sala else "-",
+            }
+        )
     return {
         "id": viaje_solicitud.id,
         "solicitud_id": solicitud.id,
@@ -287,8 +320,18 @@ def _serializar_viaje_solicitud(viaje_solicitud):
         "destino": solicitud.lugar_destino.nombre_institucion_salud,
         "pacientes": solicitud.solicitud_pacientes.count(),
         "pacientesCount": solicitud.solicitud_pacientes.count(),
+        "pacientes_detalle": pacientes,
         "personalCount": len(personal),
         "personal": personal,
+    }
+
+
+def _serializar_viatico(viatico):
+    return {
+        "id": viatico.id,
+        "codigo": viatico.codigo,
+        "nombre": viatico.nombre,
+        "monto_vigente": str(viatico.monto_vigente) if viatico.monto_vigente is not None else "",
     }
 
 
@@ -760,7 +803,7 @@ class SGTransporteHospitalarioDashboardView(LoginRequiredMixin, TemplateView):
         context = super().get_context_data(**kwargs)
         context.update(construir_contexto_dashboard(self.request.user))
         active_tab = self._active_tab()
-        solicitudes_activas = list(_obtener_qs_solicitudes_propias(self.request.user))
+        solicitudes_activas = list(_obtener_qs_solicitudes_activas(self.request.user))
         solicitudes_autorizacion = list(_obtener_qs_solicitudes_autorizacion(self.request.user))
         viaje_construccion_items = list(_obtener_qs_viaje_construccion(self.request.user))
         viajes_ejecucion_items = list(_obtener_qs_viajes_ejecucion(self.request.user))
@@ -831,6 +874,10 @@ class SGTransporteHospitalarioDashboardView(LoginRequiredMixin, TemplateView):
         context["motoristas_operativos"] = [
             _serializar_motorista(motorista)
             for motorista in Motorista.objects.filter(activo=True).select_related("empleado").order_by("id")
+        ]
+        context["viaticos_operativos"] = [
+            _serializar_viatico(viatico)
+            for viatico in Viatico.objects.filter(activo=True).order_by("codigo", "nombre")
         ]
         context["autorizacion_total"] = len(solicitudes_autorizacion)
         context["pacientes_payload"] = json.dumps(getattr(self, "pacientes_payload", []))
@@ -988,7 +1035,8 @@ def api_solicitudes_activas(request):
     search = (request.GET.get("search[value]") or "").strip()
     estado_filtro = (request.GET.get("estado") or "").strip()
 
-    qs = _obtener_qs_solicitudes_propias(request.user)
+    qs = _obtener_qs_solicitudes_activas(request.user)
+    usuario_empleado_id = getattr(getattr(request.user, "empleado", None), "id", None)
 
     total = qs.count()
     if estado_filtro:
@@ -1007,17 +1055,20 @@ def api_solicitudes_activas(request):
 
     data = []
     for s in rows:
+        es_propia = s.solicitante_empleado_id == usuario_empleado_id
         data.append(
             {
                 "id": s.id,
                 "numero_solicitud": s.numero_solicitud,
                 "fecha": timezone.localtime(s.fecha_solicitud).strftime("%d/%m/%Y %H:%M"),
+                "creado_por": str(s.solicitante_empleado) if s.solicitante_empleado_id else "-",
                 "area_solicitante": _area_solicitante_desde_punto(s.punto_solicitud),
                 "tipo_solicitud": s.tipo_solicitud.nombre,
                 "prioridad": s.prioridad.nombre,
                 "proceso": s.proceso_funcional,
-                "puede_editar": s.puede_editar,
-                "puede_eliminar": s.puede_editar,
+                "es_propia": es_propia,
+                "puede_editar": bool(es_propia and s.puede_editar),
+                "puede_eliminar": bool(es_propia and s.puede_editar),
                 "url_ver": reverse("sg_transporte_hospitalario_solicitud_ver", kwargs={"pk": s.id}),
                 "url_editar": reverse("sg_transporte_hospitalario_solicitud_editar", kwargs={"pk": s.id}),
                 "url_eliminar": reverse("sg_transporte_hospitalario_solicitud_eliminar", kwargs={"pk": s.id}),
@@ -1280,6 +1331,8 @@ def api_programacion_confirmar(request):
     viaje_solicitud_ids_raw = body.get("viaje_solicitud_ids")
     if not isinstance(viaje_solicitud_ids_raw, list) or not viaje_solicitud_ids_raw:
         return JsonResponse({"ok": False, "error": "Debe seleccionar al menos una solicitud para crear el viaje."}, status=400)
+    if len(viaje_solicitud_ids_raw) != len({str(v) for v in viaje_solicitud_ids_raw}):
+        return JsonResponse({"ok": False, "error": "Una solicitud no puede agregarse dos veces al mismo viaje."}, status=400)
 
     programacion_form = ViajeProgramacionForm(data=body)
     if not programacion_form.is_valid():
@@ -1296,52 +1349,78 @@ def api_programacion_confirmar(request):
             status=400,
         )
 
-    with transaction.atomic():
-        try:
-            viaje_solicitudes = list(
-                ViajeSolicitud.objects.select_for_update().select_related("solicitud").filter(
-                    id__in=viaje_solicitud_ids_raw,
-                    activo=True,
-                    viaje__isnull=True,
-                    solicitud__activo=True,
+    viaticos_json = programacion_form.cleaned_data.get("viaticos_json") or []
+    viaticos_por_id = {}
+    if viaticos_json:
+        viatico_ids = [item["viatico_id"] for item in viaticos_json]
+        viaticos = list(
+            Viatico.objects.filter(id__in=viatico_ids, activo=True).order_by("codigo", "nombre")
+        )
+        viaticos_por_id = {viatico.id: viatico for viatico in viaticos}
+        if len(viaticos_por_id) != len(viatico_ids):
+            return JsonResponse({"ok": False, "error": "Uno o más viáticos seleccionados no están disponibles."}, status=400)
+
+    try:
+        with transaction.atomic():
+            try:
+                viaje_solicitudes = list(
+                    ViajeSolicitud.objects.select_for_update().select_related("solicitud").filter(
+                        id__in=viaje_solicitud_ids_raw,
+                        activo=True,
+                        viaje__isnull=True,
+                        solicitud__activo=True,
+                    )
                 )
+            except Exception:
+                return JsonResponse({"ok": False, "error": "No se pudieron cargar las solicitudes seleccionadas."}, status=400)
+
+            if len(viaje_solicitudes) != len({str(v) for v in viaje_solicitud_ids_raw}):
+                return JsonResponse({"ok": False, "error": "Una o más solicitudes seleccionadas no están disponibles."}, status=400)
+
+            viaje = Viaje.objects.create(
+                numero_viaje=_generar_numero_viaje(),
+                fecha_programacion=timezone.now(),
+                motorista=programacion_form.cleaned_data["motorista"],
+                vehiculo=programacion_form.cleaned_data["vehiculo"],
+                tipo_viaje=programacion_form.cleaned_data["tipo_viaje"],
+                centro_costo=programacion_form.cleaned_data["centro_costo"],
+                estado="PROGRAMADA",
+                activo=True,
             )
-        except Exception:
-            return JsonResponse({"ok": False, "error": "No se pudieron cargar las solicitudes seleccionadas."}, status=400)
 
-        if len(viaje_solicitudes) != len({str(v) for v in viaje_solicitud_ids_raw}):
-            return JsonResponse({"ok": False, "error": "Una o más solicitudes seleccionadas no están disponibles."}, status=400)
+            ViajePersonal.objects.bulk_create(
+                [
+                    ViajePersonal(
+                        viaje=viaje,
+                        empleado_id=empleado_id,
+                        tipo_participacion="OPERATIVO",
+                    )
+                    for empleado_id in programacion_form.cleaned_data["personal_operativo_ids"]
+                ]
+            )
 
-        viaje = Viaje.objects.create(
-            numero_viaje=_generar_numero_viaje(),
-            fecha_programacion=timezone.now(),
-            motorista=programacion_form.cleaned_data["motorista"],
-            vehiculo=programacion_form.cleaned_data["vehiculo"],
-            tipo_viaje=programacion_form.cleaned_data["tipo_viaje"],
-            centro_costo=programacion_form.cleaned_data["centro_costo"],
-            estado="PROGRAMADA",
-            activo=True,
-        )
+            if viaticos_json:
+                for item in viaticos_json:
+                    viatico = viaticos_por_id.get(item["viatico_id"])
+                    if not viatico:
+                        raise ValueError("Uno o más viáticos seleccionados no están disponibles.")
+                    ViajeViatico.registrar_asignacion(
+                        viaje=viaje,
+                        viatico=viatico,
+                        creado_por=request.user,
+                        observacion=item.get("observacion"),
+                    )
 
-        ViajePersonal.objects.bulk_create(
-            [
-                ViajePersonal(
-                    viaje=viaje,
-                    empleado_id=empleado_id,
-                    tipo_participacion="OPERATIVO",
-                )
-                for empleado_id in programacion_form.cleaned_data["personal_operativo_ids"]
-            ]
-        )
+            for viaje_solicitud in viaje_solicitudes:
+                viaje_solicitud.viaje = viaje
+                viaje_solicitud.activo = True
+                viaje_solicitud.save(update_fields=["viaje", "activo"])
 
-        for viaje_solicitud in viaje_solicitudes:
-            viaje_solicitud.viaje = viaje
-            viaje_solicitud.activo = True
-            viaje_solicitud.save(update_fields=["viaje", "activo"])
-
-            solicitud = viaje_solicitud.solicitud
-            solicitud.estado = Solicitud.Estado.PROGRAMADA
-            solicitud.save(update_fields=["estado"])
+                solicitud = viaje_solicitud.solicitud
+                solicitud.estado = Solicitud.Estado.PROGRAMADA
+                solicitud.save(update_fields=["estado"])
+    except ValueError as exc:
+        return JsonResponse({"ok": False, "error": str(exc)}, status=400)
 
     return JsonResponse({"ok": True, "data": {"viaje_id": viaje.id, "numero_viaje": viaje.numero_viaje, "cantidad": len(viaje_solicitudes)}})
 
@@ -1516,11 +1595,14 @@ class SolicitudFormView(LoginRequiredMixin, TemplateView):
             return redirect("acceso_denegado")
         return super().dispatch(request, *args, **kwargs)
 
-    def _get_solicitud(self):
+    def _get_solicitud(self, solo_propias=None):
         pk = self.kwargs.get("pk")
         if not pk:
             return None
-        return get_object_or_404(_obtener_qs_solicitudes_propias(self.request.user), pk=pk)
+        if solo_propias is None:
+            solo_propias = self.modo == "editar"
+        qs = _obtener_qs_solicitudes_propias(self.request.user) if solo_propias else _obtener_qs_solicitudes_activas(self.request.user)
+        return get_object_or_404(qs, pk=pk)
 
     def get(self, request, *args, **kwargs):
         solicitud = self._get_solicitud()

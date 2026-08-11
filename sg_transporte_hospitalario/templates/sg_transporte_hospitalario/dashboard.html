@@ -74,6 +74,7 @@
               <tr>
                 <th>Número solicitud</th>
                 <th>Fecha</th>
+                <th>Creado por</th>
                 <th>Área solicitante</th>
                 <th>Tipo solicitud</th>
                 <th>Prioridad</th>
@@ -86,6 +87,7 @@
               <tr data-solicitud-id="{{ s.pk }}">
                 <td data-label="Número solicitud">{{ s.numero_solicitud }}</td>
                 <td data-label="Fecha">{{ s.fecha_solicitud|date:"d/m/Y H:i" }}</td>
+                <td data-label="Creado por">{{ s.solicitante_empleado }}</td>
                 <td data-label="Área solicitante">{{ s.punto_solicitud }}</td>
                 <td data-label="Tipo solicitud">{{ s.tipo_solicitud.nombre }}</td>
                 <td data-label="Prioridad">{{ s.prioridad.nombre }}</td>
@@ -136,11 +138,12 @@
             <select id="th-autorizacion-criterio" class="th-input">
               <option value="0">Número</option>
               <option value="1">Fecha</option>
-              <option value="2">Prioridad</option>
-              <option value="3">Punto de solicitud</option>
-              <option value="4">Tipo</option>
-              <option value="5">Pacientes</option>
-              <option value="6">Destino</option>
+              <option value="2">Creado por</option>
+              <option value="3">Prioridad</option>
+              <option value="4">Punto de solicitud</option>
+              <option value="5">Tipo</option>
+              <option value="6">Pacientes</option>
+              <option value="7">Destino</option>
             </select>
             <input type="text" id="th-autorizacion-busqueda" class="th-input" placeholder="Buscar solicitudes">
             <button type="button" id="th-autorizacion-buscar" class="th-btn th-btn--primary">
@@ -159,6 +162,7 @@
               <tr>
                 <th>Número</th>
                 <th>Fecha</th>
+                <th>Creado por</th>
                 <th>Prioridad</th>
                 <th>Punto de solicitud</th>
                 <th>Tipo</th>
@@ -172,6 +176,7 @@
               <tr data-solicitud-id="{{ solicitud.id }}" data-pacientes-count="{{ solicitud.cantidad_pacientes|default:0 }}" data-priority-level="{{ solicitud.prioridad.nivel }}" data-destino="{{ solicitud.lugar_destino.nombre_institucion_salud }}">
                 <td data-label="Número">{{ solicitud.numero_solicitud }}</td>
                 <td data-label="Fecha">{{ solicitud.fecha_solicitud|date:"d/m/Y H:i" }}</td>
+                <td data-label="Creado por">{{ solicitud.solicitante_empleado }}</td>
                 <td data-label="Prioridad"><span class="th-badge">{{ solicitud.prioridad.nombre }}</span></td>
                 <td data-label="Punto de solicitud">{{ solicitud.punto_solicitud }}</td>
                 <td data-label="Tipo">{{ solicitud.tipo_solicitud.nombre }}</td>
@@ -185,7 +190,7 @@
               </tr>
               {% empty %}
               <tr>
-                <td colspan="8">No hay solicitudes pendientes disponibles para autorización.</td>
+                <td colspan="9">No hay solicitudes pendientes disponibles para autorización.</td>
               </tr>
               {% endfor %}
             </tbody>
@@ -236,6 +241,199 @@
         </div>
       </div>
     </div>
+    {% elif active_tab == 'viaje_construccion' %}
+    <div class="th-workspace__hero">
+      <div>
+        <h3>Construcción del Viaje</h3>
+        <p>Seleccione solicitudes autorizadas, consolide recursos y confirme la programación final.</p>
+      </div>
+      <div class="th-pill">
+        <i class="bi bi-graph-up-arrow"></i>
+        {{ viaje_construccion_total }} solicitudes disponibles
+      </div>
+    </div>
+
+    {{ viaje_construccion_items|json_script:"th-viaje-construccion-items" }}
+    {{ vehiculos_operativos|json_script:"th-viaje-construccion-vehiculos" }}
+    {{ motoristas_operativos|json_script:"th-viaje-construccion-motoristas" }}
+    {{ viaticos_operativos|json_script:"th-viaje-construccion-viaticos" }}
+
+    <form id="th-viaje-construccion-form" class="th-grid" novalidate>
+      {% csrf_token %}
+      <article class="th-card th-span-12 th-viaje-programacion">
+        <div class="th-viaje-programacion__empty" id="th-viaje-empty-state">
+          <strong>Solicitudes autorizadas disponibles</strong>
+          <p>Use la búsqueda para localizar solicitudes y agregarlas a la construcción del viaje.</p>
+        </div>
+        <div class="th-viaje-programacion__grid">
+          <div class="th-viaje-programacion__field">
+            <span>Buscar solicitud</span>
+            <input type="search" id="th-viaje-buscar-solicitud" class="th-input" placeholder="Número, punto, prioridad o destino">
+          </div>
+        </div>
+
+        <div class="th-table-wrap">
+          <table class="th-table" id="th-viaje-construccion-table">
+            <thead>
+              <tr>
+                <th></th>
+                <th>Número</th>
+                <th>Fecha</th>
+                <th>Punto</th>
+                <th>Pacientes</th>
+                <th>Prioridad</th>
+                <th>Destino</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in viaje_construccion_items %}
+              <tr data-viaje-solicitud-id="{{ item.id }}" data-search-text="{{ item.numero }} {{ item.punto }} {{ item.punto_corto }} {{ item.prioridad }} {{ item.destino }}">
+                <td data-label="Seleccionar">
+                  <input type="checkbox" class="th-viaje-check" data-viaje-solicitud-checkbox="{{ item.id }}">
+                </td>
+                <td data-label="Número">{{ item.numero }}</td>
+                <td data-label="Fecha">{{ item.fecha }}</td>
+                <td data-label="Punto">{{ item.punto_corto }}</td>
+                <td data-label="Pacientes">{{ item.pacientesCount }}</td>
+                <td data-label="Prioridad"><span class="th-badge">{{ item.prioridad }}</span></td>
+                <td data-label="Destino">{{ item.destino }}</td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="7">No hay solicitudes autorizadas disponibles para construcción.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="th-card th-span-6 th-viaje-panel">
+        <div class="th-viaje-panel__header">
+          <div>
+            <h4 class="th-card__title"><i class="bi bi-people"></i> Solicitudes y pacientes</h4>
+            <p class="th-viaje-panel__description">Los cuatro indicadores resumen la selección actual sin duplicar la información principal.</p>
+          </div>
+        </div>
+        <div class="th-viaje-summary">
+          <div class="th-viaje-stat th-viaje-stat--highlight">
+            <span>Solicitudes</span>
+            <strong id="th-viaje-solicitudes-total">0</strong>
+          </div>
+          <div class="th-viaje-stat">
+            <span>Pacientes</span>
+            <strong id="th-viaje-pacientes-total">0</strong>
+          </div>
+          <div class="th-viaje-stat">
+            <span>Personal</span>
+            <strong id="th-viaje-personal-total">0</strong>
+          </div>
+          <div class="th-viaje-stat">
+            <span>Viáticos</span>
+            <strong id="th-viaje-viaticos-total">0</strong>
+          </div>
+        </div>
+        <div class="th-viaje-validation">
+          <div class="th-viaje-status th-viaje-capacity-alert" id="th-viaje-capacity-alert" hidden>
+            <span class="th-viaje-status__label">Alerta</span>
+            <span class="th-viaje-status__value">El viaje supera la cantidad recomendada de 3 pacientes.<br>Puede continuar si confirma la construcción del viaje.</span>
+          </div>
+        </div>
+        <div class="th-viaje-list" id="th-viaje-seleccionadas-list"></div>
+      </article>
+
+      <article class="th-card th-span-6 th-viaje-panel">
+        <div class="th-viaje-panel__header">
+          <div>
+            <h4 class="th-card__title"><i class="bi bi-person-badge"></i> Personal operativo</h4>
+            <p class="th-viaje-panel__description">El personal sugerido se consolida por empleado y puede complementarse manualmente.</p>
+          </div>
+        </div>
+        <div class="th-viaje-programacion__field">
+          <span>Buscar y seleccionar personal</span>
+          <select id="th-viaje-personal-selector" class="formularioCampo-select th-viaje-select th-viaje-personal-selector" aria-label="Buscar y seleccionar personal">
+            <option value=""></option>
+          </select>
+        </div>
+        <div class="th-viaje-list" id="th-viaje-personal-list"></div>
+      </article>
+
+      <article class="th-card th-span-6 th-viaje-panel">
+        <div class="th-viaje-panel__header">
+          <div>
+            <h4 class="th-card__title"><i class="bi bi-truck"></i> Recursos del viaje</h4>
+            <p class="th-viaje-panel__description">Seleccione vehículo, motorista, centro de costo y tipo de viaje.</p>
+          </div>
+        </div>
+        <div class="th-viaje-programacion__grid">
+          <div class="th-viaje-programacion__field">
+            <span>Vehículo</span>
+            {{ programacion_form.vehiculo }}
+          </div>
+          <div class="th-viaje-programacion__field">
+            <span>Motorista</span>
+            {{ programacion_form.motorista }}
+          </div>
+          <div class="th-viaje-programacion__field">
+            <span>Centro de costo</span>
+            {{ programacion_form.centro_costo }}
+          </div>
+          <div class="th-viaje-programacion__field">
+            <span>Tipo de viaje</span>
+            {{ programacion_form.tipo_viaje }}
+          </div>
+        </div>
+        <div class="th-viaje-validation">
+          <div class="th-viaje-status">
+            <span class="th-viaje-status__label">Vehículo disponible</span>
+            <span class="th-viaje-status__value" id="th-viaje-vehiculo-texto">Seleccione una ambulancia disponible.</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="th-card th-span-6 th-viaje-panel">
+        <div class="th-viaje-panel__header">
+          <div>
+            <h4 class="th-card__title"><i class="bi bi-cash-coin"></i> Viáticos</h4>
+            <p class="th-viaje-panel__description">Los viáticos se consultan desde el catálogo vigente y conservan su monto histórico al asignarse.</p>
+          </div>
+        </div>
+        <div class="th-viaje-programacion__grid">
+          <div class="th-viaje-programacion__field">
+            <span>Seleccionar viático</span>
+            <select id="th-viaje-viatico-select" class="th-input formularioCampo-select th-viaje-select">
+              <option value="">Seleccione un viático</option>
+            </select>
+          </div>
+          <div class="th-viaje-programacion__field">
+            <span>Observación</span>
+            <input type="text" id="th-viaje-viatico-observacion" class="th-input" placeholder="Observación opcional">
+          </div>
+        </div>
+        <div class="th-viaje-programacion__actions">
+          <button type="button" class="th-btn th-btn--ghost" id="th-viaje-viatico-agregar">
+            <i class="bi bi-plus-circle"></i>
+            Agregar viático
+          </button>
+        </div>
+        <div class="th-viaje-list" id="th-viaje-viaticos-list"></div>
+      </article>
+
+      <article class="th-card th-span-12">
+        {{ programacion_form.personal_operativo_ids }}
+        {{ programacion_form.viaticos_json }}
+        <div class="th-form-error" id="th-viaje-feedback" hidden></div>
+        <div class="th-viaje-programacion__actions">
+          <button type="button" class="th-btn th-btn--primary" id="th-viaje-confirmar">
+            <i class="bi bi-check2-circle"></i>
+            Construir viaje
+          </button>
+        </div>
+        {% if programacion_form.non_field_errors %}
+        <div class="th-form-error">{{ programacion_form.non_field_errors|join:", " }}</div>
+        {% endif %}
+      </article>
+    </form>
     {% elif active_tab == 'ejecucion' %}
       <div class="th-workspace__hero">
         <div>
@@ -432,12 +630,14 @@
 <script>
   window.sgTransporteHospitalarioDashboard = {
     activeTab: "{{ active_tab }}",
+    tabsUrlBase: "{% url 'sg_transporte_hospitalario_dashboard' %}",
       emptyTable: "No hay solicitudes activas registradas.",
       emptyAutorizacionTable: "No hay solicitudes pendientes disponibles para autorización.",
       emptyEjecucionTable: "No hay viajes programados disponibles.",
     urlAutorizarSolicitud: "{% url 'sg_transporte_hospitalario_solicitud_autorizar' %}",
       urlDetalleSolicitud: "{% url 'sg_transporte_hospitalario_solicitud_detalle' %}",
       urlBuscarEmpleados: "{% url 'sg_transporte_hospitalario_buscar_empleados' %}",
+      urlProgramacionViaje: "{% url 'sg_transporte_hospitalario_programacion_viaje' %}",
       urlProgramacionAnular: "{% url 'sg_transporte_hospitalario_programacion_anular' %}",
       urlProgramacionConfirmar: "{% url 'sg_transporte_hospitalario_programacion_confirmar' %}",
       urlEjecucionGuardar: "{% url 'sg_transporte_hospitalario_ejecucion_guardar' %}"

@@ -1,5 +1,10 @@
+from decimal import Decimal
+import uuid
+
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
+from django.db import transaction
 from django.db.models import Q
 from django.core.validators import MinValueValidator
 from django.utils import timezone
@@ -64,6 +69,7 @@ class Viatico(models.Model):
     codigo = models.CharField(max_length=30, unique=True, db_index=True)
     nombre = models.CharField(max_length=120, db_index=True)
     descripcion = models.TextField(blank=True, null=True)
+    monto_vigente = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
     activo = models.BooleanField(default=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -71,11 +77,163 @@ class Viatico(models.Model):
     class Meta:
         db_table = "transporte_hospitalario_viatico"
         ordering = ["nombre"]
-        verbose_name = "Viatico"
-        verbose_name_plural = "Viaticos"
+        verbose_name = "Viático"
+        verbose_name_plural = "Viáticos"
 
     def __str__(self):
         return self.nombre
+
+    @staticmethod
+    def _formatear_codigo(pk):
+        return f"VIA-{pk:03d}"
+
+    def save(self, *args, **kwargs):
+        codigo_original = None
+        if self.pk:
+            codigo_original = (
+                type(self).objects.filter(pk=self.pk).values_list("codigo", flat=True).first()
+            )
+
+        if not self.pk and not self.codigo:
+            with transaction.atomic():
+                self.codigo = f"TMP-{uuid.uuid4().hex[:12]}"
+                super().save(*args, **kwargs)
+                self.codigo = self._formatear_codigo(self.pk)
+                super().save(update_fields=["codigo"])
+            return
+
+        if codigo_original and self.codigo != codigo_original:
+            self.codigo = codigo_original
+
+        super().save(*args, **kwargs)
+
+    @staticmethod
+    def _normalizar_monto(monto):
+        if monto is None:
+            return None
+        if isinstance(monto, Decimal):
+            return monto
+        return Decimal(str(monto))
+
+    @classmethod
+    def crear_con_historial(cls, *, codigo, nombre, monto_vigente=None, descripcion=None, activo=True, cambiado_por=None, motivo=None):
+        if monto_vigente is not None and not motivo:
+            raise ValidationError("El motivo es obligatorio para registrar el monto inicial del viático.")
+
+        monto_vigente = cls._normalizar_monto(monto_vigente)
+
+        with transaction.atomic():
+            viatico = cls.objects.create(
+                codigo=codigo,
+                nombre=nombre,
+                descripcion=descripcion,
+                monto_vigente=monto_vigente,
+                activo=activo,
+            )
+            if monto_vigente is not None:
+                ViaticoHistorial.objects.create(
+                    viatico=viatico,
+                    monto_anterior=None,
+                    monto_nuevo=monto_vigente,
+                    cambiado_por=cambiado_por,
+                    motivo=motivo,
+                )
+        return viatico
+
+    def registrar_cambio_monto(self, nuevo_monto, *, cambiado_por=None, motivo):
+        if not motivo:
+            raise ValidationError("El motivo es obligatorio para modificar el monto vigente.")
+
+        nuevo_monto = self._normalizar_monto(nuevo_monto)
+        monto_anterior = self.monto_vigente
+
+        with transaction.atomic():
+            self.monto_vigente = nuevo_monto
+            self.save(update_fields=["monto_vigente", "updated_at"])
+            ViaticoHistorial.objects.create(
+                viatico=self,
+                monto_anterior=monto_anterior,
+                monto_nuevo=nuevo_monto,
+                cambiado_por=cambiado_por,
+                motivo=motivo,
+            )
+
+        return self
+
+
+class ViaticoHistorial(models.Model):
+    viatico = models.ForeignKey(
+        Viatico,
+        on_delete=models.PROTECT,
+        related_name="historial_cambios",
+    )
+    monto_anterior = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
+    monto_nuevo = models.DecimalField(max_digits=12, decimal_places=2)
+    cambiado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="viaticos_historial_cambios",
+        null=True,
+        blank=True,
+    )
+    motivo = models.TextField()
+    fecha_cambio = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        db_table = "transporte_hospitalario_viatico_historial"
+        ordering = ["-fecha_cambio", "-id"]
+        verbose_name = "Viatico historial"
+        verbose_name_plural = "Viaticos historial"
+
+    def __str__(self):
+        return f"Viatico {self.viatico_id} - {self.fecha_cambio:%Y-%m-%d %H:%M}"
+
+
+class ViajeViatico(models.Model):
+    viaje = models.ForeignKey(
+        "Viaje",
+        on_delete=models.PROTECT,
+        related_name="viaje_viaticos",
+    )
+    viatico = models.ForeignKey(
+        Viatico,
+        on_delete=models.PROTECT,
+        related_name="viaje_viaticos",
+    )
+    monto_aplicado = models.DecimalField(max_digits=12, decimal_places=2)
+    fecha_asignacion = models.DateTimeField(default=timezone.now, db_index=True)
+    observacion = models.TextField(blank=True, null=True)
+    creado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="viajes_viaticos_creados",
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        db_table = "transporte_hospitalario_viaje_viatico"
+        ordering = ["-fecha_asignacion", "-id"]
+        verbose_name = "Viaje viatico"
+        verbose_name_plural = "Viajes viatico"
+
+    def __str__(self):
+        return f"Viaje {self.viaje_id} - Viatico {self.viatico_id}"
+
+    @classmethod
+    def registrar_asignacion(cls, *, viaje, viatico, creado_por=None, observacion=None, fecha_asignacion=None):
+        monto_aplicado = Viatico._normalizar_monto(viatico.monto_vigente)
+        if monto_aplicado is None:
+            raise ValidationError("El viático no tiene un monto vigente para asignarse al viaje.")
+
+        return cls.objects.create(
+            viaje=viaje,
+            viatico=viatico,
+            monto_aplicado=monto_aplicado,
+            fecha_asignacion=fecha_asignacion or timezone.now(),
+            observacion=observacion,
+            creado_por=creado_por,
+        )
 
 
 class Vehiculo(models.Model):
@@ -343,7 +501,6 @@ class Viaje(models.Model):
     centro_costo = models.PositiveIntegerField(null=True, blank=True, validators=[MinValueValidator(1)])
     tipo_viaje = models.PositiveSmallIntegerField(
         choices=TipoProgramacion.choices,
-        default=TipoProgramacion.REGIONAL,
         db_index=True,
     )
     estado = models.CharField(max_length=30, db_index=True)

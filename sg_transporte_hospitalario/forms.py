@@ -13,6 +13,21 @@ from .models import Motorista, Prioridad, PuntoSolicitud, Solicitud, TipoSolicit
 from servicio.models import Institucion_salud
 
 
+class PlaceholderSelect(forms.Select):
+    def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
+        option = super().create_option(name, value, label, selected, index, subindex=subindex, attrs=attrs)
+        if option.get("value", None) in ("", None):
+            option["attrs"]["disabled"] = True
+            option["attrs"]["hidden"] = True
+            option["attrs"]["selected"] = True
+        return option
+
+
+class NoRequiredSelect(forms.Select):
+    def use_required_attribute(self, initial):
+        return False
+
+
 def _nombre_empleado(empleado):
     return " ".join(x for x in [getattr(empleado, "primer_nombre", ""), getattr(empleado, "primer_apellido", "")] if x).strip() or str(empleado)
 
@@ -76,11 +91,11 @@ class SolicitudForm(forms.ModelForm):
                 attrs={"type": "datetime-local", "class": "th-input"},
                 format="%Y-%m-%dT%H:%M",
             ),
-            "punto_solicitud": forms.Select(attrs={"class": "formularioCampo-select"}),
-            "tipo_solicitud": forms.Select(attrs={"class": "formularioCampo-select"}),
-            "prioridad": forms.Select(attrs={"class": "formularioCampo-select"}),
-            "lugar_salida": forms.Select(attrs={"class": "formularioCampo-select"}),
-            "lugar_destino": forms.Select(attrs={"class": "formularioCampo-select"}),
+            "punto_solicitud": forms.Select(attrs={"class": "formularioCampo-select th-viaje-select"}),
+            "tipo_solicitud": forms.Select(attrs={"class": "formularioCampo-select th-viaje-select"}),
+            "prioridad": forms.Select(attrs={"class": "formularioCampo-select th-viaje-select"}),
+            "lugar_salida": forms.Select(attrs={"class": "formularioCampo-select th-viaje-select"}),
+            "lugar_destino": forms.Select(attrs={"class": "formularioCampo-select th-viaje-select"}),
             "motivo": forms.Textarea(attrs={"class": "th-input", "rows": 2, "placeholder": "Describa el motivo del viaje"}),
             "observaciones": forms.Textarea(attrs={"class": "th-input", "rows": 2, "placeholder": "Agregue observaciones adicionales"}),
         }
@@ -108,32 +123,14 @@ class SolicitudForm(forms.ModelForm):
         self.fields["prioridad"].queryset = Prioridad.objects.filter(activo=True)
         self.fields["prioridad"].empty_label = "Seleccione una prioridad"
 
-        preferred_salida_pk = 65
-        preferred_destino_text = "HESP-ESCUELA"
         instituciones_qs = (
             Institucion_salud.objects
             .filter(estado=1)
             .select_related("nivel_complejidad_institucional", "region_salud")
             .order_by("nombre_institucion_salud")
         )
-        preferred_institucion = instituciones_qs.filter(pk=preferred_salida_pk).first()
-        destino_preferred = instituciones_qs.filter(nombre_institucion_salud__icontains=preferred_destino_text).first()
-
-        salida_qs = instituciones_qs.annotate(
-            prioridad_salida=Case(
-                When(pk=preferred_salida_pk, then=Value(0)),
-                default=Value(1),
-                output_field=IntegerField(),
-            )
-        ).order_by("prioridad_salida", "nombre_institucion_salud")
-        destino_qs = instituciones_qs.annotate(
-            prioridad_destino=Case(
-                When(nombre_institucion_salud__icontains=preferred_destino_text, then=Value(0)),
-                When(pk=preferred_salida_pk, then=Value(1)),
-                default=Value(2),
-                output_field=IntegerField(),
-            )
-        ).order_by("prioridad_destino", "nombre_institucion_salud")
+        salida_qs = instituciones_qs.order_by("nombre_institucion_salud")
+        destino_qs = instituciones_qs.order_by("nombre_institucion_salud")
 
         self.fields["lugar_salida"].queryset = salida_qs
         self.fields["lugar_salida"].empty_label = "Seleccione un lugar de salida"
@@ -141,10 +138,6 @@ class SolicitudForm(forms.ModelForm):
         self.fields["lugar_destino"].queryset = destino_qs
         self.fields["lugar_destino"].empty_label = "Seleccione un lugar de destino"
         self.fields["lugar_destino"].label_from_instance = lambda obj: obj.nombre_institucion_salud
-        if preferred_institucion:
-            self.initial["lugar_salida"] = preferred_institucion.pk
-        elif destino_preferred:
-            self.initial["lugar_destino"] = destino_preferred.pk
 
     def clean(self):
         cleaned_data = super().clean()
@@ -160,10 +153,9 @@ class SolicitudForm(forms.ModelForm):
 
 
 class ViajeProgramacionForm(forms.ModelForm):
-    viatico = forms.ModelChoiceField(
-        queryset=_viaticos_disponibles_qs(),
+    viaticos_json = forms.CharField(
         required=False,
-        widget=forms.Select(attrs={"class": "th-input"}),
+        widget=forms.HiddenInput(attrs={"data-programacion-viaticos": "1"}),
     )
     personal_operativo_ids = forms.CharField(
         required=True,
@@ -174,9 +166,9 @@ class ViajeProgramacionForm(forms.ModelForm):
         model = Viaje
         fields = ["vehiculo", "motorista", "tipo_viaje", "centro_costo"]
         widgets = {
-            "vehiculo": forms.Select(attrs={"class": "th-input"}),
-            "motorista": forms.Select(attrs={"class": "th-input"}),
-            "tipo_viaje": forms.Select(attrs={"class": "th-input"}),
+            "vehiculo": NoRequiredSelect(attrs={"class": "th-input formularioCampo-select th-viaje-select"}),
+            "motorista": NoRequiredSelect(attrs={"class": "th-input formularioCampo-select th-viaje-select"}),
+            "tipo_viaje": NoRequiredSelect(attrs={"class": "th-input formularioCampo-select th-viaje-select"}),
             "centro_costo": forms.NumberInput(attrs={"class": "th-input", "min": "1", "step": "1", "placeholder": "Centro de costo"}),
         }
 
@@ -192,14 +184,57 @@ class ViajeProgramacionForm(forms.ModelForm):
         self.fields["motorista"].label_from_instance = lambda obj: f"{obj.empleado.dni} - {_nombre_empleado(obj.empleado)}"
         self.fields["motorista"].required = True
 
-        self.fields["tipo_viaje"].choices = Viaje.TipoProgramacion.choices
+        self.fields["tipo_viaje"].choices = [("", "Seleccione un tipo de viaje")] + list(Viaje.TipoProgramacion.choices)
+        self.fields["tipo_viaje"].initial = ""
         self.fields["tipo_viaje"].required = True
-        self.fields["viatico"].queryset = _viaticos_disponibles_qs()
-        self.fields["viatico"].empty_label = "Seleccione un viático"
-        self.fields["viatico"].label_from_instance = lambda obj: f"{obj.codigo} - {obj.nombre}"
-        self.fields["viatico"].required = False
-        self.fields["viatico"].help_text = "Campo de referencia institucional; no se almacena en el viaje."
         self.fields["centro_costo"].required = True
+
+    def clean_viaticos_json(self):
+        raw_value = self.cleaned_data.get("viaticos_json")
+        if isinstance(raw_value, list):
+            raw_value = json.dumps(raw_value)
+        raw_value = (raw_value or "").strip()
+        if not raw_value:
+            return []
+
+        try:
+            parsed = json.loads(raw_value)
+        except (TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise ValidationError("Los viáticos seleccionados no son válidos.") from exc
+
+        if isinstance(parsed, dict):
+            parsed = [parsed]
+
+        if not isinstance(parsed, list):
+            raise ValidationError("Los viáticos seleccionados no son válidos.")
+
+        viaticos = []
+        vistos = set()
+        for item in parsed:
+            if isinstance(item, dict):
+                viatico_id = item.get("viatico_id") or item.get("id")
+                observacion = (item.get("observacion") or "").strip() or None
+            else:
+                viatico_id = item
+                observacion = None
+
+            try:
+                viatico_id = int(viatico_id)
+            except (TypeError, ValueError):
+                raise ValidationError("Los viáticos seleccionados no son válidos.")
+
+            if viatico_id in vistos:
+                continue
+            vistos.add(viatico_id)
+            viaticos.append({"viatico_id": viatico_id, "observacion": observacion})
+
+        disponibles = {
+            viatico.id for viatico in _viaticos_disponibles_qs().filter(pk__in=[item["viatico_id"] for item in viaticos])
+        }
+        if len(disponibles) != len(viaticos):
+            raise ValidationError("Uno o más viáticos seleccionados no están disponibles.")
+
+        return viaticos
 
     def clean_personal_operativo_ids(self):
         raw_value = self.cleaned_data.get("personal_operativo_ids")

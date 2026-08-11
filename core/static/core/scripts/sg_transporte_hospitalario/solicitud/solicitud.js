@@ -160,7 +160,7 @@
 			labelField: 'text',
 			searchField: ['text'],
 			create: false,
-			allowEmptyOption: false,
+			allowEmptyOption: true,
 			sortField: [{ field: 'text', direction: 'asc' }],
 		};
 		const tomSelectOptions = Object.assign({}, baseOptions, options || {});
@@ -171,6 +171,7 @@
 		if (node.tomselect) {
 			return node.tomselect;
 		}
+		node.classList.add('th-viaje-select');
 		return new TomSelect(selector, tomSelectOptions);
 	}
 
