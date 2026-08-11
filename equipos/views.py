@@ -6,8 +6,9 @@ import qrcode
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Count, Prefetch, Q
 from django.http import Http404, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -81,6 +82,54 @@ CSS_ESTADO_GARANTIA = {
 }
 
 
+# Campos del equipo con UNIQUE en la base. Se usan para traducir el error del
+# motor en un error del formulario, junto al campo que lo provoco.
+CAMPOS_UNICOS_DISPOSITIVO = {
+    "numero_serie": "Ya existe un equipo con este número de serie.",
+    "inventario_bienes_nacionales": (
+        "Ya existe un equipo con este inventario de bienes nacionales."
+    ),
+    "inventario_numero_ficha": (
+        "Ya existe un equipo con este número de ficha."
+    ),
+}
+
+
+def _asignar_error_de_duplicado(form, error):
+    """Convierte un choque al guardar en un error legible del formulario.
+
+    Llegan por dos caminos. El modelo revalida en save(), asi que un duplicado
+    aparece como ValidationError con sus campos ya identificados. Si el choque
+    ocurre entre esa comprobacion y la insercion, lo detecta la base y llega
+    como IntegrityError, del que solo se puede leer el nombre de la columna en
+    el mensaje del motor.
+
+    En ambos casos se responde con el formulario y su error. Cuando no se
+    reconoce el campo se deja un aviso general en lugar de callar: es preferible
+    decir que no se guardo a insinuar que si.
+    """
+    if isinstance(error, ValidationError):
+        for campo, mensajes in getattr(error, "message_dict", {}).items():
+            for mensaje in mensajes:
+                form.add_error(
+                    campo if campo in form.fields else None, mensaje
+                )
+        if form.errors:
+            return
+    else:
+        detalle = str(error)
+        for campo, mensaje in CAMPOS_UNICOS_DISPOSITIVO.items():
+            if campo in detalle:
+                form.add_error(campo, mensaje)
+                return
+
+    form.add_error(
+        None,
+        "No se pudo guardar el equipo porque otro registro usa los mismos "
+        "datos. Revise el número de serie y los inventarios.",
+    )
+
+
 def _registrar_error_vista(mensaje, request, **contexto):
     # Los logs del modulo registran solo errores tecnicos. No guardan exitos ni
     # valores del formulario para evitar ruido y datos sensibles innecesarios.
@@ -139,38 +188,48 @@ def registrar_dispositivo(request):
 
     if request.method == "POST" and form.is_valid():
         registro_completo = False
-        with transaction.atomic():
-            dispositivo = form.save(commit=False)
-            dispositivo.creado_por = request.user
-            dispositivo.modificado_por = request.user
-            dispositivo.save()
+        dispositivo = None
+        try:
+            with transaction.atomic():
+                dispositivo = form.save(commit=False)
+                dispositivo.creado_por = request.user
+                dispositivo.modificado_por = request.user
+                dispositivo.save()
 
-            _crear_asignacion_dispositivo(
-                dispositivo,
-                form,
-                request.user,
-                "Asignación inicial del equipo.",
-            )
-
-            foto_general = form.cleaned_data["foto_general"]
-            foto_general.seek(0)
-            resultado_media = MediaService.subir_imagen_dispositivo(
-                dispositivo_id=dispositivo.id,
-                archivo=foto_general,
-                tipo_imagen="GENERAL",
-                usuario=request.user,
-            )
-
-            if resultado_media.get("ok"):
-                registro_completo = True
-            else:
-                # El error tecnico ya queda en el log de MediaService. Al
-                # usuario se le muestra un mensaje estable sin datos internos.
-                transaction.set_rollback(True)
-                form.add_error(
-                    "foto_general",
-                    "No se pudo guardar la foto. Intente nuevamente.",
+                _crear_asignacion_dispositivo(
+                    dispositivo,
+                    form,
+                    request.user,
+                    "Asignación inicial del equipo.",
                 )
+
+                foto_general = form.cleaned_data["foto_general"]
+                foto_general.seek(0)
+                resultado_media = MediaService.subir_imagen_dispositivo(
+                    dispositivo_id=dispositivo.id,
+                    archivo=foto_general,
+                    tipo_imagen="GENERAL",
+                    usuario=request.user,
+                )
+
+                if resultado_media.get("ok"):
+                    registro_completo = True
+                else:
+                    # El error tecnico ya queda en el log de MediaService. Al
+                    # usuario se le muestra un mensaje estable sin datos internos.
+                    transaction.set_rollback(True)
+                    form.add_error(
+                        "foto_general",
+                        "No se pudo guardar la foto. Intente nuevamente.",
+                    )
+        except (IntegrityError, ValidationError) as error:
+            # El formulario ya comprueba los duplicados, pero entre esa consulta
+            # y la insercion se sube la foto al servidor de imagenes, que tarda.
+            # Si el usuario vuelve a enviar en ese rato, la segunda peticion ya
+            # habia pasado la validacion y choca aqui contra el UNIQUE.
+            # La restriccion de base es la ultima linea de defensa y no debe
+            # llegarle al usuario como pagina de error.
+            _asignar_error_de_duplicado(form, error)
 
         if registro_completo:
             messages.success(
@@ -184,8 +243,9 @@ def registrar_dispositivo(request):
 
         # La instancia conserva su PK en memoria aunque la base haya hecho
         # rollback; se restablece para que el formulario siga siendo de alta.
-        dispositivo.pk = None
-        dispositivo._state.adding = True
+        if dispositivo is not None:
+            dispositivo.pk = None
+            dispositivo._state.adding = True
 
     return render(
         request,

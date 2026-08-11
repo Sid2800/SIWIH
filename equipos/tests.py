@@ -392,6 +392,77 @@ class EquiposViewsTests(TestCase):
         self.assertIn("procedencia", respuesta.context["form"].errors)
         self.assertEqual(Dispositivo.objects.count(), cantidad_inicial)
 
+    def test_una_serie_repetida_da_error_de_formulario_y_no_revienta(self):
+        # El equipo de la clase ya usa SERIE-ORIGINAL. Repetirla debe devolver
+        # el formulario con su error, no una pagina de error 500 por el
+        # UNIQUE de la base.
+        cantidad_inicial = Dispositivo.objects.count()
+
+        respuesta = self.client.post(
+            reverse("registrar_dispositivo_equipos"),
+            self._datos_formulario_dispositivo(numero_serie="SERIE-ORIGINAL"),
+        )
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn("numero_serie", respuesta.context["form"].errors)
+        self.assertEqual(Dispositivo.objects.count(), cantidad_inicial)
+
+    def _simular_carrera_de_serie(self, saltar_validacion):
+        """Reproduce el reenvio mientras se subia la foto.
+
+        El formulario ya habia comprobado que la serie estaba libre; el choque
+        aparece despues, al guardar. Con saltar_validacion se decide si lo
+        detecta el modelo (ValidationError) o la base (IntegrityError).
+        """
+        serie_existente = self.dispositivo.numero_serie
+        original = Dispositivo.save
+
+        def guardar_con_choque(self_disp, *args, **kwargs):
+            if self_disp.pk is None:
+                self_disp.numero_serie = serie_existente
+            return original(self_disp, *args, **kwargs)
+
+        parches = [patch.object(Dispositivo, "save", guardar_con_choque)]
+        if saltar_validacion:
+            parches.append(
+                patch.object(Dispositivo, "validate_unique", lambda *a, **k: None)
+            )
+
+        with parches[0]:
+            if len(parches) > 1:
+                with parches[1]:
+                    return self.client.post(
+                        reverse("registrar_dispositivo_equipos"),
+                        self._datos_formulario_dispositivo(
+                            numero_serie="SERIE-LIBRE"
+                        ),
+                    )
+            return self.client.post(
+                reverse("registrar_dispositivo_equipos"),
+                self._datos_formulario_dispositivo(numero_serie="SERIE-LIBRE"),
+            )
+
+    def test_un_duplicado_detectado_al_guardar_no_devuelve_pagina_de_error(self):
+        # El modelo revalida en save(): el choque llega como ValidationError.
+        cantidad_inicial = Dispositivo.objects.count()
+
+        respuesta = self._simular_carrera_de_serie(saltar_validacion=False)
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn("numero_serie", respuesta.context["form"].errors)
+        self.assertEqual(Dispositivo.objects.count(), cantidad_inicial)
+
+    def test_un_choque_de_unique_en_la_base_no_devuelve_pagina_de_error(self):
+        # Si el choque ocurre entre la comprobacion y la insercion, lo detecta
+        # el UNIQUE de la base y llega como IntegrityError.
+        cantidad_inicial = Dispositivo.objects.count()
+
+        respuesta = self._simular_carrera_de_serie(saltar_validacion=True)
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertTrue(respuesta.context["form"].errors)
+        self.assertEqual(Dispositivo.objects.count(), cantidad_inicial)
+
     def test_numero_de_referencia_opcional_se_guarda_en_mayusculas(self):
         respuesta = self.client.post(
             reverse("registrar_dispositivo_equipos"),
@@ -1312,6 +1383,12 @@ class EquiposViewsTests(TestCase):
         self.assertContains(respuesta, self.dispositivo.codigo)
         self.assertContains(respuesta, "Generar ficha PDF")
         self.assertContains(respuesta, "Confirmar baja definitiva")
+        self.assertContains(respuesta, "mensajes: [")
+        self.assertContains(
+            respuesta,
+            "Esta acción no se puede deshacer.",
+        )
+        self.assertContains(respuesta, "botonAfirmativo: 'Sí, dar de baja'")
         self.assertContains(respuesta, "Equipo seleccionado")
 
     def test_tramite_baja_muestra_la_imagen_general_del_equipo(self):
