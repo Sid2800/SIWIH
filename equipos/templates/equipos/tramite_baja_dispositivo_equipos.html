@@ -433,14 +433,17 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
 
-            const aceptado = await confirmarAccion(
-                'Confirmar baja definitiva',
-                'El equipo <strong>{{ dispositivo.codigo }}</strong> quedará dado de '
-                + 'baja de forma permanente: no podrá editarse ni volver a '
-                + 'asignarse. Esta acción no se puede deshacer.',
-                'Sí, dar de baja',
-                'Cancelar'
-            );
+            const aceptado = await confirmarAccion({
+                titulo: 'Confirmar baja definitiva',
+                mensajes: [
+                    'El equipo <strong>{{ dispositivo.codigo }}</strong> quedará dado de '
+                    + 'baja de forma permanente: no podrá editarse ni volver a '
+                    + 'asignarse. Esta acción no se puede deshacer.'
+                ],
+                icono: 'warning',
+                botonAfirmativo: 'Sí, dar de baja',
+                botonNegativo: 'Cancelar'
+            });
 
             if (!aceptado) {
                 return;
