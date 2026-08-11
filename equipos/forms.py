@@ -620,6 +620,15 @@ class DispositivoCreateForm(forms.ModelForm):
         ]
         # Sin garantia se expresa dejando la fecha vacia, no con una opcion.
         self.fields["fecha_fin_garantia"].required = False
+
+        # El calendario del navegador no ofrece dias pasados al dar de alta.
+        # En edicion no se limita: la garantia del equipo puede haber vencido
+        # desde que se registro, y el navegador marcaria como invalido un
+        # valor que ya estaba guardado, impidiendo tocar cualquier otro campo.
+        if self.instance.pk is None:
+            self.fields["fecha_fin_garantia"].widget.attrs["min"] = (
+                timezone.localdate().isoformat()
+            )
         self.fields["estado"].choices = [
             (EstadoDispositivo.OPERATIVO, EstadoDispositivo.OPERATIVO.label),
             (
@@ -695,6 +704,32 @@ class DispositivoCreateForm(forms.ModelForm):
         valor = self.initial.get("marca")
         return int(valor) if str(valor or "").isdigit() else None
 
+    def clean_fecha_fin_garantia(self):
+        """Una garantia no puede nacer vencida.
+
+        Se rechaza una fecha pasada solo cuando se esta poniendo o cambiando.
+        Si el equipo ya la tenia guardada y ha vencido con el tiempo, se deja
+        pasar: de lo contrario no se podria editar nada de un equipo con la
+        garantia caducada, que es justo cuando mas se le toca.
+        """
+        fecha = self.cleaned_data.get("fecha_fin_garantia")
+
+        if fecha is None:
+            return fecha
+
+        sin_cambios = (
+            self.instance.pk is not None
+            and self.instance.fecha_fin_garantia == fecha
+        )
+
+        if not sin_cambios and fecha < timezone.localdate():
+            raise forms.ValidationError(
+                "La garantía no puede vencer antes de hoy. Si el equipo ya no "
+                "tiene garantía, deje la fecha vacía."
+            )
+
+        return fecha
+
     def clean_numero_serie(self):
         # Una cadena vacia se guarda como NULL para permitir varios equipos sin serie.
         return (self.cleaned_data.get("numero_serie") or "").strip() or None
@@ -754,10 +789,17 @@ class ProcedenciaCatalogoForm(forms.ModelForm):
 
     class Meta:
         model = Procedencia
-        fields = ["nombre", "tipo", "rtn", "telefono", "contacto", "correo"]
+        fields = [
+            "nombre", "tipo", "rtn", "telefono", "telefono_alterno",
+            "contacto", "correo",
+        ]
         labels = {
             "rtn": "RTN",
             "telefono": "Teléfono",
+            "telefono_alterno": "Teléfono alterno",
+            # "Contacto" a secas se leia como un dato de contacto cualquiera y
+            # se rellenaba con un numero. El nombre completo despeja la duda.
+            "contacto": "Persona de contacto",
         }
         widgets = {
             "nombre": forms.TextInput(
@@ -786,6 +828,14 @@ class ProcedenciaCatalogoForm(forms.ModelForm):
                 attrs={
                     "class": "formularioCampo-text",
                     "id": "telefono_procedencia_catalogo",
+                    "placeholder": "Opcional",
+                    "maxlength": 30,
+                }
+            ),
+            "telefono_alterno": forms.TextInput(
+                attrs={
+                    "class": "formularioCampo-text",
+                    "id": "telefono_alterno_procedencia_catalogo",
                     "placeholder": "Opcional",
                     "maxlength": 30,
                 }

@@ -1081,10 +1081,11 @@ class EquiposViewsTests(TestCase):
         )
         self.assertIsNone(dispositivo.fecha_fin_garantia)
 
-    def test_registro_admite_garantia_ya_vencida(self):
-        # Hace falta para cargar inventario antiguo: el equipo existe y su
-        # garantia caduco, y eso tambien es un hecho que hay que poder anotar.
-        self.client.post(
+    def test_registro_rechaza_una_garantia_que_ya_vencio(self):
+        # Una garantia no puede nacer vencida: casi siempre es un año mal
+        # tecleado. Si el equipo de verdad no tiene cobertura, la fecha se
+        # deja vacia.
+        respuesta = self.client.post(
             reverse("registrar_dispositivo_equipos"),
             self._datos_formulario_dispositivo(
                 numero_serie="SERIE-GARANTIA-VIEJA",
@@ -1092,8 +1093,56 @@ class EquiposViewsTests(TestCase):
             ),
         )
 
-        dispositivo = Dispositivo.objects.get(numero_serie="SERIE-GARANTIA-VIEJA")
-        self.assertEqual(dispositivo.fecha_fin_garantia, date(2020, 1, 1))
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn("fecha_fin_garantia", respuesta.context["form"].errors)
+        self.assertFalse(
+            Dispositivo.objects.filter(numero_serie="SERIE-GARANTIA-VIEJA").exists()
+        )
+
+    def test_registro_admite_una_garantia_que_vence_hoy(self):
+        # El limite es hoy inclusive: una garantia que vence hoy sigue cubriendo.
+        self.client.post(
+            reverse("registrar_dispositivo_equipos"),
+            self._datos_formulario_dispositivo(
+                numero_serie="SERIE-GARANTIA-HOY",
+                fecha_fin_garantia=timezone.localdate().isoformat(),
+            ),
+        )
+
+        dispositivo = Dispositivo.objects.get(numero_serie="SERIE-GARANTIA-HOY")
+        self.assertEqual(dispositivo.fecha_fin_garantia, timezone.localdate())
+
+    def test_editar_un_equipo_con_garantia_ya_vencida_sigue_siendo_posible(self):
+        # La trampa de esta validacion: alta y edicion comparten formulario.
+        # Un equipo registrado hace meses tiene hoy una fecha pasada guardada,
+        # y rechazarla impediria cambiarle la ubicacion o el estado.
+        self.dispositivo.fecha_fin_garantia = date(2020, 1, 1)
+        self.dispositivo.save(update_fields=["fecha_fin_garantia"])
+
+        respuesta = self.client.post(
+            reverse("editar_dispositivo_equipos", args=[self.dispositivo.id]),
+            self._datos_formulario_dispositivo(
+                numero_serie=self.dispositivo.numero_serie,
+                fecha_fin_garantia="2020-01-01",
+                observaciones="Cambio ajeno a la garantía.",
+            ),
+        )
+
+        self.assertEqual(respuesta.status_code, 302)
+        self.dispositivo.refresh_from_db()
+        self.assertEqual(self.dispositivo.observaciones, "Cambio ajeno a la garantía.")
+
+    def test_no_se_puede_cambiar_la_garantia_a_una_fecha_ya_vencida(self):
+        respuesta = self.client.post(
+            reverse("editar_dispositivo_equipos", args=[self.dispositivo.id]),
+            self._datos_formulario_dispositivo(
+                numero_serie=self.dispositivo.numero_serie,
+                fecha_fin_garantia="2019-05-05",
+            ),
+        )
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn("fecha_fin_garantia", respuesta.context["form"].errors)
 
     def test_registro_rechaza_una_fecha_de_garantia_invalida(self):
         respuesta = self.client.post(
@@ -1532,7 +1581,7 @@ class EquiposViewsTests(TestCase):
         self.assertIn("inline;", respuesta["Content-Disposition"])
         self.assertIn(self.dispositivo.codigo, respuesta["Content-Disposition"])
         self.assertTrue(respuesta.content.startswith(b"%PDF"))
-        self.assertFalse(
+        self.assertTrue(
             dibujar_pie_pagina.call_args.kwargs["mostrar_paginacion"]
         )
         self.assertEqual(
@@ -2254,6 +2303,30 @@ class ProcedenciaTests(TestCase):
                     telefono=escrito,
                 )
                 self.assertEqual(procedencia.telefono, escrito.strip())
+
+    def test_el_telefono_alterno_se_formatea_igual(self):
+        procedencia = Procedencia.objects.create(
+            nombre="EMPRESA CON DOS NUMEROS",
+            tipo=TipoProcedencia.EMPRESA,
+            telefono="33484816",
+            telefono_alterno="2234 5678",
+        )
+
+        self.assertEqual(procedencia.telefono, "3348-4816")
+        self.assertEqual(procedencia.telefono_alterno, "2234-5678")
+
+    def test_la_persona_de_contacto_guarda_texto_y_no_un_numero(self):
+        # El campo se llamaba solo "Contacto" y se rellenaba con un telefono.
+        # Guarda el nombre de quien atiende; el segundo numero tiene el suyo.
+        procedencia = Procedencia.objects.create(
+            nombre="PROVEEDOR CON CONTACTO",
+            tipo=TipoProcedencia.EMPRESA,
+            contacto="  Ing. Martinez  ",
+            telefono_alterno="33484816",
+        )
+
+        self.assertEqual(procedencia.contacto, "Ing. Martinez")
+        self.assertEqual(procedencia.telefono_alterno, "3348-4816")
 
     def test_telefono_vacio_sigue_vacio(self):
         procedencia = Procedencia.objects.create(

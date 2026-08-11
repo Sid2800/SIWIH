@@ -219,96 +219,50 @@ class FichaActivoFijoPdfService:
             valor = str(texto or "").strip() or "&nbsp;"
             return Paragraph(valor, estilo)
 
-        # Las tres parejas etiqueta/valor respetan la organizacion del formato
-        # de papel. Los campos administrativos no disponibles quedan en blanco
-        # para completarlos manualmente cuando corresponda.
-        filas = [
-            (
-                ("Nº Inventario", datos["numero_inventario"]),
-                ("Nº Inventario B/N", datos["inventario_bn"]),
-                ("Familia", datos["familia"]),
-            ),
-            (
-                ("Descripción", datos["descripcion"]),
-                ("", ""),
-                ("Subfamilia", datos["subfamilia"]),
-            ),
-            (
-                ("Marca", datos["marca"]),
-                ("", ""),
-                ("Código local", datos["codigo_local"]),
-            ),
-            (
-                ("Modelo", datos["modelo"]),
-                ("", ""),
-                ("Centro de costo", datos["centro_costo"]),
-            ),
-            (
-                ("Tipo", datos["tipo"]),
-                ("", ""),
-                ("Departamento", datos["departamento"]),
-            ),
-            (
-                ("Color", datos["color"]),
-                ("", ""),
-                ("Sala / Ambiente", datos["sala_ambiente"]),
-            ),
-            (
-                ("Nº serie", datos["numero_serie"]),
-                ("", ""),
-                ("Nombre jefe departamento/sala", datos["jefe_departamento"]),
-            ),
-            (
-                ("Potencia", datos["potencia"]),
-                ("", ""),
-                ("Proveedor", datos["proveedor"]),
-            ),
-            (
-                ("Principal / Componente", datos["principal_componente"]),
-                ("", ""),
-                ("Proveedor mnto.", datos["proveedor_mantenimiento"]),
-            ),
-            (
-                ("Inactivo", datos["inactivo"]),
-                ("", ""),
-                ("Contrato mnto.", datos["contrato_mantenimiento"]),
-            ),
-            (
-                ("En reparación", datos["en_reparacion"]),
-                ("", ""),
-                ("Fecha inicio contr.", datos["fecha_inicio_contrato"]),
-            ),
-            (
-                ("Fecha de baja", datos["fecha_baja"]),
-                ("", ""),
-                ("Fecha fin contr.", datos["fecha_fin_contrato"]),
-            ),
-            (
-                ("Precio", datos["precio"]),
-                ("Nº Orden compra", datos["orden_compra"]),
-                ("Tipo contrato", datos["tipo_contrato"]),
-            ),
-            (
-                ("Nº Factura", datos["numero_factura"]),
-                ("Comprobante", datos["comprobante"]),
-                ("Duración garantía", datos["duracion_garantia"]),
-            ),
-            (
-                ("Tipo garantía", datos["tipo_garantia"]),
-                ("", ""),
-                ("Fecha fin garantía", datos["fecha_fin_garantia"]),
-            ),
-            (
-                ("Nº activo sustituido", datos["activo_sustituido"]),
-                ("", ""),
-                ("", ""),
-            ),
-            (
-                ("Fecha de entrega", datos["fecha_entrega"]),
-                ("", ""),
-                ("", ""),
-            ),
+        # La ficha se organiza en dos bloques equilibrados. Las casillas que
+        # SIWIH todavia no administra conservan su etiqueta y quedan vacias
+        # para que puedan completarse manualmente en el documento impreso.
+        campos_izquierda = [
+            ("Nº Inventario", datos["numero_inventario"]),
+            ("Nº Inventario B/N", datos["inventario_bn"]),
+            ("Descripción", datos["descripcion"]),
+            ("Marca", datos["marca"]),
+            ("Modelo", datos["modelo"]),
+            ("Tipo", datos["tipo"]),
+            ("Color", datos["color"]),
+            ("Nº serie", datos["numero_serie"]),
+            ("Potencia", datos["potencia"]),
+            ("Principal / Componente", datos["principal_componente"]),
+            ("Inactivo", datos["inactivo"]),
+            ("En reparación", datos["en_reparacion"]),
+            ("Fecha de baja", datos["fecha_baja"]),
+            ("Precio", datos["precio"]),
+            ("Nº Factura", datos["numero_factura"]),
+            ("Nº Orden compra", datos["orden_compra"]),
+            ("Comprobante", datos["comprobante"]),
+            ("Nº activo sustituido", datos["activo_sustituido"]),
         ]
+        campos_derecha = [
+            ("Familia", datos["familia"]),
+            ("Subfamilia", datos["subfamilia"]),
+            ("Código local", datos["codigo_local"]),
+            ("Centro de costo", datos["centro_costo"]),
+            ("Departamento", datos["departamento"]),
+            ("Sala / Ambiente", datos["sala_ambiente"]),
+            ("Nombre jefe departamento/sala", datos["jefe_departamento"]),
+            ("Proveedor", datos["proveedor"]),
+            ("Proveedor mnto.", datos["proveedor_mantenimiento"]),
+            ("Contrato mnto.", datos["contrato_mantenimiento"]),
+            ("Fecha inicio contr.", datos["fecha_inicio_contrato"]),
+            ("Fecha fin contr.", datos["fecha_fin_contrato"]),
+            ("Tipo contrato", datos["tipo_contrato"]),
+            ("Tipo garantía", datos["tipo_garantia"]),
+            ("Duración garantía", datos["duracion_garantia"]),
+            ("Fecha fin garantía", datos["fecha_fin_garantia"]),
+            ("Fecha de entrega", datos["fecha_entrega"]),
+            ("", ""),
+        ]
+        filas = list(zip(campos_izquierda, campos_derecha))
 
         datos_tabla = []
         for fila in filas:
@@ -324,14 +278,7 @@ class FichaActivoFijoPdfService:
 
         tabla = Table(
             datos_tabla,
-            colWidths=[
-                2.25 * cm,
-                3.35 * cm,
-                2.25 * cm,
-                2.35 * cm,
-                2.55 * cm,
-                4.45 * cm,
-            ],
+            colWidths=[2.35 * cm, 6.25 * cm, 2.6 * cm, 6 * cm],
         )
         estilo_tabla = [
             ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#777777")),
@@ -342,7 +289,6 @@ class FichaActivoFijoPdfService:
             ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
             ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#E7EEEE")),
             ("BACKGROUND", (2, 0), (2, -1), colors.HexColor("#E7EEEE")),
-            ("BACKGROUND", (4, 0), (4, -1), colors.HexColor("#E7EEEE")),
         ]
         tabla.setStyle(TableStyle(estilo_tabla))
         _, alto_tabla = tabla.wrap(ancho_contenido, alto)
@@ -386,7 +332,7 @@ class FichaActivoFijoPdfService:
         tabla_firmas = Table(
             firmas,
             colWidths=[ancho_contenido / 2, ancho_contenido / 2],
-            rowHeights=[43, 43, 43],
+            rowHeights=[50, 50, 50],
         )
         tabla_firmas.setStyle(
             TableStyle(
@@ -399,12 +345,11 @@ class FichaActivoFijoPdfService:
                 ]
             )
         )
-        _, alto_firmas = tabla_firmas.wrap(ancho_contenido, alto)
-        tabla_firmas.drawOn(
-            pdf,
-            x_contenido,
-            y_tabla - alto_firmas - 8,
-        )
+        tabla_firmas.wrap(ancho_contenido, alto)
+        # Las firmas ocupan una zona fija en la parte inferior. Asi permanecen
+        # abajo aunque una descripcion o un nombre hagan crecer alguna fila.
+        y_firmas = 62 + (4 * cm)
+        tabla_firmas.drawOn(pdf, x_contenido, y_firmas)
 
         ahora_local = timezone.localtime()
         ReportePdfBaseService.dibujar_pie_pagina_carta(
@@ -416,7 +361,7 @@ class FichaActivoFijoPdfService:
             "",
             1,
             1,
-            mostrar_paginacion=False,
+            mostrar_paginacion=True,
             etiqueta_usuario="GENERADO POR: ",
         )
         pdf.save()

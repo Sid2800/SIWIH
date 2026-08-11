@@ -289,6 +289,10 @@ class Procedencia(models.Model):
     tipo = models.PositiveSmallIntegerField(choices=TipoProcedencia.choices)
     rtn = models.CharField(max_length=20, unique=True, null=True, blank=True)
     telefono = models.CharField(max_length=30, blank=True)
+    telefono_alterno = models.CharField(max_length=30, blank=True)
+    # Nombre de la persona por quien preguntar, no otro numero: un telefono de
+    # empresa sin saber a quien buscar obliga a explicar el caso desde cero en
+    # cada llamada.
     contacto = models.CharField(max_length=150, blank=True)
     correo = models.EmailField(blank=True)
     activo = models.BooleanField(default=True, db_index=True)
@@ -308,6 +312,7 @@ class Procedencia(models.Model):
         # cadenas vacias. Por eso un RTN omitido se persiste siempre como NULL.
         self.rtn = (self.rtn or "").strip() or None
         self.telefono = normalizar_telefono(self.telefono)
+        self.telefono_alterno = normalizar_telefono(self.telefono_alterno)
         self.contacto = (self.contacto or "").strip()
         self.correo = (self.correo or "").strip()
 
