@@ -1,18 +1,11 @@
-from referencia.models import Referencia_diagnostico, Respuesta_diagnostico, Referencia, Respuesta, SeguimientoTic
-from core.utils.utilidades_fechas import generar_rango_mes, filtro_rango_fecha
-from django.db.models import Q, F, Case, When, Value, CharField, Count, Sum, IntegerField
-from django.db.models.functions import ExtractMonth, Concat, Trim, ExtractYear, Now
-from core.utils.utilidades_calculos import calcular_porcentaje
+from referencia.models import Referencia, SeguimientoTic, ControlCalidadReferencia, ControlCalidadRespuesta
 from servicio.models import Institucion_salud
 from core.services.referencia.referencia_diagnostico_service import RefDiagnosticoService
 from core.constants.domain_constants import HEAC_INSTITUCION_ID
 from core.constants.domain_constants import LogApp
 from core.utils.utilidades_logging import *
 from django.db import transaction
-from datetime import date,datetime
-from django.utils import timezone
-import calendar
-from collections import defaultdict
+
 
 
 class ReferenciaService:
@@ -20,7 +13,7 @@ class ReferenciaService:
     
 
     @staticmethod
-    def crear_referencia_enviada_segun_repuesta(data: dict, diagnosticos, user=None):
+    def crear_referencia_enviada_segun_repuesta(data: dict, diagnosticos, user=None, control_calidad = None):
         
         try:
             with transaction.atomic():
@@ -34,6 +27,7 @@ class ReferenciaService:
                     "motivo": data.get("motivo"),
                     "motivo_detalle": data.get("motivo_detalle"),
                     "atencion_requerida": data.get("atencion_requerida"),
+                    "personal_salud_refiere": data.get("personal_salud_refiere"),
                     "elaborada_por": data.get("elaborada_por"),
                     "unidad_clinica_refiere": data.get("unidad_clinica_refiere"),
                     "especialidad_destino": data.get("especialidad_destino"),
@@ -57,6 +51,8 @@ class ReferenciaService:
                     referencia_id=referencia.id,
                     diagnosticos=diagnosticos
                 )
+
+                ReferenciaService.procesar_control_calidad_referencia(referencia, control_calidad, user)
                 return referencia
 
         except Exception:
@@ -162,10 +158,72 @@ class ReferenciaService:
 
 
     @staticmethod
-    def obtener_seguimiento_id(idSeguimiento):
+    def procesar_control_calidad_referencia(referencia, criterios,usuario):
+        """
+        Crea o actualiza el control de calidad asociado a una referencia.
+
+        Si el control ya existe, únicamente se actualiza cuando
+        alguno de los criterios cambió.
+        """
+
         try:
-            relaciones = ['referencia','creado_por']
-            seguimiento = SeguimientoTic.objects.select_related(*relaciones).get(id=idSeguimiento)
-            return seguimiento
-        except SeguimientoTic.DoesNotExist:
-            return None
+            control = referencia.control_calidad
+
+        except ControlCalidadReferencia.DoesNotExist:
+            ControlCalidadReferencia.objects.create(
+                referencia=referencia,
+                creado_por=usuario,
+                modificado_por=usuario,
+                **criterios
+            )
+            return
+
+        hubo_cambios = False
+
+        for campo, valor in criterios.items():
+
+            if getattr(control, campo) != valor:
+                setattr(control, campo, valor)
+                hubo_cambios = True
+
+        if hubo_cambios:
+            control.modificado_por = usuario
+            control.save()
+
+
+    @staticmethod
+    def procesar_control_calidad_respuesta(respuesta, criterios,usuario):
+        """
+        Crea o actualiza el control de calidad asociado a una referencia.
+
+        Si el control ya existe, únicamente se actualiza cuando
+        alguno de los criterios cambió.
+        """
+
+        try:
+            control = respuesta.control_calidad
+
+        except ControlCalidadRespuesta.DoesNotExist:
+            ControlCalidadRespuesta.objects.create(
+                respuesta=respuesta,
+                creado_por=usuario,
+                modificado_por=usuario,
+                **criterios
+            )
+            return
+
+        hubo_cambios = False
+
+        for campo, valor in criterios.items():
+
+            if getattr(control, campo) != valor:
+                setattr(control, campo, valor)
+                hubo_cambios = True
+
+        if hubo_cambios:
+            control.modificado_por = usuario
+            control.save()
+
+
+
+        

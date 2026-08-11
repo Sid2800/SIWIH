@@ -67,6 +67,10 @@ class FuenteSeguimiento(models.IntegerChoices):
     PROFESIONAL_SALUD = 4, "PROFESIONAL DE SALUD"
     OTRO = 5, "OTRO"
 
+class TipoControlCalidadReferencia(models.IntegerChoices):
+    REFERENCIA = 1, "REFERENCIA"
+    RESPUESTA = 2, "RESPUESTA"
+
 
 class TipoDefuncion(models.IntegerChoices):
     INTRAHOSPITALARIA = 1, "Intrahospitalaria"

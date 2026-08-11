@@ -1,6 +1,7 @@
 from core.validators.main_validator import validar_entero_positivo
 from core.validators.fecha_validator import validar_fecha, validar_rango_fechas, validar_horario
 from clinico.validators import validar_tipo_atencion_activo
+from rrhh.validators import validar_personal_salud_activo
 from core.services.agenda_medica.periodo_laboral_service import PeriodoLaboralService
 from django.core.exceptions import ValidationError
 from datetime import datetime, timedelta, time, date
@@ -110,9 +111,12 @@ class PeriodoLaboralValidator:
     def validarReglasCriticasPeriodoLaboral(cls, periodo):
 
         if not periodo:
-            return None 
+            return None
 
         periodo_registro = None
+
+        # Validar que el personal exista y esté activo
+        personal_salud = validar_personal_salud_activo(periodo.personal_id)
 
         # Fase de modificación
         if periodo.id:
@@ -120,9 +124,8 @@ class PeriodoLaboralValidator:
             # Validar que exista y esté activo
             periodo_registro = cls._validarExistenciaPeriodoLaboral(periodo.id)
 
-
             # Cambio de personal
-            if periodo.personal_id != periodo_registro.personal_salud.id:
+            if personal_salud.id != periodo_registro.personal_salud.id:
                 raise ValidationError(
                     "No se permite el cambio de personal en un período laboral."
                 )
@@ -151,7 +154,7 @@ class PeriodoLaboralValidator:
                     raise ValidationError(
                         "No se permite desactivar un periodo en ejecucion"
                     )
-                
+
                 # No permitir modificar fecha inicial
                 if periodo.fecha_inicio != periodo_registro.fecha_inicio:
                     raise ValidationError(
@@ -165,7 +168,6 @@ class PeriodoLaboralValidator:
                         "La fecha final de un período en ejecución "
                         "debe ser mayor a hoy."
                     )
-                    
 
         return periodo_registro
         

@@ -29,46 +29,46 @@ async function cargarSalas(select) {
 
 const UnidadClinicaLoader = (function () {
 
-   async function cargar(select, uso = "general") {
-      if (!select) return;
-
-      try {
-         // construir URL correctamente
-
-
-         const data = await fetchData(API_URLS.listarUnidadClinica, { uso: uso });
-
-         // limpiar select
-         select.innerHTML = '';
-
-         if (Array.isArray(data) && data.length > 0) {
-
-            data.forEach(item => {
-               const texto =   `${item.nombre}  (${item.tipo})` ;
-               const option = new Option(
-                  texto,            // texto visible
-                  item.clave        // valor: "S-1", "E-2", "A-3"
+      async function cargar(select = null, uso = "general") {
+         try {
+               const data = await fetchData(
+                  API_URLS.listarUnidadClinica,
+                  { uso: uso }
                );
 
-               // opcional: metadata útil
-               option.dataset.tipo = item.tipo;
-               option.dataset.origen = item.origen;
+               if (!Array.isArray(data)) {
+                  throw new Error("Respuesta inválida del servidor");
+               }
 
-               select.appendChild(option);
-            });
+               if (select) {
+                  select.innerHTML = '';
 
-         } else {
-            console.warn("No hay unidades clinicas disponibles.");
+                  data.forEach(item => {
+                     const texto = `${item.nombre} (${item.tipo})`;
+
+                     const option = new Option(
+                           texto,
+                           item.clave
+                     );
+
+                     option.dataset.tipo = item.tipo;
+                     option.dataset.origen = item.origen;
+
+                     select.appendChild(option);
+                  });
+               }
+
+               return data;
+
+         } catch (error) {
+               console.error("Error cargando unidades clínicas:", error);
+               toastr.error("No se pudieron cargar las unidades clínicas.");
+               return [];
          }
-
-      } catch (error) {
-         console.error("Error cargando unidades clinicas:", error);
-         toastr.error("No se pudieron cargar las unidades clinicas");
       }
-   }
 
-   return {
-      cargar
-   };
+      return {
+         cargar
+      };
 
 })();

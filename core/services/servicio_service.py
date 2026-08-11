@@ -237,6 +237,8 @@ class ServicioService:
         return unidades_clinicas
 
 
+
+
     @staticmethod
     def obtener_unidad_clinica(id):
         if not id:

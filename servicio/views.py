@@ -110,14 +110,21 @@ class ListarUnidadesClinicas(View):
         incluir_externo = True
         solo_emergencia = False
 
-        if uso == UsoUnidadC.DEFUNCION or UsoUnidadC.OBITO:
+        if uso == UsoUnidadC.DEFUNCION or uso == UsoUnidadC.OBITO:
             incluir_externo = False
             solo_emergencia = True
+
+        if uso == UsoUnidadC.REFERENCIA:
+            incluir_externo = False
+            solo_emergencia = False
+
+            
 
         unidades_clinicas = ServicioService.obtener_unidades_clinicas(
             incluir_externo=incluir_externo,
             solo_emergencia= solo_emergencia
         )
+
         return JsonResponse(unidades_clinicas, safe=False)
 
 

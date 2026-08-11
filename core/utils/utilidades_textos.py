@@ -62,7 +62,8 @@ def construir_nombre_dinamico(obj, campos):
         ).strip()
 
 
-def str_to_bool(value, default=True):
+def str_to_bool(value, default=False):
     if value is None:
         return default
+
     return value in ["1", "true", "True"]

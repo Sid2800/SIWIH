@@ -96,7 +96,7 @@ class ObitoFetalAdmin(admin.ModelAdmin):
 class PacienteAdmin(admin.ModelAdmin):
     list_display = ('dni','get_nombre_completo','fecha_nacimiento','sexo','tipo','get_direccion_completa')
     search_fields = ('dni','primer_nombre', 'segundo_nombre', 'primer_apellido', 'segundo_apellido'  )
-    autocomplete_fields = ['sector'] 
+    autocomplete_fields = ['sector','padre','madre'] 
     list_filter = ('sexo','ocupacion','tipo','clasificacion','zona','creado_por','estado','sai', 'etnia')
     readonly_fields = ('fecha_creado', 'fecha_modificado','creado_por','modificado_por')
 
