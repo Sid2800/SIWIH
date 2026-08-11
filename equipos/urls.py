@@ -131,6 +131,29 @@ urlpatterns = [
         name='cambiar_estado_tipo_equipos'
     ),
 
+    # La procedencia tiene catálogo propio porque incluye datos de contacto,
+    # no solo un nombre como los catálogos técnicos del equipo.
+    path(
+        'catalogo/procedencias/',
+        views.catalogo_procedencias,
+        name='catalogo_procedencias_equipos'
+    ),
+    path(
+        'catalogo/procedencias/agregar/',
+        views.agregar_procedencia_catalogo,
+        name='agregar_procedencia_equipos'
+    ),
+    path(
+        'catalogo/procedencias/<int:procedencia_id>/editar/',
+        views.editar_procedencia_catalogo,
+        name='editar_procedencia_equipos'
+    ),
+    path(
+        'catalogo/procedencias/<int:procedencia_id>/estado/',
+        views.cambiar_estado_procedencia,
+        name='cambiar_estado_procedencia_equipos'
+    ),
+
     # Autocompletado de los Select2 del formulario de equipos.
     path(
         'buscar-tipos/',

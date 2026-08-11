@@ -16,6 +16,28 @@ class FichaBajaPdfService:
     """Genera la ficha imprimible previa a la baja definitiva de un equipo."""
 
     INDEFINIDO = "INDEFINIDO"
+    # Codigo de control del formato administrativo proporcionado por el hospital.
+    CODIGO_DOCUMENTAL = "AX-GR-SG-MANT-002 A"
+
+    @classmethod
+    def _dibujar_codigo_documental(cls, pdf, x_derecha, y):
+        """Dibuja el identificador del formato sin mezclarlo con el inventario."""
+        ancho_codigo = 6.5 * cm
+        alto_codigo = 18
+        x_codigo = x_derecha - ancho_codigo
+
+        pdf.saveState()
+        pdf.setFillColor(colors.black)
+        pdf.setStrokeColor(colors.HexColor("#777777"))
+        pdf.setLineWidth(0.5)
+        pdf.rect(x_codigo, y, ancho_codigo, alto_codigo, stroke=1, fill=0)
+        pdf.setFont("Helvetica-Bold", 10)
+        pdf.drawCentredString(
+            x_codigo + (ancho_codigo / 2),
+            y + 5,
+            cls.CODIGO_DOCUMENTAL,
+        )
+        pdf.restoreState()
 
     @classmethod
     def _texto(cls, valor):
@@ -90,6 +112,12 @@ class FichaBajaPdfService:
         ubicacion = asignacion.ubicacion if asignacion else None
         nombre_empleado_asignado = cls._nombre_empleado(
             asignacion.responsable if asignacion else None
+        )
+
+        cls._dibujar_codigo_documental(
+            pdf,
+            x_contenido + ancho_contenido,
+            alto - 101,
         )
 
         pdf.setFillColor(colors.black)

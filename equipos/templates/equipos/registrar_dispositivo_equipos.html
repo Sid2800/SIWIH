@@ -199,6 +199,45 @@
         {% endif %}
 
         {% comment %}
+           La procedencia es obligatoria, pero se agrupa para mantener el
+           formulario compacto. Si vuelve con errores, el bloque se abre.
+        {% endcomment %}
+        <details class="equipos-registro__opcionales"
+                 id="procedencia_equipo"
+                 {% if form.modalidad_procedencia.errors or form.procedencia.errors or form.numero_referencia.errors %}open{% endif %}>
+            <summary class="equipos-registro__opcionales-resumen">
+                <h3 class="equipos-registro__opcionales-titulo">
+                    <i class="bi bi-box-arrow-in-down"></i>
+                    Procedencia
+                </h3>
+                <span class="equipos-registro__opcionales-conteo">
+                    Modalidad, origen y referencia externa
+                </span>
+                <i class="bi bi-chevron-down equipos-registro__opcionales-flecha"></i>
+            </summary>
+
+            <div class="equipos-registro__opcionales-cuerpo">
+                <div class="equipos-registro__campos equipos-registro__campos--dos">
+                    <div class="equipos-registro__campo">
+                        <label for="modalidad_procedencia_dispositivo">Modalidad *</label>
+                        {{ form.modalidad_procedencia }}
+                        {{ form.modalidad_procedencia.errors }}
+                    </div>
+                    <div class="equipos-registro__campo">
+                        <label for="procedencia_dispositivo">Procedencia *</label>
+                        {{ form.procedencia }}
+                        {{ form.procedencia.errors }}
+                    </div>
+                    <div class="equipos-registro__campo equipos-registro__campo--completo">
+                        <label for="numero_referencia_dispositivo">Número de referencia</label>
+                        {{ form.numero_referencia }}
+                        {{ form.numero_referencia.errors }}
+                    </div>
+                </div>
+            </div>
+        </details>
+
+        {% comment %}
            Ningun campo de este bloque es obligatorio, por eso arranca cerrado.
            Los controles siguen enviandose aunque el details este plegado; solo
            se abre solo cuando alguno vuelve con error de validacion para que el
@@ -770,15 +809,30 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Select2 mide el ancho al arrancar. Dentro de un <details> cerrado los
     // campos no tienen ancho, asi que se reajustan al desplegarlo.
-    const bloqueOpcionales = document.querySelector('.equipos-registro__opcionales');
+    const bloquesOpcionales = document.querySelectorAll(
+        '.equipos-registro__opcionales'
+    );
 
-    if (bloqueOpcionales) {
+    bloquesOpcionales.forEach(function (bloqueOpcionales) {
         bloqueOpcionales.addEventListener('toggle', function () {
-            if (bloqueOpcionales.open) {
+            if (this.open) {
                 $('#marca_dispositivo, #modelo_dispositivo')
                     .trigger('change.select2');
             }
         });
+    });
+
+    // Un control required dentro de <details> debe quedar visible antes de
+    // que el navegador intente enfocarlo al informar la validacion.
+    const formularioEquipo = document.getElementById('formulario_equipo');
+    const bloqueProcedencia = document.getElementById('procedencia_equipo');
+
+    if (formularioEquipo && bloqueProcedencia) {
+        formularioEquipo.addEventListener('invalid', function (evento) {
+            if (bloqueProcedencia.contains(evento.target)) {
+                bloqueProcedencia.open = true;
+            }
+        }, true);
     }
 });
 </script>

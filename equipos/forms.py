@@ -16,8 +16,11 @@ from .models import (
     Dispositivo,
     EstadoDispositivo,
     MarcaDispositivo,
+    ModalidadProcedencia,
     ModeloDispositivo,
+    Procedencia,
     TipoDispositivo,
+    TipoProcedencia,
     TipoTecnologiaDispositivo,
     normalizar_inventario_bienes_nacionales,
     normalizar_inventario_numero_ficha,
@@ -346,6 +349,9 @@ class DispositivoCreateForm(forms.ModelForm):
             "marca",
             "modelo",
             "area_gestora",
+            "modalidad_procedencia",
+            "procedencia",
+            "numero_referencia",
             "color",
             "color_secundario",
             "numero_serie",
@@ -388,6 +394,25 @@ class DispositivoCreateForm(forms.ModelForm):
                 attrs={
                     "class": "formularioCampo-select",
                     "id": "area_gestora_dispositivo",
+                }
+            ),
+            "modalidad_procedencia": forms.Select(
+                attrs={
+                    "class": "formularioCampo-select",
+                    "id": "modalidad_procedencia_dispositivo",
+                }
+            ),
+            "procedencia": forms.Select(
+                attrs={
+                    "class": "formularioCampo-select",
+                    "id": "procedencia_dispositivo",
+                }
+            ),
+            "numero_referencia": forms.TextInput(
+                attrs={
+                    "class": "formularioCampo-text",
+                    "id": "numero_referencia_dispositivo",
+                    "placeholder": "Opcional",
                 }
             ),
             "color": forms.Select(
@@ -506,6 +531,7 @@ class DispositivoCreateForm(forms.ModelForm):
         filtro_modelo = Q(activo=True)
         filtro_area_gestora = Q(activo=True)
         filtro_color = Q(activo=True)
+        filtro_procedencia = Q(activo=True)
 
         if self.instance and self.instance.pk:
             if self.instance.tipo_id:
@@ -520,6 +546,8 @@ class DispositivoCreateForm(forms.ModelForm):
                 filtro_color |= Q(pk=self.instance.color_id)
             if self.instance.color_secundario_id:
                 filtro_color |= Q(pk=self.instance.color_secundario_id)
+            if self.instance.procedencia_id:
+                filtro_procedencia |= Q(pk=self.instance.procedencia_id)
 
         # El tipo tambien se busca por AJAX: el catalogo pasa del centenar de
         # entradas y volcarlas en el HTML alarga cada carga sin necesidad.
@@ -570,6 +598,14 @@ class DispositivoCreateForm(forms.ModelForm):
             filtro_area_gestora
         ).exclude(nombre="INDEFINIDO")
         self.fields["area_gestora"].empty_label = "Seleccione el area gestora"
+        self.fields["procedencia"].queryset = Procedencia.objects.filter(
+            filtro_procedencia
+        )
+        self.fields["procedencia"].empty_label = "Seleccione la procedencia"
+        self.fields["modalidad_procedencia"].choices = [
+            ("", "Seleccione la modalidad"),
+            *ModalidadProcedencia.choices,
+        ]
         # Los dos colores salen del mismo catalogo y comparten filtro, asi que
         # un color nuevo queda disponible para ambos sin tocar nada mas.
         self.fields["color"].queryset = ColorDispositivo.objects.filter(filtro_color)
@@ -711,6 +747,102 @@ class DispositivoCreateForm(forms.ModelForm):
             cleaned_data["area_clinica"] = None
 
         return cleaned_data
+
+
+class ProcedenciaCatalogoForm(forms.ModelForm):
+    """Alta y edición de personas o empresas que originan equipos."""
+
+    class Meta:
+        model = Procedencia
+        fields = ["nombre", "tipo", "rtn", "telefono", "contacto", "correo"]
+        labels = {
+            "rtn": "RTN",
+            "telefono": "Teléfono",
+        }
+        widgets = {
+            "nombre": forms.TextInput(
+                attrs={
+                    "class": "formularioCampo-text",
+                    "id": "nombre_procedencia_catalogo",
+                    "placeholder": "Nombre de la empresa o persona",
+                    "maxlength": 150,
+                }
+            ),
+            "tipo": forms.Select(
+                attrs={
+                    "class": "formularioCampo-select",
+                    "id": "tipo_procedencia_catalogo",
+                }
+            ),
+            "rtn": forms.TextInput(
+                attrs={
+                    "class": "formularioCampo-text",
+                    "id": "rtn_procedencia_catalogo",
+                    "placeholder": "Opcional",
+                    "maxlength": 20,
+                }
+            ),
+            "telefono": forms.TextInput(
+                attrs={
+                    "class": "formularioCampo-text",
+                    "id": "telefono_procedencia_catalogo",
+                    "placeholder": "Opcional",
+                    "maxlength": 30,
+                }
+            ),
+            "contacto": forms.TextInput(
+                attrs={
+                    "class": "formularioCampo-text",
+                    "id": "contacto_procedencia_catalogo",
+                    "placeholder": "Opcional",
+                    "maxlength": 150,
+                }
+            ),
+            "correo": forms.EmailInput(
+                attrs={
+                    "class": "formularioCampo-text",
+                    "id": "correo_procedencia_catalogo",
+                    "placeholder": "Opcional",
+                }
+            ),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["tipo"].choices = [
+            ("", "Seleccione el tipo"),
+            *TipoProcedencia.choices,
+        ]
+
+    def clean_nombre(self):
+        nombre = normalizar_nombre_catalogo(self.cleaned_data.get("nombre"))
+
+        if not nombre:
+            raise forms.ValidationError("Debe ingresar la procedencia.")
+
+        duplicada = Procedencia.objects.filter(nombre=nombre).exclude(
+            pk=self.instance.pk
+        )
+        if duplicada.exists():
+            raise forms.ValidationError(
+                "Ya existe una procedencia con ese nombre."
+            )
+
+        return nombre
+
+    def clean_rtn(self):
+        rtn = (self.cleaned_data.get("rtn") or "").strip() or None
+
+        if rtn is not None:
+            duplicada = Procedencia.objects.filter(rtn=rtn).exclude(
+                pk=self.instance.pk
+            )
+            if duplicada.exists():
+                raise forms.ValidationError(
+                    "Ya existe una procedencia con este RTN."
+                )
+
+        return rtn
 
 
 class MarcaCatalogoForm(forms.ModelForm):

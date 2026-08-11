@@ -9,6 +9,7 @@ from .models import (
     MarcaDispositivo,
     ModeloDispositivo,
     OrdenTrabajoBajaDispositivo,
+    Procedencia,
     TipoDispositivo,
 )
 
@@ -50,6 +51,13 @@ class ColorDispositivoAdmin(admin.ModelAdmin):
     search_fields = ("nombre",)
 
 
+@admin.register(Procedencia)
+class ProcedenciaAdmin(admin.ModelAdmin):
+    list_display = ("nombre", "tipo", "rtn", "telefono", "activo")
+    list_filter = ("tipo", "activo")
+    search_fields = ("nombre", "rtn", "telefono", "contacto", "correo")
+
+
 @admin.register(Dispositivo)
 class DispositivoAdmin(admin.ModelAdmin):
     # Permite revisar la ficha del equipo desde admin, pero el flujo normal
@@ -61,6 +69,8 @@ class DispositivoAdmin(admin.ModelAdmin):
         "marca",
         "modelo",
         "area_gestora",
+        "modalidad_procedencia",
+        "procedencia",
         "color",
         "numero_serie",
         "inventario_bienes_nacionales",
@@ -73,6 +83,8 @@ class DispositivoAdmin(admin.ModelAdmin):
         "marca",
         "modelo",
         "area_gestora",
+        "modalidad_procedencia",
+        "procedencia",
         "color",
         "tipo_tecnologia",
         "estado",
@@ -83,6 +95,8 @@ class DispositivoAdmin(admin.ModelAdmin):
         "marca__nombre",
         "modelo__nombre",
         "area_gestora__nombre",
+        "procedencia__nombre",
+        "numero_referencia",
         "color__nombre",
         "numero_serie",
         "inventario_bienes_nacionales",
@@ -93,6 +107,7 @@ class DispositivoAdmin(admin.ModelAdmin):
         "marca",
         "modelo",
         "area_gestora",
+        "procedencia",
         "color",
         "creado_por",
         "modificado_por",

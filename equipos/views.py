@@ -27,6 +27,7 @@ from .forms import (
     ImagenDispositivoForm,
     MarcaCatalogoForm,
     ModeloCatalogoForm,
+    ProcedenciaCatalogoForm,
     TipoCatalogoForm,
     TIPOS_IMAGEN_DISPOSITIVO,
 )
@@ -43,6 +44,7 @@ from .models import (
     ModeloDispositivo,
     OrdenTrabajoBajaDispositivo,
     PausaGarantia,
+    Procedencia,
     TipoDispositivo,
 )
 from .decorators import (
@@ -356,6 +358,7 @@ def _obtener_dispositivos_base():
         "modelo",
         "area_gestora",
         "color",
+        "procedencia",
     ).prefetch_related(_prefetch_asignacion_activa())
 
 
@@ -381,14 +384,11 @@ def _aplicar_busqueda_dispositivos(dispositivos, consulta):
 
 
 def _ordenar_dispositivos(dispositivos):
-    # Orden estable para que paginacion/listados no cambien entre consultas.
+    # Los registros recientes encabezan listado y busqueda. El id resuelve
+    # empates si varios equipos comparten la misma fecha de creacion.
     return dispositivos.order_by(
-        "tipo__nombre",
-        "marca__nombre",
-        "modelo__nombre",
-        "area_gestora__nombre",
-        "color__nombre",
-        "numero_serie",
+        "-fecha_creado",
+        "-pk",
     ).distinct()
 
 
@@ -611,6 +611,7 @@ def detalle_dispositivo(request, dispositivo_id):
             "modelo",
             "area_gestora",
             "color",
+            "procedencia",
             "baja__registrado_por",
             "orden_trabajo_baja__creado_por",
         ),
@@ -685,6 +686,7 @@ def editar_dispositivo(request, dispositivo_id):
             "modelo",
             "area_gestora",
             "color",
+            "procedencia",
         ),
         pk=dispositivo_id,
     )
@@ -838,6 +840,7 @@ def tramite_baja_dispositivo(request, dispositivo_id):
             "area_gestora",
             "color",
             "color_secundario",
+            "procedencia",
         ),
         pk=dispositivo_id,
     )
@@ -1062,6 +1065,7 @@ def ficha_activo_fijo_pdf(request, dispositivo_id):
             "area_gestora",
             "color",
             "color_secundario",
+            "procedencia",
         ),
         pk=dispositivo_id,
     )
@@ -1570,6 +1574,110 @@ def cambiar_estado_modelo(request, modelo_id):
         f"Modelo {modelo.nombre} {'reactivado' if modelo.activo else 'desactivado'}.",
     )
     return redirect(_url_catalogo(modelo.marca))
+
+
+def _url_catalogo_procedencias(procedencia=None):
+    url = reverse("catalogo_procedencias_equipos")
+    if procedencia is None:
+        return url
+    return f"{url}?procedencia={procedencia.pk}"
+
+
+@exige_ver_equipos
+@login_required
+@registrar_errores_vista("Error en catalogo de procedencias")
+def catalogo_procedencias(request):
+    procedencia_editada = None
+    procedencia_id = request.GET.get("procedencia")
+
+    if str(procedencia_id or "").isdigit():
+        procedencia_editada = get_object_or_404(
+            Procedencia,
+            pk=int(procedencia_id),
+        )
+
+    procedencias = Procedencia.objects.annotate(
+        total_equipos=Count("dispositivos"),
+    ).order_by("-activo", "nombre")
+
+    return render(
+        request,
+        "equipos/catalogo_procedencias_equipos.html",
+        {
+            "procedencias": procedencias,
+            "procedencia_editada": procedencia_editada,
+            "form_procedencia": ProcedenciaCatalogoForm(
+                instance=procedencia_editada
+            ),
+            "url_regresar": reverse("inicio_equipos"),
+        },
+    )
+
+
+@exige_catalogo_equipos
+@login_required
+@registrar_errores_vista("Error al agregar procedencia")
+@require_POST
+def agregar_procedencia_catalogo(request):
+    form = ProcedenciaCatalogoForm(request.POST)
+
+    if not form.is_valid():
+        primer_error = next(
+            (str(error) for errores in form.errors.values() for error in errores),
+            "Revise los datos de la procedencia.",
+        )
+        messages.error(request, primer_error)
+        return redirect(_url_catalogo_procedencias())
+
+    procedencia = form.save()
+    messages.success(
+        request,
+        f"Procedencia {procedencia.nombre} agregada correctamente.",
+    )
+    return redirect(_url_catalogo_procedencias())
+
+
+@exige_catalogo_equipos
+@login_required
+@registrar_errores_vista("Error al editar procedencia")
+@require_POST
+def editar_procedencia_catalogo(request, procedencia_id):
+    procedencia = get_object_or_404(Procedencia, pk=procedencia_id)
+    form = ProcedenciaCatalogoForm(request.POST, instance=procedencia)
+
+    if not form.is_valid():
+        primer_error = next(
+            (str(error) for errores in form.errors.values() for error in errores),
+            "Revise los datos de la procedencia.",
+        )
+        messages.error(request, primer_error)
+        return redirect(_url_catalogo_procedencias(procedencia))
+
+    procedencia = form.save()
+    messages.success(
+        request,
+        f"Procedencia {procedencia.nombre} actualizada correctamente.",
+    )
+    return redirect(_url_catalogo_procedencias())
+
+
+@exige_catalogo_equipos
+@login_required
+@registrar_errores_vista("Error al cambiar estado de procedencia")
+@require_POST
+def cambiar_estado_procedencia(request, procedencia_id):
+    procedencia = get_object_or_404(Procedencia, pk=procedencia_id)
+    procedencia.activo = not procedencia.activo
+    procedencia.save(update_fields=["activo"])
+
+    messages.success(
+        request,
+        (
+            f"Procedencia {procedencia.nombre} "
+            f"{'reactivada' if procedencia.activo else 'desactivada'}."
+        ),
+    )
+    return redirect(_url_catalogo_procedencias())
 
 
 @exige_ver_equipos

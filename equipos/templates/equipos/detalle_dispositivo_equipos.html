@@ -245,6 +245,24 @@
             </dl>
         </section>
 
+        <section class="equipos-detalle__tarjeta">
+            <h3><i class="bi bi-box-arrow-in-down"></i> Procedencia</h3>
+            <dl class="equipos-detalle__datos">
+                <div>
+                    <dt>Modalidad</dt>
+                    <dd>{{ dispositivo.get_modalidad_procedencia_display }}</dd>
+                </div>
+                <div>
+                    <dt>Procedencia</dt>
+                    <dd>{{ dispositivo.procedencia.nombre }}</dd>
+                </div>
+                <div>
+                    <dt>Teléfono</dt>
+                    <dd>{{ dispositivo.procedencia.telefono|default:"No indicado" }}</dd>
+                </div>
+            </dl>
+        </section>
+
         {% comment %}
            Garantia. La fecha del contrato no se toca nunca: el vencimiento
            real se calcula sumandole los dias que el equipo estuvo fuera, y

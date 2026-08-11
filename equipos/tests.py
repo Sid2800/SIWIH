@@ -2,7 +2,7 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 from importlib import import_module
 from io import BytesIO
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from django.apps import apps as django_apps
 from django.contrib.auth import get_user_model
@@ -38,13 +38,20 @@ from .models import (
     EstadoDispositivo,
     EstadoGarantiaDispositivo,
     MarcaDispositivo,
+    ModalidadProcedencia,
     ModeloDispositivo,
     OrdenTrabajoBajaDispositivo,
     PausaGarantia,
+    Procedencia,
     TipoDispositivo,
+    TipoProcedencia,
     TipoTecnologiaDispositivo,
 )
-from .forms import CostoLempirasField, DispositivoCreateForm
+from .forms import (
+    CostoLempirasField,
+    DispositivoCreateForm,
+    ProcedenciaCatalogoForm,
+)
 from .services.garantia_service import (
     calcular_estado_garantia,
     puede_pausarse,
@@ -101,6 +108,22 @@ def dar_acceso_global(usuario, rol=RolUsuario.ADMIN):
     )
 
 
+def crear_dispositivo_prueba(**datos):
+    """Crea equipos válidos sin repetir el catálogo base en cada prueba."""
+    if "procedencia" not in datos:
+        procedencia, _ = Procedencia.objects.get_or_create(
+            nombre="PROCEDENCIA DE PRUEBA",
+            defaults={"tipo": TipoProcedencia.EMPRESA},
+        )
+        datos["procedencia"] = procedencia
+
+    datos.setdefault(
+        "modalidad_procedencia",
+        ModalidadProcedencia.COMPRA,
+    )
+    return Dispositivo.objects.create(**datos)
+
+
 class EquiposViewsTests(TestCase):
     databases = {"default"}
 
@@ -128,6 +151,11 @@ class EquiposViewsTests(TestCase):
         )
         cls.area_gestora, _ = AreaGestora.objects.get_or_create(nombre="BIOMEDICA")
         cls.color, _ = ColorDispositivo.objects.get_or_create(nombre="BLANCO")
+        cls.procedencia = Procedencia.objects.create(
+            nombre="DISTRIBUIDORA MEDICA",
+            tipo=TipoProcedencia.EMPRESA,
+            telefono="2234-5678",
+        )
         cls.servicio = Servicio.objects.create(
             nombre_servicio="Emergencia",
             nombre_corto="EMER",
@@ -164,12 +192,15 @@ class EquiposViewsTests(TestCase):
             creado_por=cls.usuario,
             modificado_por=cls.usuario,
         )
-        cls.dispositivo = Dispositivo.objects.create(
+        cls.dispositivo = crear_dispositivo_prueba(
             tipo=cls.tipo,
             tipo_tecnologia=TipoTecnologiaDispositivo.ELECTRONICO,
             marca=cls.marca,
             modelo=cls.modelo,
             area_gestora=cls.area_gestora,
+            modalidad_procedencia=ModalidadProcedencia.COMPRA,
+            procedencia=cls.procedencia,
+            numero_referencia="oc-2026-15",
             color=cls.color,
             numero_serie="SERIE-ORIGINAL",
             estado=EstadoDispositivo.OPERATIVO,
@@ -240,6 +271,9 @@ class EquiposViewsTests(TestCase):
             "marca": self.marca.id,
             "modelo": self.modelo.id,
             "area_gestora": self.area_gestora.id,
+            "modalidad_procedencia": ModalidadProcedencia.COMPRA,
+            "procedencia": self.procedencia.id,
+            "numero_referencia": "REF-PRUEBA",
             "color": self.color.id,
             # Por defecto se registra con un solo color: el secundario es la
             # excepcion, no la norma.
@@ -271,6 +305,7 @@ class EquiposViewsTests(TestCase):
             'listado_dispositivos_equipos',
             'buscar_dispositivo_equipos',
             'catalogo_marcas_equipos',
+            'catalogo_procedencias_equipos',
         ]
 
         for nombre_ruta in nombres_rutas:
@@ -285,8 +320,90 @@ class EquiposViewsTests(TestCase):
 
         self.assertContains(respuesta, reverse('catalogo_marcas_equipos'))
         self.assertContains(respuesta, 'Marcas y modelos')
+        self.assertContains(respuesta, reverse('catalogo_procedencias_equipos'))
+        self.assertContains(respuesta, 'Procedencias')
+
+    def test_catalogo_de_procedencias_lista_y_agrega(self):
+        respuesta = self.client.get(reverse("catalogo_procedencias_equipos"))
+        self.assertContains(respuesta, self.procedencia.nombre)
+        self.assertContains(respuesta, reverse("agregar_procedencia_equipos"))
+
+        respuesta = self.client.post(
+            reverse("agregar_procedencia_equipos"),
+            {
+                "nombre": "  donante individual  ",
+                "tipo": TipoProcedencia.PERSONA,
+                "rtn": "",
+                "telefono": "9988-7766",
+                "contacto": "",
+                "correo": "",
+            },
+        )
+
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertTrue(
+            Procedencia.objects.filter(nombre="DONANTE INDIVIDUAL").exists()
+        )
+
+    def test_catalogo_de_procedencias_edita_y_cambia_estado(self):
+        respuesta = self.client.post(
+            reverse(
+                "editar_procedencia_equipos",
+                args=[self.procedencia.pk],
+            ),
+            {
+                "nombre": "distribuidora actualizada",
+                "tipo": TipoProcedencia.EMPRESA,
+                "rtn": "",
+                "telefono": "2200-0000",
+                "contacto": "Ventas",
+                "correo": "ventas@example.com",
+            },
+        )
+        self.assertEqual(respuesta.status_code, 302)
+        self.procedencia.refresh_from_db()
+        self.assertEqual(self.procedencia.nombre, "DISTRIBUIDORA ACTUALIZADA")
+
+        respuesta = self.client.post(
+            reverse(
+                "cambiar_estado_procedencia_equipos",
+                args=[self.procedencia.pk],
+            )
+        )
+        self.assertEqual(respuesta.status_code, 302)
+        self.procedencia.refresh_from_db()
+        self.assertFalse(self.procedencia.activo)
 
     # --- Color secundario -------------------------------------------------
+
+    def test_registro_exige_modalidad_y_procedencia(self):
+        cantidad_inicial = Dispositivo.objects.count()
+        respuesta = self.client.post(
+            reverse("registrar_dispositivo_equipos"),
+            self._datos_formulario_dispositivo(
+                numero_serie="SIN-PROCEDENCIA",
+                modalidad_procedencia="",
+                procedencia="",
+            ),
+        )
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn("modalidad_procedencia", respuesta.context["form"].errors)
+        self.assertIn("procedencia", respuesta.context["form"].errors)
+        self.assertEqual(Dispositivo.objects.count(), cantidad_inicial)
+
+    def test_numero_de_referencia_opcional_se_guarda_en_mayusculas(self):
+        respuesta = self.client.post(
+            reverse("registrar_dispositivo_equipos"),
+            self._datos_formulario_dispositivo(
+                numero_serie="REFERENCIA-EXTERNA",
+                numero_referencia="  oc externa-15  ",
+            ),
+        )
+        equipo = Dispositivo.objects.get(numero_serie="REFERENCIA-EXTERNA")
+
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertEqual(equipo.numero_referencia, "OC EXTERNA-15")
 
     def test_registro_con_un_solo_color_deja_el_secundario_vacio(self):
         respuesta = self.client.post(
@@ -1094,6 +1211,9 @@ class EquiposViewsTests(TestCase):
                 "marca": self.marca.id,
                 "modelo": self.modelo.id,
                 "area_gestora": self.area_gestora.id,
+                "modalidad_procedencia": ModalidadProcedencia.DONACION,
+                "procedencia": self.procedencia.id,
+                "numero_referencia": "DON-2026-01",
                 "color": self.color.id,
                 "numero_serie": "SERIE-EDITADA",
                 "inventario_bienes_nacionales": "F/212300",
@@ -1306,6 +1426,16 @@ class EquiposViewsTests(TestCase):
         self.assertContains(respuesta, url_ficha)
         self.assertContains(respuesta, "Ficha de activo fijo")
 
+    def test_detalle_muestra_la_procedencia_del_equipo(self):
+        respuesta = self.client.get(
+            reverse("detalle_dispositivo_equipos", args=[self.dispositivo.id])
+        )
+
+        self.assertContains(respuesta, "Procedencia")
+        self.assertContains(respuesta, "Compra")
+        self.assertContains(respuesta, self.procedencia.nombre)
+        self.assertContains(respuesta, self.procedencia.telefono)
+
     def test_ficha_activo_fijo_genera_pdf_sin_modificar_el_equipo(self):
         fecha_modificado = self.dispositivo.fecha_modificado
 
@@ -1360,6 +1490,7 @@ class EquiposViewsTests(TestCase):
         self.assertEqual(datos["numero_serie"], "SERIE-ACTIVO-001")
         self.assertEqual(datos["precio"], "L 12,500.50")
         self.assertEqual(datos["departamento"], str(self.area_clinica))
+        self.assertEqual(datos["proveedor"], self.procedencia.nombre)
         self.assertEqual(
             datos["fecha_entrega"],
             timezone.localtime(self.dispositivo.fecha_creado).strftime(
@@ -1384,7 +1515,6 @@ class EquiposViewsTests(TestCase):
             "centro_costo",
             "sala_ambiente",
             "jefe_departamento",
-            "proveedor",
             "proveedor_mantenimiento",
             "contrato_mantenimiento",
             "fecha_inicio_contrato",
@@ -1512,6 +1642,22 @@ class EquiposViewsTests(TestCase):
         self.assertEqual(
             FichaBajaPdfService._codigo_inventario(self.dispositivo),
             "FICHA-001",
+        )
+
+    def test_ficha_baja_dibuja_codigo_de_control_documental(self):
+        pdf = MagicMock()
+
+        FichaBajaPdfService._dibujar_codigo_documental(
+            pdf,
+            x_derecha=550,
+            y=691,
+        )
+
+        pdf.rect.assert_called_once()
+        pdf.drawCentredString.assert_called_once()
+        self.assertEqual(
+            pdf.drawCentredString.call_args.args[2],
+            "AX-GR-SG-MANT-002 A",
         )
 
     @override_settings(EQUIPOS_QR_BASE_URL="http://192.168.0.102:8000")
@@ -1844,6 +1990,27 @@ class EquiposViewsTests(TestCase):
         self.assertContains(respuesta, "equipos-listado__boton-buscar")
         self.assertContains(respuesta, 'form="equipos-listado-filtros"', count=2)
 
+    def test_listado_muestra_primero_el_equipo_mas_reciente(self):
+        equipo_reciente = crear_dispositivo_prueba(
+            tipo=self.tipo,
+            tipo_tecnologia=TipoTecnologiaDispositivo.ELECTRONICO,
+            marca=self.marca,
+            modelo=self.modelo,
+            area_gestora=self.area_gestora,
+            color=self.color,
+            numero_serie="SERIE-RECIENTE",
+            estado=EstadoDispositivo.OPERATIVO,
+            criticidad=CriticidadDispositivo.MEDIA,
+            creado_por=self.usuario,
+            modificado_por=self.usuario,
+        )
+
+        respuesta = self.client.get(reverse("listado_dispositivos_equipos"))
+        dispositivos = list(respuesta.context["dispositivos"])
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(dispositivos[0], equipo_reciente)
+
     def test_busqueda_equipo_usa_los_mismos_campos_que_el_listado(self):
         url = reverse("buscar_dispositivo_equipos")
 
@@ -1974,6 +2141,64 @@ class EquiposViewsTests(TestCase):
         self.assertIsNotNone(equipo)
         self.assertIsNone(equipo.modelo_id)
         self.assertEqual(equipo.modelo_nombre, "INDEFINIDO")
+
+
+class ProcedenciaTests(TestCase):
+    databases = {"default"}
+
+    def test_nombre_se_normaliza_en_mayusculas(self):
+        procedencia = Procedencia.objects.create(
+            nombre="  distribuidora central  ",
+            tipo=TipoProcedencia.EMPRESA,
+        )
+
+        self.assertEqual(procedencia.nombre, "DISTRIBUIDORA CENTRAL")
+
+    def test_rtn_vacio_se_guarda_como_null_y_no_choca_con_otro_vacio(self):
+        primera = Procedencia.objects.create(
+            nombre="EMPRESA UNO",
+            tipo=TipoProcedencia.EMPRESA,
+            rtn="",
+        )
+        segunda = Procedencia.objects.create(
+            nombre="PERSONA DOS",
+            tipo=TipoProcedencia.PERSONA,
+            rtn="   ",
+        )
+
+        self.assertIsNone(primera.rtn)
+        self.assertIsNone(segunda.rtn)
+
+    def test_rtn_informado_no_puede_repetirse(self):
+        Procedencia.objects.create(
+            nombre="EMPRESA UNO",
+            tipo=TipoProcedencia.EMPRESA,
+            rtn="08019000123456",
+        )
+
+        with self.assertRaises(ValidationError):
+            Procedencia.objects.create(
+                nombre="EMPRESA DOS",
+                tipo=TipoProcedencia.EMPRESA,
+                rtn="08019000123456",
+            )
+
+    def test_formulario_normaliza_nombre_y_rtn_vacio(self):
+        form = ProcedenciaCatalogoForm(
+            {
+                "nombre": "  persona donante  ",
+                "tipo": TipoProcedencia.PERSONA,
+                "rtn": "",
+                "telefono": "",
+                "contacto": "",
+                "correo": "",
+            }
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        procedencia = form.save()
+        self.assertEqual(procedencia.nombre, "PERSONA DONANTE")
+        self.assertIsNone(procedencia.rtn)
 
 
 class CatalogoMarcaModeloTests(TestCase):
@@ -2372,12 +2597,18 @@ class PermisosEquiposTests(TestCase):
         )
         cls.area_gestora, _ = AreaGestora.objects.get_or_create(nombre="BIOMEDICA")
         cls.color, _ = ColorDispositivo.objects.get_or_create(nombre="BLANCO")
-        cls.dispositivo = Dispositivo.objects.create(
+        cls.procedencia = Procedencia.objects.create(
+            nombre="PROVEEDOR DE PERMISOS",
+            tipo=TipoProcedencia.EMPRESA,
+        )
+        cls.dispositivo = crear_dispositivo_prueba(
             tipo=cls.tipo,
             tipo_tecnologia=TipoTecnologiaDispositivo.ELECTRONICO,
             marca=cls.marca,
             modelo=cls.modelo,
             area_gestora=cls.area_gestora,
+            modalidad_procedencia=ModalidadProcedencia.COMPRA,
+            procedencia=cls.procedencia,
             color=cls.color,
             numero_serie="SERIE-PERMISOS",
             estado=EstadoDispositivo.OPERATIVO,
@@ -2398,6 +2629,7 @@ class PermisosEquiposTests(TestCase):
             reverse("listado_dispositivos_equipos"),
             reverse("buscar_dispositivo_equipos"),
             reverse("qr_dispositivo_equipos", args=[self.dispositivo.pk]),
+            reverse("catalogo_procedencias_equipos"),
         ]
 
     def urls_edicion(self):
@@ -2416,6 +2648,15 @@ class PermisosEquiposTests(TestCase):
             reverse("cambiar_estado_marca_equipos", args=[self.marca.pk]),
             reverse("cambiar_estado_modelo_equipos", args=[self.modelo.pk]),
             reverse("cambiar_estado_tipo_equipos", args=[self.tipo.pk]),
+            reverse("agregar_procedencia_equipos"),
+            reverse(
+                "editar_procedencia_equipos",
+                args=[self.procedencia.pk],
+            ),
+            reverse(
+                "cambiar_estado_procedencia_equipos",
+                args=[self.procedencia.pk],
+            ),
         ]
 
     def urls_baja(self):
@@ -2569,6 +2810,28 @@ class PermisosEquiposTests(TestCase):
             with self.subTest(url=url):
                 self.assertEntra(url, self.directivo)
 
+    def test_directivo_consulta_procedencias_sin_controles_de_catalogo(self):
+        self.client.force_login(self.directivo)
+        respuesta = self.client.get(reverse("catalogo_procedencias_equipos"))
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertContains(respuesta, self.procedencia.nombre)
+        self.assertNotContains(respuesta, reverse("agregar_procedencia_equipos"))
+        self.assertNotContains(
+            respuesta,
+            reverse(
+                "editar_procedencia_equipos",
+                args=[self.procedencia.pk],
+            ),
+        )
+        self.assertNotContains(
+            respuesta,
+            reverse(
+                "cambiar_estado_procedencia_equipos",
+                args=[self.procedencia.pk],
+            ),
+        )
+
     def test_directivo_no_edita_equipos(self):
         for url in self.urls_edicion():
             with self.subTest(url=url):
@@ -2616,6 +2879,21 @@ class PermisosEquiposTests(TestCase):
             MarcaDispositivo.objects.filter(nombre="MARCA INTRUSA").exists()
         )
 
+    def test_post_de_procedencia_sin_permiso_no_crea_registros(self):
+        self.client.force_login(self.directivo)
+        respuesta = self.client.post(
+            reverse("agregar_procedencia_equipos"),
+            {
+                "nombre": "PROCEDENCIA INTRUSA",
+                "tipo": TipoProcedencia.EMPRESA,
+            },
+        )
+
+        self.assertRedirects(respuesta, reverse("acceso_denegado"))
+        self.assertFalse(
+            Procedencia.objects.filter(nombre="PROCEDENCIA INTRUSA").exists()
+        )
+
     # --- Helpers de permisos ----------------------------------------------
 
     def test_helpers_reflejan_la_matriz_de_permisos(self):
@@ -2656,6 +2934,7 @@ class PermisosEquiposTests(TestCase):
         respuesta = self.client.get(reverse("inicio_equipos"))
         self.assertNotContains(respuesta, reverse("registrar_dispositivo_equipos"))
         self.assertNotContains(respuesta, reverse("catalogo_marcas_equipos"))
+        self.assertContains(respuesta, reverse("catalogo_procedencias_equipos"))
         self.assertContains(respuesta, reverse("listado_dispositivos_equipos"))
 
     def test_inicio_de_equipos_muestra_todo_al_tecnico(self):
@@ -2663,6 +2942,7 @@ class PermisosEquiposTests(TestCase):
         respuesta = self.client.get(reverse("inicio_equipos"))
         self.assertContains(respuesta, reverse("registrar_dispositivo_equipos"))
         self.assertContains(respuesta, reverse("catalogo_marcas_equipos"))
+        self.assertContains(respuesta, reverse("catalogo_procedencias_equipos"))
 
     def test_listado_oculta_acciones_de_edicion_y_baja_al_directivo(self):
         self.client.force_login(self.directivo)
@@ -2928,7 +3208,7 @@ class DetalleReducidoTests(TestCase):
         )
         cls.area_gestora, _ = AreaGestora.objects.get_or_create(nombre="BIOMEDICA")
         cls.color, _ = ColorDispositivo.objects.get_or_create(nombre="BLANCO")
-        cls.dispositivo = Dispositivo.objects.create(
+        cls.dispositivo = crear_dispositivo_prueba(
             tipo=cls.tipo,
             tipo_tecnologia=TipoTecnologiaDispositivo.ELECTRONICO,
             marca=cls.marca,
@@ -3102,7 +3382,7 @@ class GarantiaCalculoTests(TestCase):
 
     def crear_equipo(self, fin_garantia=None, estado=EstadoDispositivo.OPERATIVO,
                      serie=None):
-        equipo = Dispositivo.objects.create(
+        equipo = crear_dispositivo_prueba(
             tipo=self.tipo,
             tipo_tecnologia=TipoTecnologiaDispositivo.ELECTRONICO,
             marca=self.marca,
@@ -3302,7 +3582,7 @@ class PausaGarantiaModeloTests(TestCase):
         cls.color, _ = ColorDispositivo.objects.get_or_create(nombre="BLANCO")
 
     def crear_equipo(self, estado=EstadoDispositivo.OPERATIVO, fin=None):
-        equipo = Dispositivo.objects.create(
+        equipo = crear_dispositivo_prueba(
             tipo=self.tipo,
             tipo_tecnologia=TipoTecnologiaDispositivo.ELECTRONICO,
             marca=self.marca,
@@ -3479,7 +3759,7 @@ class PuedePausarseTests(TestCase):
         cls.color, _ = ColorDispositivo.objects.get_or_create(nombre="BLANCO")
 
     def crear_equipo(self, fin, estado=EstadoDispositivo.OPERATIVO):
-        equipo = Dispositivo.objects.create(
+        equipo = crear_dispositivo_prueba(
             tipo=self.tipo,
             tipo_tecnologia=TipoTecnologiaDispositivo.ELECTRONICO,
             marca=self.marca,
@@ -3571,7 +3851,7 @@ class VistasGarantiaTests(TestCase):
         cls.color, _ = ColorDispositivo.objects.get_or_create(nombre="BLANCO")
 
     def crear_equipo(self, fin, serie, estado=EstadoDispositivo.OPERATIVO):
-        equipo = Dispositivo.objects.create(
+        equipo = crear_dispositivo_prueba(
             tipo=self.tipo,
             tipo_tecnologia=TipoTecnologiaDispositivo.ELECTRONICO,
             marca=self.marca,

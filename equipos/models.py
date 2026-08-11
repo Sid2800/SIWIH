@@ -69,6 +69,16 @@ class TipoTecnologiaDispositivo(models.IntegerChoices):
     NO_ELECTRONICO = 2, "No electrónico"
 
 
+class TipoProcedencia(models.IntegerChoices):
+    EMPRESA = 1, "Empresa"
+    PERSONA = 2, "Persona"
+
+
+class ModalidadProcedencia(models.IntegerChoices):
+    COMPRA = 1, "Compra"
+    DONACION = 2, "Donación"
+
+
 class EstadoGarantiaDispositivo(models.TextChoices):
     """Situacion de la garantia. No se guarda: la calcula garantia_service."""
 
@@ -252,6 +262,41 @@ class ColorDispositivo(models.Model):
     def __str__(self):
         return self.nombre
 
+
+class Procedencia(models.Model):
+    nombre = models.CharField(max_length=150, unique=True)
+    tipo = models.PositiveSmallIntegerField(choices=TipoProcedencia.choices)
+    rtn = models.CharField(max_length=20, unique=True, null=True, blank=True)
+    telefono = models.CharField(max_length=30, blank=True)
+    contacto = models.CharField(max_length=150, blank=True)
+    correo = models.EmailField(blank=True)
+    activo = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        db_table = "equipo_procedencia"
+        verbose_name = "Procedencia de equipo"
+        verbose_name_plural = "Procedencias de equipos"
+        ordering = ["nombre"]
+
+    def clean(self):
+        self.nombre = normalizar_nombre_catalogo(self.nombre)
+        if not self.nombre:
+            raise ValidationError({"nombre": "Debe ingresar la procedencia."})
+
+        # MySQL permite varios NULL en una columna UNIQUE, pero no varias
+        # cadenas vacias. Por eso un RTN omitido se persiste siempre como NULL.
+        self.rtn = (self.rtn or "").strip() or None
+        self.telefono = (self.telefono or "").strip()
+        self.contacto = (self.contacto or "").strip()
+        self.correo = (self.correo or "").strip()
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.nombre
+
 # Tabla principal del modulo.
 # Guarda la ficha del equipo y apunta a catalogos por FK para mantener la base
 # ligera: se guardan ids numericos, no textos repetidos.
@@ -286,6 +331,15 @@ class Dispositivo(models.Model):
         on_delete=models.PROTECT,
         related_name="dispositivos",
     )
+    modalidad_procedencia = models.PositiveSmallIntegerField(
+        choices=ModalidadProcedencia.choices,
+    )
+    procedencia = models.ForeignKey(
+        Procedencia,
+        on_delete=models.PROTECT,
+        related_name="dispositivos",
+    )
+    numero_referencia = models.CharField(max_length=100, null=True, blank=True)
     color = models.ForeignKey(
         ColorDispositivo,
         on_delete=models.PROTECT,
@@ -431,6 +485,9 @@ class Dispositivo(models.Model):
         # Aqui se normalizan opcionales y se revisan duplicados flexibles.
         errores = {}
         self.numero_serie = (self.numero_serie or "").strip() or None
+        self.numero_referencia = (
+            normalizar_nombre_catalogo(self.numero_referencia) or None
+        )
 
         if self.marca_id is None:
             # Si no se conoce la marca no guardamos texto vacio: se usa el

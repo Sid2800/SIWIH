@@ -1,0 +1,140 @@
+{% extends 'core/base.html' %}
+{% load permisos_equipos %}
+
+{% block title %}Procedencias de equipos{% endblock title %}
+
+{% block content %}
+<div class="contenedor2 equipos-pagina equipos-pagina--ancha">
+    <div class="tituloFormulario">
+        <div class="equipos-encabezado-superior">
+            <div class="tituloFormulario-texto">
+                <i class="bi bi-building"></i>
+                <h2 class="sin-margen">Procedencias de equipos</h2>
+            </div>
+            <a class="equipos-volver equipos-volver--inline equipos-encabezado-volver"
+               href="{{ url_regresar }}">
+                <i class="bi bi-arrow-left"></i>
+                Equipos
+            </a>
+        </div>
+        <div class="tituloFormulario-subrallado"></div>
+    </div>
+
+    <div class="equipos-catalogo">
+        <section class="equipos-registro__seccion equipos-catalogo__columna equipos-catalogo__columna--completa">
+            <h3 class="equipos-registro__titulo">
+                <i class="bi bi-person-vcard"></i>
+                Personas y empresas
+            </h3>
+
+            {% if request.user|puede_administrar_catalogo_equipos %}
+                <form class="equipos-catalogo__form"
+                      method="post"
+                      action="{% if procedencia_editada %}{% url 'editar_procedencia_equipos' procedencia_editada.pk %}{% else %}{% url 'agregar_procedencia_equipos' %}{% endif %}">
+                    {% csrf_token %}
+                    <div class="equipos-registro__campos equipos-registro__campos--dos">
+                        <div class="equipos-registro__campo">
+                            <label for="nombre_procedencia_catalogo">Nombre *</label>
+                            {{ form_procedencia.nombre }}
+                            {{ form_procedencia.nombre.errors }}
+                        </div>
+                        <div class="equipos-registro__campo">
+                            <label for="tipo_procedencia_catalogo">Tipo *</label>
+                            {{ form_procedencia.tipo }}
+                            {{ form_procedencia.tipo.errors }}
+                        </div>
+                        <div class="equipos-registro__campo">
+                            <label for="rtn_procedencia_catalogo">RTN</label>
+                            {{ form_procedencia.rtn }}
+                            {{ form_procedencia.rtn.errors }}
+                        </div>
+                        <div class="equipos-registro__campo">
+                            <label for="telefono_procedencia_catalogo">Teléfono</label>
+                            {{ form_procedencia.telefono }}
+                            {{ form_procedencia.telefono.errors }}
+                        </div>
+                        <div class="equipos-registro__campo">
+                            <label for="contacto_procedencia_catalogo">Contacto</label>
+                            {{ form_procedencia.contacto }}
+                            {{ form_procedencia.contacto.errors }}
+                        </div>
+                        <div class="equipos-registro__campo">
+                            <label for="correo_procedencia_catalogo">Correo</label>
+                            {{ form_procedencia.correo }}
+                            {{ form_procedencia.correo.errors }}
+                        </div>
+                    </div>
+
+                    <button class="formularioBotones-boton equipos-catalogo__boton"
+                            type="submit">
+                        {% if procedencia_editada %}
+                            <i class="bi bi-check-lg"></i>
+                            Guardar cambios
+                        {% else %}
+                            <i class="bi bi-plus-lg"></i>
+                            Agregar procedencia
+                        {% endif %}
+                    </button>
+
+                    {% if procedencia_editada %}
+                        <a class="equipos-catalogo__cancelar"
+                           href="{% url 'catalogo_procedencias_equipos' %}">
+                            Cancelar
+                        </a>
+                    {% endif %}
+                </form>
+            {% endif %}
+
+            <ul class="equipos-catalogo__lista equipos-catalogo__lista--columnas">
+                {% for procedencia in procedencias %}
+                    <li class="equipos-catalogo__item{% if procedencia_editada and procedencia.pk == procedencia_editada.pk %} equipos-catalogo__item--activo{% endif %}{% if not procedencia.activo %} equipos-catalogo__item--inactivo{% endif %}">
+                        {% if request.user|puede_administrar_catalogo_equipos %}
+                            <a class="equipos-catalogo__enlace"
+                               href="{% url 'catalogo_procedencias_equipos' %}?procedencia={{ procedencia.pk }}"
+                               title="Editar {{ procedencia.nombre }}">
+                                <span class="equipos-catalogo__nombre">
+                                    {{ procedencia.nombre }} · {{ procedencia.get_tipo_display }}
+                                </span>
+                                <span class="equipos-catalogo__conteo">
+                                    RTN: {{ procedencia.rtn|default:"No indicado" }} ·
+                                    Tel: {{ procedencia.telefono|default:"No indicado" }} ·
+                                    {{ procedencia.total_equipos }} equipo{{ procedencia.total_equipos|pluralize }}
+                                </span>
+                            </a>
+                            <form method="post"
+                                  action="{% url 'cambiar_estado_procedencia_equipos' procedencia.pk %}">
+                                {% csrf_token %}
+                                <button class="equipos-catalogo__estado"
+                                        type="submit"
+                                        title="{% if procedencia.activo %}Desactivar{% else %}Reactivar{% endif %} {{ procedencia.nombre }}">
+                                    {% if procedencia.activo %}
+                                        <i class="bi bi-toggle-on"></i>
+                                    {% else %}
+                                        <i class="bi bi-toggle-off"></i>
+                                    {% endif %}
+                                </button>
+                            </form>
+                        {% else %}
+                            <span class="equipos-catalogo__enlace">
+                                <span class="equipos-catalogo__nombre">
+                                    {{ procedencia.nombre }} · {{ procedencia.get_tipo_display }}
+                                </span>
+                                <span class="equipos-catalogo__conteo">
+                                    RTN: {{ procedencia.rtn|default:"No indicado" }} ·
+                                    Tel: {{ procedencia.telefono|default:"No indicado" }} ·
+                                    Contacto: {{ procedencia.contacto|default:"No indicado" }} ·
+                                    Correo: {{ procedencia.correo|default:"No indicado" }}
+                                </span>
+                            </span>
+                        {% endif %}
+                    </li>
+                {% empty %}
+                    <li class="equipos-catalogo__vacio">
+                        Todavía no hay procedencias registradas.
+                    </li>
+                {% endfor %}
+            </ul>
+        </section>
+    </div>
+</div>
+{% endblock content %}

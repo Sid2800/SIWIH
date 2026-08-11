@@ -62,10 +62,9 @@
         </section>
 
         {% comment %}
-           La seccion entera desaparece si el usuario no administra catalogos:
-           es su unica opcion, dejar el encabezado solo seria ruido.
+           Procedencias se puede consultar con permiso de lectura. Las altas y
+           cambios, igual que marcas y modelos, requieren administrar catalogos.
         {% endcomment %}
-        {% if request.user|puede_administrar_catalogo_equipos %}
         <section class="equipos-submenu">
             <header class="equipos-submenu__encabezado">
                 <span class="equipos-submenu__icono">
@@ -75,15 +74,22 @@
             </header>
 
             <div class="equipos-submenu__opciones">
+                {% if request.user|puede_administrar_catalogo_equipos %}
                 <a class="equipos-submenu__opcion"
                     href="{% url 'catalogo_marcas_equipos' %}">
                     <i class="bi bi-diagram-3"></i>
                     <span>Marcas y modelos</span>
                     <i class="bi bi-chevron-right"></i>
                 </a>
+                {% endif %}
+                <a class="equipos-submenu__opcion"
+                   href="{% url 'catalogo_procedencias_equipos' %}">
+                    <i class="bi bi-building"></i>
+                    <span>Procedencias</span>
+                    <i class="bi bi-chevron-right"></i>
+                </a>
             </div>
         </section>
-        {% endif %}
     </div>
 </div>
 {% endblock content %}

@@ -131,7 +131,7 @@ class FichaActivoFijoPdfService:
             "departamento": cls._departamento(asignacion),
             "sala_ambiente": "",
             "jefe_departamento": "",
-            "proveedor": "",
+            "proveedor": cls._texto(dispositivo.procedencia),
             "proveedor_mantenimiento": "",
             "contrato_mantenimiento": "",
             "fecha_inicio_contrato": "",
