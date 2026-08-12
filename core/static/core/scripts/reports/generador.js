@@ -811,6 +811,7 @@ document.addEventListener('DOMContentLoaded', function () {
     modelo.value = 'paciente';
     modelo.dispatchEvent(new Event('change'));
 
+
         // Lógica del tab
     document.querySelectorAll('.reporteTabsBoton').forEach(btn => {
         btn.addEventListener('click', () => {

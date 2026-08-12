@@ -26,7 +26,7 @@ import json
 from core.services.paciente_service import PacienteService
 from core.services.reporte.PDF.reporte_generador_service import ReporteGeneradorService
 from core.services.reporte.EXCEL.reporte_service_excel import ServiceExcel
-from core.constants.stored_procedures import SP_CATALOGO_REFERENCIAS_RECIBIDAS, SP_CATALOGO_REFERENCIAS_ENVIADAS
+from core.constants.stored_procedures import SP_CATALOGO_REFERENCIAS_RECIBIDAS, SP_CATALOGO_REFERENCIAS_ENVIADAS, SP_CATALOGO_CALIDAD_REFERENCIAS_ENVIADAS, SP_CATALOGO_CALIDAD_RESPUESTAS
 from core.constants.permisos import (
     # Atención
     ATENCION_EDITOR_ROLES,
@@ -87,11 +87,20 @@ class ReporteGeneradorView(UnidadRolRequiredMixin, TemplateView):
             (9, 'RESPUESTAS RESUELTAS SEGUN UNIDADES CLINICAS'),
             (10,'REFERENCIAS Y RESPUESTAS POR GESTOR- OTROS DEP- CLINICA PRIVADA'),
             (11,'REFERENCIAS ENVIADAS A PRIMER NIVEL DE ATENCION SEGUN GESTOR'),
+            (12,'REFERENCIAS RECIBIDAS SEGUN FORMATO SINAR POR INSTITUCION'),
+            (13,'CALIDAD DE REFERENCIAS ENVIADAS SEGUN UNIDAD CLÍNICA'),
+            (14,"CALIDAD DE RESPUESTAS SEGUN UNIDAD CLÍNICA"),
+            (15,"REFERENCIA RECBIDAS SIN RESPUESTAS SEGUN UNIDAD CLÍNICA"),
+            (16, "RESUMEN GENERAL DE CALIDAD DEL PERÍODO")
+
         ]
 
         informesCatalogo = [
             (1, 'REFERENCIAS ENVIADAS'),
             (2, 'REFERENCIAS RECIBIDAS'),
+            (3, 'CALIDAD DE REFERENCIAS ENVIADAS'),
+            (4, 'CALIDAD DE RESPUESTAS')
+
         ]
 
         usuario = self.request.user
@@ -133,7 +142,7 @@ class ReporteGeneradorView(UnidadRolRequiredMixin, TemplateView):
             # Referencia
             if UsuarioService.pertenece_unidades(usuario,REFERENCIA_VISUALIZACION_UNIDADES):
                 context.setdefault('informesReferencia', informesReferencia)
-                context.setdefault('informesCatalogo', informesCatalogo[:2])
+                context.setdefault('informesCatalogo', informesCatalogo[:4])
                     
                 
         anio_actual = datetime.now().year
@@ -313,10 +322,9 @@ class ObtenerOpcionesFiltro(View):
 
             if campo == 'unidad_clinica_id':
                     unidades_clinicas = ServicioService.obtener_unidades_clinicas(incluir_externo=True)
-                    print(unidades_clinicas)
                     unidades_clinicas = [{'id': f"{uc['clave']}", 'valor': f"{uc['nombre']}", 'tipo': uc['tipo']} for uc in unidades_clinicas]
 
-                    print(unidades_clinicas)
+    
 
                     return JsonResponse({'valores': unidades_clinicas}, status=200)
 
@@ -894,12 +902,14 @@ class InformesCatalogo(View):
     # ======= CONSTANTES LOCALES DE LA CLASE =======
     INFORMES_TITULOS = {
         1: "CATALOGO DE REFERENCIAS ENVIADAS :",
-        2: "CATALOGO DE REFERECNIAS RECIBIDAS :",
+        2: "CATALOGO DE REFERENCIAS RECIBIDAS :",
+        3: "CATÁLOGO DE CALIDAD DE REFERENCIAS ENVIADAS",
+        4: "CATÁLOGO DE CALIDAD DE RESPUESTAS"
     }
 
 
     # Grupos lógicos de informes
-    CATOLOGOS_REFERENCIA = {1, 2}
+    CATOLOGOS_REFERENCIA = {1, 2, 3, 4}
 
     def post(self, request, *args, **kwargs):
         usuario = request.user
@@ -932,7 +942,7 @@ class InformesCatalogo(View):
 
         catalogo = 0
         try:
-            catalogo = validar_informe(reporte_criterios['catalogo'], [1,2])
+            catalogo = validar_informe(reporte_criterios['catalogo'], [1,2,3,4])
             reporte_criterios.update({'catalogo': catalogo})
         except ValueError as e:
             return JsonResponse({"error": str(e)}, status=400)
@@ -941,8 +951,17 @@ class InformesCatalogo(View):
         if catalogo in self.CATOLOGOS_REFERENCIA: #{1, 2} REFERENCIA 
             if catalogo == 1:
                 sp = SP_CATALOGO_REFERENCIAS_ENVIADAS
-            else:
+            elif catalogo == 2:
                 sp = SP_CATALOGO_REFERENCIAS_RECIBIDAS
+            elif catalogo == 3:
+                sp = SP_CATALOGO_CALIDAD_REFERENCIAS_ENVIADAS
+            elif catalogo == 4:
+                sp = SP_CATALOGO_CALIDAD_RESPUESTAS
+                
+
+
+                
+            
                 
             titulos, data = ServiceExcel.obtener_data_catalogo(sp, fecha_ini, fecha_fin)
 

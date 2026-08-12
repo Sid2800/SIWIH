@@ -371,8 +371,36 @@ ZONA INFORMES ESTADÍSTICOS
                     ]
                 ],
                 "ancho_columnas": [155, 56, 56, 56, 56, 60, 60]
-            }
+            },
+            12: {
+                "encabezado": [
+                    [
+                        etiqueta.upper(),
+                        "CONTEO",
+                        "SI CUMP.",
+                        "NO CUMP.",
+                        "% CUMP."
+                    ]
+                ],
+                "ancho_columnas": [210, 70, 65, 65, 80]
+            },
+            15: {
+                "encabezado": [
+                    [
+                        etiqueta.upper(),
+                        "REF. RECIB.",
+                        "CON RESP.",
+                        "SIN RESP.",
+                        "% RESP."
+                    ]
+                ],
+                "ancho_columnas": [190, 80, 80, 80, 75]
+            },
         }
+
+        config_informes[13] = config_informes[12]
+        config_informes[14] = config_informes[12]
+
 
 
         cfg = config_informes.get(informe)
@@ -451,7 +479,7 @@ ZONA INFORMES ESTADÍSTICOS
                 celda1, celda2 = linea[1].split('-', 1)
                 # Reconstruye la línea dinámicamente
                 linea = (celda1, celda2, *linea[2:])
-                indices_encabezados.append(pag)
+                indices_encabezados.append(len(pagina) + 1)
 
             # --- Construcción dinámica de la fila ---
             fila = [linea[0][:35]] + list(linea[1:])
@@ -509,7 +537,312 @@ ZONA INFORMES ESTADÍSTICOS
         # --- Guardar PDF ---
         pdf.save()
         return response
-    
+
+
+    @staticmethod
+    def GenerarInformeResumenGeneralCalidad(reporte_criterios):
+        """
+        Genera el PDF del resumen general de calidad del período.
+        """
+
+        anio = reporte_criterios['anio']
+        mes = reporte_criterios['mes']
+        nombre_mes = calendar.month_name[mes]
+
+        usuario = reporte_criterios['usuario']
+        usuario_nombre = reporte_criterios['usuario_nombre']
+
+        informe_titulo = reporte_criterios['informe_titulo']
+        informe = reporte_criterios['informe']
+
+        observacion = reporte_criterios.get('observacion', '0')
+
+        datos = reporte_criterios['resumen_general_calidad']
+
+        # ==========================================================
+        # CONFIGURACIÓN PDF
+        # ==========================================================
+
+        archivo_name = f"{informe_titulo}_{mes}_{anio}.pdf"
+        title = f"{informe_titulo} {str(nombre_mes).upper()}"
+
+        response = HttpResponse(content_type='application/pdf')
+        response['Content-Disposition'] = (
+            f'inline; filename="{archivo_name}"'
+        )
+
+        pdf = canvas.Canvas(response, pagesize=letter)
+        pdf.setTitle(title)
+
+        ancho, alto = letter
+        fechaActual = timezone.now()
+
+        # ==========================================================
+        # ENCABEZADO
+        # ==========================================================
+
+        ReportePdfBaseService.dibujar_encabezado(pdf, ancho, alto - 30)
+
+        ReporteReferenciaService.dibujar_titulo_reporte_referencia(
+            pdf,
+            ancho,
+            alto,
+            informe_titulo,
+            nombre_mes,
+            anio
+        )
+
+        # ==========================================================
+        # FUNCIÓN PARA DIBUJAR UN GRÁFICO
+        # ==========================================================
+
+        def dibujar_grafico(x, y, ancho_grafico, alto_grafico, titulo,datos_grafico):
+            """
+            Dibuja un gráfico de barras horizontal.
+            """
+            # Contenedor
+            pdf.setStrokeColor(colors.HexColor("#D0D0D0"))
+            pdf.setFillColor(colors.white)
+
+            pdf.roundRect(
+                x,
+                y,
+                ancho_grafico,
+                alto_grafico,
+                8,
+                stroke=1,
+                fill=1
+            )
+
+            # Título
+            pdf.setFillColor(colors.HexColor("#174843"))
+            pdf.setFont("Helvetica-Bold", 11)
+
+            pdf.drawString(
+                x + 15,
+                y + alto_grafico - 20,
+                titulo
+            )
+
+            # Total
+            total = sum(datos_grafico.values())
+
+            if total == 0:
+                pdf.setFont("Helvetica", 9)
+                pdf.setFillColor(colors.HexColor("#666666"))
+
+                pdf.drawCentredString(
+                    x + ancho_grafico / 2,
+                    y + alto_grafico / 2,
+                    "SIN DATOS"
+                )
+
+                return
+
+            # Configuración de barras
+            margen_izq = 20
+            margen_der = 20
+            ancho_barra = ancho_grafico - margen_izq - margen_der
+            alto_barra = 26
+
+            y_barra = y + alto_grafico - 75
+
+            for etiqueta, valor in datos_grafico.items():
+
+                porcentaje = (
+                    (valor / total) * 100
+                    if total
+                    else 0
+                )
+
+                # Etiqueta
+                pdf.setFillColor(colors.HexColor("#333333"))
+                pdf.setFont("Helvetica", 8.5)
+
+                pdf.drawString(
+                    x + margen_izq,
+                    y_barra + 31,
+                    etiqueta
+                )
+
+                # Fondo barra
+                pdf.setFillColor(colors.HexColor("#ECEBE8"))
+
+                pdf.roundRect(
+                    x + margen_izq,
+                    y_barra,
+                    ancho_barra,
+                    alto_barra,
+                    4,
+                    stroke=0,
+                    fill=1
+                )
+
+                # Barra proporcional
+                ancho_valor = (
+                    ancho_barra * porcentaje / 100
+                )
+
+                pdf.setFillColor(
+                    colors.HexColor("#5C938B")
+                )
+
+                if ancho_valor > 0:
+                    pdf.roundRect(
+                        x + margen_izq,
+                        y_barra,
+                        ancho_valor,
+                        alto_barra,
+                        4,
+                        stroke=0,
+                        fill=1
+                    )
+
+                # Valor
+                texto_valor = (
+                    f"{valor}  ({porcentaje:.2f} %)"
+                )
+
+                pdf.setFillColor(colors.HexColor("#161616"))
+                pdf.setFont("Helvetica-Bold", 12)
+
+                pdf.drawRightString(
+                    x + ancho_grafico - margen_der - 6,
+                    y_barra + 8,
+                    texto_valor
+                )
+
+                y_barra -= 58
+
+        # ==========================================================
+        # DATOS DE LOS 4 GRÁFICOS
+        # ==========================================================
+
+        referencias = datos["referencias_recibidas"]
+
+        calidad_referencias = datos["calidad_referencias"]
+
+        calidad_respuestas = datos["calidad_respuestas"]
+
+        sinar = datos["formato_sinar"]
+
+
+        alto_grafico = 150
+        # ==========================================================
+        # GRÁFICO 1
+        # ==========================================================
+
+        dibujar_grafico(
+            45,
+            450,
+            250,
+            alto_grafico,
+            "REFERENCIAS RECIBIDAS",
+            {
+                "CON RESPUESTA": referencias["con_respuesta"],
+                "SIN RESPUESTA": referencias["sin_respuesta"],
+            }
+        )
+
+        # ==========================================================
+        # GRÁFICO 2
+        # ==========================================================
+
+        dibujar_grafico(
+            317,
+            450,
+            250,
+            alto_grafico,
+            "CALIDAD DE REFERENCIAS",
+            {
+                "CUMPLE": calidad_referencias["cumple"],
+                "NO CUMPLE": calidad_referencias["no_cumple"],
+            }
+        )
+
+        # ==========================================================
+        # GRÁFICO 3
+        # ==========================================================
+
+        dibujar_grafico(
+            45,
+            270,
+            250,
+            alto_grafico,
+            "CALIDAD DE RESPUESTAS",
+            {
+                "CUMPLE": calidad_respuestas["cumple"],
+                "NO CUMPLE": calidad_respuestas["no_cumple"],
+            }
+        )
+
+        # ==========================================================
+        # GRÁFICO 4
+        # ==========================================================
+
+        dibujar_grafico(
+            317,
+            270,
+            250,
+            alto_grafico,
+            "FORMATO SINAR",
+            {
+                "SINAR": sinar["si"],
+                "NO SINAR": sinar["no"],
+            }
+        )
+
+        # ==========================================================
+        # OBSERVACIÓN
+        # ==========================================================
+
+        if observacion != '0':
+
+            styles = getSampleStyleSheet()
+
+            estilo_obs = styles["Normal"]
+            estilo_obs.fontName = "Helvetica"
+            estilo_obs.fontSize = 8.5
+            estilo_obs.leading = 12
+
+            p = Paragraph(
+                f"<b>OBSERVACIÓN:</b> {observacion}",
+                estilo_obs
+            )
+
+            w, h = p.wrap(500, 50)
+
+            p.drawOn(
+                pdf,
+                65,
+                135 - h
+            )
+
+        # ==========================================================
+        # PIE DE PÁGINA
+        # ==========================================================
+
+        ReportePdfBaseService.dibujar_pie_pagina_carta(
+            pdf,
+            alto,
+            ancho,
+            formatear_fecha(fechaActual),
+            usuario,
+            usuario_nombre,
+            1,
+            1
+        )
+
+        # ==========================================================
+        # GUARDAR
+        # ==========================================================
+
+        pdf.save()
+
+        return response
+
+
+
 #  ZONA FORMATO REFERENCIA/RESPUESTA
 
 
