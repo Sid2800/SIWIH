@@ -355,39 +355,6 @@ def _actualizar_asignacion_dispositivo(dispositivo, form, usuario, asignacion_ac
     )
 
 
-def _obtener_opciones_area_listado():
-    # Construye opciones de filtro solo con areas que tienen equipos asignados.
-    opciones = []
-    vistos = set()
-    asignaciones = AsignacionDispositivo.objects.filter(
-        fecha_fin__isnull=True
-    ).select_related(
-        "area_clinica__servicio",
-        "unidad_no_clinica",
-    ).order_by(
-        "area_clinica__nombre_area_atencion",
-        "unidad_no_clinica__nombre_unidad",
-    )
-
-    for asignacion in asignaciones:
-        if asignacion.area_clinica_id:
-            valor = f"clinica:{asignacion.area_clinica_id}"
-            etiqueta = f"Clínica - {asignacion.area_clinica}"
-        elif asignacion.unidad_no_clinica_id:
-            valor = f"no_clinica:{asignacion.unidad_no_clinica_id}"
-            etiqueta = f"No clínica - {asignacion.unidad_no_clinica}"
-        else:
-            continue
-
-        if valor in vistos:
-            continue
-
-        vistos.add(valor)
-        opciones.append({"value": valor, "label": etiqueta})
-
-    return opciones
-
-
 def _parametro_entero(valor):
     # Convierte parametros GET a enteros seguros antes de filtrar.
     if valor and valor.isdigit():
@@ -494,7 +461,6 @@ def listado_dispositivos(request):
     # Vista principal de inventario. Lee filtros GET, aplica consultas,
     # pagina resultados y renderiza la tabla.
     consulta = request.GET.get("q", "").strip()
-    filtro_area = request.GET.get("area", "").strip()
     filtro_estado = request.GET.get("estado", "").strip()
     filtro_tipo = request.GET.get("tipo", "").strip()
     filtro_marca = request.GET.get("marca", "").strip()
@@ -505,21 +471,6 @@ def listado_dispositivos(request):
         _obtener_dispositivos_base(),
         consulta,
     )
-
-    if filtro_area.startswith("clinica:"):
-        area_id = _parametro_entero(filtro_area.removeprefix("clinica:"))
-        if area_id:
-            dispositivos = dispositivos.filter(
-                asignaciones__fecha_fin__isnull=True,
-                asignaciones__area_clinica_id=area_id,
-            )
-    elif filtro_area.startswith("no_clinica:"):
-        unidad_id = _parametro_entero(filtro_area.removeprefix("no_clinica:"))
-        if unidad_id:
-            dispositivos = dispositivos.filter(
-                asignaciones__fecha_fin__isnull=True,
-                asignaciones__unidad_no_clinica_id=unidad_id,
-            )
 
     estado_id = _parametro_entero(filtro_estado)
     if estado_id:
@@ -568,14 +519,12 @@ def listado_dispositivos(request):
             "querystring": query_params.urlencode(),
             "filtros": {
                 "q": consulta,
-                "area": filtro_area,
                 "estado": filtro_estado,
                 "tipo": filtro_tipo,
                 "marca": filtro_marca,
                 "modelo": filtro_modelo,
                 "area_gestora": filtro_area_gestora,
             },
-            "area_choices": _obtener_opciones_area_listado(),
             "estado_choices": [
                 {"value": str(valor), "label": etiqueta}
                 for valor, etiqueta in EstadoDispositivo.choices

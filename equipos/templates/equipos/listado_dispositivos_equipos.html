@@ -109,19 +109,6 @@
             </div>
             <div class="equipos-listado__filtro">
                 <div class="equipos-listado__campo-icono">
-                    <i class="bi bi-geo-alt"></i>
-                    <select class="formularioCampo-select" id="filtro_area" name="area">
-                        <option value="">Todas las áreas</option>
-                        {% for area in area_choices %}
-                            <option value="{{ area.value }}" {% if filtros.area == area.value %}selected{% endif %}>
-                                {{ area.label }}
-                            </option>
-                        {% endfor %}
-                    </select>
-                </div>
-            </div>
-            <div class="equipos-listado__filtro">
-                <div class="equipos-listado__campo-icono">
                     <i class="bi bi-eye"></i>
                     <select class="formularioCampo-select" id="filtro_estado" name="estado">
                         <option value="">Estados activos</option>
