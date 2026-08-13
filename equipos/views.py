@@ -1253,6 +1253,35 @@ def buscar_tipos(request):
 
 @exige_formularios_equipos_json
 @login_required
+@registrar_errores_vista("Error al buscar procedencias de equipo")
+def buscar_procedencias(request):
+    """Alimenta el Select2 de procedencia en el formulario de equipo.
+
+    Se busca por nombre y tambien por RTN, porque una factura trae el RTN y es
+    lo que el tecnico tiene delante al registrar. Solo se ofrecen las activas:
+    una procedencia desactivada no debe poder elegirse en un equipo nuevo.
+    """
+    consulta = request.GET.get("q", "").strip()
+    procedencias = Procedencia.objects.filter(activo=True)
+
+    if consulta:
+        procedencias = procedencias.filter(
+            Q(nombre__icontains=consulta) | Q(rtn__icontains=consulta)
+        )
+
+    pagina = _paginar_autocompletado(
+        procedencias.order_by("nombre"),
+        request,
+        lambda procedencia: {
+            "id": procedencia.id,
+            "text": procedencia.nombre,
+        },
+    )
+    return _respuesta_select2(pagina)
+
+
+@exige_formularios_equipos_json
+@login_required
 @registrar_errores_vista("Error al buscar marcas de equipo")
 def buscar_marcas(request):
     # Alimenta el Select2 de marca. Sin texto devuelve las primeras marcas para

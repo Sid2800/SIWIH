@@ -1,13 +1,6 @@
-<script>
 document.addEventListener('DOMContentLoaded', function () {
-    // La tabla la pinta Django, con sus filtros y su paginacion. De DataTables
-    // se aprovecha solo la extension Responsive, que colapsa las columnas que
-    // no caben y las deja consultables al desplegar la fila. Paginado, busqueda
-    // y orden se apagan: ya los resuelve el servidor y duplicarlos daria
-    // contadores contradictorios.
+    // Django resuelve filtros y paginacion. DataTables solo adapta columnas.
     const tabla = document.querySelector('.equipos-listado__tabla');
-    // La fila de "no se encontraron equipos" usa colspan y confundiria a
-    // DataTables, asi que solo se inicializa cuando hay equipos de verdad.
     const hayEquipos = tabla && tabla.querySelector('.equipos-listado__fila');
 
     if (hayEquipos && window.jQuery && $.fn && $.fn.DataTable) {
@@ -19,16 +12,8 @@ document.addEventListener('DOMContentLoaded', function () {
             ordering: false,
             autoWidth: false,
             columnDefs: [
-                // Columna 0: la flecha que despliega. Va aparte del codigo
-                // porque ese es un enlace y el clic seria ambiguo.
                 { targets: 0, className: 'dtr-control', orderable: false },
-                // El menu de acciones nunca se colapsa: al pasar a la fila
-                // desplegable, Responsive rehace su HTML y el <details>
-                // perderia los manejadores que se le asignan aqui abajo.
                 { targets: 8, className: 'all' },
-                // Orden en que se van rindiendo las columnas al estrecharse:
-                // primero desaparece la serie, y el codigo aguanta hasta el
-                // final porque es lo que identifica la fila.
                 { targets: 1, responsivePriority: 1 },
                 { targets: 7, responsivePriority: 2 },
                 { targets: 2, responsivePriority: 3 },
@@ -43,29 +28,25 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
 
-        // Responsive mide los anchos al arrancar y se queda con esa medida.
-        // Como los anchos de columna vienen del CSS, al redimensionar sin
-        // recargar no reevalua que cabe: encogiendo no aparecia la flecha y
-        // agrandando no volvian las columnas. Esto lo obliga a recalcular.
         let recalculoPendiente;
 
         function recalcularTabla() {
             clearTimeout(recalculoPendiente);
-            // Se espera un momento porque redimensionar dispara el evento
-            // muchas veces por segundo y cada recalculo remide toda la tabla.
             recalculoPendiente = setTimeout(function () {
                 tablaDatos.columns.adjust().responsive.recalc();
             }, 150);
         }
 
         window.addEventListener('resize', recalcularTabla);
-        // En tablet y telefono girar el aparato cambia el ancho sin que llegue
-        // un resize fiable en todos los navegadores.
         window.addEventListener('orientationchange', recalcularTabla);
     }
 
-    const menusAcciones = document.querySelectorAll('.equipos-listado__acciones-menu');
-    const filasEditables = document.querySelectorAll('.equipos-listado__fila--editable[data-edit-url]');
+    const menusAcciones = document.querySelectorAll(
+        '.equipos-listado__acciones-menu'
+    );
+    const filasEditables = document.querySelectorAll(
+        '.equipos-listado__fila--editable[data-edit-url]'
+    );
 
     function cerrarMenus(excepto) {
         menusAcciones.forEach(function (menu) {
@@ -97,7 +78,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
     filasEditables.forEach(function (fila) {
         fila.addEventListener('dblclick', function (event) {
-            if (event.target.closest('a, button, input, select, textarea, summary, details, label, .equipos-listado__acciones-menu, .equipos-listado__acciones')) {
+            if (event.target.closest(
+                'a, button, input, select, textarea, summary, details, label, '
+                + '.equipos-listado__acciones-menu, .equipos-listado__acciones'
+            )) {
                 return;
             }
 
@@ -105,4 +89,3 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 });
-</script>

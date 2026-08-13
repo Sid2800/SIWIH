@@ -1,4 +1,5 @@
 {% extends 'core/base.html' %}
+{% load static %}
 {% load permisos_equipos %}
 
 {% block title %}Procedencias de equipos{% endblock title %}
@@ -156,31 +157,5 @@
 {% endblock content %}
 
 {% block extra_js %}
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    // Formatea el telefono mientras se escribe: 33484816 -> 3348-4816.
-    // El servidor normaliza igual al guardar, asi que esto es solo para que
-    // el numero se lea bien en el momento; si alguien pega un numero con
-    // prefijo de pais o extension, se respeta tal cual.
-    const campos = [
-        document.getElementById('telefono_procedencia_catalogo'),
-        document.getElementById('telefono_alterno_procedencia_catalogo'),
-    ].filter(Boolean);
-
-    campos.forEach(function (campo) {
-        function formatear() {
-            const digitos = campo.value.replace(/\D/g, '');
-
-            if (digitos.length !== 8 || campo.value.trim().startsWith('+')) {
-                return;
-            }
-
-            campo.value = digitos.slice(0, 4) + '-' + digitos.slice(4);
-        }
-
-        campo.addEventListener('input', formatear);
-        campo.addEventListener('blur', formatear);
-    });
-});
-</script>
+<script src="{% static 'core/scripts/equipos/catalogoProcedencias.js' %}"></script>
 {% endblock extra_js %}

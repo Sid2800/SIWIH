@@ -1,7 +1,5 @@
-<script>
 document.addEventListener('DOMContentLoaded', function () {
-    // Django conserva los filtros y DataTables solo adapta las cinco columnas
-    // cuando la pantalla se estrecha, igual que en el listado de equipos.
+    // Django conserva los filtros y DataTables adapta las cinco columnas.
     const tabla = document.querySelector('.equipos-garantias__tabla');
     const hayEquipos = tabla && tabla.querySelector('.equipos-listado__fila');
 
@@ -19,8 +17,6 @@ document.addEventListener('DOMContentLoaded', function () {
             ordering: false,
             autoWidth: false,
             columnDefs: [
-                // El codigo identifica la fila y tambien abre los datos que
-                // Responsive haya colapsado; no se agrega una sexta columna.
                 { targets: 0, className: 'dtr-control', responsivePriority: 1 },
                 { targets: 2, responsivePriority: 2 },
                 { targets: 1, responsivePriority: 3 },
@@ -58,4 +54,3 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 });
-</script>

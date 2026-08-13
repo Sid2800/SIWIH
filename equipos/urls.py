@@ -166,6 +166,11 @@ urlpatterns = [
         name='buscar_marcas_equipos'
     ),
     path(
+        'buscar-procedencias/',
+        views.buscar_procedencias,
+        name='buscar_procedencias_equipos'
+    ),
+    path(
         'buscar-modelos/',
         views.buscar_modelos,
         name='buscar_modelos_equipos'

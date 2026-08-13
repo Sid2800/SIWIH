@@ -1432,12 +1432,14 @@ class EquiposViewsTests(TestCase):
         self.assertContains(respuesta, self.dispositivo.codigo)
         self.assertContains(respuesta, "Generar ficha PDF")
         self.assertContains(respuesta, "Confirmar baja definitiva")
-        self.assertContains(respuesta, "mensajes: [")
         self.assertContains(
             respuesta,
-            "Esta acción no se puede deshacer.",
+            f'data-codigo-equipo="{self.dispositivo.codigo}"',
         )
-        self.assertContains(respuesta, "botonAfirmativo: 'Sí, dar de baja'")
+        self.assertContains(
+            respuesta,
+            "/static/core/scripts/equipos/tramiteBajaEquipo.js",
+        )
         self.assertContains(respuesta, "Equipo seleccionado")
 
     def test_tramite_baja_muestra_la_imagen_general_del_equipo(self):
@@ -4476,3 +4478,156 @@ class VistasGarantiaTests(TestCase):
             respuesta, "equipos/detalle_dispositivo_reducido_equipos.html"
         )
         self.assertNotContains(respuesta, "Garantía")
+
+
+class BuscadorProcedenciasTests(TestCase):
+    """Autocompletado de procedencias en el formulario de equipo."""
+
+    databases = {"default"}
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.usuario = get_user_model().objects.create_user(
+            username="tecnico-proc-select", password="clave"
+        )
+        dar_acceso_equipos(cls.usuario, RolUsuario.DIGITADOR)
+
+        cls.distribuidora = Procedencia.objects.create(
+            nombre="DISTRIBUIDORA CENTRAL",
+            tipo=TipoProcedencia.EMPRESA,
+            rtn="08019012345678",
+        )
+        Procedencia.objects.create(
+            nombre="FUNDACION AMIGOS",
+            tipo=TipoProcedencia.EMPRESA,
+        )
+        cls.retirada = Procedencia.objects.create(
+            nombre="PROVEEDOR RETIRADO",
+            tipo=TipoProcedencia.EMPRESA,
+            activo=False,
+        )
+
+    def setUp(self):
+        self.client.force_login(self.usuario)
+
+    def test_sin_texto_devuelve_las_activas(self):
+        respuesta = self.client.get(reverse("buscar_procedencias_equipos"))
+        textos = [r["text"] for r in respuesta.json()["results"]]
+
+        self.assertIn("DISTRIBUIDORA CENTRAL", textos)
+        self.assertIn("FUNDACION AMIGOS", textos)
+
+    def test_omite_las_desactivadas(self):
+        # Una procedencia retirada no debe poder elegirse en un equipo nuevo.
+        respuesta = self.client.get(reverse("buscar_procedencias_equipos"))
+        textos = [r["text"] for r in respuesta.json()["results"]]
+
+        self.assertNotIn("PROVEEDOR RETIRADO", textos)
+
+    def test_busca_por_nombre(self):
+        respuesta = self.client.get(
+            reverse("buscar_procedencias_equipos"), {"q": "distribui"}
+        )
+        textos = [r["text"] for r in respuesta.json()["results"]]
+
+        self.assertEqual(textos, ["DISTRIBUIDORA CENTRAL"])
+
+    def test_busca_tambien_por_rtn(self):
+        # La factura trae el RTN y es lo que el tecnico tiene delante.
+        respuesta = self.client.get(
+            reverse("buscar_procedencias_equipos"), {"q": "0801901234"}
+        )
+        textos = [r["text"] for r in respuesta.json()["results"]]
+
+        self.assertEqual(textos, ["DISTRIBUIDORA CENTRAL"])
+
+    def test_pagina_cuando_hay_muchas(self):
+        for indice in range(25):
+            Procedencia.objects.create(
+                nombre=f"PROVEEDOR {indice:03d}", tipo=TipoProcedencia.EMPRESA
+            )
+
+        cuerpo = self.client.get(reverse("buscar_procedencias_equipos")).json()
+
+        self.assertEqual(len(cuerpo["results"]), 20)
+        self.assertTrue(cuerpo["pagination"]["more"])
+
+    def test_quien_no_es_de_equipos_recibe_403(self):
+        ajeno = get_user_model().objects.create_user(
+            username="ajeno-proc-select", password="clave"
+        )
+        self.client.force_login(ajeno)
+
+        respuesta = self.client.get(reverse("buscar_procedencias_equipos"))
+
+        self.assertEqual(respuesta.status_code, 403)
+
+
+class SelectRemotoProcedenciaTests(TestCase):
+    """El formulario no debe incrustar el catalogo entero en el HTML."""
+
+    databases = {"default"}
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.usuario = get_user_model().objects.create_user(
+            username="tecnico-html-proc", password="clave"
+        )
+        dar_acceso_equipos(cls.usuario, RolUsuario.DIGITADOR)
+        for indice in range(40):
+            Procedencia.objects.create(
+                nombre=f"PROCEDENCIA {indice:03d}", tipo=TipoProcedencia.EMPRESA
+            )
+
+    def setUp(self):
+        self.client.force_login(self.usuario)
+
+    def test_el_formulario_no_dibuja_una_opcion_por_procedencia(self):
+        # Con Select2 las opciones llegan por AJAX; dibujarlas todas serian
+        # cientos de lineas inutiles en cada carga del formulario.
+        respuesta = self.client.get(reverse("registrar_dispositivo_equipos"))
+        html = respuesta.content.decode("utf-8", "ignore")
+
+        self.assertNotContains(respuesta, "PROCEDENCIA 007")
+        self.assertNotContains(respuesta, "PROCEDENCIA 039")
+        # Sigue estando el selector, con la URL del buscador.
+        self.assertIn("data-url-procedencias", html)
+
+    def test_al_editar_se_conserva_visible_la_procedencia_del_equipo(self):
+        # Select2 necesita la opcion elegida en el HTML para poder mostrarla.
+        tipo = TipoDispositivo.objects.create(nombre="MONITOR HTML")
+        marca = MarcaDispositivo.objects.create(nombre="MARCA HTML")
+        gestora, _ = AreaGestora.objects.get_or_create(nombre="BIOMEDICA")
+        color, _ = ColorDispositivo.objects.get_or_create(nombre="BLANCO")
+        procedencia = Procedencia.objects.get(nombre="PROCEDENCIA 003")
+        equipo = Dispositivo.objects.create(
+            tipo=tipo,
+            tipo_tecnologia=TipoTecnologiaDispositivo.ELECTRONICO,
+            marca=marca,
+            area_gestora=gestora,
+            color=color,
+            numero_serie="SERIE-HTML-PROC",
+            modalidad_procedencia=ModalidadProcedencia.COMPRA,
+            procedencia=procedencia,
+            estado=EstadoDispositivo.OPERATIVO,
+            criticidad=CriticidadDispositivo.MEDIA,
+            creado_por=self.usuario,
+            modificado_por=self.usuario,
+        )
+
+        respuesta = self.client.get(
+            reverse("editar_dispositivo_equipos", args=[equipo.pk])
+        )
+
+        self.assertContains(respuesta, "PROCEDENCIA 003")
+        self.assertNotContains(respuesta, "PROCEDENCIA 020")
+
+    def test_la_validacion_sigue_aceptando_cualquier_procedencia_activa(self):
+        # El queryset completo se conserva aunque no se dibuje: si se recortara,
+        # el formulario rechazaria lo que el usuario acaba de elegir en Select2.
+        from equipos.forms import DispositivoCreateForm
+
+        formulario = DispositivoCreateForm()
+        elegibles = formulario.fields["procedencia"].queryset.count()
+
+        self.assertEqual(elegibles, Procedencia.objects.filter(activo=True).count())

@@ -1,4 +1,5 @@
 {% extends 'core/base.html' %}
+{% load static %}
 
 {% block title %}Garantías{% endblock title %}
 
@@ -116,5 +117,5 @@
 
 {% endblock content %}
 {% block extra_js %}
-{% include "equipos/includes/garantias_interacciones_js.html" %}
+<script src="{% static 'core/scripts/equipos/garantiasEquipos.js' %}"></script>
 {% endblock extra_js %}

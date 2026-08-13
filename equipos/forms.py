@@ -97,6 +97,36 @@ TIPOS_IMAGEN_DISPOSITIVO = (
 )
 
 
+class SelectRemoto(forms.Select):
+    """Select cuyas opciones las trae Select2 del servidor, no el HTML.
+
+    Django dibuja una <option> por cada elemento del queryset. Con un catalogo
+    de cientos de procedencias eso son cientos de lineas en cada carga del
+    formulario, y ademas inutiles: Select2 va a pedirlas por AJAX de todos
+    modos. Aqui solo se dibuja la opcion vacia y la que este seleccionada, que
+    es lo unico que el navegador necesita para mostrar el valor actual.
+
+    El queryset del campo no se toca: sigue completo para que la validacion
+    acepte cualquier procedencia activa que el usuario elija en el desplegable.
+    """
+
+    def optgroups(self, name, value, attrs=None):
+        seleccionados = {str(v) for v in value if v not in (None, "")}
+        grupos = []
+
+        for grupo, opciones, indice in super().optgroups(name, value, attrs):
+            visibles = [
+                opcion
+                for opcion in opciones
+                if opcion["value"] in ("", None)
+                or str(opcion["value"]) in seleccionados
+            ]
+            if visibles:
+                grupos.append((grupo, visibles, indice))
+
+        return grupos
+
+
 # Personaliza la etiqueta visible del select de empleados.
 # Select2 usa este texto cuando ya hay un responsable seleccionado.
 class EmpleadoChoiceField(forms.ModelChoiceField):
@@ -402,7 +432,9 @@ class DispositivoCreateForm(forms.ModelForm):
                     "id": "modalidad_procedencia_dispositivo",
                 }
             ),
-            "procedencia": forms.Select(
+            # SelectRemoto en lugar de Select: las opciones las trae Select2 del
+            # servidor y no hace falta incrustar el catalogo entero en el HTML.
+            "procedencia": SelectRemoto(
                 attrs={
                     "class": "formularioCampo-select",
                     "id": "procedencia_dispositivo",
@@ -602,6 +634,9 @@ class DispositivoCreateForm(forms.ModelForm):
             filtro_procedencia
         )
         self.fields["procedencia"].empty_label = "Seleccione la procedencia"
+        self.fields["procedencia"].widget.attrs["data-url-procedencias"] = reverse(
+            "buscar_procedencias_equipos"
+        )
         self.fields["modalidad_procedencia"].choices = [
             ("", "Seleccione la modalidad"),
             *ModalidadProcedencia.choices,
