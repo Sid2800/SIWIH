@@ -182,8 +182,8 @@ class BajaDispositivoForm(forms.ModelForm):
         # El input real va oculto porque la interfaz es la zona de arrastre.
         # Un control required + hidden no se puede enfocar, asi que el
         # navegador cancela el envio sin poder mostrar el mensaje y el boton
-        # parece muerto. La obligatoriedad se mantiene en el servidor y el
-        # template avisa desde su propio JS antes de enviar.
+        # parece muerto. La obligatoriedad se mantiene en el servidor y
+        # tramiteBajaEquipo.js avisa antes de enviar.
         self.fields["ficha_firmada"].widget.use_required_attribute = (
             lambda initial: False
         )

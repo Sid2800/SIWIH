@@ -2,6 +2,7 @@ import base64
 import logging
 from functools import wraps
 from io import BytesIO
+
 import qrcode
 from django.conf import settings
 from django.contrib import messages
@@ -70,6 +71,26 @@ ICONOS_TIPO_IMAGEN = {
     "ESTADO_FISICO": "bi bi-shield-check",
     "ACCESORIOS": "bi bi-plug",
     "OTRA": "bi bi-image",
+}
+
+CSS_ESTADO_DISPOSITIVO = {
+    EstadoDispositivo.OPERATIVO: "equipos-estado--operativo",
+    EstadoDispositivo.EN_MANTENIMIENTO: "equipos-estado--media",
+    EstadoDispositivo.FUERA_DE_SERVICIO: "equipos-estado--alta",
+    EstadoDispositivo.DADO_DE_BAJA: "equipos-estado--inactivo",
+    EstadoDispositivo.REPUESTO_PENDIENTE: "equipos-estado--repuesto",
+}
+CSS_CRITICIDAD_DISPOSITIVO = {
+    CriticidadDispositivo.BAJA: "equipos-estado--operativo",
+    CriticidadDispositivo.MEDIA: "equipos-estado--media",
+    CriticidadDispositivo.ALTA: "equipos-estado--alta",
+}
+ETIQUETAS_ESTADO_DISPOSITIVO = {
+    EstadoDispositivo.OPERATIVO: "Oper.",
+    EstadoDispositivo.EN_MANTENIMIENTO: "Mant.",
+    EstadoDispositivo.FUERA_DE_SERVICIO: "F. serv.",
+    EstadoDispositivo.DADO_DE_BAJA: "Baja",
+    EstadoDispositivo.REPUESTO_PENDIENTE: "Rep.",
 }
 
 # Reutiliza los colores de estado del modulo para no inventar una paleta nueva.
@@ -421,38 +442,22 @@ def _ordenar_dispositivos(dispositivos):
 
 def _preparar_dispositivos_para_tabla(dispositivos):
     # Agrega atributos temporales a cada objeto para simplificar el template.
-    estado_css = {
-        EstadoDispositivo.OPERATIVO: "equipos-estado--operativo",
-        EstadoDispositivo.EN_MANTENIMIENTO: "equipos-estado--media",
-        EstadoDispositivo.FUERA_DE_SERVICIO: "equipos-estado--alta",
-        EstadoDispositivo.DADO_DE_BAJA: "equipos-estado--inactivo",
-        EstadoDispositivo.REPUESTO_PENDIENTE: "equipos-estado--repuesto",
-    }
-    criticidad_css = {
-        CriticidadDispositivo.BAJA: "equipos-estado--operativo",
-        CriticidadDispositivo.MEDIA: "equipos-estado--media",
-        CriticidadDispositivo.ALTA: "equipos-estado--alta",
-    }
-
-    estado_etiqueta = {
-        EstadoDispositivo.OPERATIVO: "Oper.",
-        EstadoDispositivo.EN_MANTENIMIENTO: "Mant.",
-        EstadoDispositivo.FUERA_DE_SERVICIO: "F. serv.",
-        EstadoDispositivo.DADO_DE_BAJA: "Baja",
-        EstadoDispositivo.REPUESTO_PENDIENTE: "Rep.",
-    }
     for dispositivo in dispositivos:
         dispositivo.asignacion_actual = (
             dispositivo.asignacion_activa_lista[0]
             if dispositivo.asignacion_activa_lista
             else None
         )
-        dispositivo.estado_css = estado_css.get(dispositivo.estado, "")
-        dispositivo.estado_etiqueta = estado_etiqueta.get(
+        dispositivo.estado_css = CSS_ESTADO_DISPOSITIVO.get(
+            dispositivo.estado, ""
+        )
+        dispositivo.estado_etiqueta = ETIQUETAS_ESTADO_DISPOSITIVO.get(
             dispositivo.estado,
             dispositivo.get_estado_display(),
         )
-        dispositivo.criticidad_css = criticidad_css.get(dispositivo.criticidad, "")
+        dispositivo.criticidad_css = CSS_CRITICIDAD_DISPOSITIVO.get(
+            dispositivo.criticidad, ""
+        )
 
 
 @exige_ver_equipos
@@ -647,18 +652,6 @@ def detalle_dispositivo(request, dispositivo_id):
             ficha_baja_firmada,
             ficha_baja_server_offline,
         ) = MediaService.obtener_ficha_baja_dispositivo(dispositivo.id)
-    estado_css = {
-        EstadoDispositivo.OPERATIVO: "equipos-estado--operativo",
-        EstadoDispositivo.EN_MANTENIMIENTO: "equipos-estado--media",
-        EstadoDispositivo.FUERA_DE_SERVICIO: "equipos-estado--alta",
-        EstadoDispositivo.DADO_DE_BAJA: "equipos-estado--inactivo",
-        EstadoDispositivo.REPUESTO_PENDIENTE: "equipos-estado--repuesto",
-    }
-    criticidad_css = {
-        CriticidadDispositivo.BAJA: "equipos-estado--operativo",
-        CriticidadDispositivo.MEDIA: "equipos-estado--media",
-        CriticidadDispositivo.ALTA: "equipos-estado--alta",
-    }
     # La ficha solo informa de la garantia. Pausar y reanudar se maneja desde
     # Garantias, asi que aqui no viaja nada para operar.
     pausas = list(dispositivo.pausas_garantia.all())
@@ -674,8 +667,10 @@ def detalle_dispositivo(request, dispositivo_id):
             "orden_trabajo_baja": orden_trabajo_baja,
             "ficha_baja_firmada": ficha_baja_firmada,
             "ficha_baja_server_offline": ficha_baja_server_offline,
-            "estado_css": estado_css.get(dispositivo.estado, ""),
-            "criticidad_css": criticidad_css.get(dispositivo.criticidad, ""),
+            "estado_css": CSS_ESTADO_DISPOSITIVO.get(dispositivo.estado, ""),
+            "criticidad_css": CSS_CRITICIDAD_DISPOSITIVO.get(
+                dispositivo.criticidad, ""
+            ),
             "garantia": garantia,
             "garantia_css": CSS_ESTADO_GARANTIA.get(garantia.estado, ""),
             "pausas": pausas,

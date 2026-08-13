@@ -11,7 +11,7 @@
                 <i class="{{ icono_formulario|default:'bi bi-clipboard2-plus' }}"></i>
                 <h2 class="sin-margen">{{ titulo_formulario|default:"Registrar equipo" }}</h2>
             </div>
-            <a class="equipos-volver equipos-volver--inline equipos-encabezado-volver"
+            <a class="equipos-volver equipos-encabezado-volver"
                href="{{ url_regresar }}">
                 <i class="bi bi-arrow-left"></i>
                 {{ texto_regresar|default:"Equipos" }}
@@ -329,7 +329,7 @@
            La carga de fotos es independiente del formulario de datos porque
            SIWIH Images es un servicio separado.
         {% endcomment %}
-        <section class="equipos-imagenes equipos-imagenes--edicion"
+        <section class="equipos-imagenes"
                  data-titulo-galeria="{{ dispositivo.codigo }}">
             <div class="equipos-imagenes__encabezado">
                 <div>

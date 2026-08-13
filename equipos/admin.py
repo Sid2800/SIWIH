@@ -14,8 +14,8 @@ from .models import (
 )
 
 
-# Catalogos base del modulo. Se mantienen desde Django admin para evitar crear
-# pantallas propias solo para tipo, marca y modelo.
+# Catalogos base del modulo. El admin queda como respaldo administrativo;
+# tipos, marcas, modelos y procedencias tambien tienen pantallas operativas.
 @admin.register(TipoDispositivo)
 class TipoDispositivoAdmin(admin.ModelAdmin):
     list_display = ("nombre", "activo")

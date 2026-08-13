@@ -68,6 +68,8 @@ def obtener_catalogo_indefinido(modelo_catalogo):
         defaults={"descripcion": "Valor usado cuando el dato no aplica."},
     )
     return objeto
+
+
 # Choices: Django guarda numeros en base de datos y muestra etiquetas legibles
 # en formularios/templates con get_campo_display().
 
@@ -116,7 +118,7 @@ class EstadoGarantiaDispositivo(models.TextChoices):
 DIAS_AVISO_GARANTIA = 90
 
 
-# Catalogos administrables desde Django admin.
+# Catalogos administrables desde las pantallas del modulo o Django admin.
 # El campo activo oculta opciones nuevas sin borrar historico ya usado.
 class TipoDispositivo(models.Model):
     nombre = models.CharField(max_length=100, unique=True)

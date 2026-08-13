@@ -74,8 +74,8 @@ def puede_dar_baja_equipos(user):
 def puede_usar_formularios_equipos(user):
     """Permiso de los buscadores que alimentan los formularios.
 
-    Los Select2 de tipo, marca, modelo y empleado los usan tanto el alta como
-    la edicion, asi que basta con cualquiera de las dos capacidades. Se
-    resuelve aqui para que las vistas no repitan la disyuncion.
+    Los Select2 de tipo, marca, modelo, procedencia y empleado los usan tanto
+    el alta como la edicion, asi que basta con cualquiera de las dos
+    capacidades. Se resuelve aqui para que las vistas no repitan la disyuncion.
     """
     return puede_editar_equipos(user) or puede_administrar_catalogos_equipos(user)

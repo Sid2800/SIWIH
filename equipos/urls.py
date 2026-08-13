@@ -84,8 +84,8 @@ urlpatterns = [
         name='registrar_retorno_garantia_equipos'
     ),
 
-    # Catalogo de marcas y modelos. Es el unico lugar donde se dan de alta:
-    # el formulario de equipos solo permite elegir entre los existentes.
+    # Catalogo operativo de marcas y modelos. El formulario de equipos solo
+    # permite elegir entre los registros existentes.
     path(
         'catalogo/marcas/',
         views.catalogo_marcas_modelos,
