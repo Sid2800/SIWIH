@@ -63,7 +63,8 @@ INSTALLED_APPS = [
     'agenda_medica',
     's_exp',
     'mapeo_camas',
-    'rrhh'
+    'rrhh',
+    'egresos',
 ]
 
 MIDDLEWARE = [
