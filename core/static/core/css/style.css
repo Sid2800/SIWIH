@@ -5697,7 +5697,7 @@ tbody tr:last-child .botonTablaBajar{
 /*
  * ESTILOS DEL MODULO EQUIPOS
  * Viven en core porque el modulo consume base.html y reutiliza clases globales.
- * Incluye menu interno, registro/edicion, listado, detalle, busqueda, QR y baja.
+ * Incluye menu, formularios, listado, detalle, imagenes, catalogos y garantias.
  */
 
 .equipos-pagina {
@@ -5715,13 +5715,6 @@ tbody tr:last-child .botonTablaBajar{
    min-width: 0;
    padding-left: 1.2rem;
    padding-right: 1.2rem;
-}
-
-.equipos-descripcion {
-   color: var(--colorTextoMenu);
-   margin: -1rem auto 0;
-   max-width: 72rem;
-   width: 100%;
 }
 
 .equipos-acciones-rapidas {
@@ -6937,8 +6930,7 @@ table.dataTable tbody td.equipos-listado__vacio {
    padding: .3rem .8rem;
 }
 
-.equipos-estado--operativo,
-.equipos-estado--vigente {
+.equipos-estado--operativo {
    background-color: rgba(39, 205, 64, .12);
    border-color: rgb(39, 205, 64);
    color: #146c43;
@@ -7045,13 +7037,6 @@ table.dataTable tbody td.equipos-listado__vacio {
 .equipos-detalle__tabla thead th,
 .equipos-detalle__tabla tbody td {
    font-size: 1.3rem;
-}
-
-.equipos-baja__subtitulo {
-   color: var(--colorTextoMenu);
-   font-size: 1.3rem;
-   font-weight: 400;
-   margin: .4rem 0 0;
 }
 
 .equipos-baja__equipo {
@@ -8278,13 +8263,6 @@ button.equipos-imagenes__vista:hover img {
 .equipos-garantia__cancelar {
    background-color: var(--colorContendor);
    color: inherit;
-}
-
-/* Enlace desde la tarjeta del detalle hacia esa pantalla. */
-.equipos-garantia__accion {
-   border-top: .1rem solid var(--colorLinea);
-   margin-top: 1.6rem;
-   padding-top: 1.6rem;
 }
 
 /* El panel de garantias reutiliza la cuadricula y los botones del listado. */
