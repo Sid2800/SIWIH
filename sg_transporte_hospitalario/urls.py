@@ -16,6 +16,7 @@ urlpatterns = [
     path("api/solicitudes-activas/", views.api_solicitudes_activas, name="sg_transporte_hospitalario_solicitudes_activas"),
     path("api/solicitud-detalle/", views.api_detalle_solicitud, name="sg_transporte_hospitalario_solicitud_detalle"),
     path("api/solicitud-autorizar/", views.api_solicitud_autorizar, name="sg_transporte_hospitalario_solicitud_autorizar"),
+    path("api/resumen/exportar-excel/", views.api_resumen_exportar_excel, name="sg_transporte_hospitalario_resumen_exportar_excel"),
     path("api/programacion-viaje/", views.api_programacion_viaje, name="sg_transporte_hospitalario_programacion_viaje"),
     path("api/programacion-agregar/", views.api_programacion_agregar, name="sg_transporte_hospitalario_programacion_agregar"),
     path("api/programacion-quitar/", views.api_programacion_quitar, name="sg_transporte_hospitalario_programacion_quitar"),

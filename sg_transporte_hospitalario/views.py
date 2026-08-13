@@ -1,21 +1,29 @@
 import json
+import re
+import unicodedata
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 import calendar
+from collections import defaultdict
 
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import transaction
 from django.db.models import Count, Exists, OuterRef, Q, Prefetch
 from django.utils.decorators import method_decorator
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.utils import timezone
 from django.urls import reverse
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.decorators.http import require_GET, require_POST
 from django.views.generic import ListView, TemplateView, View
+from openpyxl import Workbook
+from openpyxl.styles import Alignment
+from openpyxl.utils import get_column_letter
 
+from core.services.reporte.EXCEL.reporte_service_excel import ServiceExcel
 from core.services.usuario_service import UsuarioService
+from core.utils.utilidades_fechas import mes_nombre
 from core.utils.utilidades_mensajes import mostrar_mensaje
 from ingreso.models import Ingreso
 from paciente.models import Paciente
@@ -155,6 +163,433 @@ def _limites_periodo_resumen(request):
         "fin": _fin_dia_local(date(fecha_fin_mes.year, fecha_fin_mes.month, ultimo_dia_fin)),
         "fin_mes": fecha_fin_mes,
     }
+
+
+def _normalizar_nombre_hoja_excel(nombre, usados):
+    texto = unicodedata.normalize("NFKD", str(nombre or "")).encode("ascii", "ignore").decode("ascii")
+    texto = re.sub(r"[\\\/?\*:\[\]]", "", texto)
+    texto = re.sub(r"\s+", " ", texto).strip() or "Hoja"
+    texto = texto[:31]
+
+    base = texto
+    indice = 2
+    while texto.lower() in usados:
+        sufijo = f"_{indice}"
+        texto = f"{base[:31 - len(sufijo)]}{sufijo}".strip()
+        indice += 1
+    usados.add(texto.lower())
+    return texto
+
+
+def _formatear_fecha_excel(fecha_dt):
+    if not fecha_dt:
+        return ""
+    return timezone.localtime(fecha_dt).strftime("%d/%m/%Y %H:%M")
+
+
+def _formatear_hora_excel(fecha_dt):
+    if not fecha_dt:
+        return ""
+    return timezone.localtime(fecha_dt).strftime("%H:%M")
+
+
+def _calcular_total_horas_excel(fecha_salida, fecha_retorno):
+    if not fecha_salida or not fecha_retorno:
+        return None
+    delta = fecha_retorno - fecha_salida
+    if delta.total_seconds() < 0:
+        delta += timedelta(days=1)
+    if delta.total_seconds() < 0:
+        return None
+    return round(delta.total_seconds() / 3600.0, 2)
+
+
+def _nombre_motorista_excel(viaje):
+    motorista = getattr(viaje, "motorista", None)
+    empleado = getattr(motorista, "empleado", None)
+    if empleado:
+        return _nombre_empleado(empleado)
+    return "SIN MOTORISTA"
+
+
+def _texto_vehiculo_excel(viaje):
+    vehiculo = getattr(viaje, "vehiculo", None)
+    if vehiculo:
+        return f"{vehiculo.codigo} - {vehiculo.placa}"
+    return ""
+
+
+def _texto_motorista_excel(viaje):
+    motorista = getattr(viaje, "motorista", None)
+    empleado = getattr(motorista, "empleado", None)
+    if empleado:
+        return _nombre_empleado(empleado)
+    return ""
+
+
+def _texto_personal_viaje_excel(viaje):
+    personal = []
+    for item in viaje.viaje_personal.all():
+        nombre = _nombre_empleado(item.empleado)
+        participacion = item.tipo_participacion or ""
+        personal.append(f"{nombre} ({participacion})" if participacion else nombre)
+    return "\n".join(personal)
+
+
+def _texto_paciente_excel(item_paciente):
+    paciente = getattr(item_paciente, "paciente", None)
+    if not paciente:
+        return "", ""
+    nombre = _nombre_paciente_completo(paciente)
+    identidad = str(getattr(paciente, "dni", "") or "")
+    return nombre, identidad
+
+
+def _viaje_filas_excel(viaje):
+    solicitudes = list(viaje.viaje_solicitudes.all())
+    ejecucion = getattr(viaje, "ejecucion_viaje", None)
+    total_viaticos = sum(
+        (Decimal(str(item.monto_aplicado)) for item in viaje.viaje_viaticos.all() if item.monto_aplicado is not None),
+        Decimal("0.00"),
+    )
+    total_km = None
+    if ejecucion and ejecucion.kilometraje_salida is not None and ejecucion.kilometraje_retorno is not None:
+        total_km = Decimal(str(ejecucion.kilometraje_retorno)) - Decimal(str(ejecucion.kilometraje_salida))
+        if total_km < 0:
+            total_km = None
+    total_horas = _calcular_total_horas_excel(getattr(ejecucion, "fecha_salida", None), getattr(ejecucion, "fecha_retorno", None))
+
+    filas = []
+    total_pacientes = 0
+
+    for solicitud_relacion in solicitudes:
+        solicitud = solicitud_relacion.solicitud
+        pacientes = list(solicitud.solicitud_pacientes.all())
+        if not pacientes:
+            pacientes = [None]
+
+        for paciente_item in pacientes:
+            total_pacientes += 1 if paciente_item is not None else 0
+            nombre_paciente, identidad_paciente = ("", "")
+            if paciente_item is not None:
+                nombre_paciente, identidad_paciente = _texto_paciente_excel(paciente_item)
+
+            filas.append(
+                {
+                    "numero_orden": viaje.numero_viaje if not filas else "",
+                    "fecha_solicitud": _formatear_fecha_excel(solicitud.fecha_solicitud),
+                    "fecha_salida": _formatear_fecha_excel(viaje.fecha_programacion) if not filas else "",
+                    "prioridad": solicitud.prioridad.nombre if solicitud.prioridad_id else "",
+                    "departamento_sala": _punto_solicitud_corto(solicitud.punto_solicitud),
+                    "centro_costo": viaje.centro_costo if not filas and viaje.centro_costo is not None else "",
+                    "salida": _info_institucion(solicitud.lugar_salida)["nombre"] if solicitud.lugar_salida_id else "",
+                    "destino": _info_institucion(solicitud.lugar_destino)["nombre"] if solicitud.lugar_destino_id else "",
+                    "acompanantes": _texto_personal_viaje_excel(viaje) if not filas else "",
+                    "motorista": _texto_motorista_excel(viaje) if not filas else "",
+                    "vehiculo": _texto_vehiculo_excel(viaje) if not filas else "",
+                    "nombre_paciente": nombre_paciente,
+                    "identidad_paciente": identidad_paciente,
+                    "costo_viaticos": total_viaticos if not filas else None,
+                    "tipo_viaje": dict(Viaje.TipoProgramacion.choices).get(viaje.tipo_viaje, "") if not filas else "",
+                    "hora_salida": _formatear_hora_excel(getattr(ejecucion, "fecha_salida", None)) if not filas else "",
+                    "hora_llegada": _formatear_hora_excel(getattr(ejecucion, "fecha_retorno", None)) if not filas else "",
+                    "total_horas": total_horas if not filas else None,
+                    "km_salida": ejecucion.kilometraje_salida if ejecucion and ejecucion.kilometraje_salida is not None and not filas else None,
+                    "km_entrada": ejecucion.kilometraje_retorno if ejecucion and ejecucion.kilometraje_retorno is not None and not filas else None,
+                    "total_km": total_km if not filas else None,
+                    "pacientes": total_pacientes if not filas else "",
+                }
+            )
+
+    if not filas:
+        filas.append(
+            {
+                "numero_orden": viaje.numero_viaje,
+                "fecha_solicitud": "",
+                "fecha_salida": _formatear_fecha_excel(viaje.fecha_programacion),
+                "prioridad": "",
+                "departamento_sala": "",
+                "centro_costo": viaje.centro_costo or "",
+                "salida": "",
+                "destino": "",
+                "acompanantes": _texto_personal_viaje_excel(viaje),
+                "motorista": _texto_motorista_excel(viaje),
+                "vehiculo": _texto_vehiculo_excel(viaje),
+                "nombre_paciente": "",
+                "identidad_paciente": "",
+                "costo_viaticos": total_viaticos,
+                "tipo_viaje": dict(Viaje.TipoProgramacion.choices).get(viaje.tipo_viaje, ""),
+                "hora_salida": _formatear_hora_excel(getattr(ejecucion, "fecha_salida", None)),
+                "hora_llegada": _formatear_hora_excel(getattr(ejecucion, "fecha_retorno", None)),
+                "total_horas": total_horas,
+                "km_salida": ejecucion.kilometraje_salida if ejecucion and ejecucion.kilometraje_salida is not None else None,
+                "km_entrada": ejecucion.kilometraje_retorno if ejecucion and ejecucion.kilometraje_retorno is not None else None,
+                "total_km": total_km,
+                "pacientes": 0,
+            }
+        )
+
+    return filas, total_pacientes, total_km, total_viaticos, total_horas
+
+
+def _estilizar_encabezado_excel(ws, fila_encabezado, total_columnas):
+    rango = f"A{fila_encabezado}:{get_column_letter(total_columnas)}{fila_encabezado}"
+    ServiceExcel.aplicar_estilo_rango(
+        ws,
+        rango,
+        font=ServiceExcel.FONT_TITULO_TABLA,
+        fill=ServiceExcel.FILL_TITULO_TABLA,
+        align=ServiceExcel.ALIGN_TITULO,
+        border=ServiceExcel.BORDER_GENERAL,
+    )
+    ws.row_dimensions[fila_encabezado].height = ServiceExcel.ROW_HEIGHT_ENCABEZADO
+
+
+def _escribir_filas_excel(ws, filas, columnas_texto, columnas_numero):
+    fila_actual = ws.max_row + 1
+    for indice, fila in enumerate(filas, start=1):
+        valores = [fila[columna] for columna in [
+            "numero_orden",
+            "fecha_solicitud",
+            "fecha_salida",
+            "prioridad",
+            "departamento_sala",
+            "centro_costo",
+            "salida",
+            "destino",
+            "acompanantes",
+            "motorista",
+            "vehiculo",
+            "nombre_paciente",
+            "identidad_paciente",
+            "costo_viaticos",
+            "tipo_viaje",
+            "hora_salida",
+            "hora_llegada",
+            "total_horas",
+            "km_salida",
+            "km_entrada",
+            "total_km",
+            "pacientes",
+        ]]
+        ws.append(valores)
+        fill = ServiceExcel.FILL_ZEBRA_1 if fila_actual % 2 == 0 else ServiceExcel.FILL_ZEBRA_2
+        ServiceExcel.aplicar_estilo_rango(
+            ws,
+            f"A{fila_actual}:V{fila_actual}",
+            fill=fill,
+            border=ServiceExcel.BORDER_GENERAL,
+            font=ServiceExcel.FONT_GENERAL,
+            align=ServiceExcel.ALIGN_GENERAL,
+        )
+        for col in columnas_texto:
+            ws.cell(row=fila_actual, column=col).alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
+        for col in columnas_numero:
+            ws.cell(row=fila_actual, column=col).alignment = Alignment(horizontal="center", vertical="center")
+        fila_actual += 1
+
+
+def _generar_excel_viajes_historial(request, resumen_config):
+    if not resumen_config.get("valido", True):
+        return JsonResponse({"error": resumen_config.get("error", "Rango inválido")}, status=400)
+
+    resumen_vista = (request.GET.get("vista") or "viajes").strip().lower()
+    if resumen_vista != "viajes":
+        return JsonResponse({"error": "El reporte Excel solo está disponible para la vista Por viajes."}, status=400)
+
+    qs_viajes = _obtener_qs_viajes_historial(request.user).filter(
+        fecha_programacion__gte=resumen_config["inicio"],
+        fecha_programacion__lte=resumen_config["fin"],
+    )
+
+    viajes = list(qs_viajes)
+    if not viajes:
+        return JsonResponse({"error": "No existen viajes para el período seleccionado."}, status=404)
+
+    viajes_por_motorista = defaultdict(list)
+    consolidado = defaultdict(lambda: {
+        "motorista": "SIN MOTORISTA",
+        "total_viajes": 0,
+        "total_pacientes": 0,
+        "total_km": Decimal("0.00"),
+        "total_viaticos": Decimal("0.00"),
+    })
+
+    for viaje in viajes:
+        nombre_motorista = _nombre_motorista_excel(viaje)
+        filas, total_pacientes, total_km, total_viaticos, _ = _viaje_filas_excel(viaje)
+        viajes_por_motorista[nombre_motorista].append(
+            {
+                "viaje": viaje,
+                "filas": filas,
+                "total_pacientes": total_pacientes,
+                "total_km": total_km,
+                "total_viaticos": total_viaticos,
+            }
+        )
+
+        resumen = consolidado[nombre_motorista]
+        resumen["motorista"] = nombre_motorista
+        resumen["total_viajes"] += 1
+        resumen["total_pacientes"] += total_pacientes
+        resumen["total_km"] += total_km if isinstance(total_km, Decimal) else Decimal(str(total_km or 0))
+        resumen["total_viaticos"] += total_viaticos if isinstance(total_viaticos, Decimal) else Decimal(str(total_viaticos or 0))
+
+    wb = Workbook()
+    ws_consolidado = wb.active
+    ws_consolidado.title = "CONSOLIDADO"
+
+    fecha_inicio = resumen_config["inicio"]
+    fecha_fin = resumen_config["fin"]
+    mes_inicio_nombre = mes_nombre(fecha_inicio.month)
+    mes_fin_nombre = mes_nombre(fecha_fin.month)
+    usuario = getattr(request.user, "username", "")
+    usuario_nombre = f"{getattr(request.user, 'first_name', '')} {getattr(request.user, 'last_name', '')}".strip() or usuario
+    fecha_actual = timezone.localtime(timezone.now()).strftime("%d/%m/%Y %H:%M")
+
+    def preparar_hoja(ws, total_columnas, titulo, subtitulo):
+        ServiceExcel.dibujar_encabezado_excel(ws, col_fin=get_column_letter(total_columnas))
+        fila_titulo = ws.max_row + 2
+        ws.merge_cells(f"A{fila_titulo}:{get_column_letter(total_columnas)}{fila_titulo}")
+        titulo_celda = ws.cell(row=fila_titulo, column=1)
+        titulo_celda.value = titulo
+        titulo_celda.font = ServiceExcel.FONT_TITULO
+        titulo_celda.alignment = ServiceExcel.ALIGN_TITULO
+        ws.row_dimensions[fila_titulo].height = 22
+
+        fila_subtitulo = fila_titulo + 1
+        ws.merge_cells(f"A{fila_subtitulo}:{get_column_letter(total_columnas)}{fila_subtitulo}")
+        subtitulo_celda = ws.cell(row=fila_subtitulo, column=1)
+        subtitulo_celda.value = subtitulo
+        subtitulo_celda.font = ServiceExcel.FONT_SUBTITULO
+        subtitulo_celda.alignment = ServiceExcel.ALIGN_TITULO
+        ws.row_dimensions[fila_subtitulo].height = 20
+
+    def agregar_pie(ws):
+        ServiceExcel.dibujar_pie_excel(ws, fecha_actual, usuario, usuario_nombre)
+
+    columnas_consolidado = ["MOTORISTA", "TOTAL VIAJES", "TOTAL PACIENTES", "TOTAL KM", "TOTAL VIÁTICOS"]
+    preparar_hoja(
+        ws_consolidado,
+        len(columnas_consolidado),
+        "REPORTE EXCEL HISTÓRICO DE VIAJES POR MOTORISTA",
+        f"Período: {mes_inicio_nombre} {fecha_inicio.year} - {mes_fin_nombre} {fecha_fin.year}",
+    )
+    ws_consolidado.append([])
+    ws_consolidado.append(columnas_consolidado)
+    fila_encabezado = ws_consolidado.max_row
+    _estilizar_encabezado_excel(ws_consolidado, fila_encabezado, len(columnas_consolidado))
+
+    for col, ancho in {1: 30, 2: 14, 3: 16, 4: 14, 5: 16}.items():
+        ws_consolidado.column_dimensions[get_column_letter(col)].width = ancho
+
+    fila_actual = ws_consolidado.max_row + 1
+    for nombre_motorista in sorted(consolidado.keys(), key=lambda valor: valor.lower()):
+        item = consolidado[nombre_motorista]
+        ws_consolidado.append([
+            item["motorista"],
+            item["total_viajes"],
+            item["total_pacientes"],
+            float(item["total_km"]),
+            float(item["total_viaticos"]),
+        ])
+        fill = ServiceExcel.FILL_ZEBRA_1 if fila_actual % 2 == 0 else ServiceExcel.FILL_ZEBRA_2
+        ServiceExcel.aplicar_estilo_rango(
+            ws_consolidado,
+            f"A{fila_actual}:E{fila_actual}",
+            fill=fill,
+            border=ServiceExcel.BORDER_GENERAL,
+            font=ServiceExcel.FONT_GENERAL,
+            align=ServiceExcel.ALIGN_GENERAL,
+        )
+        ws_consolidado.cell(row=fila_actual, column=1).alignment = Alignment(horizontal="left", vertical="center")
+        fila_actual += 1
+
+    agregar_pie(ws_consolidado)
+    ServiceExcel.configurar_impresion(ws_consolidado, fila_encabezado)
+
+    usados = {"consolidado"}
+    columnas_texto = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 15, 16, 17, 22}
+    columnas_numero = {14, 18, 19, 20, 21}
+
+    for nombre_motorista in sorted(viajes_por_motorista.keys(), key=lambda valor: valor.lower()):
+        ws = wb.create_sheet(title=_normalizar_nombre_hoja_excel(nombre_motorista, usados))
+        preparar_hoja(
+            ws,
+            22,
+            f"REPORTE DE VIAJES - {nombre_motorista}",
+            f"Período: {mes_inicio_nombre} {fecha_inicio.year} - {mes_fin_nombre} {fecha_fin.year}",
+        )
+        ws.append([])
+        headers = [
+            "N° ORDEN",
+            "FECHA DE SOLICITUD",
+            "FECHA SALIDA",
+            "PRIORIDAD",
+            "DEPARTAMENTO / SALA",
+            "CENTRO DE COSTO",
+            "SALIDA",
+            "DESTINO",
+            "ACOMPAÑANTES",
+            "MOTORISTA",
+            "VEHÍCULO",
+            "NOMBRE DEL PACIENTE",
+            "NÚMERO DE IDENTIDAD DEL PACIENTE",
+            "COSTO DE VIÁTICOS",
+            "TIPO DE VIAJE",
+            "HORA SALIDA",
+            "HORA LLEGADA",
+            "TOTAL HORAS",
+            "KM. SALIDA",
+            "KM. ENTRADA",
+            "TOTAL KM",
+            "PACIENTES",
+        ]
+        ws.append(headers)
+        fila_encabezado = ws.max_row
+        _estilizar_encabezado_excel(ws, fila_encabezado, len(headers))
+        ws.freeze_panes = f"A{fila_encabezado + 1}"
+
+        anchos = {
+            1: 14,
+            2: 18,
+            3: 18,
+            4: 14,
+            5: 24,
+            6: 14,
+            7: 24,
+            8: 24,
+            9: 30,
+            10: 24,
+            11: 24,
+            12: 26,
+            13: 22,
+            14: 16,
+            15: 16,
+            16: 12,
+            17: 12,
+            18: 12,
+            19: 12,
+            20: 12,
+            21: 12,
+            22: 10,
+        }
+        for col, ancho in anchos.items():
+            ws.column_dimensions[get_column_letter(col)].width = ancho
+
+        for bundle in viajes_por_motorista[nombre_motorista]:
+            _escribir_filas_excel(ws, bundle["filas"], columnas_texto, columnas_numero)
+
+        agregar_pie(ws)
+        ServiceExcel.configurar_impresion(ws, fila_encabezado)
+
+    response = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    nombre_archivo = (
+        f"Reporte_Viajes_{mes_inicio_nombre}_{fecha_inicio.year}_{mes_fin_nombre}_{fecha_fin.year}.xlsx"
+    )
+    response["Content-Disposition"] = f'attachment; filename="{nombre_archivo}"'
+    wb.save(response)
+    return response
 
 
 def _viaje_asociado_solicitud(solicitud):
@@ -427,6 +862,10 @@ def _obtener_qs_viajes_ejecucion(usuario):
         )
         .prefetch_related(
             Prefetch(
+                "viaje_viaticos",
+                queryset=ViajeViatico.objects.select_related("viatico", "creado_por"),
+            ),
+            Prefetch(
                 "viaje_solicitudes",
                 queryset=ViajeSolicitud.objects.select_related(
                     "solicitud",
@@ -505,6 +944,15 @@ def _obtener_qs_viajes_historial(usuario):
         )
         .order_by("-fecha_programacion", "numero_viaje")
     )
+
+
+@require_GET
+def api_resumen_exportar_excel(request):
+    if not puede_ver_modulo(request.user):
+        return JsonResponse({"error": "Acceso denegado."}, status=403)
+
+    resumen_config = _limites_periodo_resumen(request)
+    return _generar_excel_viajes_historial(request, resumen_config)
 
 
 def _parse_payload_json(valor):

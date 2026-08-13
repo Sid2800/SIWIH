@@ -661,6 +661,12 @@
               <i class="bi bi-funnel"></i>
               Filtrar
             </button>
+            {% if resumen_vista == 'viajes' %}
+            <button type="submit" class="th-btn th-btn--success" formaction="{% url 'sg_transporte_hospitalario_resumen_exportar_excel' %}" formmethod="get">
+              <i class="bi bi-file-earmark-excel"></i>
+              Generar Excel
+            </button>
+            {% endif %}
             <a href="{{ tabs_url_base }}?tab=resumen&vista={{ resumen_vista }}" class="th-btn th-btn--ghost">
               <i class="bi bi-eraser"></i>
               Limpiar
