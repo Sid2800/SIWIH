@@ -1,5 +1,7 @@
 import json
+from datetime import date, datetime, time, timedelta
 from decimal import Decimal
+import calendar
 
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import transaction
@@ -94,6 +96,164 @@ def _punto_solicitud_corto(punto):
     return "-"
 
 
+def _nombre_paciente_completo(paciente):
+    if not paciente:
+        return "-"
+    return " ".join(
+        x for x in [
+            paciente.primer_nombre,
+            paciente.segundo_nombre,
+            paciente.primer_apellido,
+            paciente.segundo_apellido,
+        ] if x
+    ) or "-"
+
+
+def _inicio_dia_local(fecha_base):
+    return timezone.make_aware(datetime.combine(fecha_base, time.min))
+
+
+def _fin_dia_local(fecha_base):
+    return timezone.make_aware(datetime.combine(fecha_base, time.max))
+
+
+def _limites_periodo_resumen(request):
+    hoy = timezone.localdate()
+    mes_inicio = (request.GET.get("mes_inicio") or hoy.strftime("%Y-%m")).strip()
+    mes_fin = (request.GET.get("mes_fin") or mes_inicio or hoy.strftime("%Y-%m")).strip()
+
+    try:
+        inicio_anio, inicio_mes = [int(valor) for valor in mes_inicio.split("-", 1)]
+        fin_anio, fin_mes = [int(valor) for valor in mes_fin.split("-", 1)]
+        fecha_inicio = date(inicio_anio, inicio_mes, 1)
+        fecha_fin_mes = date(fin_anio, fin_mes, 1)
+    except (TypeError, ValueError):
+        fecha_inicio = hoy.replace(day=1)
+        fecha_fin_mes = fecha_inicio
+        mes_inicio = hoy.strftime("%Y-%m")
+        mes_fin = mes_inicio
+
+    if fecha_fin_mes < fecha_inicio:
+        ultimo_dia_inicio = calendar.monthrange(fecha_inicio.year, fecha_inicio.month)[1]
+        ultimo_dia_fin = calendar.monthrange(fecha_fin_mes.year, fecha_fin_mes.month)[1]
+        return {
+            "valido": False,
+            "error": "El mes final no puede ser anterior al mes inicio.",
+            "mes_inicio": mes_inicio,
+            "mes_fin": mes_fin,
+            "inicio": _inicio_dia_local(fecha_inicio),
+            "fin": _fin_dia_local(date(fecha_fin_mes.year, fecha_fin_mes.month, ultimo_dia_fin)),
+            "fin_mes": fecha_fin_mes,
+        }
+
+    ultimo_dia_fin = calendar.monthrange(fecha_fin_mes.year, fecha_fin_mes.month)[1]
+    return {
+        "valido": True,
+        "mes_inicio": mes_inicio,
+        "mes_fin": mes_fin,
+        "inicio": _inicio_dia_local(fecha_inicio),
+        "fin": _fin_dia_local(date(fecha_fin_mes.year, fecha_fin_mes.month, ultimo_dia_fin)),
+        "fin_mes": fecha_fin_mes,
+    }
+
+
+def _viaje_asociado_solicitud(solicitud):
+    for relacion in solicitud.viaje_solicitudes.all():
+        if relacion.viaje_id:
+            return relacion.viaje
+    return None
+
+
+def _resumen_pacientes_solicitud(solicitud):
+    pacientes = []
+    for item in solicitud.solicitud_pacientes.all():
+        if item.paciente:
+            pacientes.append(_nombre_paciente_completo(item.paciente))
+    texto = ", ".join(pacientes[:2]) if pacientes else "Sin pacientes"
+    if len(pacientes) > 2:
+        texto += f" (+{len(pacientes) - 2})"
+    return {
+        "total": len(pacientes),
+        "texto": texto,
+    }
+
+
+def _detalle_solicitud_payload(solicitud):
+    pacientes = []
+    for item in solicitud.solicitud_pacientes.select_related("paciente", "ingreso__sala"):
+        paciente_obj = item.paciente
+        pacientes.append(
+            {
+                "paciente": _nombre_paciente_completo(paciente_obj),
+                "paciente_obj": paciente_obj,
+                "expediente": str(getattr(paciente_obj, "expediente_numero", "-") or "-"),
+                "ingreso": f"ING-{item.ingreso_id}" if item.ingreso_id else "-",
+                "sala": item.ingreso.sala.nombre_sala if item.ingreso and item.ingreso.sala else "-",
+            }
+        )
+
+    personal = [
+        {
+            "id": p.empleado_id,
+            "nombre": _nombre_empleado(p.empleado),
+            "cargo": _cargo_empleado(p.empleado),
+            "unidad": getattr(_unidad_empleado(p.empleado), "nombre_corto_unidad", None)
+            or getattr(_unidad_empleado(p.empleado), "nombre_unidad", None)
+            or "-",
+            "observacion": p.observacion or "-",
+        }
+        for p in solicitud.solicitud_personal.select_related("empleado")
+    ]
+
+    punto_solicitud = _info_punto_solicitud(solicitud.punto_solicitud)
+    origen = _info_institucion(solicitud.lugar_salida)
+    destino = _info_institucion(solicitud.lugar_destino)
+    solicitante = _info_empleado_solicitante(solicitud.solicitante_empleado)
+    pacientes_detalle = []
+    for item in pacientes:
+        paciente_obj = item.get("paciente_obj")
+        pacientes_detalle.append(
+            {
+                "paciente": item["paciente"],
+                "identidad": str(getattr(paciente_obj, "dni", "") or ""),
+                "expediente": item["expediente"],
+                "ingreso": item["ingreso"],
+                "sala": item["sala"],
+            }
+        )
+
+    viaje = _viaje_asociado_solicitud(solicitud)
+
+    return {
+        "id": solicitud.id,
+        "numero_solicitud": solicitud.numero_solicitud,
+        "fecha_solicitud": timezone.localtime(solicitud.fecha_solicitud).strftime("%d/%m/%Y %H:%M"),
+        "origen": origen["nombre"],
+        "destino": destino["nombre"],
+        "tipo_solicitud": solicitud.tipo_solicitud.nombre,
+        "prioridad": solicitud.prioridad.nombre,
+        "estado": solicitud.proceso_funcional,
+        "proceso": solicitud.proceso_funcional,
+        "puede_editar": solicitud.puede_editar,
+        "motivo": solicitud.motivo,
+        "observaciones": solicitud.observaciones or "",
+        "motivo_anulacion": solicitud.motivo_anulacion or "",
+        "observacion_anulacion": solicitud.observacion_anulacion or "",
+        "anulada_por": str(solicitud.anulada_por) if solicitud.anulada_por else "",
+        "anulada_en": timezone.localtime(solicitud.anulada_en).strftime("%d/%m/%Y %H:%M") if solicitud.anulada_en else "",
+        "punto_solicitud": punto_solicitud["nombre"],
+        "punto_corto": punto_solicitud["nombre_corto"],
+        "solicitante": solicitante,
+        "pacientes": pacientes_detalle,
+        "personal": personal,
+        "viaje_asociado": {
+            "id": viaje.id,
+            "numero_viaje": viaje.numero_viaje,
+            "estado": viaje.estado,
+        } if viaje else None,
+    }
+
+
 def _generar_numero_solicitud():
     ultimo = Solicitud.objects.order_by("-id").values_list("id", flat=True).first() or 0
     return f"SOL-{ultimo + 1:06d}"
@@ -110,15 +270,13 @@ def _proceso_solicitud_label(estado):
     return etiquetas.get(estado, estado or "-")
 
 
-def _obtener_qs_solicitudes_activas(usuario):
+def _obtener_qs_solicitudes_base(usuario):
     viaje_solicitudes_activas = ViajeSolicitud.objects.filter(
         solicitud_id=OuterRef("pk"),
         activo=True,
     )
     qs = (
         Solicitud.objects
-        .filter(activo=True)
-        .exclude(estado__in=[Solicitud.Estado.ANULADA, Solicitud.Estado.FINALIZADA])
         .annotate(
             tiene_viaje_solicitud_activa=Exists(viaje_solicitudes_activas),
         )
@@ -141,6 +299,10 @@ def _obtener_qs_solicitudes_activas(usuario):
             "lugar_destino__region_salud",
         )
         .prefetch_related(
+            Prefetch(
+                "viaje_solicitudes",
+                queryset=ViajeSolicitud.objects.select_related("viaje").filter(activo=True),
+            ),
             Prefetch(
                 "solicitud_pacientes",
                 queryset=SolicitudPaciente.objects.select_related("paciente", "ingreso__sala"),
@@ -165,6 +327,49 @@ def _obtener_qs_solicitudes_activas(usuario):
         return qs.none()
 
     return qs.filter(solicitante_empleado_id=empleado_id)
+
+
+def _obtener_qs_solicitudes_activas(usuario):
+    return _obtener_qs_solicitudes_base(usuario).filter(
+        activo=True,
+    ).exclude(
+        estado__in=[Solicitud.Estado.ANULADA, Solicitud.Estado.FINALIZADA],
+    )
+
+
+def _obtener_qs_solicitudes_historial(usuario):
+    return _obtener_qs_solicitudes_base(usuario)
+
+
+def _obtener_qs_solicitudes_resumen(usuario, vista):
+    qs = _obtener_qs_solicitudes_historial(usuario)
+    if vista == "denegadas":
+        return qs.filter(estado=Solicitud.Estado.ANULADA).order_by("-fecha_solicitud", "numero_solicitud")
+    return qs.filter(estado__in=[Solicitud.Estado.PROGRAMADA, Solicitud.Estado.EN_EJECUCION, Solicitud.Estado.FINALIZADA]).order_by("-fecha_solicitud", "numero_solicitud")
+
+
+def _serializar_solicitud_resumen(solicitud):
+    pacientes = _resumen_pacientes_solicitud(solicitud)
+    viaje = _viaje_asociado_solicitud(solicitud)
+    detalle = _detalle_solicitud_payload(solicitud)
+    return {
+        "id": solicitud.id,
+        "numero": solicitud.numero_solicitud,
+        "fecha": timezone.localtime(solicitud.fecha_solicitud).strftime("%d/%m/%Y %H:%M"),
+        "punto": _punto_solicitud_corto(solicitud.punto_solicitud),
+        "tipo": solicitud.tipo_solicitud.nombre,
+        "prioridad": solicitud.prioridad.nombre,
+        "prioridad_nivel": solicitud.prioridad.nivel,
+        "pacientes": pacientes["texto"],
+        "pacientes_total": pacientes["total"],
+        "estado": solicitud.proceso_funcional,
+        "viaje_asociado": viaje.numero_viaje if viaje else "-",
+        "motivo_anulacion": solicitud.motivo_anulacion or "",
+        "observacion_anulacion": solicitud.observacion_anulacion or "",
+        "anulada_por": str(solicitud.anulada_por) if solicitud.anulada_por else "",
+        "anulada_en": timezone.localtime(solicitud.anulada_en).strftime("%d/%m/%Y %H:%M") if solicitud.anulada_en else "",
+        "detalle_json": json.dumps(detalle, ensure_ascii=False),
+    }
 
 
 def _puede_ver_todas_solicitudes(usuario):
@@ -215,6 +420,51 @@ def _obtener_qs_viajes_ejecucion(usuario):
     return (
         Viaje.objects
         .filter(activo=True, estado__in=["PROGRAMADA", "EN_EJECUCION", "FINALIZADA"])
+        .select_related(
+            "vehiculo",
+            "motorista__empleado",
+            "ejecucion_viaje",
+        )
+        .prefetch_related(
+            Prefetch(
+                "viaje_solicitudes",
+                queryset=ViajeSolicitud.objects.select_related(
+                    "solicitud",
+                    "solicitud__prioridad",
+                    "solicitud__tipo_solicitud",
+                    "solicitud__punto_solicitud",
+                    "solicitud__lugar_destino",
+                ).prefetch_related(
+                    Prefetch(
+                        "solicitud__solicitud_pacientes",
+                        queryset=SolicitudPaciente.objects.select_related("paciente", "ingreso__sala"),
+                    ),
+                    Prefetch(
+                        "solicitud__solicitud_personal",
+                        queryset=SolicitudPersonal.objects.select_related(
+                            "empleado",
+                            "empleado__personal_salud_empleado__tipo_personal_salud",
+                            "empleado__personal_no_clinico",
+                        ),
+                    ),
+                ).filter(activo=True),
+            ),
+            Prefetch(
+                "viaje_personal",
+                queryset=ViajePersonal.objects.select_related(
+                    "empleado",
+                    "empleado__personal_salud_empleado__tipo_personal_salud",
+                    "empleado__personal_no_clinico",
+                ),
+            )
+        )
+        .order_by("-fecha_programacion", "numero_viaje")
+    )
+
+
+def _obtener_qs_viajes_historial(usuario):
+    return (
+        Viaje.objects
         .select_related(
             "vehiculo",
             "motorista__empleado",
@@ -803,6 +1053,10 @@ class SGTransporteHospitalarioDashboardView(LoginRequiredMixin, TemplateView):
         context = super().get_context_data(**kwargs)
         context.update(construir_contexto_dashboard(self.request.user))
         active_tab = self._active_tab()
+        resumen_config = None
+        resumen_vista = (self.request.GET.get("vista") or "viajes").strip().lower()
+        if resumen_vista not in {"viajes", "autorizadas", "denegadas"}:
+            resumen_vista = "viajes"
         solicitudes_activas = list(_obtener_qs_solicitudes_activas(self.request.user))
         solicitudes_autorizacion = list(_obtener_qs_solicitudes_autorizacion(self.request.user))
         viaje_construccion_items = list(_obtener_qs_viaje_construccion(self.request.user))
@@ -882,6 +1136,60 @@ class SGTransporteHospitalarioDashboardView(LoginRequiredMixin, TemplateView):
         context["autorizacion_total"] = len(solicitudes_autorizacion)
         context["pacientes_payload"] = json.dumps(getattr(self, "pacientes_payload", []))
         context["personal_payload"] = json.dumps(getattr(self, "personal_payload", []))
+        context["resumen_vista"] = resumen_vista
+        context["resumen_vista_label"] = {
+            "viajes": "Por viajes",
+            "autorizadas": "Solicitudes autorizadas",
+            "denegadas": "Solicitudes denegadas",
+        }[resumen_vista]
+        context["resumen_tabs"] = [
+            {"key": "viajes", "label": "Por viajes"},
+            {"key": "autorizadas", "label": "Solicitudes autorizadas"},
+            {"key": "denegadas", "label": "Solicitudes denegadas"},
+        ]
+        context["resumen_titulo"] = "Resumen / Historial"
+        context["resumen_config"] = resumen_config
+        if active_tab == "resumen":
+            resumen_config = _limites_periodo_resumen(self.request)
+            context["resumen_config"] = resumen_config
+            context["resumen_error"] = resumen_config.get("error") if not resumen_config.get("valido", True) else ""
+            if resumen_config.get("valido", True):
+                if resumen_vista == "viajes":
+                    qs_resumen = _obtener_qs_viajes_historial(self.request.user).filter(
+                        fecha_programacion__gte=resumen_config["inicio"],
+                        fecha_programacion__lte=resumen_config["fin"],
+                    )
+                    context["resumen_items"] = [
+                        _serializar_viaje_ejecucion(viaje)
+                        for viaje in qs_resumen
+                    ]
+                    context["resumen_total"] = len(context["resumen_items"])
+                    context["resumen_empty"] = "No hay viajes para los filtros seleccionados."
+                else:
+                    qs_resumen = _obtener_qs_solicitudes_resumen(self.request.user, resumen_vista).filter(
+                        fecha_solicitud__gte=resumen_config["inicio"],
+                        fecha_solicitud__lte=resumen_config["fin"],
+                    )
+                    context["resumen_items"] = [
+                        _serializar_solicitud_resumen(solicitud)
+                        for solicitud in qs_resumen
+                    ]
+                    context["resumen_total"] = len(context["resumen_items"])
+                    context["resumen_empty"] = "No hay solicitudes para los filtros seleccionados."
+            else:
+                context["resumen_items"] = []
+                context["resumen_total"] = 0
+                context["resumen_empty"] = resumen_config["error"]
+            context["resumen_mes_inicio"] = resumen_config["mes_inicio"]
+            context["resumen_mes_fin"] = resumen_config["mes_fin"]
+        else:
+            context["resumen_items"] = []
+            context["resumen_total"] = 0
+            context["resumen_empty"] = "No hay registros para los filtros seleccionados."
+            hoy = timezone.localdate().strftime("%Y-%m")
+            context["resumen_mes_inicio"] = hoy
+            context["resumen_mes_fin"] = hoy
+            context["resumen_error"] = ""
         return context
 
 
@@ -1095,86 +1403,11 @@ def api_detalle_solicitud(request):
         return JsonResponse({"ok": False, "error": "El parametro id es requerido."}, status=400)
 
     try:
-        solicitud = _obtener_qs_solicitudes_activas(request.user).get(pk=solicitud_id)
+        solicitud = _obtener_qs_solicitudes_historial(request.user).get(pk=solicitud_id)
     except Solicitud.DoesNotExist:
         return JsonResponse({"ok": False, "error": "Solicitud no encontrada."}, status=404)
-
-    pacientes = []
-    for item in solicitud.solicitud_pacientes.select_related("paciente", "ingreso__sala"):
-        nombre = "-"
-        if item.paciente:
-            nombre = " ".join(
-                x for x in [
-                    item.paciente.primer_nombre,
-                    item.paciente.segundo_nombre,
-                    item.paciente.primer_apellido,
-                    item.paciente.segundo_apellido,
-                ] if x
-            )
-        pacientes.append(
-            {
-                "paciente": nombre,
-                "paciente_obj": item.paciente,
-                "expediente": str(getattr(item.paciente, "expediente_numero", "-")),
-                "ingreso": f"ING-{item.ingreso_id}" if item.ingreso_id else "-",
-                "sala": item.ingreso.sala.nombre_sala if item.ingreso and item.ingreso.sala else "-",
-            }
-        )
-
-    personal = [
-        {
-            "id": p.empleado_id,
-            "nombre": _nombre_empleado(p.empleado),
-            "cargo": _cargo_empleado(p.empleado),
-            "unidad": getattr(_unidad_empleado(p.empleado), "nombre_corto_unidad", None)
-            or getattr(_unidad_empleado(p.empleado), "nombre_unidad", None)
-            or "-",
-            "observacion": p.observacion or "-",
-        }
-        for p in solicitud.solicitud_personal.select_related("empleado")
-    ]
-
-    punto_solicitud = _info_punto_solicitud(solicitud.punto_solicitud)
-    origen = _info_institucion(solicitud.lugar_salida)
-    destino = _info_institucion(solicitud.lugar_destino)
-    solicitante = _info_empleado_solicitante(solicitud.solicitante_empleado)
-    pacientes_detalle = []
-    for item in pacientes:
-        paciente_obj = item.get("paciente_obj")
-        pacientes_detalle.append(
-            {
-                "paciente": item["paciente"],
-                "identidad": str(getattr(paciente_obj, "dni", "") or ""),
-                "expediente": item["expediente"],
-                "ingreso": item["ingreso"],
-                "sala": item["sala"],
-            }
-        )
-
-    return JsonResponse(
-        {
-            "ok": True,
-            "data": {
-                "id": solicitud.id,
-                "numero_solicitud": solicitud.numero_solicitud,
-                "fecha_solicitud": timezone.localtime(solicitud.fecha_solicitud).strftime("%d/%m/%Y %H:%M"),
-                "origen": origen["nombre"],
-                "destino": destino["nombre"],
-                "tipo_solicitud": solicitud.tipo_solicitud.nombre,
-                "prioridad": solicitud.prioridad.nombre,
-                "estado": solicitud.proceso_funcional,
-                "proceso": solicitud.proceso_funcional,
-                "puede_editar": solicitud.puede_editar,
-                "motivo": solicitud.motivo,
-                "observaciones": solicitud.observaciones or "",
-                "punto_solicitud": punto_solicitud["nombre"],
-                "punto_corto": punto_solicitud["nombre_corto"],
-                "solicitante": solicitante,
-                "pacientes": pacientes_detalle,
-                "personal": personal,
-            },
-        }
-    )
+    payload = _detalle_solicitud_payload(solicitud)
+    return JsonResponse({"ok": True, "data": payload})
 @require_POST
 def api_solicitud_autorizar(request):
     if not puede_ver_modulo(request.user):

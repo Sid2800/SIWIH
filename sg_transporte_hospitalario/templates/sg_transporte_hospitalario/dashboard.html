@@ -618,6 +618,152 @@
           </div>
         </div>
       </div>
+    {% elif active_tab == 'resumen' %}
+    <div class="th-workspace__hero">
+      <div>
+        <h3>{{ resumen_titulo }}</h3>
+        <p>Consulta histórica reutilizando los modales y las tablas del módulo sin crear una arquitectura paralela.</p>
+      </div>
+      <div class="th-pill">
+        <i class="bi bi-clock-history"></i>
+        {{ resumen_total }} registros
+      </div>
+    </div>
+
+    <div class="th-grid">
+      <article class="th-card th-span-12">
+        <div class="th-toolbar">
+          <div class="th-toolbar__group th-resumen__views">
+            {% for vista in resumen_tabs %}
+            <a
+              class="th-btn {% if resumen_vista == vista.key %}th-btn--primary{% else %}th-btn--ghost{% endif %}"
+              href="{{ tabs_url_base }}?tab=resumen&vista={{ vista.key }}&mes_inicio={{ resumen_mes_inicio }}&mes_fin={{ resumen_mes_fin }}"
+            >
+              {{ vista.label }}
+            </a>
+            {% endfor %}
+          </div>
+        </div>
+
+        <form method="get" action="{{ tabs_url_base }}" class="th-toolbar th-toolbar--wrap th-resumen__filters">
+          <input type="hidden" name="tab" value="resumen">
+          <input type="hidden" name="vista" value="{{ resumen_vista }}">
+          <div class="th-toolbar__group th-toolbar__group--wrap">
+            <div class="th-resumen__field">
+              <label for="th-resumen-mes-inicio">Mes inicio</label>
+              <input type="month" id="th-resumen-mes-inicio" name="mes_inicio" class="th-input" value="{{ resumen_mes_inicio }}">
+            </div>
+            <div class="th-resumen__field">
+              <label for="th-resumen-mes-fin">Mes final</label>
+              <input type="month" id="th-resumen-mes-fin" name="mes_fin" class="th-input" value="{{ resumen_mes_fin }}">
+            </div>
+            <button type="submit" class="th-btn th-btn--primary">
+              <i class="bi bi-funnel"></i>
+              Filtrar
+            </button>
+            <a href="{{ tabs_url_base }}?tab=resumen&vista={{ resumen_vista }}" class="th-btn th-btn--ghost">
+              <i class="bi bi-eraser"></i>
+              Limpiar
+            </a>
+          </div>
+        </form>
+
+        {% if resumen_error %}
+        <div class="th-form-error">{{ resumen_error }}</div>
+        {% endif %}
+
+        <div class="th-table-wrap">
+          {% if resumen_vista == 'viajes' %}
+          <table class="th-table" id="th-resumen-table">
+            <thead>
+              <tr>
+                <th>Número viaje</th>
+                <th>Fecha de inicio</th>
+                <th>Vehículo</th>
+                <th>Motorista</th>
+                <th>Tipo de viaje</th>
+                <th>Estado</th>
+                <th>Solicitudes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for viaje in resumen_items %}
+              <tr
+                data-viaje-id="{{ viaje.id }}"
+                data-viaje-numero="{{ viaje.numero }}"
+                data-viaje-fecha="{{ viaje.fecha }}"
+                data-viaje-vehiculo="{{ viaje.vehiculo }}"
+                data-viaje-motorista="{{ viaje.motorista }}"
+                data-viaje-estado="{{ viaje.estado_ejecucion }}"
+                data-viaje-etapa="{{ viaje.estado_etiqueta }}"
+                data-viaje-detalle="{{ viaje.detalle_json|escape }}"
+                data-viaje-salida-registrada="{{ viaje.salida_registrada|yesno:'1,0' }}"
+                data-viaje-entrada-registrada="{{ viaje.entrada_registrada|yesno:'1,0' }}"
+                data-viaje-fecha-salida-input="{{ viaje.fecha_salida_input }}"
+                data-viaje-fecha-salida="{{ viaje.fecha_salida }}"
+                data-viaje-kilometraje-salida="{{ viaje.kilometraje_salida }}"
+                data-viaje-precio-litro-salida="{{ viaje.precio_litro_salida }}"
+                data-viaje-litros-cargados-salida="{{ viaje.litros_cargados_salida }}"
+                data-viaje-total-combustible="{{ viaje.total_combustible }}"
+                data-viaje-observaciones-salida="{{ viaje.observaciones_salida|escape }}"
+                data-viaje-fecha-retorno-input="{{ viaje.fecha_retorno_input }}"
+                data-viaje-fecha-retorno="{{ viaje.fecha_retorno }}"
+                data-viaje-kilometraje-retorno="{{ viaje.kilometraje_retorno }}"
+                data-viaje-observaciones-retorno="{{ viaje.observaciones_retorno|escape }}"
+              >
+                <td data-label="Número viaje">{{ viaje.numero }}</td>
+                <td data-label="Fecha de inicio">{{ viaje.fecha }}</td>
+                <td data-label="Vehículo">{{ viaje.vehiculo }}</td>
+                <td data-label="Motorista">{{ viaje.motorista }}</td>
+                <td data-label="Tipo de viaje">{{ viaje.tipo_viaje }}</td>
+                <td data-label="Estado"><span class="th-badge">{{ viaje.estado_etiqueta }}</span></td>
+                <td data-label="Solicitudes">{{ viaje.solicitudes }}</td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="7">No hay viajes para los filtros seleccionados.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <table class="th-table" id="th-resumen-table">
+            <thead>
+              <tr>
+                <th>Número solicitud</th>
+                <th>Fecha</th>
+                <th>Punto de solicitud</th>
+                <th>Tipo</th>
+                <th>Prioridad</th>
+                <th>Pacientes</th>
+                <th>Estado</th>
+                <th>Viaje asociado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for solicitud in resumen_items %}
+              <tr data-solicitud-id="{{ solicitud.id }}">
+                <td data-label="Número solicitud">{{ solicitud.numero }}</td>
+                <td data-label="Fecha">{{ solicitud.fecha }}</td>
+                <td data-label="Punto de solicitud">{{ solicitud.punto }}</td>
+                <td data-label="Tipo">{{ solicitud.tipo }}</td>
+                <td data-label="Prioridad"><span class="th-badge">{{ solicitud.prioridad }}</span></td>
+                <td data-label="Pacientes">{{ solicitud.pacientes }}</td>
+                <td data-label="Estado"><span class="th-badge">{{ solicitud.estado }}</span></td>
+                <td data-label="Viaje asociado">{{ solicitud.viaje_asociado }}</td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="8">No hay registros para los filtros seleccionados.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% endif %}
+        </div>
+      </article>
+    </div>
+
     {% else %}
     <div class="th-workspace__box">
       <strong>Sección no disponible</strong>
@@ -625,6 +771,48 @@
     {% endif %}
   </section>
 </div>
+
+{% if active_tab == 'resumen' %}
+<div id="th-solicitud-modal" class="th-modal" aria-hidden="true">
+  <div class="th-modal__backdrop" data-modal-close></div>
+  <div class="th-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="th-solicitud-modal-title">
+    <div class="th-modal__header">
+      <div>
+        <h4 id="th-solicitud-modal-title">Detalle de solicitud</h4>
+        <p id="th-solicitud-modal-subtitle">Consulta histórica en modo solo lectura</p>
+      </div>
+      <button type="button" class="th-btn th-btn--ghost th-modal__close" data-modal-close aria-label="Cerrar modal">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    <div class="th-modal__body">
+      <div id="th-solicitud-modal-content" class="th-solicitud-modal__content">
+        <div class="th-solicitud-modal__empty">Seleccione una solicitud para ver su detalle.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="th-ejecucion-modal" class="th-modal" aria-hidden="true">
+  <div class="th-modal__backdrop" data-modal-close></div>
+  <div class="th-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="th-ejecucion-modal-title">
+    <div class="th-modal__header">
+      <div>
+        <h4 id="th-ejecucion-modal-title">Ejecución del viaje</h4>
+        <p id="th-ejecucion-modal-subtitle">Detalle histórico en modo solo lectura</p>
+      </div>
+      <button type="button" class="th-btn th-btn--ghost th-modal__close" data-modal-close aria-label="Cerrar modal">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    <div class="th-modal__body">
+      <div id="th-ejecucion-modal-content" class="th-solicitud-modal__content">
+        <div class="th-solicitud-modal__empty">Seleccione un viaje para ver su detalle.</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
 {% endblock content %}
 
 {% block extra_js %}
@@ -635,6 +823,7 @@
   "emptyTable": "No hay solicitudes activas registradas.",
   "emptyAutorizacionTable": "No hay solicitudes pendientes disponibles para autorización.",
   "emptyEjecucionTable": "No hay viajes programados disponibles.",
+  "emptyResumenTable": "No hay registros para los filtros seleccionados.",
   "urlAutorizarSolicitud": "{% url 'sg_transporte_hospitalario_solicitud_autorizar' %}",
   "urlDetalleSolicitud": "{% url 'sg_transporte_hospitalario_solicitud_detalle' %}",
   "urlBuscarEmpleados": "{% url 'sg_transporte_hospitalario_buscar_empleados' %}",
@@ -644,5 +833,5 @@
   "urlEjecucionGuardar": "{% url 'sg_transporte_hospitalario_ejecucion_guardar' %}"
 }
 </script>
-<script src="{% static 'core/scripts/sg_transporte_hospitalario/dashboard/dashboard.js' %}?v=2026-08-12"></script>
+<script src="{% static 'core/scripts/sg_transporte_hospitalario/dashboard/dashboard.js' %}?v=2026-08-13-2"></script>
 {% endblock extra_js %}

@@ -77,8 +77,8 @@ class Viatico(models.Model):
     class Meta:
         db_table = "transporte_hospitalario_viatico"
         ordering = ["nombre"]
-        verbose_name = "Viático"
-        verbose_name_plural = "Viáticos"
+        verbose_name = "Viatico"
+        verbose_name_plural = "Viaticos"
 
     def __str__(self):
         return self.nombre
