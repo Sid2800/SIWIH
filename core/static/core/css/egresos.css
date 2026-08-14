@@ -1,0 +1,84 @@
+/* ============================================================
+   Módulo EGRESOS — pantalla de captura (doble lista)
+   Reusa las clases globales de la Recepción SDGI (listasRecepcion,
+   contendorLista, listbox). Aquí solo el contenido de cada fila.
+   ============================================================ */
+
+/* .contenedorListaRecepcion centra a sus hijos; aquí alineamos como el
+   resto del sistema (título y ayuda a la izquierda). */
+.egresos-captura-page.contenedorListaRecepcion {
+    align-items: stretch;
+    justify-content: flex-start;
+}
+
+/* Aviso informativo (block: nunca flex, o cada <strong> se parte en columnas). */
+.egresos-ayuda {
+    margin: 0 0 1rem 0;
+    padding: 0.8rem 1rem;
+    background: var(--colorContendor);
+    border: 1px solid var(--colorLinea);
+    border-radius: 0.6rem;
+    font-size: 1.5rem;
+    color: var(--colorTablacelda);
+    display: block;
+    line-height: 1.5;
+}
+.egresos-ayuda i { color: var(--colorBoton); margin-right: 0.5rem; vertical-align: -0.15rem; }
+
+/* Fila del buscador + filtro de área en la lista izquierda. */
+.egresos-filtros-fila {
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+.egresos-filtros-fila > * { flex: 1 1 12rem; min-width: 0; }
+
+/* El listado desplaza en horizontal: la fila es más ancha que el panel. */
+.contenedorListaRecepcion .listbox { overflow-x: auto; }
+
+/* Una fila por expediente. Colores del listbox de SDGI (hover gris; al marcar,
+   fondo var(--negro) con texto var(--blanco), que se invierten solos en oscuro),
+   por eso no se define color propio de la fila. */
+.egresos-item {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    white-space: nowrap;
+    font-size: 1.25rem;
+    line-height: 1.7;
+    min-width: max-content;   /* que el resaltado cubra toda la fila desplazada */
+    box-sizing: border-box;
+}
+.listbox li.egresos-item:hover { border-radius: 0; }
+
+.egresos-c {
+    flex: 0 0 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.egresos-c--exp  { width: 7rem;  font-weight: 700; }
+.egresos-c--id   { width: 12rem; font-weight: 600; }
+.egresos-c--nom  { width: 20rem; }
+.egresos-c--ing  { width: 8.5rem; }
+.egresos-c--area { width: 15rem; }
+/* Hover/selección heredan el color del <li> (reglas de .listbox). */
+.listbox li:hover .egresos-c,
+.listbox li.selected .egresos-c { color: inherit; }
+
+.egresos-vacio {
+    list-style: none;
+    padding: 1.2rem;
+    text-align: center;
+    opacity: 0.55;
+    font-size: 1.4rem;
+    text-transform: none;
+    cursor: default;
+}
+.egresos-vacio:hover { background-color: transparent !important; color: inherit !important; }
+
+/* En móvil se ocultan las columnas menos decisivas (para identificar basta
+   expediente, identidad y nombre). El resto va en el tooltip. */
+@media (max-width: 768px) {
+    .egresos-c--ing, .egresos-c--area { display: none; }
+    .egresos-c--nom { width: 16rem; }
+}

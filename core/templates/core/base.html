@@ -177,6 +177,16 @@
             </li>
             {% endif %}
 
+            {% load egresos_permisos %}
+            {% if request.user|puede_egresos %}
+            <li>
+               <a href="{% url 'egresos_captura' %}" class="bn-navegacion__enlace">
+                  <i class="bi bi-box-arrow-right bn-navegacion-enlace__logo"></i>
+                  <span class="bn-navegacion-enlace__texto">Egresos</span>
+               </a>
+            </li>
+            {% endif %}
+
 
 
             <li>
@@ -507,6 +517,8 @@
          s_exp_exportar_excel: "{% url 's_exp_exportar_excel' %}",
          s_exp_exportar_pdf: "{% url 's_exp_exportar_pdf' %}",
          s_exp_buscar_expedientes_api: "{% url 's_exp_buscar_expedientes_api' %}",
+         egresos_ingresos_para_egreso_api: "{% url 'egresos_ingresos_para_egreso_api' %}",
+         egresos_crear_lote_captura_api: "{% url 'egresos_crear_lote_captura_api' %}",
          s_exp_crear_solicitud_api: "{% url 's_exp_crear_solicitud_api' %}",
          s_exp_mis_solicitudes_api: "{% url 's_exp_mis_solicitudes_api' %}",
          s_exp_solicitar_devolucion_api: "{% url 's_exp_solicitar_devolucion_api' %}",

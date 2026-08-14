@@ -1,0 +1,101 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Captura de Expedientes — Egresos{% endblock title %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'core/css/egresos.css' %}">
+{% endblock extra_css %}
+
+{% block content %}
+{% comment %}
+Pantalla de CAPTURA de expedientes para egresos (solo Estadística/staff).
+Reusa las clases de la Recepción de egresos SDGI (contendorLista, listbox,
+listasRecepcion) para no duplicar estilos; el contenido de cada fila es propio.
+{% endcomment %}
+<div class="contenedor2 contenedorListaRecepcion egresos-captura-page">
+    <div class="tituloFormulario sexp-margin-bottom-15">
+        <div class="tituloFormulario-texto">
+            <i class="bi bi-box-arrow-right"></i>
+            <h2 class="sin-margen">Captura de Expedientes para Egresos</h2>
+        </div>
+        <div class="tituloFormulario-subrallado"></div>
+    </div>
+
+    <p class="egresos-ayuda">
+        <i class="bi bi-info-circle"></i>
+        <span>Seleccione los expedientes que va a tomar de los ingresos abiertos. Al confirmar,
+        quedan <strong>prestados a Estadística</strong> para llenar sus egresos. Solo aparecen los
+        expedientes <strong>disponibles</strong>.</span>
+    </p>
+
+    <fieldset class="recepcionIngresoCampos">
+        <legend>Datos de la captura</legend>
+        <div class="formularioCampo">
+            <label for="cap-fecha">Fecha</label>
+            <input type="text" id="cap-fecha" class="formularioCampo-text" disabled>
+        </div>
+        <div class="formularioCampo">
+            <label for="cap-responsable">Responsable (Estadística)</label>
+            <input type="text" id="cap-responsable" class="formularioCampo-text"
+                   value="{{ request.user.get_full_name|default:request.user.username }}" disabled>
+        </div>
+        <div class="formularioCampo" id="recepcionIngresoObservaciones">
+            <label for="cap-observaciones">Observaciones</label>
+            <textarea id="cap-observaciones" cols="40" rows="10" maxlength="250"
+                      class="formularioCampo-text" placeholder="Observaciones (opcional)"></textarea>
+        </div>
+    </fieldset>
+
+    <div class="listasRecepcion">
+        <!-- Izquierda: ingresos abiertos con expediente disponible -->
+        <div class="contendorLista">
+            <h3 class="sin-margen">Ingresos abiertos</h3>
+            <div class="egresos-filtros-fila">
+                <input type="text" class="formularioCampo-text" id="cap-buscar-izq"
+                       placeholder="Buscar por identidad, expediente o nombre" autocomplete="off">
+                <select id="cap-filtro-area" class="formularioCampo-text" title="Filtrar por área del ingreso">
+                    <option value="">Todas las áreas</option>
+                </select>
+            </div>
+            <ul id="cap-lista-izq" class="listbox sin-margen"></ul>
+            <label>Total <span id="cap-total-izq">0</span> --- Filtrado <span id="cap-sub-izq">0</span></label>
+        </div>
+
+        <div class="listasRecepcionBotones">
+            <button type="button" id="cap-mover-der" class="formularioBotones-boton" title="Mover seleccionado a la derecha">
+                <i class="bi bi-arrow-right-circle"></i>
+            </button>
+            <button type="button" id="cap-mover-izq" class="formularioBotones-boton" title="Mover seleccionado a la izquierda">
+                <i class="bi bi-arrow-left-circle"></i>
+            </button>
+            <button type="button" id="cap-mover-todo-der" class="formularioBotones-boton" title="Mover todos a la derecha">
+                <i class="bi bi-skip-forward-circle"></i>
+            </button>
+            <button type="button" id="cap-mover-todo-izq" class="formularioBotones-boton" title="Mover todos a la izquierda">
+                <i class="bi bi-skip-backward-circle"></i>
+            </button>
+        </div>
+
+        <!-- Derecha: los que se van a capturar -->
+        <div class="contendorLista">
+            <h3 class="sin-margen">Por Capturar</h3>
+            <input type="text" class="formularioCampo-text sin-margen" id="cap-buscar-der"
+                   placeholder="Buscar por identidad, expediente o nombre" autocomplete="off">
+            <ul id="cap-lista-der" class="listbox"></ul>
+            <label>Total <span id="cap-total-der">0</span> --- Filtrado <span id="cap-sub-der">0</span></label>
+        </div>
+    </div>
+
+    <div class="recepcionIngresoBotones">
+        <button type="button" class="formularioBotones-boton" id="cap-confirmar" disabled>
+            <i class="bi bi-check-square-fill"></i>
+            <span>Confirmar captura</span>
+        </button>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script src="{% static 'core/scripts/egresos/captura.js' %}"></script>
+{% endblock extra_js %}
