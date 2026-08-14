@@ -77,6 +77,7 @@ class LogApp:
     AGENDA = "agenda"
     
     S_EXP = "s_exp"          # Solicitud/Préstamo de Expedientes
+    EGRESOS = "egresos"      # Censo de egresos hospitalarios
 
 class EstadoTemporalPeriodo(str, Enum):
     FUTURO = "FUTURO"

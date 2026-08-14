@@ -393,3 +393,15 @@ MAPEO_CAMAS_HISTORIALES_UNIDADES = ["ADMI"]
 # [2026-05-28] Acceso al dashboard operativo de KPIs/gráficas en tiempo real.
 MAPEO_CAMAS_DASHBOARD_ROLES = []
 MAPEO_CAMAS_DASHBOARD_UNIDADES = ["ADMI"]
+
+
+# -----------------------------
+# PERMISOS APP EGRESOS
+# -----------------------------
+# Censo de egresos hospitalarios. Mismo patrón que el resto de módulos:
+#   - Estadística (unidad 'EST') es quien llena los egresos (edición).
+#   - El personal 'staff'/superuser tiene acceso y visualización TOTAL
+#     (se resuelve en el servicio egresos.services.permisos).
+# No se crea un mecanismo nuevo: se reutilizan las unidades/roles existentes.
+EGRESOS_EDITOR_ROLES = ['admin', 'digitador', 'directivo']
+EGRESOS_EDITOR_UNIDADES = ['EST']   # Estadística
