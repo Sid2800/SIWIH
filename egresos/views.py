@@ -10,9 +10,7 @@ import json
 
 from django.db import transaction
 from django.http import JsonResponse
-from django.shortcuts import redirect
 from django.views.generic import TemplateView
-from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.decorators.http import require_GET, require_POST
 from django.views.decorators.csrf import csrf_protect
 
@@ -24,27 +22,33 @@ from s_exp.models import (
 )
 
 from egresos.models import LoteEgreso, LoteEgresoDetalle
-from egresos.services.permisos import puede_acceder_egresos
 from egresos.services.movimiento import mover_a_estadistica
 
+from core.mixins import UnidadRolRequiredMixin
+from usuario.permisos import verificar_permisos_usuario
+from core.constants.permisos import (
+    EGRESOS_VISUALIZACION_ROLES, EGRESOS_VISUALIZACION_UNIDADES,
+)
 from core.utils.utilidades_logging import log_error, log_info
 from core.constants.domain_constants import LogApp
 
 
 # =============================================================================
-# MIXIN de acceso (mismo criterio que el servicio de permisos)
+# Acceso: mismo mecanismo que el resto de módulos (no se inventa nada nuevo).
+#   - Vistas: UnidadRolRequiredMixin (superuser / GLOBAL / rol+unidad).
+#   - APIs:   verificar_permisos_usuario(user, roles, unidades).
 # =============================================================================
-class EgresosAccesoMixin(LoginRequiredMixin):
-    """Solo Estadística y staff pueden entrar a las pantallas de Egresos."""
-    def dispatch(self, request, *args, **kwargs):
-        if not puede_acceder_egresos(request.user):
-            return redirect('acceso_denegado')
-        return super().dispatch(request, *args, **kwargs)
+def _tiene_permiso_egresos(user):
+    return verificar_permisos_usuario(
+        user, EGRESOS_VISUALIZACION_ROLES, EGRESOS_VISUALIZACION_UNIDADES
+    )
 
 
-class CapturaEgresosView(EgresosAccesoMixin, TemplateView):
+class CapturaEgresosView(UnidadRolRequiredMixin, TemplateView):
     """Pantalla donde Estadística captura expedientes desde los ingresos."""
     template_name = 'egresos/captura.html'
+    required_roles = EGRESOS_VISUALIZACION_ROLES
+    required_unidades = EGRESOS_VISUALIZACION_UNIDADES
 
 
 # =============================================================================
@@ -85,7 +89,7 @@ def ingresos_para_egreso_api(request):
     (sala/servicio del ingreso), número de expediente y si está DISPONIBLE para
     capturar. No modifica nada del módulo Ingreso (solo lectura).
     """
-    if not puede_acceder_egresos(request.user):
+    if not _tiene_permiso_egresos(request.user):
         return JsonResponse({"error": "Sin permisos"}, status=403)
 
     try:
@@ -148,7 +152,7 @@ def crear_lote_captura_api(request):
     (no se confía en lo que mandó el navegador). Todo va en una transacción: o se
     capturan todos o ninguno.
     """
-    if not puede_acceder_egresos(request.user):
+    if not _tiene_permiso_egresos(request.user):
         return JsonResponse({"error": "Sin permisos"}, status=403)
 
     try:

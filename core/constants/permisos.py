@@ -398,10 +398,11 @@ MAPEO_CAMAS_DASHBOARD_UNIDADES = ["ADMI"]
 # -----------------------------
 # PERMISOS APP EGRESOS
 # -----------------------------
-# Censo de egresos hospitalarios. Mismo patrón que el resto de módulos:
-#   - Estadística (unidad 'EST') es quien llena los egresos (edición).
-#   - El personal 'staff'/superuser tiene acceso y visualización TOTAL
-#     (se resuelve en el servicio egresos.services.permisos).
-# No se crea un mecanismo nuevo: se reutilizan las unidades/roles existentes.
-EGRESOS_EDITOR_ROLES = ['admin', 'digitador', 'directivo']
-EGRESOS_EDITOR_UNIDADES = ['EST']   # Estadística
+# Censo de egresos hospitalarios. Mismo patrón/mecanismo que el resto de
+# módulos (p. ej. INGRESO_VISUALIZACION_*): no se inventa nada nuevo.
+#   - Estadística (unidad 'EST') captura y llena los egresos.
+#   - superusuario y usuarios GLOBAL (staff) tienen acceso total
+#     (lo resuelven UnidadRolRequiredMixin / verificar_permisos_usuario /
+#      tiene_unidades_config, no un servicio propio).
+EGRESOS_VISUALIZACION_ROLES = ["admin", "digitador", "directivo"]
+EGRESOS_VISUALIZACION_UNIDADES = ["EST"]   # Estadística

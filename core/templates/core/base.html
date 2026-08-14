@@ -177,8 +177,7 @@
             </li>
             {% endif %}
 
-            {% load egresos_permisos %}
-            {% if request.user|puede_egresos %}
+            {% if request.user|tiene_unidades_config:"EGRESOS_VISUALIZACION_UNIDADES" %}
             <li>
                <a href="{% url 'egresos_captura' %}" class="bn-navegacion__enlace">
                   <i class="bi bi-box-arrow-right bn-navegacion-enlace__logo"></i>
