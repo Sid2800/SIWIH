@@ -36,5 +36,6 @@ urlpatterns = [
 
 
     path('s_exp/',include('s_exp.urls')),
+    path('egresos/',include('egresos.urls')),
     path('admin/', admin.site.urls),
 ]
