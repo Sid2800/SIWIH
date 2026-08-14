@@ -30,7 +30,12 @@ const modalEjecucionTitle = document.getElementById('th-ejecucion-modal-title');
 const modalEjecucionSubtitle = document.getElementById('th-ejecucion-modal-subtitle');
 const modalEjecucionDecision = document.getElementById('th-ejecucion-modal-decision');
 
-if (window.jQuery && jQuery.fn.DataTable && tableNode) {
+const resumenBodyRows = tableNode && tableNode.tBodies && tableNode.tBodies[0] ? Array.prototype.slice.call(tableNode.tBodies[0].rows || []) : [];
+const resumenTieneFilasReales = resumenBodyRows.some(function (row) {
+	return row && row.cells && row.cells.length > 1 && !row.querySelector('td[colspan]');
+});
+
+if (window.jQuery && jQuery.fn.DataTable && tableNode && resumenTieneFilasReales) {
 	jQuery(tableNode).DataTable({
 		order: [[1, 'desc']],
 		language: {

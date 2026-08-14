@@ -393,3 +393,33 @@ MAPEO_CAMAS_HISTORIALES_UNIDADES = ["ADMI"]
 # [2026-05-28] Acceso al dashboard operativo de KPIs/gráficas en tiempo real.
 MAPEO_CAMAS_DASHBOARD_ROLES = []
 MAPEO_CAMAS_DASHBOARD_UNIDADES = ["ADMI"]
+
+
+# -----------------------------
+# PERMISOS APP SG_TRANSPORTE_HOSPITALARIO
+# -----------------------------
+
+# Unidades operativas del módulo: se valida pertenencia explícita, aunque el 
+# catálogo cubra todas las unidades activas del hospital.
+SG_TRANSPORTE_SOLICITUD_ROLES = ["admin", "digitador"]
+SG_TRANSPORTE_SOLICITUD_UNIDADES = ["ADMI"]
+
+
+# Etapa Solicitud
+# Etapa Autorización
+SG_TRANSPORTE_AUTORIZACION_ROLES = ["admin", "digitador"]
+SG_TRANSPORTE_AUTORIZACION_UNIDADES = ["ADMI"]
+
+# Etapa Viaje
+SG_TRANSPORTE_VIAJE_ROLES = ["admin", "digitador"]
+SG_TRANSPORTE_VIAJE_UNIDADES = ["ADMI"]
+
+# Etapa Ejecución
+SG_TRANSPORTE_EJECUCION_ROLES = ["admin", "digitador"]
+SG_TRANSPORTE_EJECUCION_UNIDADES = ["ADMI"]
+
+# Etapa Resumen
+SG_TRANSPORTE_RESUMEN_ROLES = ["admin", "digitador", "directivo", "visitante"]
+SG_TRANSPORTE_RESUMEN_UNIDADES = ["ADMI"]
+
+

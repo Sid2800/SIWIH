@@ -41,7 +41,7 @@
         <h4 class="th-card__title"><i class="bi bi-list-ul"></i> Seguimiento de solicitudes activas</h4>
         <div class="th-toolbar">
           <div class="th-toolbar__group">
-            {% if puede_escribir %}
+            {% if puede_solicitud %}
             <a href="{% url 'sg_transporte_hospitalario_solicitud_nueva' %}" class="th-btn th-btn--primary">
               <i class="bi bi-plus-circle"></i>
               Nueva solicitud
@@ -226,6 +226,7 @@
         </div>
         <div class="th-modal__footer">
           <div class="th-modal__actions">
+            {% if puede_autorizacion %}
             <button type="button" class="th-btn th-btn--success" id="th-solicitud-modal-autorizar" onclick="return window.sgThAutorizacion.autorizarDesdeModal(this, event)">
               <i class="bi bi-check2-circle"></i>
               Autorizar
@@ -234,6 +235,7 @@
               <i class="bi bi-x-circle"></i>
               Anular
             </button>
+            {% endif %}
             <button type="button" class="th-btn th-btn--ghost" data-modal-close>
               <i class="bi bi-x-lg"></i>
               Cerrar
@@ -412,10 +414,12 @@
           </div>
         </div>
         <div class="th-viaje-programacion__actions">
+          {% if puede_viaje %}
           <button type="button" class="th-btn th-btn--ghost" id="th-viaje-viatico-agregar">
             <i class="bi bi-plus-circle"></i>
             Agregar viático
           </button>
+          {% endif %}
         </div>
         <div class="th-viaje-list" id="th-viaje-viaticos-list"></div>
       </article>
@@ -425,10 +429,12 @@
         {{ programacion_form.viaticos_json }}
         <div class="th-form-error" id="th-viaje-feedback" hidden></div>
         <div class="th-viaje-programacion__actions">
+          {% if puede_viaje %}
           <button type="button" class="th-btn th-btn--primary" id="th-viaje-confirmar">
             <i class="bi bi-check2-circle"></i>
             Construir viaje
           </button>
+          {% endif %}
         </div>
         {% if programacion_form.non_field_errors %}
         <div class="th-form-error">{{ programacion_form.non_field_errors|join:", " }}</div>
@@ -500,7 +506,7 @@
                   <td data-label="Acciones">
                     <div class="th-row-actions">
                       <button type="button" class="th-btn th-btn--ghost th-row-actions__btn" data-ejecucion-ver="1" onclick="return window.sgThEjecucion.ver(this, event)">Ver</button>
-                      {% if viaje.puede_marcar_salida %}
+                      {% if puede_ejecucion and viaje.puede_marcar_salida %}
                       <button type="button" class="th-btn th-btn--success th-row-actions__btn" data-ejecucion-salida="1" onclick="return window.sgThEjecucion.marcarSalida(this, event)">Marcar salida</button>
                       {% else %}
                       <button type="button" class="th-btn th-btn--ghost th-row-actions__btn" disabled>Salida registrada</button>
@@ -606,10 +612,12 @@
               <p id="th-ejecucion-modal-decision">Seleccione una opción de la bandeja.</p>
             </div>
             <div class="th-modal__actions">
+              {% if puede_ejecucion %}
               <button type="button" class="th-btn th-btn--primary" id="th-ejecucion-modal-guardar" onclick="return window.sgThEjecucion.guardarModal(this, event)">
                 <i class="bi bi-check2-circle"></i>
                 Guardar
               </button>
+              {% endif %}
               <button type="button" class="th-btn th-btn--ghost" data-modal-close onclick="return window.sgThEjecucion.cerrarModal(this, event)">
                 <i class="bi bi-x-circle"></i>
                 Cerrar
@@ -661,7 +669,7 @@
               <i class="bi bi-funnel"></i>
               Filtrar
             </button>
-            {% if resumen_vista == 'viajes' %}
+            {% if resumen_vista == 'viajes' and puede_resumen %}
             <button type="submit" class="th-btn th-btn--success" formaction="{% url 'sg_transporte_hospitalario_resumen_exportar_excel' %}" formmethod="get">
               <i class="bi bi-file-earmark-excel"></i>
               Generar Excel
@@ -839,5 +847,5 @@
   "urlEjecucionGuardar": "{% url 'sg_transporte_hospitalario_ejecucion_guardar' %}"
 }
 </script>
-<script src="{% static 'core/scripts/sg_transporte_hospitalario/dashboard/dashboard.js' %}?v=2026-08-13-2"></script>
+<script src="{% static 'core/scripts/sg_transporte_hospitalario/dashboard/dashboard.js' %}?v=2026-08-13-3"></script>
 {% endblock extra_js %}

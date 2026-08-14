@@ -21,6 +21,18 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment
 from openpyxl.utils import get_column_letter
 
+from core.constants.permisos import (
+    SG_TRANSPORTE_AUTORIZACION_ROLES,
+    SG_TRANSPORTE_AUTORIZACION_UNIDADES,
+    SG_TRANSPORTE_EJECUCION_ROLES,
+    SG_TRANSPORTE_EJECUCION_UNIDADES,
+    SG_TRANSPORTE_RESUMEN_ROLES,
+    SG_TRANSPORTE_RESUMEN_UNIDADES,
+    SG_TRANSPORTE_SOLICITUD_ROLES,
+    SG_TRANSPORTE_SOLICITUD_UNIDADES,
+    SG_TRANSPORTE_VIAJE_ROLES,
+    SG_TRANSPORTE_VIAJE_UNIDADES,
+)
 from core.services.reporte.EXCEL.reporte_service_excel import ServiceExcel
 from core.services.usuario_service import UsuarioService
 from core.utils.utilidades_fechas import mes_nombre
@@ -28,24 +40,108 @@ from core.utils.utilidades_mensajes import mostrar_mensaje
 from ingreso.models import Ingreso
 from paciente.models import Paciente
 from rrhh.models import Empleado
+from usuario.models import PerfilUnidad
 
 from .forms import EjecucionViajeForm, SolicitudCreateForm, SolicitudForm, ViajeProgramacionForm, _empleados_operativos_disponibles_qs
 from .models import EjecucionViaje, Solicitud, SolicitudPaciente, SolicitudPersonal, TipoSolicitud, Viaje, ViajeSolicitud, ViajePersonal, ViajeViatico, Vehiculo, Motorista, Viatico
+
+
+def _tiene_permiso_etapa(usuario, roles, unidades):
+    if not usuario:
+        return False
+
+    if usuario.is_superuser or _es_admin_global(usuario):
+        return bool(usuario)
+
+    if not hasattr(usuario, "pk"):
+        return False
+
+    if not roles or not unidades:
+        return False
+
+    return PerfilUnidad.objects.filter(
+        usuario_id=getattr(usuario, "id", None),
+        rol__in=roles,
+        servicio_unidad__nombre_corto_unidad__in=unidades,
+    ).exists()
+
+
+def puede_solicitud_modulo(usuario):
+    return _tiene_permiso_etapa(usuario, SG_TRANSPORTE_SOLICITUD_ROLES, SG_TRANSPORTE_SOLICITUD_UNIDADES)
+
+
+def puede_autorizacion_modulo(usuario):
+    return _tiene_permiso_etapa(usuario, SG_TRANSPORTE_AUTORIZACION_ROLES, SG_TRANSPORTE_AUTORIZACION_UNIDADES)
+
+
+def puede_viaje_modulo(usuario):
+    return _tiene_permiso_etapa(usuario, SG_TRANSPORTE_VIAJE_ROLES, SG_TRANSPORTE_VIAJE_UNIDADES)
+
+
+def puede_ejecucion_modulo(usuario):
+    return _tiene_permiso_etapa(usuario, SG_TRANSPORTE_EJECUCION_ROLES, SG_TRANSPORTE_EJECUCION_UNIDADES)
+
+
+def puede_resumen_modulo(usuario):
+    if not usuario:
+        return False
+
+    if usuario.is_superuser or _es_admin_global(usuario) or _es_directivo_global(usuario):
+        return True
+
+    return _tiene_permiso_etapa(usuario, SG_TRANSPORTE_RESUMEN_ROLES, SG_TRANSPORTE_RESUMEN_UNIDADES)
 
 
 def puede_ver_modulo(usuario):
     return bool(
         usuario
         and (
-            usuario.is_superuser
-            or UsuarioService.es_directivo(usuario)
-            or UsuarioService.es_admin_global(usuario)
+            puede_solicitud_modulo(usuario)
+            or puede_autorizacion_modulo(usuario)
+            or puede_viaje_modulo(usuario)
+            or puede_ejecucion_modulo(usuario)
+            or puede_resumen_modulo(usuario)
         )
     )
 
 
 def puede_gestionar_modulo(usuario):
-    return bool(usuario and (usuario.is_superuser or UsuarioService.es_admin_global(usuario)))
+    return bool(
+        usuario
+        and (
+            puede_solicitud_modulo(usuario)
+            or puede_autorizacion_modulo(usuario)
+            or puede_viaje_modulo(usuario)
+            or puede_ejecucion_modulo(usuario)
+        )
+    )
+
+
+def _es_admin_global(usuario):
+    try:
+        return UsuarioService.es_admin_global(usuario)
+    except AttributeError:
+        return False
+
+
+def _es_directivo_global(usuario):
+    try:
+        return UsuarioService.es_directivo(usuario)
+    except AttributeError:
+        return False
+
+
+TAB_PERMISSION_MAP = {
+    "solicitud": puede_solicitud_modulo,
+    "autorizacion": puede_autorizacion_modulo,
+    "viaje_construccion": puede_viaje_modulo,
+    "ejecucion": puede_ejecucion_modulo,
+    "resumen": puede_resumen_modulo,
+}
+
+
+def _tabs_permitidos(usuario):
+    return [tab for tab in TAB_SECTIONS if TAB_PERMISSION_MAP.get(tab["key"], lambda _: False)(usuario)]
 
 
 def construir_contexto_dashboard(usuario):
@@ -54,7 +150,13 @@ def construir_contexto_dashboard(usuario):
         "subtitulo": "Módulo de gestión de transporte hospitalario.",
         "fecha_actual": timezone.localtime(timezone.now()).strftime("%d/%m/%Y %H:%M"),
         "puede_ver": puede_ver_modulo(usuario),
-        "puede_escribir": puede_gestionar_modulo(usuario),
+        "puede_escribir": puede_solicitud_modulo(usuario),
+        "puede_solicitud": puede_solicitud_modulo(usuario),
+        "puede_autorizacion": puede_autorizacion_modulo(usuario),
+        "puede_viaje": puede_viaje_modulo(usuario),
+        "puede_ejecucion": puede_ejecucion_modulo(usuario),
+        "puede_resumen": puede_resumen_modulo(usuario),
+        "tabs": _tabs_permitidos(usuario),
     }
 
 
@@ -946,9 +1048,25 @@ def _obtener_qs_viajes_historial(usuario):
     )
 
 
+def _finalizar_solicitudes_asociadas_viaje(viaje):
+    return (
+        Solicitud.objects
+        .filter(
+            viaje_solicitudes__viaje=viaje,
+            viaje_solicitudes__activo=True,
+            activo=True,
+        )
+        .exclude(estado__in=[Solicitud.Estado.ANULADA, Solicitud.Estado.FINALIZADA])
+        .update(
+            estado=Solicitud.Estado.FINALIZADA,
+            activo=False,
+        )
+    )
+
+
 @require_GET
 def api_resumen_exportar_excel(request):
-    if not puede_ver_modulo(request.user):
+    if not puede_resumen_modulo(request.user):
         return JsonResponse({"error": "Acceso denegado."}, status=403)
 
     resumen_config = _limites_periodo_resumen(request)
@@ -1434,8 +1552,11 @@ class SGTransporteHospitalarioDashboardView(LoginRequiredMixin, TemplateView):
 
     def _active_tab(self):
         active_tab = self.request.GET.get("tab", "solicitud")
-        tab_keys = {tab["key"] for tab in TAB_SECTIONS}
-        return active_tab if active_tab in tab_keys else "solicitud"
+        tabs_permitidos = _tabs_permitidos(self.request.user)
+        tab_keys = {tab["key"] for tab in tabs_permitidos}
+        if active_tab in tab_keys:
+            return active_tab
+        return tabs_permitidos[0]["key"] if tabs_permitidos else "solicitud"
 
     def dispatch(self, request, *args, **kwargs):
         if not puede_ver_modulo(request.user):
@@ -1443,7 +1564,7 @@ class SGTransporteHospitalarioDashboardView(LoginRequiredMixin, TemplateView):
         return super().dispatch(request, *args, **kwargs)
 
     def post(self, request, *args, **kwargs):
-        if not puede_gestionar_modulo(request.user):
+        if not puede_solicitud_modulo(request.user):
             return JsonResponse({"ok": False, "error": "Acceso denegado."}, status=403)
 
         form = SolicitudCreateForm(request.POST)
@@ -1530,7 +1651,7 @@ class SGTransporteHospitalarioDashboardView(LoginRequiredMixin, TemplateView):
             ]
             solicitud.personal_json = json.dumps(personal, ensure_ascii=False)
 
-        context["tabs"] = TAB_SECTIONS
+        context["tabs"] = _tabs_permitidos(self.request.user)
         context["active_tab"] = active_tab
         context["tabs_url_base"] = reverse("sg_transporte_hospitalario_dashboard")
         context["usuario_empleado_id"] = usuario_empleado_id
@@ -1651,14 +1772,18 @@ def api_estado_modulo(request):
             "ok": True,
             "modulo": "SG-transporte_hospitalario",
             "lectura": True,
-            "escritura": puede_gestionar_modulo(request.user),
+            "solicitud": puede_solicitud_modulo(request.user),
+            "autorizacion": puede_autorizacion_modulo(request.user),
+            "viaje": puede_viaje_modulo(request.user),
+            "ejecucion": puede_ejecucion_modulo(request.user),
+            "resumen": puede_resumen_modulo(request.user),
         }
     )
 
 
 @require_GET
 def api_buscar_pacientes(request):
-    if not puede_ver_modulo(request.user):
+    if not puede_solicitud_modulo(request.user):
         return JsonResponse({"ok": False, "error": "Acceso denegado."}, status=403)
 
     termino = (request.GET.get("q") or "").strip()
@@ -1732,7 +1857,7 @@ def api_buscar_pacientes(request):
 
 @require_GET
 def api_buscar_empleados(request):
-    if not puede_ver_modulo(request.user):
+    if not puede_solicitud_modulo(request.user):
         return JsonResponse({"ok": False, "error": "Acceso denegado."}, status=403)
 
     termino = (request.GET.get("q") or "").strip()
@@ -1782,7 +1907,7 @@ def api_buscar_empleados(request):
 
 @require_GET
 def api_solicitudes_activas(request):
-    if not puede_ver_modulo(request.user):
+    if not puede_solicitud_modulo(request.user):
         return JsonResponse({"ok": False, "error": "Acceso denegado."}, status=403)
 
     draw = int(request.GET.get("draw", 0))
@@ -1858,7 +1983,7 @@ def api_detalle_solicitud(request):
     return JsonResponse({"ok": True, "data": payload})
 @require_POST
 def api_solicitud_autorizar(request):
-    if not puede_ver_modulo(request.user):
+    if not puede_autorizacion_modulo(request.user):
         return JsonResponse({"ok": False, "error": "Acceso denegado."}, status=403)
 
     try:
@@ -1903,7 +2028,7 @@ def api_solicitud_autorizar(request):
 
 @require_GET
 def api_programacion_viaje(request):
-    if not puede_ver_modulo(request.user):
+    if not puede_viaje_modulo(request.user):
         return JsonResponse({"ok": False, "error": "Acceso denegado."}, status=403)
 
     seleccionadas = (
@@ -1924,7 +2049,7 @@ def api_programacion_viaje(request):
 
 @require_POST
 def api_programacion_agregar(request):
-    if not puede_ver_modulo(request.user):
+    if not puede_viaje_modulo(request.user):
         return JsonResponse({"ok": False, "error": "Acceso denegado."}, status=403)
 
     try:
@@ -1940,7 +2065,7 @@ def api_programacion_agregar(request):
 
 @require_POST
 def api_programacion_quitar(request):
-    if not puede_ver_modulo(request.user):
+    if not puede_viaje_modulo(request.user):
         return JsonResponse({"ok": False, "error": "Acceso denegado."}, status=403)
 
     try:
@@ -1956,7 +2081,7 @@ def api_programacion_quitar(request):
 
 @require_POST
 def api_programacion_anular(request):
-    if not puede_ver_modulo(request.user):
+    if not puede_autorizacion_modulo(request.user):
         return JsonResponse({"ok": False, "error": "Acceso denegado."}, status=403)
 
     try:
@@ -2001,7 +2126,7 @@ def api_programacion_anular(request):
 
 @require_POST
 def api_programacion_confirmar(request):
-    if not puede_ver_modulo(request.user):
+    if not puede_viaje_modulo(request.user):
         return JsonResponse({"ok": False, "error": "Acceso denegado."}, status=403)
 
     try:
@@ -2108,7 +2233,7 @@ def api_programacion_confirmar(request):
 
 @require_POST
 def api_ejecucion_guardar(request):
-    if not puede_ver_modulo(request.user):
+    if not puede_ejecucion_modulo(request.user):
         return JsonResponse({"ok": False, "error": "Acceso denegado."}, status=403)
 
     try:
@@ -2225,6 +2350,9 @@ def api_ejecucion_guardar(request):
     with transaction.atomic():
         viaje.save(update_fields=["estado", "updated_at"])
         ejecucion.save()
+        if viaje.estado == "FINALIZADO":
+            # 2026-08-13: Al cerrar el viaje, finalizar todas las solicitudes activas asociadas para liberar pacientes.
+            _finalizar_solicitudes_asociadas_viaje(viaje)
 
     estado_ejecucion = _estado_ejecucion_viaje(viaje)
     return JsonResponse(
@@ -2250,7 +2378,7 @@ class SolicitudListView(LoginRequiredMixin, ListView):
     context_object_name = "solicitudes_activas"
 
     def dispatch(self, request, *args, **kwargs):
-        if not puede_ver_modulo(request.user):
+        if not puede_solicitud_modulo(request.user):
             return redirect("acceso_denegado")
         return redirect(f"{reverse('sg_transporte_hospitalario_dashboard')}?tab=solicitud")
 
@@ -2260,7 +2388,6 @@ class SolicitudListView(LoginRequiredMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update(construir_contexto_dashboard(self.request.user))
-        context["tabs"] = TAB_SECTIONS
         context["active_tab"] = "solicitud"
         context["usuario_empleado_id"] = getattr(getattr(self.request.user, "empleado", None), "id", None)
         context["estados"] = Solicitud.Estado.choices
@@ -2272,7 +2399,7 @@ class SolicitudFormView(LoginRequiredMixin, TemplateView):
     modo = "crear"
 
     def dispatch(self, request, *args, **kwargs):
-        if not puede_ver_modulo(request.user):
+        if not puede_solicitud_modulo(request.user):
             return redirect("acceso_denegado")
         return super().dispatch(request, *args, **kwargs)
 
@@ -2335,7 +2462,7 @@ class SolicitudFormView(LoginRequiredMixin, TemplateView):
         return self.render_to_response(context)
 
     def post(self, request, *args, **kwargs):
-        if not puede_gestionar_modulo(request.user):
+        if not puede_solicitud_modulo(request.user):
             return JsonResponse({"ok": False, "error": "Acceso denegado."}, status=403)
 
         solicitud = self._get_solicitud()
@@ -2403,7 +2530,6 @@ class SolicitudFormView(LoginRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update(construir_contexto_dashboard(self.request.user))
-        context["tabs"] = TAB_SECTIONS
         context["active_tab"] = "solicitud"
         context["modo"] = self.modo
         context["titulo_form"] = {
@@ -2431,7 +2557,7 @@ class SolicitudCreateView(SolicitudFormView):
     modo = "crear"
 
     def post(self, request, *args, **kwargs):
-        if not puede_gestionar_modulo(request.user):
+        if not puede_solicitud_modulo(request.user):
             return JsonResponse({"ok": False, "error": "Acceso denegado."}, status=403)
 
         form = SolicitudForm(request.POST)
@@ -2492,7 +2618,7 @@ class SolicitudUpdateView(SolicitudFormView):
     modo = "editar"
 
     def post(self, request, *args, **kwargs):
-        if not puede_gestionar_modulo(request.user):
+        if not puede_solicitud_modulo(request.user):
             return JsonResponse({"ok": False, "error": "Acceso denegado."}, status=403)
 
         solicitud = self._get_solicitud()
@@ -2555,7 +2681,7 @@ class SolicitudDeleteView(LoginRequiredMixin, View):
     http_method_names = ["post"]
 
     def post(self, request, *args, **kwargs):
-        if not puede_gestionar_modulo(request.user):
+        if not puede_solicitud_modulo(request.user):
             return JsonResponse({"ok": False, "error": "Acceso denegado."}, status=403)
 
         pk = kwargs.get("pk")

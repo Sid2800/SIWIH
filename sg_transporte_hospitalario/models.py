@@ -253,6 +253,30 @@ class Vehiculo(models.Model):
     def __str__(self):
         return f"{self.codigo} - {self.placa}"
 
+    @staticmethod
+    def _formatear_codigo(pk):
+        return f"VEH-{pk:03d}"
+
+    def save(self, *args, **kwargs):
+        codigo_original = None
+        if self.pk:
+            codigo_original = (
+                type(self).objects.filter(pk=self.pk).values_list("codigo", flat=True).first()
+            )
+
+        if not self.pk and not self.codigo:
+            with transaction.atomic():
+                self.codigo = f"TMP-{uuid.uuid4().hex[:12]}"
+                super().save(*args, **kwargs)
+                self.codigo = self._formatear_codigo(self.pk)
+                super().save(update_fields=["codigo"])
+            return
+
+        if codigo_original and self.codigo != codigo_original:
+            self.codigo = codigo_original
+
+        super().save(*args, **kwargs)
+
 
 class Motorista(models.Model):
     empleado = models.OneToOneField(
