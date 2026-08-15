@@ -82,3 +82,104 @@
     .egresos-c--ing, .egresos-c--area { display: none; }
     .egresos-c--nom { width: 16rem; }
 }
+
+
+/* ============================================================
+   LLENADO — lista de lotes y estado pendiente/completado
+   ============================================================ */
+.egresos-llenado-filtros { align-items: center; margin-bottom: 1rem; }
+.egresos-check-inline {
+    display: flex; align-items: center; gap: 0.5rem;
+    font-size: 1.4rem; color: var(--colorTablacelda); white-space: nowrap;
+    flex: 0 0 auto;
+}
+.egresos-check-inline input { width: 1.4rem; height: 1.4rem; }
+
+.egresos-lotes { display: flex; flex-direction: column; gap: 1.4rem; }
+
+.egresos-lote {
+    border: 1px solid var(--colorLinea);
+    border-radius: 0.7rem;
+    background: var(--colorContendor);
+    overflow: hidden;
+}
+.egresos-lote__cab {
+    display: flex; justify-content: space-between; align-items: center;
+    gap: 1rem; flex-wrap: wrap;
+    padding: 0.8rem 1rem;
+    border-bottom: 1px solid var(--colorLinea);
+    font-size: 1.4rem;
+}
+.egresos-lote__meta { opacity: 0.7; margin-left: 0.6rem; }
+.egresos-lote__prog { display: flex; align-items: center; gap: 0.7rem; font-size: 1.25rem; }
+.egresos-prog {
+    width: 9rem; height: 0.7rem; border-radius: 1rem;
+    background: var(--colorLinea); overflow: hidden;
+}
+.egresos-prog__barra { height: 100%; background: var(--colorBoton); }
+
+/* La fila de llenado extiende la fila base con estado + botón. */
+.egresos-llenado-item { justify-content: flex-start; }
+.egresos-c--estado { width: 12rem; }
+.egresos-item--ok { opacity: 0.75; }
+
+.egresos-badge {
+    display: inline-flex; align-items: center; gap: 0.35rem;
+    padding: 0.15rem 0.6rem; border-radius: 1rem;
+    font-size: 1.1rem; font-weight: 600; white-space: nowrap;
+}
+.egresos-badge--ok   { background: #1f7a3d; color: #fff; }
+.egresos-badge--pend { background: #b8860b; color: #fff; }
+
+.egresos-btn-llenar {
+    margin-left: auto; text-decoration: none; white-space: nowrap;
+    font-size: 1.2rem; padding: 0.35rem 0.8rem;
+}
+.listbox li.egresos-llenado-item:hover .egresos-btn-llenar { color: var(--blanco); }
+
+.egresos-vacio-bloque {
+    padding: 2rem; text-align: center; opacity: 0.6; font-size: 1.5rem;
+}
+
+
+/* ============================================================
+   FORMULARIO de egreso
+   ============================================================ */
+.egresos-req { color: #c0392b; font-weight: 700; }
+.egresos-form-ancho { flex-basis: 100%; }
+
+.egresos-btn-secundario { background: var(--colorLinea); }
+
+/* Diagnósticos ilimitados */
+.egresos-diag-grupo { flex-basis: 100%; margin-bottom: 1rem; }
+.egresos-diag-grupo h4 { font-size: 1.4rem; margin-bottom: 0.5rem; }
+.egresos-diag-lista { display: flex; flex-direction: column; gap: 0.6rem; margin-bottom: 0.6rem; }
+
+.egresos-diag-fila { display: flex; gap: 0.6rem; align-items: flex-start; }
+.egresos-diag-buscador { position: relative; flex: 0 0 14rem; }
+.egresos-diag-codigo { width: 100%; }
+.egresos-diag-desc { flex: 1 1 auto; min-width: 0; }
+.egresos-diag-quitar { flex: 0 0 auto; }
+
+/* Dropdown de sugerencias CIE10 */
+.egresos-diag-sugerencias {
+    position: absolute; z-index: 30; top: 100%; left: 0; right: 0;
+    max-height: 22rem; overflow-y: auto;
+    background: var(--colorContendor);
+    border: 1px solid var(--colorLinea);
+    border-radius: 0.5rem;
+    box-shadow: 0 0.4rem 1rem rgba(0, 0, 0, 0.25);
+}
+.egresos-diag-sug {
+    padding: 0.5rem 0.7rem; font-size: 1.25rem; cursor: pointer;
+    border-bottom: 1px solid var(--colorLinea);
+    color: var(--colorTablacelda);
+}
+.egresos-diag-sug:last-child { border-bottom: none; }
+.egresos-diag-sug:hover { background: var(--colorBoton); color: var(--blanco); }
+
+@media (max-width: 768px) {
+    .egresos-c--estado { width: 9rem; }
+    .egresos-diag-fila { flex-wrap: wrap; }
+    .egresos-diag-buscador { flex-basis: 100%; }
+}

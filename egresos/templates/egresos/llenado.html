@@ -1,0 +1,53 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Llenado de Egresos{% endblock title %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'core/css/egresos.css' %}">
+{% endblock extra_css %}
+
+{% block content %}
+{% comment %}
+Lista de expedientes que Estadística tomó (por lote). Cada renglón se llena con
+el formulario de egreso; al guardarlo aparece como COMPLETADO. Cuando el lote
+esté terminado (o la mayoría), Admisión lo recibe de vuelta.
+{% endcomment %}
+<div class="contenedor2 egresos-llenado-page">
+    <div class="tituloFormulario sexp-margin-bottom-15">
+        <div class="tituloFormulario-texto">
+            <i class="bi bi-pencil-square"></i>
+            <h2 class="sin-margen">Llenado de Egresos</h2>
+        </div>
+        <div class="tituloFormulario-subrallado"></div>
+    </div>
+
+    <p class="egresos-ayuda">
+        <i class="bi bi-info-circle"></i>
+        <span>Estos son los expedientes que tomó de los ingresos. Llene los datos de
+        cada egreso; al guardarlo quedará marcado como <strong>completado</strong>.
+        Cuando el lote esté terminado se devuelve a Admisión.</span>
+    </p>
+
+    <div class="egresos-filtros-fila egresos-llenado-filtros">
+        <input type="text" class="formularioCampo-text" id="llen-buscar"
+               placeholder="Buscar por identidad, expediente o nombre" autocomplete="off">
+        <label class="egresos-check-inline">
+            <input type="checkbox" id="llen-solo-pendientes"> Ver solo pendientes
+        </label>
+    </div>
+
+    <div id="llen-contenedor" class="egresos-lotes"></div>
+    <div id="llen-vacio" class="egresos-vacio-bloque" style="display:none;">
+        No hay expedientes tomados pendientes de llenar.
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+    // La URL del formulario lleva el id del detalle; se genera desde este molde.
+    window.EGRESOS_LLENAR_URL = "{% url 'egresos_llenar' 0 %}";
+</script>
+<script src="{% static 'core/scripts/egresos/llenado.js' %}"></script>
+{% endblock extra_js %}

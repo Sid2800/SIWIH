@@ -180,8 +180,14 @@
             {% if request.user|tiene_unidades_config:"EGRESOS_VISUALIZACION_UNIDADES" %}
             <li>
                <a href="{% url 'egresos_captura' %}" class="bn-navegacion__enlace">
-                  <i class="bi bi-box-arrow-right bn-navegacion-enlace__logo"></i>
-                  <span class="bn-navegacion-enlace__texto">Egresos</span>
+                  <i class="bi bi-box-arrow-in-down-right bn-navegacion-enlace__logo"></i>
+                  <span class="bn-navegacion-enlace__texto">Egresos: Captura</span>
+               </a>
+            </li>
+            <li>
+               <a href="{% url 'egresos_llenado' %}" class="bn-navegacion__enlace">
+                  <i class="bi bi-pencil-square bn-navegacion-enlace__logo"></i>
+                  <span class="bn-navegacion-enlace__texto">Egresos: Llenado</span>
                </a>
             </li>
             {% endif %}
@@ -518,6 +524,11 @@
          s_exp_buscar_expedientes_api: "{% url 's_exp_buscar_expedientes_api' %}",
          egresos_ingresos_para_egreso_api: "{% url 'egresos_ingresos_para_egreso_api' %}",
          egresos_crear_lote_captura_api: "{% url 'egresos_crear_lote_captura_api' %}",
+         egresos_llenado: "{% url 'egresos_llenado' %}",
+         egresos_pendientes_llenado_api: "{% url 'egresos_pendientes_llenado_api' %}",
+         egresos_areas_api: "{% url 'egresos_areas_api' %}",
+         egresos_buscar_cie10_api: "{% url 'egresos_buscar_cie10_api' %}",
+         egresos_buscar_procedimiento_api: "{% url 'egresos_buscar_procedimiento_api' %}",
          s_exp_crear_solicitud_api: "{% url 's_exp_crear_solicitud_api' %}",
          s_exp_mis_solicitudes_api: "{% url 's_exp_mis_solicitudes_api' %}",
          s_exp_solicitar_devolucion_api: "{% url 's_exp_solicitar_devolucion_api' %}",

@@ -1,0 +1,234 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Datos del Egreso{% endblock title %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'core/css/egresos.css' %}">
+{% endblock extra_css %}
+
+{% block content %}
+{% comment %}
+Formulario de egreso de UN expediente tomado (un detalle de lote). Los datos del
+paciente y la fecha/área de ingreso vienen precargados; Estadística completa lo
+propio del egreso. Los diagnósticos son ilimitados (código CIE10 + descripción).
+{% endcomment %}
+<div class="contenedor2 egresos-form-page">
+    <div class="tituloFormulario sexp-margin-bottom-15">
+        <div class="tituloFormulario-texto">
+            <i class="bi bi-clipboard-plus"></i>
+            <h2 class="sin-margen">Datos del Egreso</h2>
+        </div>
+        <div class="tituloFormulario-subrallado"></div>
+    </div>
+
+    <!-- Datos del paciente / expediente (solo lectura, precargados) -->
+    <fieldset class="recepcionIngresoCampos">
+        <legend>Paciente y expediente</legend>
+        <div class="formularioCampo">
+            <label>Expediente</label>
+            <input type="text" id="eg-expediente" class="formularioCampo-text" disabled>
+        </div>
+        <div class="formularioCampo">
+            <label>Identidad</label>
+            <input type="text" id="eg-identidad" class="formularioCampo-text" disabled>
+        </div>
+        <div class="formularioCampo">
+            <label>Nombre</label>
+            <input type="text" id="eg-nombre" class="formularioCampo-text" disabled>
+        </div>
+    </fieldset>
+
+    <!-- Encabezado del renglón + área -->
+    <fieldset class="recepcionIngresoCampos">
+        <legend>Datos del censo</legend>
+        <div class="formularioCampo">
+            <label for="eg-area">Área del censo <span class="egresos-req">*</span></label>
+            <select id="eg-area" class="formularioCampo-text"></select>
+        </div>
+        <div class="formularioCampo">
+            <label for="eg-numero">N.º (correlativo)</label>
+            <input type="number" min="1" id="eg-numero" class="formularioCampo-text" autocomplete="off">
+        </div>
+        <div class="formularioCampo">
+            <label for="eg-pagina">Página (libro)</label>
+            <input type="text" id="eg-pagina" class="formularioCampo-text" maxlength="20" autocomplete="off">
+        </div>
+    </fieldset>
+
+    <!-- Fechas y estancia -->
+    <fieldset class="recepcionIngresoCampos">
+        <legend>Fechas</legend>
+        <div class="formularioCampo">
+            <label for="eg-fecha-ingreso">Fecha de ingreso</label>
+            <input type="date" id="eg-fecha-ingreso" class="formularioCampo-text">
+        </div>
+        <div class="formularioCampo">
+            <label for="eg-fecha-egreso">Fecha de egreso <span class="egresos-req">*</span></label>
+            <input type="date" id="eg-fecha-egreso" class="formularioCampo-text">
+        </div>
+        <div class="formularioCampo">
+            <label>Días de estancia</label>
+            <input type="text" id="eg-dias" class="formularioCampo-text" disabled>
+        </div>
+    </fieldset>
+
+    <!-- Datos clínicos -->
+    <fieldset class="recepcionIngresoCampos">
+        <legend>Datos clínicos</legend>
+        <div class="formularioCampo">
+            <label for="eg-edad">Edad</label>
+            <input type="number" min="0" id="eg-edad" class="formularioCampo-text" autocomplete="off">
+        </div>
+        <div class="formularioCampo">
+            <label for="eg-sexo">Sexo</label>
+            <select id="eg-sexo" class="formularioCampo-text">
+                <option value="">—</option>
+                <option value="H">Hombre</option>
+                <option value="M">Mujer</option>
+            </select>
+        </div>
+        <div class="formularioCampo">
+            <label for="eg-condicion">Condición al egreso</label>
+            <select id="eg-condicion" class="formularioCampo-text">
+                <option value="">—</option>
+                <option value="V">Vivo</option>
+                <option value="M">Muerto</option>
+            </select>
+        </div>
+        <div class="formularioCampo">
+            <label for="eg-peso">Peso (gramos)</label>
+            <input type="number" min="0" id="eg-peso" class="formularioCampo-text" autocomplete="off">
+        </div>
+    </fieldset>
+
+    <!-- Operación -->
+    <fieldset class="recepcionIngresoCampos">
+        <legend>Operación (si aplica)</legend>
+        <div class="formularioCampo">
+            <label for="eg-op-codigo">Código de operación</label>
+            <input type="text" id="eg-op-codigo" class="formularioCampo-text" maxlength="20"
+                   placeholder="Ej. 7499" autocomplete="off">
+        </div>
+        <div class="formularioCampo egresos-form-ancho">
+            <label for="eg-op-desc">Descripción de la operación</label>
+            <input type="text" id="eg-op-desc" class="formularioCampo-text" maxlength="200"
+                   placeholder="Se completa según el código" autocomplete="off">
+        </div>
+    </fieldset>
+
+    <!-- Referencia -->
+    <fieldset class="recepcionIngresoCampos">
+        <legend>Referencia</legend>
+        <div class="formularioCampo">
+            <label for="eg-tipo-ref">Tipo</label>
+            <select id="eg-tipo-ref" class="formularioCampo-text">
+                <option value="">Ninguna</option>
+                <option value="TRAE">Trae referencia</option>
+                <option value="REFERIDO">Referido a</option>
+            </select>
+        </div>
+        <div class="formularioCampo egresos-form-ancho">
+            <label for="eg-ref-texto">Institución</label>
+            <input type="text" id="eg-ref-texto" class="formularioCampo-text" maxlength="200" autocomplete="off">
+        </div>
+    </fieldset>
+
+    <!-- Solo áreas de observación (OA/OP) -->
+    <fieldset class="recepcionIngresoCampos egresos-solo-observacion" style="display:none;">
+        <legend>Observación (OA/OP)</legend>
+        <div class="formularioCampo">
+            <label for="eg-epicrisis">¿Tiene epicrisis?</label>
+            <select id="eg-epicrisis" class="formularioCampo-text">
+                <option value="">—</option>
+                <option value="si">Sí</option>
+                <option value="no">No</option>
+            </select>
+        </div>
+        <div class="formularioCampo">
+            <label for="eg-ir-sala">¿Debería ir a sala?</label>
+            <select id="eg-ir-sala" class="formularioCampo-text">
+                <option value="">—</option>
+                <option value="si">Sí</option>
+                <option value="no">No</option>
+            </select>
+        </div>
+        <div class="formularioCampo egresos-form-ancho">
+            <label for="eg-procedencia">Procedencia</label>
+            <input type="text" id="eg-procedencia" class="formularioCampo-text" maxlength="200" autocomplete="off">
+        </div>
+    </fieldset>
+
+    <!-- Diagnósticos (ilimitados) -->
+    <fieldset class="recepcionIngresoCampos egresos-diag-fs">
+        <legend>Diagnósticos</legend>
+
+        <div class="egresos-diag-grupo">
+            <h4 class="sin-margen">Diagnóstico de ingreso</h4>
+            <div id="eg-diag-ingreso" class="egresos-diag-lista"></div>
+            <button type="button" class="formularioBotones-boton egresos-btn-add" data-tipo="INGRESO">
+                <i class="bi bi-plus-circle"></i> Agregar diagnóstico de ingreso
+            </button>
+        </div>
+
+        <div class="egresos-diag-grupo">
+            <h4 class="sin-margen">Diagnósticos de egreso</h4>
+            <div id="eg-diag-egreso" class="egresos-diag-lista"></div>
+            <button type="button" class="formularioBotones-boton egresos-btn-add" data-tipo="EGRESO">
+                <i class="bi bi-plus-circle"></i> Agregar diagnóstico de egreso
+            </button>
+        </div>
+    </fieldset>
+
+    <!-- Estado y comentario -->
+    <fieldset class="recepcionIngresoCampos">
+        <legend>Estado</legend>
+        <div class="formularioCampo">
+            <label class="egresos-check-inline">
+                <input type="checkbox" id="eg-en-censo"> Incluido en el censo
+            </label>
+        </div>
+        <div class="formularioCampo egresos-form-ancho" id="recepcionIngresoObservaciones">
+            <label for="eg-comentario">Comentario</label>
+            <textarea id="eg-comentario" cols="40" rows="6" maxlength="500"
+                      class="formularioCampo-text" placeholder="Comentario (opcional)"></textarea>
+        </div>
+    </fieldset>
+
+    <div class="recepcionIngresoBotones">
+        <a href="{% url 'egresos_llenado' %}" class="formularioBotones-boton egresos-btn-secundario">
+            <i class="bi bi-arrow-left-circle"></i> <span>Volver a la lista</span>
+        </a>
+        <button type="button" class="formularioBotones-boton" id="eg-guardar">
+            <i class="bi bi-check-square-fill"></i> <span>Guardar egreso</span>
+        </button>
+    </div>
+</div>
+
+<!-- Molde de fila de diagnóstico -->
+<template id="eg-diag-tpl">
+    <div class="egresos-diag-fila">
+        <div class="egresos-diag-buscador">
+            <input type="text" class="formularioCampo-text egresos-diag-codigo"
+                   placeholder="Código CIE10" autocomplete="off">
+            <div class="egresos-diag-sugerencias" style="display:none;"></div>
+        </div>
+        <input type="text" class="formularioCampo-text egresos-diag-desc"
+               placeholder="Descripción del diagnóstico" autocomplete="off">
+        <button type="button" class="formularioBotones-boton egresos-diag-quitar" title="Quitar">
+            <i class="bi bi-x-circle"></i>
+        </button>
+    </div>
+</template>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+    window.EGRESO_DETALLE_ID = {{ detalle_id }};
+    window.urls_egreso = {
+        datos: "{% url 'egresos_datos_llenado_api' detalle_id %}",
+        guardar: "{% url 'egresos_guardar_egreso_api' detalle_id %}"
+    };
+</script>
+<script src="{% static 'core/scripts/egresos/egreso_form.js' %}"></script>
+{% endblock extra_js %}

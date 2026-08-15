@@ -166,10 +166,13 @@ function confirmarCaptura() {
             }),
             success: function (resp) {
                 if (!resp.success) return;
-                toastr.success(`${resp.capturados} expediente(s) capturados (lote #${resp.lote_id}).`);
+                toastr.success(`${resp.capturados} expediente(s) capturados (lote #${resp.lote_id}). Redirigiendo al llenado…`);
                 _idsDerecha.clear(); _selIzq.clear(); _selDer.clear();
                 $('#cap-observaciones').val('');
-                cargarIngresos();  // recargar: los capturados ya no están disponibles
+                // Al capturar, se pasa directo a la pantalla de llenado de datos.
+                setTimeout(function () {
+                    window.location.href = window.urls.egresos_llenado;
+                }, 900);
             },
             error: function (xhr) {
                 const err = xhr.responseJSON ? xhr.responseJSON.error : 'Error desconocido';

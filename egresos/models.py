@@ -229,6 +229,13 @@ class Egreso(models.Model):
         Expediente, on_delete=models.SET_NULL, null=True, blank=True,
         related_name='egresos', verbose_name='Expediente'
     )
+    # Detalle del lote desde el que Estadística llenó este egreso. Sirve para
+    # marcar el renglón como "completado" en la lista de llenado. Es 1:1: cada
+    # expediente tomado en un lote produce un egreso.
+    lote_detalle = models.OneToOneField(
+        'LoteEgresoDetalle', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='egreso', verbose_name='Detalle de lote de origen'
+    )
 
     # ---- Encabezado del renglón (como en el Excel) ----
     numero = models.PositiveIntegerField(
