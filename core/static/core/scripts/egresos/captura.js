@@ -15,9 +15,26 @@ const _idsDerecha = new Set();   // expediente_id elegidos
 const _selIzq = new Set();       // marcados (resaltados) en la izquierda
 const _selDer = new Set();
 
+let _periodo = 'todos';   // filtro por fecha de ingreso activo
+
 $(document).ready(function () {
     $('#cap-fecha').val(new Date().toLocaleString('es-HN', { hour12: false }));
+    // Fecha de referencia por defecto: hoy (oculta mientras el filtro sea "Todos").
+    $('#cap-fecha-ref').val(new Date().toISOString().slice(0, 10));
+    $('#cap-fecha-ref-cont').hide();
     cargarIngresos();
+
+    // Filtro por período (día/semana/mes/año/rango/todos).
+    $('.egresos-periodo').on('click', function () {
+        _periodo = $(this).data('periodo');
+        $('.egresos-periodo').removeClass('egresos-periodo--activa');
+        $(this).addClass('egresos-periodo--activa');
+        // Rango muestra desde/hasta; el resto usa la fecha de referencia.
+        $('.egresos-rango-campo').toggle(_periodo === 'rango');
+        $('#cap-fecha-ref-cont').toggle(_periodo !== 'rango' && _periodo !== 'todos');
+        cargarIngresos();
+    });
+    $('#cap-fecha-ref, #cap-fecha-desde, #cap-fecha-hasta').on('change', cargarIngresos);
 
     $('#cap-buscar-izq').on('input', pintarIzquierda);
     $('#cap-filtro-area').on('change', pintarIzquierda);
@@ -32,10 +49,18 @@ $(document).ready(function () {
 });
 
 function cargarIngresos() {
+    const data = { periodo: _periodo };
+    if (_periodo === 'rango') {
+        data.desde = $('#cap-fecha-desde').val();
+        data.hasta = $('#cap-fecha-hasta').val();
+    } else {
+        data.fecha = $('#cap-fecha-ref').val();
+    }
     $.ajax({
         url: window.urls.egresos_ingresos_para_egreso_api,
         method: 'GET',
         cache: false,
+        data: data,
         success: function (resp) {
             // Solo los que tienen expediente y están disponibles se pueden capturar.
             _todos = (resp.data || []).filter(e => e.expediente_id && e.disponible);

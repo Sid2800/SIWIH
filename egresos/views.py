@@ -7,7 +7,7 @@ egresos. Aquí va, por ahora, la API que ALIMENTA ese listado (solo lectura; no
 modifica el módulo Ingreso).
 """
 import json
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from django.db import transaction
 from django.http import JsonResponse
@@ -110,11 +110,46 @@ def _expedientes_no_disponibles():
     return no_disp | en_proceso
 
 
+def _rango_periodo(periodo, fecha_ref, desde, hasta):
+    """
+    Traduce el filtro por fecha a un rango [inicio, fin] de fechas (date).
+      - dia    : ese día
+      - semana : semana (lunes a domingo) que contiene la fecha
+      - mes    : mes de la fecha
+      - anio   : año de la fecha
+      - rango  : desde..hasta (ambos inclusive)
+      - (otro/todos): sin filtro -> (None, None)
+    """
+    ref = _parse_fecha(fecha_ref) or date.today()
+    if periodo == 'dia':
+        return ref, ref
+    if periodo == 'semana':
+        ini = ref - timedelta(days=ref.weekday())   # lunes
+        return ini, ini + timedelta(days=6)          # domingo
+    if periodo == 'mes':
+        ini = ref.replace(day=1)
+        fin = (ini.replace(year=ini.year + 1, month=1) if ini.month == 12
+               else ini.replace(month=ini.month + 1)) - timedelta(days=1)
+        return ini, fin
+    if periodo == 'anio':
+        return date(ref.year, 1, 1), date(ref.year, 12, 31)
+    if periodo == 'rango':
+        d = _parse_fecha(desde)
+        h = _parse_fecha(hasta)
+        if d and h and d > h:
+            d, h = h, d
+        return d, h
+    return None, None
+
+
 @require_GET
 def ingresos_para_egreso_api(request):
     """
     Lista los ingresos ABIERTOS (solo fecha de ingreso, sin egreso) para que
     Estadística tome sus expedientes.
+
+    Admite filtrar por fecha de ingreso: periodo=dia|semana|mes|anio|rango con
+    fecha (referencia) o desde/hasta (rango). Sin periodo, devuelve todos.
 
     Devuelve por ingreso: paciente (identidad y nombre), fecha de ingreso, área
     (sala/servicio del ingreso), número de expediente y si está DISPONIBLE para
@@ -132,6 +167,21 @@ def ingresos_para_egreso_api(request):
             .select_related('paciente', 'sala', 'sala__servicio')
             .order_by('-fecha_ingreso')
         )
+
+        # Filtro por fecha de ingreso (día/semana/mes/año/rango).
+        # Se usan límites datetime con zona (no el lookup __date, que en este
+        # MySQL sin tablas de zona horaria devuelve vacío).
+        periodo = (request.GET.get('periodo') or '').strip()
+        dini, dfin = _rango_periodo(
+            periodo, request.GET.get('fecha'),
+            request.GET.get('desde'), request.GET.get('hasta'),
+        )
+        if dini:
+            inicio = timezone.make_aware(datetime.combine(dini, datetime.min.time()))
+            ingresos = ingresos.filter(fecha_ingreso__gte=inicio)
+        if dfin:
+            fin = timezone.make_aware(datetime.combine(dfin, datetime.max.time()))
+            ingresos = ingresos.filter(fecha_ingreso__lte=fin)
 
         # Expediente de cada paciente (uno solo, el vigente), en bloque para no
         # disparar una consulta por fila.

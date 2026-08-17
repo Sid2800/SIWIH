@@ -48,6 +48,33 @@ listasRecepcion) para no duplicar estilos; el contenido de cada fila es propio.
         </div>
     </fieldset>
 
+    <!-- Filtro por fecha de ingreso: día / semana / mes / año / rango -->
+    <fieldset class="recepcionIngresoCampos egresos-fecha-fs">
+        <legend>Filtrar ingresos por fecha</legend>
+        <div class="egresos-periodo-botones">
+            <button type="button" class="egresos-periodo egresos-periodo--activa" data-periodo="todos">Todos</button>
+            <button type="button" class="egresos-periodo" data-periodo="dia">Día</button>
+            <button type="button" class="egresos-periodo" data-periodo="semana">Semana</button>
+            <button type="button" class="egresos-periodo" data-periodo="mes">Mes</button>
+            <button type="button" class="egresos-periodo" data-periodo="anio">Año</button>
+            <button type="button" class="egresos-periodo" data-periodo="rango">Rango</button>
+        </div>
+        <div class="egresos-fecha-campos">
+            <div class="formularioCampo" id="cap-fecha-ref-cont">
+                <label for="cap-fecha-ref">Fecha de referencia</label>
+                <input type="date" id="cap-fecha-ref" class="formularioCampo-text">
+            </div>
+            <div class="formularioCampo egresos-rango-campo" style="display:none;">
+                <label for="cap-fecha-desde">Desde</label>
+                <input type="date" id="cap-fecha-desde" class="formularioCampo-text">
+            </div>
+            <div class="formularioCampo egresos-rango-campo" style="display:none;">
+                <label for="cap-fecha-hasta">Hasta</label>
+                <input type="date" id="cap-fecha-hasta" class="formularioCampo-text">
+            </div>
+        </div>
+    </fieldset>
+
     <div class="listasRecepcion">
         <!-- Izquierda: ingresos abiertos con expediente disponible -->
         <div class="contendorLista">

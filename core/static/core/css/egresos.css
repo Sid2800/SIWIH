@@ -60,6 +60,33 @@
 }
 .egresos-ayuda i { color: var(--colorBoton); margin-right: 0.5rem; vertical-align: -0.15rem; }
 
+/* ------------------------------------------------------------
+   Filtro por fecha de ingreso (día/semana/mes/año/rango).
+   ------------------------------------------------------------ */
+.egresos-fecha-fs { margin-bottom: 1rem; }
+.egresos-periodo-botones {
+    display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.6rem;
+    flex-basis: 100%;
+}
+.egresos-periodo {
+    padding: 0.45rem 1.1rem;
+    font-size: 1.3rem;
+    border: 1px solid var(--colorLinea);
+    border-radius: 2rem;
+    background: var(--colorContendor);
+    color: var(--colorTablacelda);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+.egresos-periodo:hover { border-color: var(--colorBoton); }
+.egresos-periodo--activa {
+    background: var(--colorBoton);
+    color: var(--blanco);
+    border-color: var(--colorBoton);
+    font-weight: 700;
+}
+.egresos-fecha-campos { display: flex; gap: 0.8rem; flex-wrap: wrap; }
+
 /* Fila del buscador + filtro de área en la lista izquierda. */
 .egresos-filtros-fila {
     display: flex;
