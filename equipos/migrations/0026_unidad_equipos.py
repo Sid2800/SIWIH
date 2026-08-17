@@ -22,15 +22,15 @@ def crear_unidad_equipos(apps, schema_editor):
     Unidad = apps.get_model("servicio", "Unidad")
     Usuario = apps.get_model("auth", "User")
 
-    # Unidad exige creado_por y modificado_por, que no admiten vacio. En una
-    # base recien creada las migraciones corren antes que exista ningun
-    # usuario, asi que aqui no hay a quien atribuirla y la migracion se marca
-    # como aplicada sin haber creado nada.
+    # Unidad exige creado_por y modificado_por. El despliegue de SIWIH se hace
+    # sobre una base institucional que ya tiene usuarios, por lo que el primero
+    # sirve como responsable de este registro tecnico.
     #
-    # Ese hueco lo cierra el receptor post_migrate de equipos/signals.py, que
-    # vuelve a intentarlo en cada migrate posterior, cuando ya hay superusuario.
-    # Mientras la unidad no exista nadie puede tener PerfilUnidad en EQ, de
-    # modo que el modulo queda cerrado, nunca abierto.
+    # Si la base estuviera completamente vacia no se crea la unidad, y entonces
+    # el modulo queda accesible solo para superusuarios y para quienes tengan un
+    # PerfilUnidad de alcance GLOBAL: ambos se resuelven antes de mirar la
+    # unidad. Lo que no se podria es dar acceso a un tecnico, porque su permiso
+    # se concede precisamente colgandolo de EQ.
     responsable = Usuario.objects.order_by("pk").first()
 
     if responsable is None:
