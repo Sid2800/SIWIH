@@ -258,6 +258,10 @@
                     <dd>{{ dispositivo.procedencia.nombre }}</dd>
                 </div>
                 <div>
+                    <dt>Número de referencia</dt>
+                    <dd>{{ dispositivo.numero_referencia|default:"No indicado" }}</dd>
+                </div>
+                <div>
                     <dt>Teléfono</dt>
                     <dd>{{ dispositivo.procedencia.telefono|default:"No indicado" }}</dd>
                 </div>

@@ -5705,16 +5705,7 @@ tbody tr:last-child .botonTablaBajar{
    position: relative;
    flex-direction: column;
    gap: 1.4rem;
-}
-
-.contenedor:has(> .equipos-pagina--ancha) {
-   width: min(calc(100% - 2rem), 190rem);
-}
-
-.equipos-pagina--ancha {
    min-width: 0;
-   padding-left: 1.2rem;
-   padding-right: 1.2rem;
 }
 
 .equipos-acciones-rapidas {
@@ -8003,10 +7994,12 @@ button.equipos-imagenes__vista:hover img {
 }
 
 /* El catalogo de tipos pasa del centenar de entradas: en pantallas anchas se
-   reparte en varias columnas para no obligar a un desplazamiento larguisimo. */
+   reparte en varias columnas para no obligar a un desplazamiento larguisimo.
+   El min() es lo que evita que en un telefono la columna siga midiendo 28rem
+   y se salga por la derecha: cuando no cabe, pasa a valer lo que haya. */
 .equipos-catalogo__lista--columnas {
    display: grid;
-   grid-template-columns: repeat(auto-fill, minmax(28rem, 1fr));
+   grid-template-columns: repeat(auto-fill, minmax(min(28rem, 100%), 1fr));
 }
 
 .equipos-catalogo__cancelar {
@@ -8141,6 +8134,29 @@ button.equipos-imagenes__vista:hover img {
       derecho que igualar. */
    .equipos-registro__acciones--con-galeria {
       padding-right: 0;
+   }
+}
+
+/* El formulario del catalogo pone los campos y el boton uno al lado del otro,
+   que es lo que le conviene a marcas y modelos: un solo campo y el boton a su
+   derecha. Procedencias lleva siete campos, y en un telefono esa segunda
+   columna dejaba los campos en 80px con el boton ocupando el resto. Se corta a
+   650px, el mismo punto en el que los campos dejan de ir en dos columnas. */
+@media (max-width: 650px) {
+   .equipos-catalogo__form {
+      grid-template-columns: 1fr;
+   }
+
+   /* .formularioBotones-boton reparte su contenido con space-between, pensado
+      para un ancho fijo. A ancho completo eso mandaria el icono y el texto a
+      los extremos opuestos del boton. */
+   .equipos-catalogo__boton {
+      justify-content: center;
+      width: 100%;
+   }
+
+   .equipos-catalogo__cancelar {
+      text-align: center;
    }
 }
 
@@ -8321,11 +8337,13 @@ p + .equipos-garantia__bloqueo {
 
 /* Mas anchas que las columnas de marcas: aqui la linea de datos lleva un RTN
    de 14 digitos mas el telefono y el numero de equipos, y con la medida
-   original el RTN se partia en dos lineas. */
+   original el RTN se partia en dos lineas. Las 34rem son 340px, mas de lo que
+   deja libre un telefono de 375px, asi que sin el min() la ficha se salia del
+   recuadro y cortaba el encabezado de la pagina. */
 .equipos-catalogo__lista--fichas {
    border-top: 0;
    gap: 1rem;
-   grid-template-columns: repeat(auto-fill, minmax(34rem, 1fr));
+   grid-template-columns: repeat(auto-fill, minmax(min(34rem, 100%), 1fr));
    padding: .2rem;
 }
 
