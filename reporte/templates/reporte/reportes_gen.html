@@ -43,12 +43,12 @@
             <fieldset class="detallesRegistro">
                 <legend>Rango de fechas para todos los reportes</legend>
 
-                <div class="formularioCampoModal">
+                <div class="reporteCampo">
                     <label for="reporte-gen-fecha-inicial">Fecha Inicial</label>
                     <input type="date" id="reporte-gen-fecha-inicial" name="fecha_inicio" value="{{ fecha_inicio|date:'Y-m-d' }}" class="formularioCampo-date">
                 </div>
 
-                <div class="formularioCampoModal">
+                <div class="reporteCampo">
                     <label for="reporte-gen-fecha-final">Fecha Final</label>
                     <input type="date" id="reporte-gen-fecha-final" name="fecha_fin" value="{{ fecha_fin|date:'Y-m-d' }}" class="formularioCampo-date">
                 </div>
@@ -59,7 +59,7 @@
             <fieldset class="frmGeneradorReportesCampos">
                 <legend>Modelos Reportes</legend>
 
-                <div class="formularioCampoModal">
+                <div class="reporteCampo">
                     <label for="reporte-gen-modelo">Modelo</label>
                     <select id="reporte-gen-modelo" name="modelo" class="formularioCampo-select">
                         {% for valor, texto in modelos %}
@@ -68,26 +68,26 @@
                     </select>
                 </div>
 
-                <div class="formularioCampoModal">
+                <div class="reporteCampo">
                     <label for="reporte-gen-interacion">Interacción</label>
                     <select id="reporte-gen-interacion" class="formularioCampo-select" name="interacion">
                     </select>
                 </div>
 
-                <div class="formularioCampoModal">
+                <div class="reporteCampo">
                     <label for="reporte-gen-agrupacion">Agrupación</label>
                     <select id="reporte-gen-agrupacion" class="formularioCampo-select" name="agrupacion">
                     </select>
                 </div>
                 
 
-                <div class="formularioCampoModal">
+                <div class="reporteCampo">
                     <label for="reporte-gen-filtro-campo">Campo Filtro</label>
                     <select id="reporte-gen-filtro-campo" class="formularioCampo-select" name="filtro">
                     </select>
                 </div>
 
-                <div class="formularioCampoModal">
+                <div class="reporteCampo">
                     <label for="reporte-gen-filtro-valor">Valor Filtro</label>
                     <select id="reporte-gen-filtro-valor" class="formularioCampo-select" name="filtro">
                     </select>
@@ -115,7 +115,7 @@
             <fieldset class="reporte-informe">
                 <div class="informe-criterios-generales">
                 
-                    <div class="formularioCampoModal">
+                    <div class="reporteCampo">
                             <label for="informe-rx-informe-anio">Año</label>
                             <select id="informe-rx-informe-anio" class="formularioCampo-select">
                                 {% for anio in anios %}
@@ -126,7 +126,7 @@
                             </select>      
                     </div>
                     
-                    <div class="formularioCampoModal">
+                    <div class="reporteCampo">
                         <label for="informe-rx-informe-mes">Mes</label>
                         <select id="informe-rx-informe-mes" class="formularioCampo-select"> 
                             <option value="01" {% if mes_actual == "01" %}selected{% endif %}>ENERO</option>
@@ -178,7 +178,7 @@
                 {% if  request.user|tiene_rol:"ADMIN:RX,digitador:RX"%}
                     <fieldset class="reporteCamposInformes">
                         <legend>Radiologia</legend>
-                            <div class="formularioCampoModal">
+                            <div class="reporteCampo">
                                 <label for="informe-rx-informe">Informe</label>
                                 <select id="informe-rx-informe" class="formularioCampo-select" name="rx-informe">
                                     {% for valor, texto in informesRx %}
@@ -196,7 +196,7 @@
                 {% if  request.user|tiene_rol:"ADMIN:UAU,digitador:UAU,directivo:"%}
                     <fieldset class="reporteCamposInformes">
                         <legend>Referencia - Respuesta</legend>
-                            <div class="formularioCampoModal">
+                            <div class="reporteCampo">
                                 <label for="informe-referencia-informe">Informe</label>
                                 <select id="informe-referencia-informe" class="formularioCampo-select" name="referencia-informe">
                                     {% for valor, texto in informesReferencia %}
@@ -221,12 +221,12 @@
                     <fieldset class="detallesRegistro">
                         <legend>Rango de fechas</legend>
 
-                        <div class="formularioCampoModal">
+                        <div class="reporteCampo">
                             <label for="catalogo-fecha-inicial">Fecha Inicial</label>
                             <input type="date" id="catalogo-fecha-inicial" value="{{ fecha_inicio|date:'Y-m-d' }}" class="formularioCampo-date">
                         </div>
 
-                        <div class="formularioCampoModal">
+                        <div class="reporteCampo">
                             <label for="catalogo-fecha-final">Fecha Final</label>
                             <input type="date" id="catalogo-fecha-final" value="{{ fecha_fin|date:'Y-m-d' }}" class="formularioCampo-date">
                         </div>
@@ -235,20 +235,22 @@
                     <fieldset class="reporteCamposCatologo">
                         <legend>Catálogo</legend>
 
-                        <div class="formularioCampoModal">
+                        <div class="reporteCampo">
                             <label for="catalogo-tipo">Tipo</label>
                             <select id="catalogo-tipo" class="formularioCampo-select">
                                 {% for valor, texto in informesCatalogo %}
                                     <option value="{{ valor }}">{{ texto }}</option>
                                 {% endfor %}
                             </select>
+
+                            <a class="formularioBotones-boton" id="catalogo-generar-boton">
+                                <i class="bi bi-download"></i>
+                                <span>Generar</span>
+                            </a>
                         </div>
 
                         
-                        <a class="formularioBotones-boton" id="catalogo-generar-boton">
-                            <i class="bi bi-download"></i>
-                            <span>Generar</span>
-                        </a>
+                        
                     </fieldset>
                 </fieldset>
             {% endif %}
@@ -269,6 +271,7 @@ urls['reporteGenerado'] = "{% url 'reporte_generado' %}";
 urls['informesImagenologia'] = "{% url 'informes_imagenologia' %}";
 urls['informesReferencia'] = "{% url 'informes_referencia' %}";
 urls['informesCatalogo'] = "{% url 'informes_catalogo' %}";
+
 
 
 
