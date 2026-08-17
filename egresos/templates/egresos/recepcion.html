@@ -1,0 +1,49 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Recepción de Egresos — Admisión{% endblock title %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'core/css/egresos.css' %}">
+{% endblock extra_css %}
+
+{% block content %}
+{% comment %}
+Admisión recibe los lotes que Estadística envió. Marca qué expedientes
+regresaron (cambia su ubicación a Admisión) y, cuando están todos, cierra el
+lote con su fecha de captura.
+{% endcomment %}
+<div class="contenedor2 egresos-recepcion-page">
+    <div class="tituloFormulario sexp-margin-bottom-15">
+        <div class="tituloFormulario-texto">
+            <i class="bi bi-box-arrow-in-left"></i>
+            <h2 class="sin-margen">Recepción de Egresos (Admisión)</h2>
+        </div>
+        <div class="tituloFormulario-subrallado"></div>
+    </div>
+
+    <p class="egresos-ayuda">
+        <i class="bi bi-info-circle"></i>
+        <span>Estos son los lotes que Estadística envió. Marque los expedientes que
+        <strong>regresaron</strong> (vuelven a Admisión y quedan disponibles). Cuando
+        estén <strong>todos</strong>, cierre el lote.</span>
+    </p>
+
+    <div class="egresos-filtros-fila egresos-llenado-filtros">
+        <input type="text" class="formularioCampo-text" id="rec-buscar"
+               placeholder="Buscar por identidad, expediente o nombre" autocomplete="off">
+        <label class="egresos-check-inline">
+            <input type="checkbox" id="rec-solo-pendientes"> Ver solo pendientes
+        </label>
+    </div>
+
+    <div id="rec-contenedor" class="egresos-lotes"></div>
+    <div id="rec-vacio" class="egresos-vacio-bloque" style="display:none;">
+        No hay lotes enviados pendientes de recibir.
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script src="{% static 'core/scripts/egresos/recepcion.js' %}"></script>
+{% endblock extra_js %}

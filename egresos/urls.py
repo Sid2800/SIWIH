@@ -27,4 +27,15 @@ urlpatterns = [
     path('api/buscar-cie10/', views.buscar_cie10_api, name='egresos_buscar_cie10_api'),
     path('api/buscar-procedimiento/', views.buscar_procedimiento_api,
          name='egresos_buscar_procedimiento_api'),
+
+    # --- Devolución / recepción del lote (Estadística envía; Admisión recibe) ---
+    path('api/enviar-lote-admision/<int:lote_id>/', views.enviar_lote_admision_api,
+         name='egresos_enviar_lote_admision_api'),
+    path('recepcion/', views.RecepcionEgresosView.as_view(), name='egresos_recepcion'),
+    path('api/lotes-para-recepcion/', views.lotes_para_recepcion_api,
+         name='egresos_lotes_para_recepcion_api'),
+    path('api/marcar-devuelto/<int:detalle_id>/', views.marcar_devuelto_api,
+         name='egresos_marcar_devuelto_api'),
+    path('api/cerrar-lote/<int:lote_id>/', views.cerrar_lote_api,
+         name='egresos_cerrar_lote_api'),
 ]

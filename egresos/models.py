@@ -111,14 +111,19 @@ class LoteEgreso(models.Model):
          devuelven todos; ahí el lote se cierra y queda su fecha de captura por
          Admisión.
     """
-    ABIERTO = 'ABIERTO'          # Estadística lo tiene, aún digitando/devolviendo
+    ABIERTO = 'ABIERTO'          # Estadística lo tiene, aún digitando egresos
+    EN_REVISION = 'EN_REVISION'  # enviado a Admisión, revisando la devolución
     CERRADO = 'CERRADO'          # todos devueltos y revisados por Admisión
     ESTADOS = [
         (ABIERTO, 'Abierto'),
+        (EN_REVISION, 'En revisión (Admisión)'),
         (CERRADO, 'Cerrado'),
     ]
 
-    estado = models.CharField(max_length=10, choices=ESTADOS, default=ABIERTO)
+    estado = models.CharField(max_length=12, choices=ESTADOS, default=ABIERTO)
+
+    # Momento en que Estadística envió el lote a Admisión para su devolución.
+    fecha_envio_admision = models.DateTimeField(null=True, blank=True)
 
     # Captura por Estadística (quién y cuándo tomó los expedientes).
     usuario_estadistica = models.ForeignKey(

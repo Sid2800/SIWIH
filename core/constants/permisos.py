@@ -406,3 +406,7 @@ MAPEO_CAMAS_DASHBOARD_UNIDADES = ["ADMI"]
 #      tiene_unidades_config, no un servicio propio).
 EGRESOS_VISUALIZACION_ROLES = ["admin", "digitador", "directivo"]
 EGRESOS_VISUALIZACION_UNIDADES = ["EST"]   # Estadística
+
+# Recepción/devolución del lote y cierre: lo hace Admisión (unidad 'ADMI').
+EGRESOS_ADMISION_ROLES = ["admin", "digitador", "directivo"]
+EGRESOS_ADMISION_UNIDADES = ["ADMI"]       # Admisión

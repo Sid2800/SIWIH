@@ -85,8 +85,58 @@ function loteHtml(lote, detallesVisibles) {
                 </div>
             </header>
             <ul class="listbox sin-margen">${filas}</ul>
+            <footer class="egresos-lote__pie">
+                <button type="button" class="formularioBotones-boton egresos-btn-enviar"
+                        data-lote="${lote.lote_id}" data-total="${lote.total}"
+                        data-completados="${lote.completados}">
+                    <i class="bi bi-send-check"></i> Enviar lote a Admisión
+                </button>
+            </footer>
         </section>`;
 }
+
+// Estadística envía el lote a Admisión (aunque falten algunos por llenar).
+$(document).on('click', '.egresos-btn-enviar', function () {
+    const loteId = $(this).data('lote');
+    const total = $(this).data('total');
+    const completados = $(this).data('completados');
+    const faltan = total - completados;
+    const aviso = faltan > 0
+        ? `<div class="egresos-aviso-faltan">Faltan <strong>${faltan}</strong> egreso(s) por llenar. Se enviarán de todos modos.</div>`
+        : '';
+    Swal.fire({
+        title: `¿Enviar lote #${loteId} a Admisión?`,
+        html: `Admisión revisará la lista y recibirá los expedientes.${aviso}`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: '<i class="bi bi-send-check"></i> Sí, enviar',
+        cancelButtonText: '<i class="bi bi-x-circle-fill"></i> Cancelar',
+        customClass: {
+            popup: 'contenedor-modal',
+            title: 'contener-modal-titulo',
+            confirmButton: 'contener-modal-boton-confirmar',
+            cancelButton: 'contener-modal-boton-cancelar',
+        },
+        didOpen: () => {
+            const a = document.querySelector('.swal2-actions');
+            if (a) a.classList.add('contener-modal-contenedor-botones');
+        }
+    }).then(function (result) {
+        if (!result.isConfirmed) return;
+        $.ajax({
+            url: window.urls.egresos_enviar_lote_admision_api.replace(/\/0\/$/, '/' + loteId + '/'),
+            method: 'POST',
+            headers: { 'X-CSRFToken': window.CSRF_TOKEN },
+        }).done(function (resp) {
+            if (!resp.success) return;
+            toastr.success(`Lote #${loteId} enviado a Admisión.`);
+            cargarPendientes();
+        }).fail(function (xhr) {
+            const err = xhr.responseJSON ? xhr.responseJSON.error : 'No se pudo enviar el lote';
+            toastr.error(err);
+        });
+    });
+});
 
 function pintar() {
     const bloques = [];

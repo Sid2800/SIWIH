@@ -192,6 +192,15 @@
             </li>
             {% endif %}
 
+            {% if request.user|tiene_unidades_config:"EGRESOS_ADMISION_UNIDADES" %}
+            <li>
+               <a href="{% url 'egresos_recepcion' %}" class="bn-navegacion__enlace">
+                  <i class="bi bi-box-arrow-in-left bn-navegacion-enlace__logo"></i>
+                  <span class="bn-navegacion-enlace__texto">Egresos: Recepción</span>
+               </a>
+            </li>
+            {% endif %}
+
 
 
             <li>
@@ -529,6 +538,11 @@
          egresos_areas_api: "{% url 'egresos_areas_api' %}",
          egresos_buscar_cie10_api: "{% url 'egresos_buscar_cie10_api' %}",
          egresos_buscar_procedimiento_api: "{% url 'egresos_buscar_procedimiento_api' %}",
+         egresos_recepcion: "{% url 'egresos_recepcion' %}",
+         egresos_lotes_para_recepcion_api: "{% url 'egresos_lotes_para_recepcion_api' %}",
+         egresos_enviar_lote_admision_api: "{% url 'egresos_enviar_lote_admision_api' 0 %}",
+         egresos_marcar_devuelto_api: "{% url 'egresos_marcar_devuelto_api' 0 %}",
+         egresos_cerrar_lote_api: "{% url 'egresos_cerrar_lote_api' 0 %}",
          s_exp_crear_solicitud_api: "{% url 's_exp_crear_solicitud_api' %}",
          s_exp_mis_solicitudes_api: "{% url 's_exp_mis_solicitudes_api' %}",
          s_exp_solicitar_devolucion_api: "{% url 's_exp_solicitar_devolucion_api' %}",

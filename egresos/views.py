@@ -29,12 +29,14 @@ from egresos.models import (
     LoteEgreso, LoteEgresoDetalle,
     AreaEgreso, Procedimiento, Egreso, EgresoDiagnostico,
 )
-from egresos.services.movimiento import mover_a_estadistica
+from egresos.services.movimiento import mover_a_estadistica, devolver_a_admision
 
+from django.utils import timezone
 from core.mixins import UnidadRolRequiredMixin
 from usuario.permisos import verificar_permisos_usuario
 from core.constants.permisos import (
     EGRESOS_VISUALIZACION_ROLES, EGRESOS_VISUALIZACION_UNIDADES,
+    EGRESOS_ADMISION_ROLES, EGRESOS_ADMISION_UNIDADES,
 )
 from core.utils.utilidades_logging import log_error, log_info
 from core.constants.domain_constants import LogApp
@@ -48,6 +50,12 @@ from core.constants.domain_constants import LogApp
 def _tiene_permiso_egresos(user):
     return verificar_permisos_usuario(
         user, EGRESOS_VISUALIZACION_ROLES, EGRESOS_VISUALIZACION_UNIDADES
+    )
+
+
+def _tiene_permiso_admision(user):
+    return verificar_permisos_usuario(
+        user, EGRESOS_ADMISION_ROLES, EGRESOS_ADMISION_UNIDADES
     )
 
 
@@ -598,3 +606,188 @@ def buscar_procedimiento_api(request):
         'id', 'codigo', 'descripcion'
     ).first()
     return JsonResponse({"data": proc})
+
+
+# =============================================================================
+# DEVOLUCIÓN / RECEPCIÓN DEL LOTE (Fase 4)
+#   - Estadística ENVÍA el lote a Admisión (cuando terminó o casi).
+#   - Admisión revisa la lista, marca los que regresaron (cambia su ubicación a
+#     ADMISIÓN) y, cuando están todos, CIERRA el lote con su fecha de captura.
+# =============================================================================
+@csrf_protect
+@require_POST
+def enviar_lote_admision_api(request, lote_id):
+    """Estadística envía el lote a Admisión para su devolución/revisión."""
+    if not _tiene_permiso_egresos(request.user):
+        return JsonResponse({"error": "Sin permisos"}, status=403)
+
+    lote = get_object_or_404(LoteEgreso, id=lote_id)
+    if lote.estado != LoteEgreso.ABIERTO:
+        return JsonResponse(
+            {"error": "El lote ya fue enviado o está cerrado"}, status=400
+        )
+    if not lote.detalles.exists():
+        return JsonResponse({"error": "El lote no tiene expedientes"}, status=400)
+
+    try:
+        lote.estado = LoteEgreso.EN_REVISION
+        lote.fecha_envio_admision = timezone.now()
+        lote.save(update_fields=['estado', 'fecha_envio_admision'])
+
+        log_info(
+            f"Lote de egresos #{lote.id} enviado a Admisión por {request.user.username}",
+            app=LogApp.EGRESOS,
+        )
+        return JsonResponse({"success": True, "lote_id": lote.id})
+    except Exception as e:
+        log_error(f"Error en enviar_lote_admision_api ({lote_id}): {e}", app=LogApp.EGRESOS)
+        return JsonResponse({"error": "Error interno del servidor"}, status=500)
+
+
+class RecepcionEgresosView(UnidadRolRequiredMixin, TemplateView):
+    """Admisión recibe los lotes enviados, marca devoluciones y cierra."""
+    template_name = 'egresos/recepcion.html'
+    required_roles = EGRESOS_ADMISION_ROLES
+    required_unidades = EGRESOS_ADMISION_UNIDADES
+
+
+@require_GET
+def lotes_para_recepcion_api(request):
+    """Lotes enviados a Admisión (EN_REVISIÓN) con el detalle de cada expediente."""
+    if not _tiene_permiso_admision(request.user):
+        return JsonResponse({"error": "Sin permisos"}, status=403)
+
+    try:
+        lotes = (
+            LoteEgreso.objects
+            .filter(estado=LoteEgreso.EN_REVISION)
+            .prefetch_related(
+                'detalles__expediente', 'detalles__paciente', 'detalles__egreso',
+            )
+            .order_by('fecha_envio_admision')
+        )
+
+        data = []
+        for lote in lotes:
+            detalles = []
+            for d in lote.detalles.all():
+                pac = d.paciente
+                detalles.append({
+                    "detalle_id": d.id,
+                    "numero_expediente": d.expediente.numero if d.expediente_id else None,
+                    "identidad": DatosPaciente.dni(pac) if pac else '',
+                    "nombre": DatosPaciente.nombre_completo(pac) if pac else '',
+                    "devuelto": d.estado == LoteEgresoDetalle.DEVUELTO,
+                    "con_egreso": hasattr(d, 'egreso') and d.egreso is not None,
+                    "comentario": d.comentario or '',
+                })
+            total = len(detalles)
+            devueltos = sum(1 for d in detalles if d["devuelto"])
+            data.append({
+                "lote_id": lote.id,
+                "fecha_captura": lote.fecha_captura_estadistica.date().isoformat(),
+                "fecha_envio": (lote.fecha_envio_admision.date().isoformat()
+                                if lote.fecha_envio_admision else ''),
+                "responsable": (lote.usuario_estadistica.get_full_name()
+                                or lote.usuario_estadistica.username),
+                "observaciones": lote.observaciones or '',
+                "total": total,
+                "devueltos": devueltos,
+                "todos_devueltos": total > 0 and devueltos == total,
+                "detalles": detalles,
+            })
+
+        return JsonResponse({"data": data, "total": len(data)})
+    except Exception as e:
+        log_error(f"Error en lotes_para_recepcion_api: {e}", app=LogApp.EGRESOS)
+        return JsonResponse({"error": "Error interno del servidor"}, status=500)
+
+
+@csrf_protect
+@require_POST
+def marcar_devuelto_api(request, detalle_id):
+    """
+    Admisión marca (o desmarca) un expediente como devuelto. Al marcarlo, el
+    expediente vuelve a ADMISIÓN y queda DISPONIBLE; al desmarcarlo, regresa a
+    Estadística (prestado).
+    """
+    if not _tiene_permiso_admision(request.user):
+        return JsonResponse({"error": "Sin permisos"}, status=403)
+
+    try:
+        body = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Datos inválidos"}, status=400)
+
+    detalle = get_object_or_404(
+        LoteEgresoDetalle.objects.select_related('lote', 'expediente'), id=detalle_id
+    )
+    if detalle.lote.estado != LoteEgreso.EN_REVISION:
+        return JsonResponse(
+            {"error": "El lote no está en revisión"}, status=400
+        )
+
+    devuelto = _tribool(body.get('devuelto'))
+    comentario = (body.get('comentario') or '').strip() or None
+
+    try:
+        with transaction.atomic():
+            if devuelto:
+                detalle.estado = LoteEgresoDetalle.DEVUELTO
+                detalle.fecha_devolucion = timezone.now()
+                if detalle.expediente_id:
+                    devolver_a_admision(detalle.expediente, request.user)
+            else:
+                detalle.estado = LoteEgresoDetalle.PRESTADO
+                detalle.fecha_devolucion = None
+                if detalle.expediente_id:
+                    mover_a_estadistica(detalle.expediente, request.user)
+            detalle.comentario = comentario
+            detalle.save(update_fields=['estado', 'fecha_devolucion', 'comentario'])
+
+        return JsonResponse({
+            "success": True,
+            "detalle_id": detalle.id,
+            "devuelto": detalle.estado == LoteEgresoDetalle.DEVUELTO,
+        })
+    except Exception as e:
+        log_error(f"Error en marcar_devuelto_api ({detalle_id}): {e}", app=LogApp.EGRESOS)
+        return JsonResponse({"error": "Error interno del servidor"}, status=500)
+
+
+@csrf_protect
+@require_POST
+def cerrar_lote_api(request, lote_id):
+    """
+    Admisión cierra el lote: solo cuando TODOS los expedientes fueron devueltos.
+    Registra quién y cuándo lo recibió.
+    """
+    if not _tiene_permiso_admision(request.user):
+        return JsonResponse({"error": "Sin permisos"}, status=403)
+
+    lote = get_object_or_404(
+        LoteEgreso.objects.prefetch_related('detalles'), id=lote_id
+    )
+    if lote.estado != LoteEgreso.EN_REVISION:
+        return JsonResponse({"error": "El lote no está en revisión"}, status=400)
+
+    pendientes = lote.detalles.exclude(estado=LoteEgresoDetalle.DEVUELTO).count()
+    if pendientes:
+        return JsonResponse(
+            {"error": f"Faltan {pendientes} expediente(s) por devolver"}, status=400
+        )
+
+    try:
+        lote.estado = LoteEgreso.CERRADO
+        lote.usuario_admision = request.user
+        lote.fecha_captura_admision = timezone.now()
+        lote.save(update_fields=['estado', 'usuario_admision', 'fecha_captura_admision'])
+
+        log_info(
+            f"Lote de egresos #{lote.id} cerrado por Admisión ({request.user.username})",
+            app=LogApp.EGRESOS,
+        )
+        return JsonResponse({"success": True, "lote_id": lote.id})
+    except Exception as e:
+        log_error(f"Error en cerrar_lote_api ({lote_id}): {e}", app=LogApp.EGRESOS)
+        return JsonResponse({"error": "Error interno del servidor"}, status=500)
