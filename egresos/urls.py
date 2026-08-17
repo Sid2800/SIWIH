@@ -30,6 +30,10 @@ urlpatterns = [
     path('api/buscar-cie10/', views.buscar_cie10_api, name='egresos_buscar_cie10_api'),
     path('api/buscar-procedimiento/', views.buscar_procedimiento_api,
          name='egresos_buscar_procedimiento_api'),
+    path('api/servicios/', views.servicios_api, name='egresos_servicios_api'),
+    path('api/salas/', views.salas_api, name='egresos_salas_api'),
+    path('api/buscar-institucion/', views.buscar_institucion_api,
+         name='egresos_buscar_institucion_api'),
 
     # --- Devolución / recepción del lote (Estadística envía; Admisión recibe) ---
     path('api/enviar-lote-admision/<int:lote_id>/', views.enviar_lote_admision_api,

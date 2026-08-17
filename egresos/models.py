@@ -27,7 +27,7 @@ from clinico.models import CIE10
 from paciente.models import Paciente
 from expediente.models import Expediente
 from ingreso.models import Ingreso
-from servicio.models import Servicio
+from servicio.models import Servicio, Sala, Institucion_salud
 
 
 # =============================================================================
@@ -292,6 +292,62 @@ class Egreso(models.Model):
         verbose_name='Institución de la referencia'
     )
 
+    # ---- Accidente o violencia (listas fijas del HC-13; texto libre) ----
+    causa_accidente = models.CharField(
+        max_length=120, blank=True, null=True,
+        verbose_name='Causa de accidente o violencia'
+    )
+    lugar_accidente = models.CharField(
+        max_length=120, blank=True, null=True,
+        verbose_name='Lugar de accidente o violencia'
+    )
+
+    # ---- Egreso de: servicio, sala y hora (la fecha va en fecha_egreso) ----
+    egreso_servicio = models.ForeignKey(
+        Servicio, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='egresos_por_servicio', verbose_name='Egreso de (servicio)'
+    )
+    egreso_sala = models.ForeignKey(
+        Sala, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='egresos_por_sala', verbose_name='Egreso de (sala)'
+    )
+    hora_egreso = models.TimeField(null=True, blank=True, verbose_name='Hora de egreso')
+
+    # ---- Condición y razón de egreso (número según leyenda del HC-13) ----
+    condicion_egreso_num = models.PositiveSmallIntegerField(
+        null=True, blank=True, verbose_name='Condición de egreso (número)'
+    )
+    razon_egreso_num = models.PositiveSmallIntegerField(
+        null=True, blank=True, verbose_name='Razón de egreso (número)'
+    )
+
+    # ---- Referido a (institución de salud) y autopsia ----
+    referido_institucion = models.ForeignKey(
+        Institucion_salud, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='egresos_referidos', verbose_name='Referido a (institución)'
+    )
+    autopsia = models.BooleanField(default=False, verbose_name='¿Autopsia?')
+
+    # ---- Bloque obstétrico (parto/aborto y datos del embarazo) ----
+    parto_o_aborto = models.CharField(
+        max_length=6, blank=True, null=True,
+        choices=[('PARTO', 'Parto'), ('ABORTO', 'Aborto')]
+    )
+    numero_embarazo = models.PositiveSmallIntegerField(
+        null=True, blank=True, verbose_name='Número de embarazo (incluyendo este)'
+    )
+    periodo_gestacional_semanas = models.PositiveSmallIntegerField(
+        null=True, blank=True, verbose_name='Período gestacional (semanas)'
+    )
+    total_consultas_prenatales = models.PositiveSmallIntegerField(
+        null=True, blank=True, verbose_name='Total de consultas prenatales'
+    )
+    # Etiquetas del personal que atendió el parto, separadas por coma.
+    personal_atendio_parto = models.CharField(
+        max_length=200, blank=True, null=True,
+        verbose_name='Personal que atendió el parto'
+    )
+
     # ---- Solo áreas de observación (OA/OP) ----
     epicrisis = models.BooleanField(
         null=True, blank=True, verbose_name='¿Tiene epicrisis? (Sí/No)'
@@ -384,3 +440,66 @@ class EgresoDiagnostico(models.Model):
     def __str__(self):
         cod = self.cie10.codigo if self.cie10 else '(sin código)'
         return f'{self.get_tipo_display()} — {cod}'
+
+
+class ProcedimientoQuirurgico(models.Model):
+    """
+    Procedimiento quirúrgico de un egreso (varios por egreso). Lleva la fecha
+    realizada separada en día/mes/año y un código.
+
+    NOTA: el catálogo de códigos de procedimiento aún no se ha cargado; por eso
+    el código y la descripción son texto por ahora (a futuro se enlazará a la
+    tabla del catálogo).
+    """
+    egreso = models.ForeignKey(
+        Egreso, on_delete=models.CASCADE, related_name='procedimientos_quirurgicos'
+    )
+    orden = models.PositiveSmallIntegerField(default=1)
+    dia = models.PositiveSmallIntegerField(null=True, blank=True)
+    mes = models.PositiveSmallIntegerField(null=True, blank=True)
+    anio = models.PositiveSmallIntegerField(null=True, blank=True)
+    codigo = models.CharField(max_length=20, blank=True, null=True, verbose_name='Código')
+    descripcion = models.CharField(max_length=200, blank=True, null=True)
+
+    class Meta:
+        db_table = 'egresos_proc_quirurgico'
+        verbose_name = 'Procedimiento Quirúrgico'
+        verbose_name_plural = 'Procedimientos Quirúrgicos'
+        ordering = ['egreso', 'orden']
+
+    def __str__(self):
+        return f'Egreso #{self.egreso_id} — Proc {self.orden}'
+
+
+class ProductoEmbarazo(models.Model):
+    """
+    Un producto del embarazo (recién nacido) en el bloque obstétrico del egreso.
+    Varios por egreso (parto múltiple). Datos: sexo, condición (vivo/muerto) y
+    peso al nacer en gramos.
+    """
+    SEXO_HOMBRE = 'H'
+    SEXO_MUJER = 'M'
+    SEXOS = [(SEXO_HOMBRE, 'Hombre'), (SEXO_MUJER, 'Mujer')]
+
+    COND_VIVO = 'V'
+    COND_MUERTO = 'M'
+    CONDICIONES = [(COND_VIVO, 'Vivo'), (COND_MUERTO, 'Muerto')]
+
+    egreso = models.ForeignKey(
+        Egreso, on_delete=models.CASCADE, related_name='productos_embarazo'
+    )
+    numero = models.PositiveSmallIntegerField(default=1)
+    sexo = models.CharField(max_length=1, choices=SEXOS, blank=True, null=True)
+    condicion = models.CharField(max_length=1, choices=CONDICIONES, blank=True, null=True)
+    peso_gramos = models.PositiveIntegerField(
+        null=True, blank=True, verbose_name='Peso al nacer (gramos)'
+    )
+
+    class Meta:
+        db_table = 'egresos_producto_embarazo'
+        verbose_name = 'Producto del Embarazo'
+        verbose_name_plural = 'Productos del Embarazo'
+        ordering = ['egreso', 'numero']
+
+    def __str__(self):
+        return f'Egreso #{self.egreso_id} — Producto {self.numero}'

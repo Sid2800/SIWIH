@@ -30,7 +30,10 @@ from s_exp.services.datos_solicitud import DatosPaciente
 from egresos.models import (
     LoteEgreso, LoteEgresoDetalle,
     AreaEgreso, Procedimiento, Egreso, EgresoDiagnostico,
+    ProcedimientoQuirurgico, ProductoEmbarazo,
 )
+from egresos import catalogos
+from servicio.models import Servicio, Sala, Institucion_salud
 from egresos.services.movimiento import mover_a_estadistica, devolver_a_admision
 
 from django.utils import timezone
@@ -314,6 +317,12 @@ class EgresoFormView(UnidadRolRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx['detalle_id'] = kwargs.get('detalle_id')
+        # Listas fijas del HC-13 para el formulario.
+        ctx['causas_accidente'] = catalogos.CAUSAS_ACCIDENTE
+        ctx['lugares_accidente'] = catalogos.LUGARES_ACCIDENTE
+        ctx['condiciones_egreso'] = catalogos.CONDICIONES_EGRESO
+        ctx['razones_egreso'] = catalogos.RAZONES_EGRESO
+        ctx['personal_parto'] = catalogos.PERSONAL_PARTO
         return ctx
 
 
@@ -362,6 +371,18 @@ def _parse_fecha(valor):
         return datetime.strptime(valor, '%Y-%m-%d').date()
     except (ValueError, TypeError):
         return None
+
+
+def _parse_hora(valor):
+    """'HH:MM' (o 'HH:MM:SS') -> time, o None."""
+    if not valor:
+        return None
+    for fmt in ('%H:%M', '%H:%M:%S'):
+        try:
+            return datetime.strptime(valor, fmt).time()
+        except (ValueError, TypeError):
+            pass
+    return None
 
 
 def _tribool(valor):
@@ -459,7 +480,9 @@ def datos_llenado_api(request, detalle_id):
         pac = detalle.paciente
         ing = _ingreso_de_paciente(pac.id if pac else None)
 
-        fecha_ing = ing.fecha_ingreso.date() if (ing and ing.fecha_ingreso) else None
+        # Fecha/hora de ingreso en hora local (evita el desfase UTC al mostrar).
+        ing_local = timezone.localtime(ing.fecha_ingreso) if (ing and ing.fecha_ingreso) else None
+        fecha_ing = ing_local.date() if ing_local else None
         hoy = date.today()
 
         # Sexo del paciente (H/M); 'N' u otro se deja en blanco para que elija.
@@ -473,11 +496,24 @@ def datos_llenado_api(request, detalle_id):
             "sexo": sexo,
             "edad": _edad(getattr(pac, 'fecha_nacimiento', None),
                           fecha_ing or hoy) if pac else None,
+            "fecha_nacimiento": (pac.fecha_nacimiento.isoformat()
+                                 if pac and pac.fecha_nacimiento else ''),
+            "telefono": (getattr(pac, 'telefono', '') or '') if pac else '',
+            "estado_civil": (str(pac.estado_civil)
+                             if pac and getattr(pac, 'estado_civil_id', None) else ''),
+            "ocupacion": (str(pac.ocupacion)
+                          if pac and getattr(pac, 'ocupacion_id', None) else ''),
         }
+        # Datos de ingreso: SOLO LECTURA (ya fueron registrados en Ingreso).
         ingreso = {
             "id": ing.id if ing else None,
             "fecha_ingreso": fecha_ing.isoformat() if fecha_ing else '',
+            "hora_ingreso": ing_local.strftime('%H:%M') if ing_local else '',
+            "servicio": (ing.sala.servicio.nombre_servicio
+                         if ing and ing.sala_id and ing.sala.servicio_id else ''),
+            "sala": (ing.sala.nombre_sala if ing and ing.sala_id else ''),
             "area_ingreso": str(ing.sala) if (ing and ing.sala_id) else '',
+            "cama": str(ing.cama) if (ing and ing.cama_id) else '',
         }
 
         # Egreso existente (edición).
@@ -490,6 +526,7 @@ def datos_llenado_api(request, detalle_id):
                 "numero": eg.numero,
                 "pagina": eg.pagina or '',
                 "fecha_egreso": eg.fecha_egreso.isoformat() if eg.fecha_egreso else '',
+                "hora_egreso": eg.hora_egreso.strftime('%H:%M') if eg.hora_egreso else '',
                 "fecha_ingreso": eg.fecha_ingreso.isoformat() if eg.fecha_ingreso else '',
                 "edad": eg.edad,
                 "procedencia": eg.procedencia or '',
@@ -500,6 +537,25 @@ def datos_llenado_api(request, detalle_id):
                 "operacion_descripcion": eg.operacion.descripcion if eg.operacion_id else '',
                 "tipo_referencia": eg.tipo_referencia or '',
                 "referencia_texto": eg.referencia_texto or '',
+                "causa_accidente": eg.causa_accidente or '',
+                "lugar_accidente": eg.lugar_accidente or '',
+                "egreso_servicio_id": eg.egreso_servicio_id,
+                "egreso_servicio_nombre": (eg.egreso_servicio.nombre_servicio
+                                           if eg.egreso_servicio_id else ''),
+                "egreso_sala_id": eg.egreso_sala_id,
+                "egreso_sala_nombre": (eg.egreso_sala.nombre_sala
+                                       if eg.egreso_sala_id else ''),
+                "condicion_egreso_num": eg.condicion_egreso_num,
+                "razon_egreso_num": eg.razon_egreso_num,
+                "referido_institucion_id": eg.referido_institucion_id,
+                "referido_institucion_nombre": (eg.referido_institucion.nombre_institucion_salud
+                                                if eg.referido_institucion_id else ''),
+                "autopsia": eg.autopsia,
+                "parto_o_aborto": eg.parto_o_aborto or '',
+                "numero_embarazo": eg.numero_embarazo,
+                "periodo_gestacional_semanas": eg.periodo_gestacional_semanas,
+                "total_consultas_prenatales": eg.total_consultas_prenatales,
+                "personal_atendio_parto": eg.personal_atendio_parto or '',
                 "epicrisis": eg.epicrisis,
                 "deberia_ir_sala": eg.deberia_ir_sala,
                 "en_censo": eg.en_censo,
@@ -513,6 +569,20 @@ def datos_llenado_api(request, detalle_id):
                             dg.cie10.descripcion if dg.cie10_id else ''),
                     }
                     for dg in eg.diagnosticos.all().order_by('tipo', 'orden')
+                ],
+                "procedimientos_quirurgicos": [
+                    {
+                        "orden": pq.orden, "dia": pq.dia, "mes": pq.mes, "anio": pq.anio,
+                        "codigo": pq.codigo or '', "descripcion": pq.descripcion or '',
+                    }
+                    for pq in eg.procedimientos_quirurgicos.all().order_by('orden')
+                ],
+                "productos_embarazo": [
+                    {
+                        "numero": pe.numero, "sexo": pe.sexo or '',
+                        "condicion": pe.condicion or '', "peso_gramos": pe.peso_gramos,
+                    }
+                    for pe in eg.productos_embarazo.all().order_by('numero')
                 ],
             }
 
@@ -608,6 +678,21 @@ def guardar_egreso_api(request, detalle_id):
             eg.operacion = operacion
             eg.tipo_referencia = (body.get('tipo_referencia') or '').strip() or None
             eg.referencia_texto = (body.get('referencia_texto') or '').strip() or None
+            # --- Campos HC-13 ---
+            eg.causa_accidente = (body.get('causa_accidente') or '').strip() or None
+            eg.lugar_accidente = (body.get('lugar_accidente') or '').strip() or None
+            eg.egreso_servicio_id = _entero(body.get('egreso_servicio_id'))
+            eg.egreso_sala_id = _entero(body.get('egreso_sala_id'))
+            eg.hora_egreso = _parse_hora(body.get('hora_egreso'))
+            eg.condicion_egreso_num = _entero(body.get('condicion_egreso_num'))
+            eg.razon_egreso_num = _entero(body.get('razon_egreso_num'))
+            eg.referido_institucion_id = _entero(body.get('referido_institucion_id'))
+            eg.autopsia = bool(_tribool(body.get('autopsia')))
+            eg.parto_o_aborto = (body.get('parto_o_aborto') or '').strip() or None
+            eg.numero_embarazo = _entero(body.get('numero_embarazo'))
+            eg.periodo_gestacional_semanas = _entero(body.get('periodo_gestacional_semanas'))
+            eg.total_consultas_prenatales = _entero(body.get('total_consultas_prenatales'))
+            eg.personal_atendio_parto = (body.get('personal_atendio_parto') or '').strip() or None
             eg.epicrisis = _tribool(body.get('epicrisis'))
             eg.deberia_ir_sala = _tribool(body.get('deberia_ir_sala'))
             eg.en_censo = bool(_tribool(body.get('en_censo')))
@@ -630,6 +715,36 @@ def guardar_egreso_api(request, detalle_id):
                     cie10=cie10,
                     descripcion=descripcion or (cie10.descripcion if cie10 else None),
                 )
+
+            # Procedimientos quirúrgicos (se reemplazan por completo).
+            eg.procedimientos_quirurgicos.all().delete()
+            orden_pq = 1
+            for pq in (body.get('procedimientos_quirurgicos') or []):
+                codigo = (pq.get('codigo') or '').strip()
+                desc = (pq.get('descripcion') or '').strip()
+                dia, mes, anio = _entero(pq.get('dia')), _entero(pq.get('mes')), _entero(pq.get('anio'))
+                if not (codigo or desc or dia or mes or anio):
+                    continue
+                ProcedimientoQuirurgico.objects.create(
+                    egreso=eg, orden=orden_pq, dia=dia, mes=mes, anio=anio,
+                    codigo=codigo or None, descripcion=desc or None,
+                )
+                orden_pq += 1
+
+            # Productos del embarazo (se reemplazan por completo).
+            eg.productos_embarazo.all().delete()
+            num_pe = 1
+            for pe in (body.get('productos_embarazo') or []):
+                sexo_pe = (pe.get('sexo') or '').strip()
+                cond_pe = (pe.get('condicion') or '').strip()
+                peso_pe = _entero(pe.get('peso_gramos'))
+                if not (sexo_pe or cond_pe or peso_pe):
+                    continue
+                ProductoEmbarazo.objects.create(
+                    egreso=eg, numero=num_pe, sexo=sexo_pe or None,
+                    condicion=cond_pe or None, peso_gramos=peso_pe,
+                )
+                num_pe += 1
 
         log_info(
             f"Egreso #{eg.id} guardado (detalle {detalle.id}) por {request.user.username}",
@@ -689,6 +804,49 @@ def buscar_procedimiento_api(request):
         'id', 'codigo', 'descripcion'
     ).first()
     return JsonResponse({"data": proc})
+
+
+@require_GET
+def servicios_api(request):
+    """Servicios activos para el combobox 'Egreso de'."""
+    if not _tiene_permiso_egresos(request.user):
+        return JsonResponse({"error": "Sin permisos"}, status=403)
+    from core.constants.choices_constants import EstadoRegistro
+    servicios = (
+        Servicio.objects.filter(estado=EstadoRegistro.ACTIVO)
+        .values('id', 'nombre_servicio').order_by('nombre_servicio')
+    )
+    return JsonResponse({"data": list(servicios)})
+
+
+@require_GET
+def salas_api(request):
+    """Salas activas de un servicio (para 'Egreso de')."""
+    if not _tiene_permiso_egresos(request.user):
+        return JsonResponse({"error": "Sin permisos"}, status=403)
+    from core.constants.choices_constants import EstadoRegistro
+    servicio_id = _entero(request.GET.get('servicio_id'))
+    qs = Sala.objects.filter(estado=EstadoRegistro.ACTIVO)
+    if servicio_id:
+        qs = qs.filter(servicio_id=servicio_id)
+    salas = qs.values('id', 'nombre_sala', 'servicio_id').order_by('nombre_sala')
+    return JsonResponse({"data": list(salas)})
+
+
+@require_GET
+def buscar_institucion_api(request):
+    """Búsqueda de instituciones de salud (para 'Referido a')."""
+    if not _tiene_permiso_egresos(request.user):
+        return JsonResponse({"error": "Sin permisos"}, status=403)
+    q = (request.GET.get('q') or '').strip()
+    if len(q) < 2:
+        return JsonResponse({"data": []})
+    instituciones = (
+        Institucion_salud.objects
+        .filter(nombre_institucion_salud__icontains=q)
+        .values('id', 'nombre_institucion_salud', 'codigo_sesal')[:20]
+    )
+    return JsonResponse({"data": list(instituciones)})
 
 
 # =============================================================================
