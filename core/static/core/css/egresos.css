@@ -11,6 +11,41 @@
     justify-content: flex-start;
 }
 
+/* ------------------------------------------------------------
+   Pestañas del módulo (Captura · Llenado · Recepción). Hacen que
+   las tres pantallas se vean como UN solo módulo.
+   ------------------------------------------------------------ */
+.egresos-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    border-bottom: 2px solid var(--colorLinea);
+    margin-bottom: 1.4rem;
+}
+.egresos-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.6rem 1.2rem;
+    font-size: 1.35rem;
+    text-decoration: none;
+    color: var(--colorTablacelda);
+    border: 1px solid transparent;
+    border-bottom: none;
+    border-radius: 0.5rem 0.5rem 0 0;
+    margin-bottom: -2px;   /* que la pestaña activa tape la línea inferior */
+    opacity: 0.75;
+}
+.egresos-tab:hover { opacity: 1; background: var(--colorContendor); }
+.egresos-tab--activa {
+    opacity: 1;
+    font-weight: 700;
+    color: var(--colorBoton);
+    background: var(--colorContendor);
+    border-color: var(--colorLinea);
+    border-bottom: 2px solid var(--colorContendor);
+}
+
 /* Aviso informativo (block: nunca flex, o cada <strong> se parte en columnas). */
 .egresos-ayuda {
     margin: 0 0 1rem 0;

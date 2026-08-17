@@ -114,6 +114,15 @@
                </li>
                {% endif %}
 
+               {% if request.user|tiene_unidades_config:"EGRESOS_VISUALIZACION_UNIDADES" or request.user|tiene_unidades_config:"EGRESOS_ADMISION_UNIDADES" %}
+               <li>
+                  <a href="{% url 'egresos_inicio' %}" class="bn-navegacion__enlace">
+                     <i class="bi bi-box-arrow-right bn-navegacion-enlace__logo"></i>
+                     <span class="bn-navegacion-enlace__texto">Egresos</span>
+                  </a>
+               </li>
+               {% endif %}
+
 
                {% if request.user|tiene_unidades_config:"MAPEO_CAMAS_VISUALIZACION_UNIDADES" %}
                <li>
@@ -176,31 +185,6 @@
                </a>
             </li>
             {% endif %}
-
-            {% if request.user|tiene_unidades_config:"EGRESOS_VISUALIZACION_UNIDADES" %}
-            <li>
-               <a href="{% url 'egresos_captura' %}" class="bn-navegacion__enlace">
-                  <i class="bi bi-box-arrow-in-down-right bn-navegacion-enlace__logo"></i>
-                  <span class="bn-navegacion-enlace__texto">Egresos: Captura</span>
-               </a>
-            </li>
-            <li>
-               <a href="{% url 'egresos_llenado' %}" class="bn-navegacion__enlace">
-                  <i class="bi bi-pencil-square bn-navegacion-enlace__logo"></i>
-                  <span class="bn-navegacion-enlace__texto">Egresos: Llenado</span>
-               </a>
-            </li>
-            {% endif %}
-
-            {% if request.user|tiene_unidades_config:"EGRESOS_ADMISION_UNIDADES" %}
-            <li>
-               <a href="{% url 'egresos_recepcion' %}" class="bn-navegacion__enlace">
-                  <i class="bi bi-box-arrow-in-left bn-navegacion-enlace__logo"></i>
-                  <span class="bn-navegacion-enlace__texto">Egresos: Recepción</span>
-               </a>
-            </li>
-            {% endif %}
-
 
 
             <li>

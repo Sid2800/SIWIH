@@ -1,0 +1,25 @@
+{% load permisos_unidad %}
+{% comment %}
+Barra de pestañas del módulo Egresos. Hace que Captura, Llenado y Recepción se
+vean y naveguen como UN solo módulo. Se incluye con el nombre de la pestaña
+activa, p. ej.:  {% include 'egresos/_tabs.html' with activo='captura' %}
+Las pestañas aparecen según el permiso (Estadística vs Admisión).
+{% endcomment %}
+<nav class="egresos-tabs">
+    {% if request.user|tiene_unidades_config:"EGRESOS_VISUALIZACION_UNIDADES" %}
+    <a href="{% url 'egresos_captura' %}"
+       class="egresos-tab{% if activo == 'captura' %} egresos-tab--activa{% endif %}">
+        <i class="bi bi-box-arrow-in-down-right"></i> Captura
+    </a>
+    <a href="{% url 'egresos_llenado' %}"
+       class="egresos-tab{% if activo == 'llenado' %} egresos-tab--activa{% endif %}">
+        <i class="bi bi-pencil-square"></i> Llenado
+    </a>
+    {% endif %}
+    {% if request.user|tiene_unidades_config:"EGRESOS_ADMISION_UNIDADES" %}
+    <a href="{% url 'egresos_recepcion' %}"
+       class="egresos-tab{% if activo == 'recepcion' %} egresos-tab--activa{% endif %}">
+        <i class="bi bi-box-arrow-in-left"></i> Recepción
+    </a>
+    {% endif %}
+</nav>

@@ -14,6 +14,7 @@ paciente y la fecha/área de ingreso vienen precargados; Estadística completa l
 propio del egreso. Los diagnósticos son ilimitados (código CIE10 + descripción).
 {% endcomment %}
 <div class="contenedor2 egresos-form-page">
+    {% include 'egresos/_tabs.html' with activo='llenado' %}
     <div class="tituloFormulario sexp-margin-bottom-15">
         <div class="tituloFormulario-texto">
             <i class="bi bi-clipboard-plus"></i>

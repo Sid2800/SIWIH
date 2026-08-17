@@ -2,6 +2,9 @@ from django.urls import path
 from egresos import views
 
 urlpatterns = [
+    # Entrada única del módulo (una sola opción de menú).
+    path('', views.EgresosInicioView.as_view(), name='egresos_inicio'),
+
     # --- Captura: Estadística toma expedientes desde los ingresos ---
     path('captura/', views.CapturaEgresosView.as_view(), name='egresos_captura'),
     path('api/ingresos-para-egreso/', views.ingresos_para_egreso_api,

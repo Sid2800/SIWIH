@@ -11,7 +11,9 @@ from datetime import date, datetime
 
 from django.db import transaction
 from django.http import JsonResponse
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, redirect
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.views import View
 from django.views.generic import TemplateView
 from django.views.decorators.http import require_GET, require_POST
 from django.views.decorators.csrf import csrf_protect
@@ -57,6 +59,20 @@ def _tiene_permiso_admision(user):
     return verificar_permisos_usuario(
         user, EGRESOS_ADMISION_ROLES, EGRESOS_ADMISION_UNIDADES
     )
+
+
+class EgresosInicioView(LoginRequiredMixin, View):
+    """
+    Punto de entrada único del módulo de Egresos (una sola opción de menú).
+    Redirige a la primera pantalla según el permiso del usuario: Estadística
+    entra por la Captura; Admisión (sin Estadística) por la Recepción.
+    """
+    def get(self, request, *args, **kwargs):
+        if _tiene_permiso_egresos(request.user):
+            return redirect('egresos_captura')
+        if _tiene_permiso_admision(request.user):
+            return redirect('egresos_recepcion')
+        return redirect('acceso_denegado')
 
 
 class CapturaEgresosView(UnidadRolRequiredMixin, TemplateView):
