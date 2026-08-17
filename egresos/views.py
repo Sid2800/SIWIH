@@ -318,6 +318,20 @@ class EgresoFormView(UnidadRolRequiredMixin, TemplateView):
 
 
 # ---- Helpers de llenado --------------------------------------------------
+def _ve_todos_los_lotes(user):
+    """
+    Staff con visión total (superusuario o usuario GLOBAL) ve TODOS los lotes;
+    el resto solo los que capturó cada quien.
+    """
+    from core.constants.choices_constants import AlcanceUsuario
+    from usuario.models import PerfilUnidad
+    if user.is_superuser:
+        return True
+    return PerfilUnidad.objects.filter(
+        usuario=user, alcance=AlcanceUsuario.GLOBAL
+    ).exists()
+
+
 def _edad(fecha_nac, referencia):
     """Edad en años cumplidos a la fecha de referencia (None si falta el dato)."""
     if not fecha_nac or not referencia:
@@ -385,6 +399,9 @@ def pendientes_llenado_api(request):
             )
             .order_by('-fecha_captura_estadistica')
         )
+        # Cada usuario llena lo que él capturó; staff/global ve todo.
+        if not _ve_todos_los_lotes(request.user):
+            lotes = lotes.filter(usuario_estadistica=request.user)
 
         data = []
         for lote in lotes:

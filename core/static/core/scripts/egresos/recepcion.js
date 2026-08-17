@@ -74,7 +74,7 @@ function loteHtml(lote, detallesVisibles) {
             <header class="egresos-lote__cab">
                 <div>
                     <strong>Lote #${lote.lote_id}</strong>
-                    <span class="egresos-lote__meta">Capturó ${esc(lote.responsable)} ·
+                    <span class="egresos-lote__meta">Solicitó: ${esc(lote.responsable)} ·
                         enviado ${lote.fecha_envio || lote.fecha_captura}</span>
                 </div>
                 <div class="egresos-lote__prog">
