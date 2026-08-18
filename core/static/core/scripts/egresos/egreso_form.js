@@ -1,19 +1,19 @@
 /**
  * Formulario de egreso (HC-13).
  *
- * Muestra los datos de ingreso (solo lectura) y deja completar la hoja de
- * hospitalización: diagnósticos de ingreso/egreso (CIE10, ilimitados), causa y
- * lugar de accidente, egreso de (servicio/sala + fecha y hora), procedimientos
- * quirúrgicos, condición/razón de egreso, referido a, autopsia y el bloque
- * obstétrico (productos del embarazo).
+ * Arriba, los datos de ingreso en solo lectura (incluyen edad y sexo del
+ * paciente). Debajo, lo que Estadística completa de la hoja: diagnósticos de
+ * ingreso/egreso (CIE10), causa/lugar de accidente, egreso de (servicio/sala +
+ * fecha y hora), procedimientos quirúrgicos, condición/razón de egreso, referido
+ * a, autopsia y los datos del producto del embarazo.
+ *
+ * El área del censo y el N.º correlativo NO se capturan aquí (van en el reporte
+ * Excel). Edad y sexo son datos del paciente y se muestran solo como referencia.
  */
-const _areasTipo = {};      // area_id -> 'CENSO' | 'OBSERVACION'
-
 $(document).ready(function () {
-    $.when(cargarAreas(), cargarServicios()).then(cargarDatos);
+    cargarServicios().then(cargarDatos);
 
     $('#eg-fecha-ingreso, #eg-fecha-egreso').on('change', calcularDias);
-    $('#eg-area').on('change', toggleObservacion);
     $('#eg-egr-servicio').on('change', function () { cargarSalas($(this).val()); });
 
     $('.egresos-btn-add').on('click', function () { agregarFilaDiag($(this).data('tipo'), {}); });
@@ -24,18 +24,6 @@ $(document).ready(function () {
 });
 
 // ---- Catálogos ----------------------------------------------------------
-function cargarAreas() {
-    return $.ajax({ url: window.urls.egresos_areas_api, method: 'GET' })
-        .then(function (resp) {
-            const $sel = $('#eg-area');
-            $sel.empty().append('<option value="">— Seleccione el área —</option>');
-            (resp.data || []).forEach(a => {
-                _areasTipo[a.id] = a.tipo;
-                $sel.append(`<option value="${a.id}">${a.nombre}</option>`);
-            });
-        });
-}
-
 function cargarServicios() {
     return $.ajax({ url: window.urls.egresos_servicios_api, method: 'GET' })
         .then(function (resp) {
@@ -84,10 +72,9 @@ function cargarDatos() {
             $('#eg-cama').val(ing.cama || '');
 
             const eg = resp.egreso;
-            if (eg) { prefillEgreso(eg, p, ing); }
-            else { nuevoEgreso(p, ing); }
+            if (eg) { prefillEgreso(eg, ing); }
+            else { nuevoEgreso(ing); }
             calcularDias();
-            toggleObservacion();
         })
         .fail(function (xhr) {
             const err = xhr.responseJSON ? xhr.responseJSON.error : 'No se pudieron cargar los datos';
@@ -95,23 +82,17 @@ function cargarDatos() {
         });
 }
 
-function nuevoEgreso(p, ing) {
+function nuevoEgreso(ing) {
     $('#eg-fecha-ingreso').val(ing.fecha_ingreso || '');
     $('#eg-fecha-egreso').val(hoyISO());
-    $('#eg-edad').val(p.edad != null ? p.edad : '');
-    $('#eg-sexo').val(p.sexo || '');
     $('#eg-autopsia').val('no');       // autopsia por defecto NO
     $('#eg-en-censo').prop('checked', true);
     agregarFilaDiag('INGRESO', {});
     agregarFilaDiag('EGRESO', {});
 }
 
-function prefillEgreso(eg, p, ing) {
-    $('#eg-area').val(eg.area_id || '');
-    $('#eg-numero').val(eg.numero || '');
+function prefillEgreso(eg, ing) {
     $('#eg-pagina').val(eg.pagina || '');
-    $('#eg-edad').val(eg.edad != null ? eg.edad : (p.edad != null ? p.edad : ''));
-    $('#eg-sexo').val(eg.sexo || p.sexo || '');
     $('#eg-causa').val(eg.causa_accidente || '');
     $('#eg-lugar').val(eg.lugar_accidente || '');
     $('#eg-egr-servicio').val(eg.egreso_servicio_id || '');
@@ -124,21 +105,8 @@ function prefillEgreso(eg, p, ing) {
     $('#eg-referido-id').val(eg.referido_institucion_id || '');
     $('#eg-referido').val(eg.referido_institucion_nombre || '');
     $('#eg-autopsia').val(eg.autopsia ? 'si' : 'no');
-    $('#eg-parto').val(eg.parto_o_aborto || '');
-    $('#eg-num-emb').val(eg.numero_embarazo != null ? eg.numero_embarazo : '');
-    $('#eg-gestacion').val(eg.periodo_gestacional_semanas != null ? eg.periodo_gestacional_semanas : '');
-    $('#eg-consultas').val(eg.total_consultas_prenatales != null ? eg.total_consultas_prenatales : '');
     $('#eg-en-censo').prop('checked', !!eg.en_censo);
     $('#eg-comentario').val(eg.comentario || '');
-    $('#eg-epicrisis').val(triStr(eg.epicrisis));
-    $('#eg-ir-sala').val(triStr(eg.deberia_ir_sala));
-    $('#eg-procedencia').val(eg.procedencia || '');
-
-    // Personal que atendió el parto (etiquetas separadas por coma).
-    const personal = (eg.personal_atendio_parto || '').split(',').map(s => s.trim());
-    $('.eg-personal').each(function () {
-        $(this).prop('checked', personal.indexOf($(this).val()) >= 0);
-    });
 
     // Diagnósticos.
     const diags = eg.diagnosticos || [];
@@ -160,11 +128,6 @@ function calcularDias() {
         const dias = Math.round((new Date(fe) - new Date(fi)) / 86400000);
         $('#eg-dias').val(isNaN(dias) ? '' : dias);
     } else { $('#eg-dias').val(''); }
-}
-
-function toggleObservacion() {
-    const tipo = _areasTipo[$('#eg-area').val()];
-    $('.egresos-solo-observacion').toggle(tipo === 'OBSERVACION');
 }
 
 // ---- Filas dinámicas ----------------------------------------------------
@@ -316,22 +279,11 @@ function recogerProductos() {
     return prods;
 }
 
-function recogerPersonal() {
-    const sel = [];
-    $('.eg-personal:checked').each(function () { sel.push($(this).val()); });
-    return sel.join(',');
-}
-
 function guardar() {
-    if (!$('#eg-area').val()) { toastr.warning('Seleccione el área del censo.'); return; }
     if (!$('#eg-fecha-egreso').val()) { toastr.warning('La fecha de egreso es obligatoria.'); return; }
 
     const payload = {
-        area_id: $('#eg-area').val(),
-        numero: $('#eg-numero').val() || null,
         pagina: $('#eg-pagina').val(),
-        edad: $('#eg-edad').val() || null,
-        sexo: $('#eg-sexo').val(),
         causa_accidente: $('#eg-causa').val(),
         lugar_accidente: $('#eg-lugar').val(),
         egreso_servicio_id: $('#eg-egr-servicio').val() || null,
@@ -343,14 +295,6 @@ function guardar() {
         razon_egreso_num: $('#eg-razon-num').val() || null,
         referido_institucion_id: $('#eg-referido-id').val() || null,
         autopsia: $('#eg-autopsia').val(),
-        parto_o_aborto: $('#eg-parto').val(),
-        numero_embarazo: $('#eg-num-emb').val() || null,
-        periodo_gestacional_semanas: $('#eg-gestacion').val() || null,
-        total_consultas_prenatales: $('#eg-consultas').val() || null,
-        personal_atendio_parto: recogerPersonal(),
-        epicrisis: $('#eg-epicrisis').val(),
-        deberia_ir_sala: $('#eg-ir-sala').val(),
-        procedencia: $('#eg-procedencia').val(),
         en_censo: $('#eg-en-censo').is(':checked') ? 'si' : 'no',
         comentario: $('#eg-comentario').val(),
         diagnosticos: recogerDiagnosticos(),
@@ -381,4 +325,3 @@ function hoyISO() {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
-function triStr(v) { return v === true ? 'si' : (v === false ? 'no' : ''); }

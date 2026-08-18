@@ -55,32 +55,12 @@ lectura). Debajo, lo que Estadística completa de la hoja de hospitalización.
             <input type="text" id="eg-cama" class="formularioCampo-text" disabled></div>
     </fieldset>
 
-    <!-- ============ CENSO ============ -->
+    <!-- ============ REGISTRO ============ -->
     <fieldset class="recepcionIngresoCampos">
-        <legend>Datos del censo</legend>
+        <legend>Registro</legend>
         <div class="formularioCampo">
-            <label for="eg-area">Área del censo <span class="egresos-req">*</span></label>
-            <select id="eg-area" class="formularioCampo-text"></select>
-        </div>
-        <div class="formularioCampo">
-            <label for="eg-numero">N.º (correlativo)</label>
-            <input type="number" min="1" id="eg-numero" class="formularioCampo-text" autocomplete="off">
-        </div>
-        <div class="formularioCampo">
-            <label for="eg-pagina">Página (libro)</label>
+            <label for="eg-pagina">Página (libro de Estadística)</label>
             <input type="text" id="eg-pagina" class="formularioCampo-text" maxlength="20" autocomplete="off">
-        </div>
-        <div class="formularioCampo">
-            <label for="eg-edad">Edad</label>
-            <input type="number" min="0" id="eg-edad" class="formularioCampo-text" autocomplete="off">
-        </div>
-        <div class="formularioCampo">
-            <label for="eg-sexo">Sexo</label>
-            <select id="eg-sexo" class="formularioCampo-text">
-                <option value="">—</option>
-                <option value="H">Hombre</option>
-                <option value="M">Mujer</option>
-            </select>
         </div>
     </fieldset>
 
@@ -207,68 +187,14 @@ lectura). Debajo, lo que Estadística completa de la hoja de hospitalización.
         </div>
     </fieldset>
 
-    <!-- ============ PRODUCTO DEL EMBARAZO (obstétrico) ============ -->
+    <!-- ============ DATOS DEL PRODUCTO DEL EMBARAZO ============ -->
     <fieldset class="recepcionIngresoCampos egresos-diag-fs">
         <legend>Datos del producto del embarazo</legend>
-        <div class="formularioCampo">
-            <label for="eg-parto">Parto o aborto</label>
-            <select id="eg-parto" class="formularioCampo-text">
-                <option value="">—</option>
-                <option value="PARTO">Parto</option>
-                <option value="ABORTO">Aborto</option>
-            </select>
-        </div>
-        <div class="formularioCampo">
-            <label for="eg-num-emb">N.º de embarazo (incl. este)</label>
-            <input type="number" min="1" id="eg-num-emb" class="formularioCampo-text" autocomplete="off">
-        </div>
-        <div class="formularioCampo">
-            <label for="eg-gestacion">Período gestacional (semanas)</label>
-            <input type="number" min="0" id="eg-gestacion" class="formularioCampo-text" autocomplete="off">
-        </div>
-        <div class="formularioCampo">
-            <label for="eg-consultas">Total consultas prenatales</label>
-            <input type="number" min="0" id="eg-consultas" class="formularioCampo-text" autocomplete="off">
-        </div>
-
-        <div class="formularioCampo egresos-form-ancho">
-            <label>Personal que atendió el parto</label>
-            <div class="egresos-personal">
-                {% for p in personal_parto %}
-                <label class="egresos-check-inline">
-                    <input type="checkbox" class="eg-personal" value="{{ p }}"> {{ p }}
-                </label>
-                {% endfor %}
-            </div>
-        </div>
-
         <div class="egresos-diag-grupo egresos-form-ancho">
-            <h4 class="sin-margen">Productos (recién nacidos)</h4>
             <div id="eg-prod-lista" class="egresos-diag-lista"></div>
             <button type="button" class="formularioBotones-boton" id="eg-prod-add">
                 <i class="bi bi-plus-circle"></i> Agregar producto
             </button>
-        </div>
-    </fieldset>
-
-    <!-- ============ OBSERVACIÓN (OA/OP) ============ -->
-    <fieldset class="recepcionIngresoCampos egresos-solo-observacion" style="display:none;">
-        <legend>Observación (OA/OP)</legend>
-        <div class="formularioCampo">
-            <label for="eg-epicrisis">¿Tiene epicrisis?</label>
-            <select id="eg-epicrisis" class="formularioCampo-text">
-                <option value="">—</option><option value="si">Sí</option><option value="no">No</option>
-            </select>
-        </div>
-        <div class="formularioCampo">
-            <label for="eg-ir-sala">¿Debería ir a sala?</label>
-            <select id="eg-ir-sala" class="formularioCampo-text">
-                <option value="">—</option><option value="si">Sí</option><option value="no">No</option>
-            </select>
-        </div>
-        <div class="formularioCampo egresos-form-ancho">
-            <label for="eg-procedencia">Procedencia</label>
-            <input type="text" id="eg-procedencia" class="formularioCampo-text" maxlength="200" autocomplete="off">
         </div>
     </fieldset>
 

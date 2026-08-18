@@ -626,12 +626,11 @@ def guardar_egreso_api(request, detalle_id):
     )
 
     # --- Validaciones mínimas ---
+    # El área NO se captura aquí (va en el reporte Excel); es opcional.
+    area = None
     area_id = _entero(body.get('area_id'))
-    if not area_id:
-        return JsonResponse({"error": "Seleccione el área del censo"}, status=400)
-    area = AreaEgreso.objects.filter(id=area_id, activo=True).first()
-    if not area:
-        return JsonResponse({"error": "El área seleccionada no es válida"}, status=400)
+    if area_id:
+        area = AreaEgreso.objects.filter(id=area_id, activo=True).first()
 
     fecha_egreso = _parse_fecha(body.get('fecha_egreso'))
     if not fecha_egreso:
@@ -670,9 +669,18 @@ def guardar_egreso_api(request, detalle_id):
             eg.pagina = (body.get('pagina') or '').strip() or None
             eg.fecha_egreso = fecha_egreso
             eg.fecha_ingreso = fecha_ingreso
-            eg.edad = _entero(body.get('edad'))
+            # Edad y sexo son datos del paciente (no se piden en la hoja): se
+            # derivan del paciente para que queden en el registro/reporte.
+            pac = detalle.paciente
+            if pac:
+                eg.edad = _edad(getattr(pac, 'fecha_nacimiento', None),
+                                fecha_ingreso or fecha_egreso)
+                sx = getattr(pac, 'sexo', None)
+                eg.sexo = sx if sx in (Egreso.SEXO_HOMBRE, Egreso.SEXO_MUJER) else None
+            else:
+                eg.edad = _entero(body.get('edad'))
+                eg.sexo = (body.get('sexo') or '').strip() or None
             eg.procedencia = (body.get('procedencia') or '').strip() or None
-            eg.sexo = (body.get('sexo') or '').strip() or None
             eg.condicion = (body.get('condicion') or '').strip() or None
             eg.peso_gramos = _entero(body.get('peso_gramos'))
             eg.operacion = operacion

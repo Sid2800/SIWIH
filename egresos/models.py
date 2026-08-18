@@ -218,9 +218,12 @@ class Egreso(models.Model):
     ]
 
     # ---- Vínculos ----
+    # El área del censo NO se captura en la hoja de llenado; se asigna/gestiona
+    # en el reporte de Excel (una hoja por área). Por eso es opcional aquí.
     area = models.ForeignKey(
         AreaEgreso, on_delete=models.PROTECT, related_name='egresos',
-        verbose_name='Área del censo (elegida al digitar)'
+        null=True, blank=True,
+        verbose_name='Área del censo (se define en el reporte)'
     )
     ingreso = models.ForeignKey(
         Ingreso, on_delete=models.SET_NULL, null=True, blank=True,
