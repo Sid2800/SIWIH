@@ -25,7 +25,13 @@ document.addEventListener('DOMContentLoaded', function () {
     const contenedorEvaluacion = document.getElementById("contenedor-evaluacion");
     const contenedorInteractivo = document.getElementById("contenedor-interactivo");
     const fechaRecepcion = document.getElementById("id_fecha_recepcion");
+    const contenedorElaboradaPor = document.getElementById("contenedor-elaborada-por");
+    const contenedorPersonalSaludRefiere = document.getElementById("contenedor-personal-salud-refiere");
+    const contenedorControlCalidad = document.getElementById("contenedor-control-calidad");
 
+
+
+    
     // Botones
     const botonGuardar = document.getElementById("formularioReferencia-botonGuardar");
     const textoOriginal = botonGuardar.innerHTML;
@@ -466,6 +472,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }).mask(dniPaciente);
     }
 
+
     function quitarMascaraIdentidad() {
         if (dniPaciente) {
             Inputmask.remove(dniPaciente);
@@ -500,9 +507,16 @@ document.addEventListener('DOMContentLoaded', function () {
         institucionOrigenSelect.enable();
         contenedorEvaluacion.classList.remove("oculto");
         contenedorInteractivo.classList.add("oculto");
+        // Mostrar/Ocultar controles de elaboración
+        contenedorElaboradaPor.classList.remove("oculto");
+        contenedorPersonalSaludRefiere.classList.add("oculto");
+        // mostrar/ocultar controles calidad
+        contenedorControlCalidad.classList.add("oculto");
+
         //limpiamos los select de ref enviada
         especialidadDestinoSelect.clear();
         unidadClinicaRefiereSelect.clear();
+
 
         fechaRecepcion.disabled = false;
     }
@@ -521,8 +535,16 @@ document.addEventListener('DOMContentLoaded', function () {
         document.querySelector('input[name="justificada"][value="3"]').checked = true;
         document.querySelector('input[name="oportuna"][value="3"]').checked = true;
         contenedorInteractivo.classList.remove("oculto");
+
+        // Mostrar/Ocultar controles de elaboración
+        contenedorElaboradaPor.classList.add("oculto");
+        contenedorPersonalSaludRefiere.classList.remove("oculto");
+        // mostrar/ocultar controles calidad
+
+        contenedorControlCalidad.classList.remove("oculto");
         fechaRecepcion.disabled = true;
     }
+
 
     
     /*Muestra un ventana flotante o modal que poermite agregar un diagnostico*/
@@ -794,6 +816,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return true;
         }
     
+
     async function modalAgregarEditarSeguimientoTIC(idRef) {
         
         const idSeguimiento = document.getElementById("id_idSeguimiento")
@@ -912,6 +935,196 @@ document.addEventListener('DOMContentLoaded', function () {
 
         return resultado;
     }
+
+
+    async function inicializarPersonalSaludRefiere(){
+        let data = await PersonalClinicoLoader.cargar();
+
+
+
+        const opciones = data.map(item => ({
+                value: item.id,
+                label: item.nombre,
+                customData: item.especialidad__nombre_especialidad,
+                description: item.especialidad__nombre_especialidad
+            }));
+
+     
+
+
+        // inicializar el vistual select 
+        VirtualSelect.init({
+            ele: '#vs-personal-salud-refiere',
+            options: opciones,
+            hasOptionDescription: true,
+            searchPlaceholderText: 'Buscar...',
+            search: true,
+            placeholder: 'PROFESIONAL',
+            additionalClasses: 'custom-wrapper',
+            additionalDropboxClasses: 'custom-dropbox',
+        }); 
+        
+        const hidden = document.getElementById('id_personal_salud_refiere_id');
+
+        const personal = document.querySelector('#vs-personal-salud-refiere');
+        personal.addEventListener('change', () => {
+            hidden.value = personal.value;
+        });
+
+           // Si el formulario viene en modo edición, seleccionar el valor inicial
+        if (modoUso === 2 && hidden.value) {
+            personal.setValue(hidden.value);
+        }
+
+    }
+
+    async function inicializarPersonalSaludResponde(){
+
+        const hidden = document.getElementById("respuesta_personal_salud_responde_id");
+
+        // El formulario de respuesta para referencias recibidas no existe
+        if (!hidden) {
+            return;
+        }
+
+        let data = await PersonalClinicoLoader.cargar();
+
+        const opciones = data.map(item => ({
+                value: item.id,
+                label: item.nombre,
+                customData: item.especialidad__nombre_especialidad,
+                description: item.especialidad__nombre_especialidad
+            }));
+
+        // inicializar el vistual select 
+        VirtualSelect.init({
+            ele: '#vs-personal-salud-responde',
+            options: opciones,
+            hasOptionDescription: true,
+            searchPlaceholderText: 'Buscar...',
+            search: true,
+            placeholder: 'PROFESIONAL',
+            additionalClasses: 'custom-wrapper',
+            additionalDropboxClasses: 'custom-dropbox',
+        }); 
+
+        const personal = document.querySelector('#vs-personal-salud-responde');
+        personal.addEventListener('change', () => {
+            hidden.value = personal.value;
+        });
+
+           // Si el formulario viene en modo edición, seleccionar el valor inicial
+        if (modoUso === 2 && hidden.value) {
+            personal.setValue(hidden.value);
+        }
+
+    }
+
+    async function inicializarUnidadReponsable(){
+
+
+        const hidden = document.getElementById("id_unidad_clinica_responsable_id");
+
+        // El formulario de respuesta para referencias recibidas no existe
+        if (!hidden) {
+            return;
+        }
+
+        const unidades = await UnidadClinicaLoader.cargar(null, 'referencia');
+
+        const opciones = unidades.map(item => ({
+            value: item.clave,
+            label: concatenarLimpio(`${item.nombre}(${item.tipo})`),
+            customData: item.origen,
+            description: item.origen
+        }));
+
+         // inicializar el vistual select 
+        VirtualSelect.init({
+            ele: '#vs-unidad-clinica-responsable',
+            options: opciones,
+            hasOptionDescription: true,
+            searchPlaceholderText: 'Buscar...',
+            search: true,
+            placeholder: 'UNIDAD CLINICA',
+            additionalClasses: 'custom-wrapper',
+            additionalDropboxClasses: 'custom-dropbox',
+        });
+
+
+        const unidadVS = document.querySelector('#vs-unidad-clinica-responsable');
+        unidadVS.addEventListener('change', () => {
+            hidden.value = unidadVS.value;
+        });
+
+           // Si el formulario viene en modo edición, seleccionar el valor inicial
+        if (modoUso === 2 && hidden.value) {
+            unidadVS.setValue(hidden.value);
+        }
+
+    }
+
+
+    function agregarControlCalidad(formData) {
+
+        const grupos = document.querySelectorAll(
+            ".referenciaReferenciaControlCalidadCampos .radio-fielset"
+        );
+
+        for (const grupo of grupos) {
+
+            const seleccionado = grupo.querySelector("input:checked");
+
+            if (!seleccionado) {
+
+                const nombre = grupo.querySelector(
+                    ".controlCalidadRadioLabel"
+                ).textContent.trim();
+
+                throw new Error(
+                    `Debe indicar "${nombre}" en el control de calidad.`
+                );
+            }
+
+            formData.append(
+                seleccionado.name,
+                seleccionado.value
+            );
+        }
+    }
+
+
+    function agregarControlCalidadRespuesta(formData) {
+
+        const PREFIJO = "resp_"; // lo diferncia de los de referencia 
+
+        const grupos = document.querySelectorAll(
+            ".referenciaRespuestaControlCalidadCampos .radio-fielset"
+        );
+
+        for (const grupo of grupos) {
+
+            const seleccionado = grupo.querySelector("input:checked");
+
+            if (!seleccionado) {
+
+                const nombre = grupo.querySelector(
+                    ".controlCalidadRadioLabel"
+                ).textContent.trim();
+
+                throw new Error(
+                    `Debe indicar "${nombre}" en el control de calidad.`
+                );
+            }
+
+
+            formData.append(
+                seleccionado.name.substring(PREFIJO.length),
+                seleccionado.value
+            );
+        }
+    }
+
 
 
 //#endregion
@@ -1086,30 +1299,30 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (modoUso === 2 && ckNoAtencion){
         ckNoAtencion.addEventListener("click", async function(e){
-            e.preventDefault();
-        const nombre = nombreCompleto.value ? nombreCompleto.value : "existe una inconveniencia con el nombre";
-        const idMotivo = idMotivoNoAtencion.value ? idMotivoNoAtencion.value : 0;
+                e.preventDefault();
+            const nombre = nombreCompleto.value ? nombreCompleto.value : "existe una inconveniencia con el nombre";
+            const idMotivo = idMotivoNoAtencion.value ? idMotivoNoAtencion.value : 0;
 
-        if (tipo === 1 ) { 
-            // Validar que exista referencia y que sea tipo enviada
-            toastr.error("NO es posible registrar una no atenciona este tipo de referencia ");
-            return
-        }
+            if (tipo === 1 ) { 
+                // Validar que exista referencia y que sea tipo enviada
+                toastr.error("NO es posible registrar una no atenciona este tipo de referencia ");
+                return
+            }
 
-        if (idRespuesta.value != 0 && idMotivo == 0) { 
-            // Validar que exista referencia y que sea tipo enviada
-            toastr.error("NO es posible registrar una no atencion a una referencia con repuesta");
-            return
-        }
-        
+            if (idRespuesta.value != 0 && idMotivo == 0) { 
+                // Validar que exista referencia y que sea tipo enviada
+                toastr.error("NO es posible registrar una no atencion a una referencia con repuesta");
+                return
+            }
+            
 
-        // Abrir modal para agregar o editar el seguimiento TIC
-        const noAtencion = await estableceNoAtencion(nombre, idMotivo);
-        if (noAtencion != null) idMotivoNoAtencion.value = noAtencion;
-        ckNoAtencion.checked = Number(idMotivoNoAtencion.value) !== 0;
-                
+            // Abrir modal para agregar o editar el seguimiento TIC
+            const noAtencion = await estableceNoAtencion(nombre, idMotivo);
+            if (noAtencion != null) idMotivoNoAtencion.value = noAtencion;
+            ckNoAtencion.checked = Number(idMotivoNoAtencion.value) !== 0;
+                    
 
-    })
+        })
     }
 
     
@@ -1137,7 +1350,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
     inicializarTablaRefDiagnostico();
 
+    //inicializacion del virtual selct 
+    inicializarPersonalSaludRefiere();
 
+    inicializarUnidadReponsable();
 
     // Lógica del tab
     document.querySelectorAll('.referenciaTabsBoton').forEach(btn => {
@@ -1204,10 +1420,17 @@ document.addEventListener('DOMContentLoaded', function () {
             Recibida.checked = true;
             institucionDestinoSelect.disable();
             contenedorInteractivo.classList.add("oculto");
+            contenedorElaboradaPor.classList.remove("oculto");
+            contenedorPersonalSaludRefiere.classList.add("oculto");
+            contenedorControlCalidad.classList.add("oculto");
+
         } else if (typeof tipo !== 'undefined' && tipo === 1) { // enviada
             Enviada.checked = true;
             institucionOrigenSelect.disable();
             contenedorEvaluacion.classList.add("oculto");
+            contenedorElaboradaPor.classList.add("oculto");
+            contenedorPersonalSaludRefiere.classList.remove("oculto");
+            contenedorControlCalidad.classList.remove("oculto");
             fechaRecepcion.disabled = true;
         }
         document.querySelector('.referencia-referencia-tipo').classList.add('bloqueado');
@@ -1235,6 +1458,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
         /*  Respuesta ahora bien en add o en edit */
         selectsRespuesta = inicializarFormRespuesta();
+
+        // Nuevo
+        inicializarPersonalSaludResponde();
 
         if (typeof tipo !== 'undefined' && tipo === 0) {
             //para el seguimeito del paciente en la respuesta
@@ -1288,6 +1514,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
         let valorSeleccionado;
         // Tipo de referencia e institución
+
+
+
         if (Recibida.checked) {
             valorSeleccionado = institucionOrigenSelect.getValue();
             if (!valorSeleccionado || valorSeleccionado.length === 0) {
@@ -1295,22 +1524,52 @@ document.addEventListener('DOMContentLoaded', function () {
                 institucionOrigenSelect.focus();
                 return;
             }
+
+            const unidadResponsable = document.getElementById("id_unidad_clinica_responsable_id");
+
+            if (!unidadResponsable.value) {
+                toastr.error(
+                        "Debe indicar la unidad clínica responsable de responder.",
+                        "Formulario incompleto"
+                    );
+                return;
+            }
+
         } else if (Enviada.checked) {
+
+            
             valorSeleccionado = institucionDestinoSelect.getValue();
             if (!valorSeleccionado || valorSeleccionado.length === 0) {
                 toastr.error("Debe indicar la institución de destino.");
                 institucionDestinoSelect.focus();
                 return;
             }
+            const personalSaludRefiere = document.getElementById('id_personal_salud_refiere_id');
+
+            if (!personalSaludRefiere.value) {
+                toastr.error("Debe indicar el médico que elaboró la referencia.","Formulario incompleto");
+                return;
+            }
+
+            
+            try {
+                agregarControlCalidad(formData);
+            } catch (e) {
+                toastr.error(e.message, "Formulario incompleto");
+                return;
+            }
+
+
+
             // ademas la data de destnio/*
         } else {
-            toastr.error("Recuerda indicar el tipo de referencia.");
+            toastr.error("Recuerda indicar el tipo de referencia.","Formulario incompleto");
             return;
         }
 
         // Diagnósticos
         if (!Array.isArray(datosRefDiagnostico) || datosRefDiagnostico.length === 0) {
-            toastr.error("Debe agregar al menos un diagnóstico antes de continuar.");
+            toastr.error("Debe agregar al menos un diagnóstico antes de continuar.","Formulario incompleto");
             return;
         }
 
@@ -1332,6 +1591,8 @@ document.addEventListener('DOMContentLoaded', function () {
         botonGuardar.disabled = true;
         botonGuardar.innerHTML = `<span class="spinner"></span> Guardando...`;
 
+    
+
         try {
             const response = await fetch(formReferencia.action, {
                 method: "POST",
@@ -1344,6 +1605,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const data = await response.json();
 
             if (!response.ok && response.status === 400) {
+
                 if (data.errors) {
                     Object.entries(data.errors).forEach(([campo, mensaje]) => {
                         toastr.error(concatenarLimpio(mensaje,campo), `Error de digitación`);
@@ -1359,13 +1621,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 toastr.success("Referencia registrada correctamente");
                 if (data.redirect_url) {
                         setTimeout(() => {
-
                             if(modoUso == 1){
                                 window.location.href = data.redirect_url;
                             }else {
                                 location.reload();
                             }
-                            
                         }, 600);
                     }
                 return;
@@ -1432,9 +1692,18 @@ document.addEventListener('DOMContentLoaded', function () {
         if (typeof tipo !== 'undefined' && tipo === 0){
             if (
                 !validarTomSelect(selectsRespuesta.respuestaAreaCaptaSelect, "Seleccione el área que captó la referencia") ||
-                !validarTomSelect(selectsRespuesta.respuestaUnidaClinicaRespondeSelect, "Seleccione la unidad clinica que brindó la respuesta") ||
-                !validarTomSelect(selectsRespuesta.respuestaElaboradaPorSelect, "Seleccione el tipo de personal que escribió la respuesta")
+                !validarTomSelect(selectsRespuesta.respuestaUnidaClinicaRespondeSelect, "Seleccione la unidad clinica que brindó la respuesta") 
+                // ||   legacy ahora este valor se hereda del profesional no se define por el usuario
+                // !validarTomSelect(selectsRespuesta.respuestaElaboradaPorSelect, "Seleccione el tipo de personal que escribió la respuesta")
             ) {
+                return;
+            }
+
+            // Validar que profesional hizo la respuesta
+            const personalSaludResponde = document.getElementById('respuesta_personal_salud_responde_id');
+
+            if (!personalSaludResponde.value) {
+                toastr.error("Debe indicar el profesional que elaboró la respuesta.");
                 return;
             }
 
@@ -1457,6 +1726,15 @@ document.addEventListener('DOMContentLoaded', function () {
                 toastr.error("Debe indicar al menos un tipo de seguimiento");
                 return;
             }
+
+            try {
+                agregarControlCalidadRespuesta(formData);
+            } catch (e) {
+                toastr.error(e.message, "Formulario incompleto");
+                return;
+            }
+
+            
         }
 
 
@@ -1464,6 +1742,8 @@ document.addEventListener('DOMContentLoaded', function () {
         botonGuardar.disabled = true;
         botonGuardar.innerHTML = `<span class="spinner"></span> Guardando Respues...`;
         
+
+    
         try{
             const response = await fetch(form.action, {
                 method: "POST",

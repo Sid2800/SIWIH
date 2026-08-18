@@ -180,7 +180,7 @@ const ManejarPeriodoLaboral = (function (){
 
             // listnere de select 
             const slect = document.querySelector('#modal-periodo-laboral-personal-salud')
-            slect._handler  = function (){
+            slect._changeHandler  = function (){
                 const options = slect.getSelectedOptions();
                 if (!options) { 
                     especialidad.value = ""; 
@@ -188,7 +188,7 @@ const ManejarPeriodoLaboral = (function (){
                 }
                 especialidad.value = options.customData || "";
             }
-            slect.addEventListener('change', slect._handler)
+            slect.addEventListener('change', slect._changeHandler)
 
             // jornada laboral 
             const jornada = document.getElementById("modal-periodo-laboral-jornada");

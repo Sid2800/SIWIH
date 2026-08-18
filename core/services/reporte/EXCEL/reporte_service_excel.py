@@ -22,7 +22,12 @@ class ServiceExcel:
     ENCABEZADOS_ESPECIFICOS = {
         10: ["REF RECIB ", "RESP", "% RESP ", "DERIV", "% DERIV"],
         11: ["UAPS", "CIS", "SMI ", "ZPP", "TOTAL", "% TOTAL"],
+        12: ["CONTEO", "SI CUMP.", "NO CUMP.", "% CUMP."],
     }
+
+    ENCABEZADOS_ESPECIFICOS[13] = ENCABEZADOS_ESPECIFICOS[12]
+    ENCABEZADOS_ESPECIFICOS[14] = ENCABEZADOS_ESPECIFICOS[12]
+
 
     # Paleta de colores
     COLOR_PRINCIPAL = "0F2F2C"
@@ -207,8 +212,12 @@ class ServiceExcel:
     # ---------------------
 
     def configurar_anchos(ws, columnas):
+
+        # Cada perfil contiene los anchos de las columnas y, como último valor,
+        # el número de la columna donde inicia el bloque.
         PERFILES = {
             3: [50, 18, 18, 2],
+            5: [50, 15, 15, 15, 15, 1],
             6: [40, 15, 15, 15, 15, 15, 1],
             7: [40, 13, 13, 13, 13, 13, 16, 1],
         }
@@ -226,6 +235,7 @@ class ServiceExcel:
 
         col_fin_num = columnas + 2 if columnas <= 3 else columnas
         return get_column_letter(col_inicio_num), get_column_letter(col_fin_num)
+
 
     def configurar_impresion(ws, fila_encabezado):
         ws.page_setup.paperSize = 1

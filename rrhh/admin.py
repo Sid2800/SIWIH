@@ -6,12 +6,20 @@ class EmpleadoAdmin(admin.ModelAdmin):
     list_display = ('dni', 'nombre_completo', 'telefono', 'correo', 'estado')
     list_filter = ('estado',)
     search_fields = ('dni', 'primer_nombre', 'primer_apellido', 'usuario__username')
-    autocomplete_fields = ['paciente_ref','creado_por',
-        'modificado_por', 'usuario']
+    autocomplete_fields = ['paciente_ref', 'usuario']
+    readonly_fields = ('fecha_creado', 'creado_por', 'fecha_modificado', 'modificado_por') 
 
     def nombre_completo(self, obj):
         return f"{obj.primer_nombre} {obj.primer_apellido}"
     nombre_completo.short_description = "Nombre"
+
+
+    def save_model(self, request, obj, form, change):
+        if not obj.pk:
+            obj.creado_por = request.user
+        obj.modificado_por = request.user
+        super().save_model(request, obj, form, change)
+
 
 
 class PersonalSaludAdmin(admin.ModelAdmin):
@@ -35,6 +43,20 @@ class PersonalSaludAdmin(admin.ModelAdmin):
         'servicio_unidad__nombre_unidad'
     )
 
+    readonly_fields = (
+        'fecha_creado',
+        'creado_por',
+        'fecha_modificado',
+        'modificado_por'
+    )
+    
+
+
+    autocomplete_fields = (
+        'empleado',
+        'servicio_unidad',
+    )
+
     def empleado_nombre(self, obj):
         return obj.empleado.nombre_completo
     empleado_nombre.short_description = "Empleado"
@@ -46,6 +68,13 @@ class PersonalSaludAdmin(admin.ModelAdmin):
     def servicio_unidad_nombre(self, obj):
         return obj.servicio_unidad.nombre_unidad if obj.servicio_unidad else ""
     servicio_unidad_nombre.short_description = "Unidad"
+
+
+    def save_model(self, request, obj, form, change):
+        if not obj.pk:
+            obj.creado_por = request.user
+        obj.modificado_por = request.user
+        super().save_model(request, obj, form, change)
 
 
 

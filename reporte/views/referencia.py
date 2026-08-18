@@ -29,6 +29,11 @@ class InformesReferencia(View):
         9: "RESPUESTAS RESUELTAS SEGUN UNIDAD CLINICA",
         10:"REFERENCIAS Y RESPUESTAS POR GESTOR- OTROS DEP- CLINICA PRIVADA",
         11:"REFERENCIAS ENVIADAS A PRIMER NIVEL DE ATENCION SEGUN GESTOR",
+        12: "REFERENCIAS RECIBIDAS CON FORMATO SINAR POR INSTITUCION",
+        13: "CALIDAD DE REFERENCIAS ENVIADAS SEGUN UNIDAD CLÍNICA",
+        14: "CALIDAD DE RESPUESTAS SEGUN UNIDAD CLÍNICA",
+        15: "REFERENCIA RECBIDAS SIN RESPUESTAS SEGUN UNIDAD CLÍNICA",
+        16: "RESUMEN GENERAL DE CALIDAD DEL PERÍODO"
     }
 
     OBSERVACIONES = {
@@ -39,13 +44,29 @@ class InformesReferencia(View):
             "No se incluyen respuestas registradas en el mes seleccionado cuya referencia fue recibida en un periodo distinto. "
             "El porcentaje de derivaciones se calcula en función de las respuestas registradas."
         ),
-    }
+        12: (
+            "El período se determina según la fecha de recepción de las referencias."
+        ),
+
+        13: (
+            "El período se determina según la fecha de elaboración de las referencias enviadas."
+        ),
+
+        14: (
+            "El período se determina según la fecha de atención de las respuestas."
+        ),
+
+        15: (
+            "El período se determina según la fecha de recepción de las referencias."
+        ),
+        }
 
     # Grupos lógicos de informes
     INFORMES_CLASICOS = {1, 2, 3, 5, 8}
     INFORME_SEGUIMIENTO = 4
-    INFORMES_RECIBIDAS = {6, 7, 10, 11}
+    INFORMES_RECIBIDAS = {6, 7, 10, 11, 12}
     INFORME_RESPUESTAS = 9
+    INFORMES_CALIDAD = {13, 14}
 
 
     def _validar_data(self, dataReporte):
@@ -105,7 +126,7 @@ class InformesReferencia(View):
         try:
             anio = validar_anio(anio)                
             mes = validar_mes(mes)
-            informe = validar_informe(informe, [1,2,3,4,5,6,7,8,9,10,11]) 
+            informe = validar_informe(informe, [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]) 
         except ValueError as e:
             return JsonResponse({"error": str(e)}, status=400)
 
@@ -120,7 +141,7 @@ class InformesReferencia(View):
         }
 
 
-        if int(informe) in self.INFORMES_CLASICOS: #[1,2,3,5,8]
+        if informe in self.INFORMES_CLASICOS: #[1,2,3,5,8]
             dataReporte = RefInformeService.generarDataInformeReferencia(mes,anio, informe
                                                                         , True if int(informe) !=8 else False)# mayor complejidad
             
@@ -165,7 +186,7 @@ class InformesReferencia(View):
             else:
                 return ReporteReferenciaService.GenerarInformeReferencia(criterios)
         
-        elif informe in self.INFORMES_RECIBIDAS:#[6,7,10,11]: #REFERENCIAS RECIBIDAS POR GESTOR   // 6 resumido // detallado / con repuestas
+        elif informe in self.INFORMES_RECIBIDAS:#[6,7,10,11, 12]: #REFERENCIAS RECIBIDAS POR GESTOR   // 6 resumido // detallado / con repuestas / formato sinar
             
             dataReporte = RefInformeService.generarDataInformeRefRecibidasGestor(mes,anio,informe, 1 if informe == 11 else 0)
 
@@ -173,6 +194,7 @@ class InformesReferencia(View):
                 return JsonResponse({'error': dataReporte['error']}, status=400)
 
             error = self._validar_data(dataReporte)
+
             if error:
                 return error
         
@@ -186,13 +208,38 @@ class InformesReferencia(View):
                 else:
                     return ReporteReferenciaService.GenerarInformeReferencia(criterios)
             else:
-
-
                 if tipo_documento == 1 :
                     return ServiceExcel.GenerarExcelReferenciaBase(criterios)
                 else:
                     return ReporteReferenciaService.GenerarInformeReferenciaColumnas(criterios)
+
         
+        elif informe in self.INFORMES_CALIDAD:#[13, 14]: #CALIDAD DE REFERENCIAS ENVIADAS SEGUN UNIDAD
+            if informe == 13:
+                dataReporte = RefInformeService.generarDataInformeReferencia(mes,anio,informe,False)
+            else:
+                dataReporte = RefInformeService.generarDataInformeCalidadRespuesta(mes,anio)
+
+
+            if "error" in dataReporte:
+                return JsonResponse({'error': dataReporte['error']}, status=400)
+
+            error = self._validar_data(dataReporte)
+
+            if error:
+                return error
+        
+            self._agregar_datos_reporte(criterios, dataReporte, informe)
+
+            self._agregar_observacion(informe,criterios)
+
+            for fila in dataReporte.get('tabla', []):
+                    print(fila)
+
+            if tipo_documento == 1 :
+                return ServiceExcel.GenerarExcelReferenciaBase(criterios)
+            else:
+                return ReporteReferenciaService.GenerarInformeReferenciaColumnas(criterios)
             
 
         elif informe == 9:
@@ -211,7 +258,46 @@ class InformesReferencia(View):
                 return ServiceExcel.GenerarExcelReferenciaBase(criterios)
             else:
                 return ReporteReferenciaService.GenerarInformeReferencia(criterios)
+
+        elif informe == 15:
+            dataReporte = RefInformeService.generarDataInformeReferenciasSinRespuesta(mes, anio)
+            error = self._validar_data(dataReporte)
+            if error:
+                return error
+
+            self._agregar_datos_reporte(criterios, dataReporte, informe)
+
+            self._agregar_observacion(informe,criterios)
+
+
+            if tipo_documento == 1 :
+                return ServiceExcel.GenerarExcelReferenciaBase(criterios)
+            else:
+                return ReporteReferenciaService.GenerarInformeReferenciaColumnas(criterios)
+
+
+        elif informe == 16:
+            dataReporte = RefInformeService.generarDataInformeResumenGeneralCalidad(
+                mes,
+                anio
+            )
+
+            if "error" in dataReporte:
+                return JsonResponse(
+                    {'error': dataReporte['error']},
+                    status=400
+                )
+
+            self._agregar_observacion(informe, criterios)
+
+            criterios["resumen_general_calidad"] = dataReporte
+
+            # if tipo_documento == 1 :
+            #     JsonResponse({'error': 'Funcion en desarrollo.'}, status=400)
             
+            return ReporteReferenciaService.GenerarInformeResumenGeneralCalidad(
+                criterios
+            )
 
         return JsonResponse({'error': 'Informe no reconocido.'}, status=400)
 

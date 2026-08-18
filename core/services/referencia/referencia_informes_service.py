@@ -1,6 +1,6 @@
 from referencia.models import Referencia_diagnostico, Respuesta_diagnostico, Referencia, Respuesta
 from core.utils.utilidades_fechas import generar_rango_mes, filtro_rango_fecha
-from django.db.models import Q, F, Case, When, Value, CharField, Count, Sum, IntegerField
+from django.db.models import Q, F, Case, When, Value, CharField, Count, Sum, IntegerField, BooleanField
 from django.db.models.functions import  Concat, Trim
 from core.utils.utilidades_fechas import calcular_edad_texto
 from core.utils.utilidades_calculos import calcular_porcentaje
@@ -8,6 +8,7 @@ from core.utils.utilidades_textos import formatear_dni, formatear_expediente, co
 from django.utils.timezone import localtime
 from core.constants.domain_constants import LogApp
 from core.utils.utilidades_logging import *
+from django.db.models.functions import Coalesce
 
 class RefInformeService:
     
@@ -27,21 +28,35 @@ class RefInformeService:
             return {"error": "Error generando rango de fecha"}
 
         # tipo de referencia (1 = enviadas, 0 = recibidas)
-        tipo_ref = 1 if indice in [1, 2, 3, 5] else 0
+        tipo_ref = 1 if indice in [1, 2, 3, 5, 13] else 0
 
         # campo de fecha a usar
         campo_fecha = "fecha_elaboracion" if tipo_ref == 1 else "fecha_recepcion"
 
         #  consulta a la BD
         try:
+
+            
+
+            if indice == 13:
+                select_related = [
+                    'unidad_clinica_refiere__area_atencion',
+                    'unidad_clinica_refiere__sala',
+                    'unidad_clinica_refiere__servicio_aux',
+                ]
+            else:
+                select_related = [
+                    'institucion_destino__nivel_complejidad_institucional',
+                    'motivo',
+                ]
+
+
+
             qs = Referencia.objects.filter(
                 estado=1,
                 tipo=tipo_ref,
                 **filtro_rango_fecha(campo_fecha, inicio, fin)
-            ).select_related(
-                'institucion_destino__nivel_complejidad_institucional',
-                'motivo'
-            )
+            ).select_related(*select_related)
 
             # Filtros opcionales según mayor_complejidad
             if mayor_complejidad:
@@ -209,6 +224,21 @@ class RefInformeService:
                 'tabla': tabla_final,
                 'etiqueta': "EVALUACION"
             }
+        
+        elif indice == 13:  # REFERENCIAS ENVIADAS SEGÚN UNIDAD CLÍNICA
+            etiqueta = "UNIDAD CLÍNICA"
+
+            resultado = RefInformeService.generar_tabla_calidad_referencia_unidad(qs)
+
+            tabla_final = resultado["tabla"]
+            total_general = resultado["total"]
+
+            return {
+                "total": total_general,
+                "tabla": tabla_final,
+                "etiqueta": etiqueta
+            } 
+
 
         else:
             log_warning(
@@ -435,6 +465,15 @@ class RefInformeService:
             tabla_final = resultado["tabla"]
             total_general = resultado["total_general"]
 
+        elif indice == 12:
+            etiqueda = "INSTITUCION | SINAR"
+
+            resultado = RefInformeService.generar_tabla_referencia_sinar(qs)
+            tabla_final = resultado["tabla"]
+            total_general = resultado["total"]
+        
+
+            
         else:
             log_warning(
                 f"Índice inválido {indice} en informe gestor",
@@ -447,7 +486,770 @@ class RefInformeService:
             'tabla': tabla_final,
             'etiqueta': etiqueda
         }
+
+    @staticmethod
+    def generarDataInformeCalidadRespuesta(mes,anio):
+        try:
+            inicio, fin = generar_rango_mes(mes=mes, anio=anio)
+        except Exception as e:
+            log_error(
+                f"Error generando rango de fechas mes {mes} año {anio}",
+                app=LogApp.REPORTE
+            )
+            return {"error": "Error generando rango de fecha"}
         
+
+        try:
+            select_related = [
+                'unidad_clinica_responde__area_atencion',
+                'unidad_clinica_responde__sala',
+                'unidad_clinica_responde__servicio_aux',
+                'referencia'
+            ]
+
+            qs = Respuesta.objects.filter(
+                        referencia__tipo=0,
+                        **filtro_rango_fecha("fecha_atencion", inicio, fin)
+                    ).select_related(*select_related)
+
+            resultado = RefInformeService.generar_tabla_calidad_respuesta_unidad(qs)
+
+            return {
+                "total": resultado['total'],
+                "tabla": resultado['tabla'],
+                "etiqueta": "UNIDAD CLINICA"
+            } 
+
+
+        except Exception as e:
+                log_error(
+                    f"Error consultando respuestas mes {mes} año {anio}",
+                    app=LogApp.REPORTE
+                )
+                return {"error": "Error consultando datos"}
+
+
+    @staticmethod
+    def generarDataInformeResumenGeneralCalidad(mes, anio):
+        try:
+            inicio, fin = generar_rango_mes(mes=mes, anio=anio)
+        except Exception:
+            log_error(
+                f"Error generando rango de fechas mes {mes} año {anio}",
+                app=LogApp.REPORTE
+            )
+            return {"error": "Error generando rango de fecha"}
+
+        try:
+            # ==========================================
+            # 1. REFERENCIAS RECIBIDAS
+            # ==========================================
+
+            referencias_recibidas = Referencia.objects.filter(
+                tipo=0,
+                **filtro_rango_fecha("fecha_recepcion", inicio, fin)
+            ).aggregate(
+                total=Count("id"),
+                con_respuesta=Count(
+                    "id",
+                    filter=Q(respuesta__isnull=False)
+                ),
+                sin_respuesta=Count(
+                    "id",
+                    filter=Q(respuesta__isnull=True)
+                )
+            )
+
+            # ==========================================
+            # 2. CALIDAD DE REFERENCIAS ENVIADAS
+            # ==========================================
+
+            referencias_enviadas = Referencia.objects.filter(
+                tipo=1,
+                control_calidad__isnull=False,
+                **filtro_rango_fecha("fecha_elaboracion", inicio, fin)
+            ).annotate(
+                cumple_control=Case(
+                    When(
+                        control_calidad__formato_correcto=True,
+                        control_calidad__letra_legible=True,
+                        control_calidad__datos_completos=True,
+                        control_calidad__manchones_borrones=False,
+                        control_calidad__firma_sello=True,
+                        then=Value(True)
+                    ),
+                    default=Value(False),
+                    output_field=BooleanField()
+                )
+            ).aggregate(
+                total=Count("id"),
+                cumple=Count(
+                    "id",
+                    filter=Q(cumple_control=True)
+                ),
+                no_cumple=Count(
+                    "id",
+                    filter=Q(cumple_control=False)
+                )
+            )
+
+            # ==========================================
+            # 3. CALIDAD DE RESPUESTAS
+            # ==========================================
+
+            respuestas = Respuesta.objects.filter(
+                referencia__tipo=0,
+                control_calidad__isnull=False,
+                **filtro_rango_fecha("fecha_atencion", inicio, fin)
+            ).annotate(
+                cumple_control=Case(
+                    When(
+                        control_calidad__formato_correcto=True,
+                        control_calidad__letra_legible=True,
+                        control_calidad__datos_completos=True,
+                        control_calidad__manchones_borrones=False,
+                        control_calidad__firma_sello=True,
+                        then=Value(True)
+                    ),
+                    default=Value(False),
+                    output_field=BooleanField()
+                )
+            ).aggregate(
+                total=Count("id"),
+                cumple=Count(
+                    "id",
+                    filter=Q(cumple_control=True)
+                ),
+                no_cumple=Count(
+                    "id",
+                    filter=Q(cumple_control=False)
+                )
+            )
+
+            # ==========================================
+            # 4. FORMATO SINAR
+            # ==========================================
+
+            sinar = Referencia.objects.filter(
+                tipo=0,
+                **filtro_rango_fecha("fecha_recepcion", inicio, fin)
+            ).aggregate(
+                total=Count("id"),
+                si=Count(
+                    "id",
+                    filter=Q(formato_sinar=True)
+                ),
+                no=Count(
+                    "id",
+                    filter=Q(formato_sinar=False)
+                )
+            )
+
+            return {
+                "referencias_recibidas": {
+                    "total": referencias_recibidas["total"] or 0,
+                    "con_respuesta": referencias_recibidas["con_respuesta"] or 0,
+                    "sin_respuesta": referencias_recibidas["sin_respuesta"] or 0,
+                },
+
+                "calidad_referencias": {
+                    "total": referencias_enviadas["total"] or 0,
+                    "cumple": referencias_enviadas["cumple"] or 0,
+                    "no_cumple": referencias_enviadas["no_cumple"] or 0,
+                },
+
+                "calidad_respuestas": {
+                    "total": respuestas["total"] or 0,
+                    "cumple": respuestas["cumple"] or 0,
+                    "no_cumple": respuestas["no_cumple"] or 0,
+                },
+
+                "formato_sinar": {
+                    "total": sinar["total"] or 0,
+                    "si": sinar["si"] or 0,
+                    "no": sinar["no"] or 0,
+                }
+            }
+
+        except Exception as e:
+            log_error(
+                f"Error generando resumen general de calidad mes {mes} año {anio}: {e}",
+                app=LogApp.REPORTE
+            )
+            return {"error": "Error consultando datos"}
+
+    @staticmethod
+    def generarDataInformeReferenciasSinRespuesta(mes, anio):
+        try:
+            inicio, fin = generar_rango_mes(mes=mes, anio=anio)
+        except Exception as e:
+            log_error(
+                f"Error generando rango de fechas mes {mes} año {anio}",
+                app=LogApp.REPORTE
+            )
+            return {"error": "Error generando rango de fecha"}
+        
+
+        try:
+            select_related = [
+                'unidad_clinica_responsable__area_atencion',
+                'unidad_clinica_responsable__sala',
+                'unidad_clinica_responsable__servicio_aux',
+            ]
+
+            qs = Referencia.objects.filter(
+                        tipo=0,
+                        **filtro_rango_fecha("fecha_recepcion", inicio, fin)
+                    ).select_related(*select_related)
+
+            resumen_raw = (
+                qs.annotate(
+                    unidad_clinica_nombre=Case(
+                        # SALA
+                        When(
+                            unidad_clinica_responsable__sala__isnull=False,
+                            then=Concat(
+                                Value("HOSP | "),
+                                F("unidad_clinica_responsable__sala__nombre_sala")
+                            )
+                        ),
+
+                        # AREA ATENCION
+                        When(
+                            unidad_clinica_responsable__area_atencion__isnull=False,
+                            then=Case(
+                                When(
+                                    unidad_clinica_responsable__area_atencion__servicio_id=1000,
+                                    then=Concat(
+                                        Value("EMER | "),
+                                        F("unidad_clinica_responsable__area_atencion__nombre_area_atencion")
+                                    )
+                                ),
+                                When(
+                                    unidad_clinica_responsable__area_atencion__servicio_id=700,
+                                    then=Concat(
+                                        Value("OBST | "),
+                                        F("unidad_clinica_responsable__area_atencion__nombre_area_atencion")
+                                    )
+                                ),
+                                default=Concat(
+                                    Value("CEXT | "),
+                                    F("unidad_clinica_responsable__area_atencion__nombre_area_atencion")
+                                ),
+                                output_field=CharField()
+                            )
+                        ),
+
+                        # SERVICIO AUXILIAR
+                        When(
+                            unidad_clinica_responsable__servicio_aux__isnull=False,
+                            then=Concat(
+                                Value("SAUX | "),
+                                F("unidad_clinica_responsable__servicio_aux__nombre_servicio_a")
+                            )
+                        ),
+
+                        default=Value("SIN ASIGNAR"),
+                        output_field=CharField()
+                    )
+                )
+                .values("unidad_clinica_nombre")
+                .annotate(
+                    conteo=Count("id"),
+                    con_respuesta=Count(
+                        "id",
+                        filter=Q(respuesta__isnull=False)
+                    ),
+                    sin_respuesta=Count(
+                        "id",
+                        filter=Q(respuesta__isnull=True)
+                    )
+                )
+                .order_by("-conteo", "unidad_clinica_nombre")
+            )
+
+            tabla_final = []
+
+            total = 0
+            total_respuestas = 0
+            total_sin_respuesta = 0
+
+            for fila in resumen_raw:
+                total_unidad = fila["conteo"]
+                con_respuesta = fila["con_respuesta"]
+                sin_respuesta = fila["sin_respuesta"]
+
+                tabla_final.append((
+                    fila["unidad_clinica_nombre"],
+                    total_unidad,
+                    con_respuesta,
+                    sin_respuesta,
+                    calcular_porcentaje(
+                        con_respuesta,
+                        total_unidad
+                    ),
+                ))
+
+                total += total_unidad
+                total_respuestas += con_respuesta
+                total_sin_respuesta += sin_respuesta
+
+            tabla_final.append((
+                "TOTAL GENERAL",
+                total,
+                total_respuestas,
+                total_sin_respuesta,
+                calcular_porcentaje(
+                    total_respuestas,
+                    total
+                ),
+            ))
+
+            return {
+                "total": total,
+                "tabla": tabla_final,
+                "etiqueta": "UNIDAD CLÍNICA RESPONSABLE"
+            }
+
+
+        except Exception as e:
+                log_error(
+                    f"Error consultando respuestas mes {mes} año {anio}",
+                    app=LogApp.REPORTE
+                )
+                return {"error": "Error consultando datos"}
+
+
+
+    @staticmethod
+    def generar_tabla_calidad_respuesta_unidad(qs):
+
+        qs = qs.filter(control_calidad__isnull=False)
+
+        resumen_raw = (
+            qs.annotate(
+                unidad_clinica_nombre=Case(
+                    When(
+                        unidad_clinica_responde__sala__isnull=False,
+                        then=Concat(
+                            Value("HOSP | "),
+                            F("unidad_clinica_responde__sala__nombre_sala")
+                        )
+                    ),
+                    When(
+                        unidad_clinica_responde__area_atencion__isnull=False,
+                        then=Case(
+                            When(
+                                unidad_clinica_responde__area_atencion__servicio_id=1000,
+                                then=Concat(
+                                    Value("EMER | "),
+                                    F("unidad_clinica_responde__area_atencion__nombre_area_atencion")
+                                )
+                            ),
+                            When(
+                                unidad_clinica_responde__area_atencion__servicio_id=700,
+                                then=Concat(
+                                    Value("OBST | "),
+                                    F("unidad_clinica_responde__area_atencion__nombre_area_atencion")
+                                )
+                            ),
+                            default=Concat(
+                                Value("CEXT | "),
+                                F("unidad_clinica_responde__area_atencion__nombre_area_atencion")
+                            ),
+                            output_field=CharField()
+                        )
+                    ),
+                    When(
+                        unidad_clinica_responde__servicio_aux__isnull=False,
+                        then=Concat(
+                            Value("SAUX | "),
+                            F("unidad_clinica_responde__servicio_aux__nombre_servicio_a")
+                        )
+                    ),
+                    default=Value("Sin asignar"),
+                    output_field=CharField()
+                ),
+                cumple_control=Case(
+                    When(
+                        control_calidad__formato_correcto=True,
+                        control_calidad__letra_legible=True,
+                        control_calidad__datos_completos=True,
+                        control_calidad__manchones_borrones=False,
+                        control_calidad__firma_sello=True,
+                        then=Value(True)
+                    ),
+                    default=Value(False),
+                    output_field=BooleanField()
+                ),
+                medico=Concat(
+                    F("personal_salud_responde__empleado__primer_nombre"),
+                    Value(" "),
+                    F("personal_salud_responde__empleado__primer_apellido"),
+                    output_field=CharField()
+                )
+            )
+            .values(
+                "unidad_clinica_nombre",
+                "cumple_control",
+                "medico"
+            )
+        )
+
+        resumen = {}
+
+        for item in resumen_raw:
+
+            unidad = item["unidad_clinica_nombre"]
+            medico = item["medico"]
+            cumple = item["cumple_control"]
+
+            if unidad not in resumen:
+                resumen[unidad] = {
+                    "conteo": 0,
+                    "cumple": 0,
+                    "no_cumple": 0,
+                    "medicos": {}
+                }
+
+            if medico not in resumen[unidad]["medicos"]:
+                resumen[unidad]["medicos"][medico] = {
+                    "conteo": 0,
+                    "cumple": 0,
+                    "no_cumple": 0
+                }
+
+            resumen[unidad]["conteo"] += 1
+            resumen[unidad]["medicos"][medico]["conteo"] += 1
+
+            if cumple:
+                resumen[unidad]["cumple"] += 1
+                resumen[unidad]["medicos"][medico]["cumple"] += 1
+            else:
+                resumen[unidad]["no_cumple"] += 1
+                resumen[unidad]["medicos"][medico]["no_cumple"] += 1
+
+        unidades = sorted(
+            resumen.items(),
+            key=lambda x: x[1]["conteo"],
+            reverse=True
+        )
+
+        tabla_final = []
+        total_general = 0
+        cumple_general = 0
+        no_cumple_general = 0
+
+        for unidad, datos_unidad in unidades:
+
+            tabla_final.append((
+                "__HEADER__",
+                f"{unidad}-{str(datos_unidad["conteo"])}",
+                datos_unidad["cumple"],
+                datos_unidad["no_cumple"],
+                calcular_porcentaje(
+                    datos_unidad["cumple"],
+                    datos_unidad["conteo"]
+                ),
+            ))
+
+            total_general += datos_unidad["conteo"]
+            cumple_general += datos_unidad["cumple"]
+            no_cumple_general += datos_unidad["no_cumple"]
+
+            medicos = sorted(
+                datos_unidad["medicos"].items(),
+                key=lambda x: x[1]["conteo"],
+                reverse=True
+            )
+
+            for medico, datos_medico in medicos:
+                tabla_final.append((
+                    medico,
+                    datos_medico["conteo"],
+                    datos_medico["cumple"],
+                    datos_medico["no_cumple"],
+                    calcular_porcentaje(
+                        datos_medico["cumple"],
+                        datos_medico["conteo"]
+                    ),
+                ))
+
+        tabla_final.append((
+            "TOTAL GENERAL",
+            total_general,
+            cumple_general,
+            no_cumple_general,
+            calcular_porcentaje(
+                cumple_general,
+                total_general
+            ),
+        ))
+
+
+        return {
+            "tabla": tabla_final,
+            "total": total_general,
+        }
+
+
+
+    @staticmethod
+    def generar_tabla_calidad_referencia_unidad(qs):
+
+        qs = qs.filter(control_calidad__isnull=False)
+
+        resumen_raw = (
+            qs.annotate(
+                unidad_clinica_nombre=Case(
+                    When(
+                        unidad_clinica_refiere__sala__isnull=False,
+                        then=Concat(
+                            Value("HOSP | "),
+                            F("unidad_clinica_refiere__sala__nombre_sala")
+                        )
+                    ),
+                    When(
+                        unidad_clinica_refiere__area_atencion__isnull=False,
+                        then=Case(
+                            When(
+                                unidad_clinica_refiere__area_atencion__servicio_id=1000,
+                                then=Concat(
+                                    Value("EMER | "),
+                                    F("unidad_clinica_refiere__area_atencion__nombre_area_atencion")
+                                )
+                            ),
+                            When(
+                                unidad_clinica_refiere__area_atencion__servicio_id=700,
+                                then=Concat(
+                                    Value("OBST | "),
+                                    F("unidad_clinica_refiere__area_atencion__nombre_area_atencion")
+                                )
+                            ),
+                            default=Concat(
+                                Value("CEXT | "),
+                                F("unidad_clinica_refiere__area_atencion__nombre_area_atencion")
+                            ),
+                            output_field=CharField()
+                        )
+                    ),
+                    When(
+                        unidad_clinica_refiere__servicio_aux__isnull=False,
+                        then=Concat(
+                            Value("SAUX | "),
+                            F("unidad_clinica_refiere__servicio_aux__nombre_servicio_a")
+                        )
+                    ),
+                    default=Value("Sin asignar"),
+                    output_field=CharField()
+                ),
+                cumple_control=Case(
+                    When(
+                        control_calidad__formato_correcto=True,
+                        control_calidad__letra_legible=True,
+                        control_calidad__datos_completos=True,
+                        control_calidad__manchones_borrones=False,
+                        control_calidad__firma_sello=True,
+                        then=Value(True)
+                    ),
+                    default=Value(False),
+                    output_field=BooleanField()
+                ),
+                medico=Concat(
+                    F("personal_salud_refiere__empleado__primer_nombre"),
+                    Value(" "),
+                    F("personal_salud_refiere__empleado__primer_apellido"),
+                    output_field=CharField()
+                )
+            )
+            .values(
+                "unidad_clinica_nombre",
+                "cumple_control",
+                "medico"
+            )
+        )
+
+        resumen = {}
+
+        for item in resumen_raw:
+
+            unidad = item["unidad_clinica_nombre"]
+            medico = item["medico"]
+            cumple = item["cumple_control"]
+
+            if unidad not in resumen:
+                resumen[unidad] = {
+                    "conteo": 0,
+                    "cumple": 0,
+                    "no_cumple": 0,
+                    "medicos": {}
+                }
+
+            if medico not in resumen[unidad]["medicos"]:
+                resumen[unidad]["medicos"][medico] = {
+                    "conteo": 0,
+                    "cumple": 0,
+                    "no_cumple": 0
+                }
+
+            resumen[unidad]["conteo"] += 1
+            resumen[unidad]["medicos"][medico]["conteo"] += 1
+
+            if cumple:
+                resumen[unidad]["cumple"] += 1
+                resumen[unidad]["medicos"][medico]["cumple"] += 1
+            else:
+                resumen[unidad]["no_cumple"] += 1
+                resumen[unidad]["medicos"][medico]["no_cumple"] += 1
+
+        unidades = sorted(
+            resumen.items(),
+            key=lambda x: x[1]["conteo"],
+            reverse=True
+        )
+
+        tabla_final = []
+        total_general = 0
+        cumple_general = 0
+        no_cumple_general = 0
+
+
+
+
+
+
+        for unidad, datos_unidad in unidades:
+
+            tabla_final.append((
+                "__HEADER__",
+                f"{unidad}-{str(datos_unidad["conteo"])}",
+                datos_unidad["cumple"],
+                datos_unidad["no_cumple"],
+                calcular_porcentaje(
+                    datos_unidad["cumple"],
+                    datos_unidad["conteo"]
+                ),
+            ))
+
+            total_general += datos_unidad["conteo"]
+            cumple_general += datos_unidad["cumple"]
+            no_cumple_general += datos_unidad["no_cumple"]
+
+            medicos = sorted(
+                datos_unidad["medicos"].items(),
+                key=lambda x: x[1]["conteo"],
+                reverse=True
+            )
+
+            for medico, datos_medico in medicos:
+                tabla_final.append((
+                    medico,
+                    datos_medico["conteo"],
+                    datos_medico["cumple"],
+                    datos_medico["no_cumple"],
+                    calcular_porcentaje(
+                        datos_medico["cumple"],
+                        datos_medico["conteo"]
+                    ),
+                ))
+
+        tabla_final.append((
+            "TOTAL GENERAL",
+            total_general,
+            cumple_general,
+            no_cumple_general,
+            calcular_porcentaje(
+                cumple_general,
+                total_general
+            ),
+        ))
+
+        return {
+            "tabla": tabla_final,
+            "total": total_general,
+        }
+
+
+    @staticmethod
+    def generar_tabla_referencia_sinar(qs):
+        """
+        Genera una tabla de referencias recibidas según el formato SINAR por institución.
+        Ordenado globalmente por conteo.
+        """
+        total = qs.count()
+        tabla_final = [] 
+
+        qs = qs.filter(formato_sinar__isnull=False)
+
+        instituciones = (
+            qs.values(
+                'institucion_origen_id',
+                'institucion_origen__nombre_institucion_salud',
+                'institucion_origen__nivel_complejidad_institucional__siglas'
+            )
+            .annotate(
+                nivel_siglas=Coalesce(
+                    'institucion_origen__nivel_complejidad_institucional__siglas',
+                    Value('---')
+                ),
+                conteo=Count('id'),
+                sinar_si=Count(
+                    'id',
+                    filter=Q(formato_sinar=True)
+                ),
+                sinar_no=Count(
+                    'id',
+                    filter=Q(formato_sinar=False)
+                ),
+            )
+            .order_by('institucion_origen__nombre_institucion_salud')
+        )
+
+        total_sinar_si = 0
+        total_sinar_no = 0
+        total_sinar_no_consignado = 0
+        rows = []
+
+        for item in instituciones:
+            total_sinar_si += item["sinar_si"]
+            total_sinar_no += item["sinar_no"]
+            rows.append({
+                "nombre": f"{item['nivel_siglas']} - {item['institucion_origen__nombre_institucion_salud']}",
+                "conteo": item["conteo"],
+                "sinar_si": item["sinar_si"],
+                "sinar_no": item["sinar_no"],
+                "cumplimiento": calcular_porcentaje(item["sinar_si"],item["conteo"]),
+            })
+
+
+
+        rows = sorted(
+            rows,
+            key=lambda x: x["conteo"],
+            reverse=True
+        )
+
+        for r in rows:
+            tabla_final.append((
+                r["nombre"][:36],
+                r["conteo"],
+                r["sinar_si"],
+                r["sinar_no"],
+                r["cumplimiento"],
+            ))
+
+        tabla_final.append((
+            "TOTAL DE REFERENCIAS",
+            total,
+            total_sinar_si,
+            total_sinar_no,
+            calcular_porcentaje(total_sinar_si,total),
+        ))
+
+        return {
+            "tabla": tabla_final,
+            "total": total,
+        }
 
     @staticmethod
     def generar_tabla_por_gestor(qs, incluir_total=False):
@@ -627,30 +1429,30 @@ class RefInformeService:
             })
 
         # --- OTRAS REDES ---
-        if otras_redes['conteo'] > 0:
+        if (otras_redes["conteo"] or 0) > 0:
             rows.append({
                 "nombre": "OTRAS REDES",
-                "conteo": int(otras_redes['conteo']),
-                "respuestas": int(otras_redes['respuestas']),
-                "derivadas": int(otras_redes['derivadas']),
+                "conteo": int(otras_redes["conteo"] or 0),
+                "respuestas": int(otras_redes["respuestas"] or 0),
+                "derivadas": int(otras_redes["derivadas"] or 0),
             })
 
         # --- PRIVADA ---
-        if privadas['referencias'] > 0:
+        if (privadas["referencias"] or 0) > 0:
             rows.append({
                 "nombre": "PRIVADA",
-                "conteo": int(privadas['referencias']),
-                "respuestas": int(privadas['respuestas']),
-                "derivadas": int(privadas['derivadas']),
+                "conteo": int(privadas["referencias"] or 0),
+                "respuestas": int(privadas["respuestas"] or 0),
+                "derivadas": int(privadas["derivadas"] or 0),
             })
 
         # --- OTROS ---
-        if otros['referencias'] > 0:
+        if (otros["referencias"] or 0) > 0:
             rows.append({
                 "nombre": "OTROS",
-                "conteo": int(otros['referencias']),
-                "respuestas": int(otros['respuestas']),
-                "derivadas": int(otros['derivadas']),
+                "conteo": int(otros["referencias"] or 0),
+                "respuestas": int(otros["respuestas"] or 0),
+                "derivadas": int(otros["derivadas"] or 0),
             })
 
         # ========= ORDENAR FINAL ==========
@@ -1080,7 +1882,6 @@ class RefInformeService:
         return top3_diagnosticos_referencia
         
 
-        
 
     @staticmethod
     def generarDataFormatoReferencia(id_referencia):  # 0 recibidas 1 enviadas

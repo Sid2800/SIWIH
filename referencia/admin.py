@@ -1,5 +1,5 @@
 from django.contrib import admin
-from referencia.models import Motivo_envio, Referencia_diagnostico,Referencia, Referencia_especialidad, Respuesta_Area_Capta, Respuesta, SeguimientoTic
+from referencia.models import Motivo_envio, Referencia_diagnostico,Referencia, Referencia_especialidad, Respuesta_Area_Capta, Respuesta, SeguimientoTic  
 
 
 # Register your models here.
@@ -15,8 +15,8 @@ class ReferenciaDiagnosticoInline(admin.TabularInline):
     autocomplete_fields = ['diagnostico'] 
 
 class ReferenciaAdmin(admin.ModelAdmin):
-    list_display = ('fecha_elaboracion','fecha_recepcion','paciente','tipo','motivo','institucion_origen__gestor__nombre_gestor')
-    autocomplete_fields = ['paciente','institucion_origen','institucion_destino'] 
+    list_display = ('fecha_elaboracion','fecha_recepcion','paciente','tipo','motivo','institucion_origen__gestor__nombre_gestor','personal_refiere')
+    autocomplete_fields = ['paciente','institucion_origen','institucion_destino', 'personal_salud_refiere'] 
     search_fields = ('id','paciente__primer_nombre', 'paciente__primer_apellido','institucion_origen__nombre_institucion_salud','institucion_destino__nombre_institucion_salud')
     list_filter = ('tipo', 'motivo', 'atencion_requerida','elaborada_por','oportuna','justificada','estado','institucion_origen__gestor','institucion_origen__proveedor_salud','especialidad_destino__nombre_referencia_especialidad',)
     readonly_fields = ('fecha_creado', 'creado_por', 'fecha_modificado', 'modificado_por')
@@ -31,12 +31,35 @@ class ReferenciaAdmin(admin.ModelAdmin):
 
     def get_queryset(self, request):
         queryset = super().get_queryset(request)
-        return queryset.select_related('paciente', 'institucion_origen', 'institucion_destino', 'motivo', 'elaborada_por', 'creado_por', 'modificado_por')  # Optimizamos las consultas
-
+        return queryset.select_related(
+            'paciente',
+            'institucion_origen',
+            'institucion_destino',
+            'motivo',
+            'elaborada_por',
+            'personal_salud_refiere',
+            'personal_salud_refiere__empleado',
+            'personal_salud_refiere__especialidad',
+            'creado_por',
+            'modificado_por',
+        )
 
     def paciente(self, obj):
         return f"{obj.paciente.primer_nombre} {obj.paciente.primer_apellido}"  # Mostrar nombre completo del paciente relacionado
     paciente.short_description = 'Paciente'
+
+    def personal_refiere(self, obj):
+        if obj.personal_salud_refiere:
+            nombre = obj.personal_salud_refiere.empleado.nombre_completo
+
+            if obj.personal_salud_refiere.especialidad:
+                return f"{nombre} ({obj.personal_salud_refiere.especialidad.nombre_especialidad})"
+
+            return nombre
+
+        return "-"
+
+    personal_refiere.short_description = "Personal que refiere"
 
 class ReferenciaEspecialidadAdmin(admin.ModelAdmin):
     list_display = ('nombre_referencia_especialidad','estado',)
@@ -114,8 +137,8 @@ class RespuestaAdmin(admin.ModelAdmin):
         'tipo',
         'motivo',
         'atencion_requerida',
+        'personal_salud_responde',
         'elaborada_por',
-        
     )
 
     autocomplete_fields = [
@@ -144,6 +167,7 @@ class RespuestaAdmin(admin.ModelAdmin):
         'area_capta',
         'unidad_clinica_responde',
         'fecha_elaboracion',
+        'personal_salud_responde',
     )
 
     readonly_fields = ('fecha_elaboracion',)
@@ -165,7 +189,12 @@ class RespuestaAdmin(admin.ModelAdmin):
             'unidad_clinica_responde__sala',
             'unidad_clinica_responde__area_atencion',
             'unidad_clinica_responde__servicio_aux',
+
             'elaborada_por',
+            'personal_salud_responde',
+            'personal_salud_responde__empleado',
+            'personal_salud_responde__especialidad',
+
             'motivo',
         )
 
@@ -177,16 +206,89 @@ class RespuestaAdmin(admin.ModelAdmin):
         return f"{obj.referencia.paciente.primer_nombre} {obj.referencia.paciente.primer_apellido}"
     paciente.short_description = 'Paciente'
 
+    def personal_salud_responde(self, obj):
+        if not obj.personal_salud_responde:
+            return "-"
+
+        return (
+            f"{obj.personal_salud_responde.empleado.nombre_completo}"
+            f" ({obj.personal_salud_responde.especialidad_nombre})"
+        )
+
+    personal_salud_responde.short_description = "Personal que responde"
+
     def tipo(self, obj):
         return dict(obj.referencia._meta.get_field('tipo').choices).get(obj.referencia.tipo, 'Desconocido')
     tipo.short_description = 'Tipo'
 
 
+# class ControlCalidadReferenciaAdmin(admin.ModelAdmin):
+#     list_display = (
+#         'referencia',
+#         'paciente',
+#         'formato_correcto',
+#         'letra_legible',
+#         'datos_completos',
+#         'manchones_borrones',
+#         'firma_sello',
+#     )
+
+#     autocomplete_fields = [
+#         'referencia',
+#         'creado_por',
+#         'modificado_por',
+#     ]
+
+#     search_fields = (
+#         'referencia__id',
+#         'referencia__paciente__primer_nombre',
+#         'referencia__paciente__primer_apellido',
+#         'referencia__paciente__identidad',
+#     )
+
+#     list_filter = (
+#         'formato_correcto',
+#         'letra_legible',
+#         'datos_completos',
+#         'manchones_borrones',
+#         'firma_sello',
+#     )
+
+#     readonly_fields = (
+#         'fecha_creado',
+#         'fecha_modificado',
+#     )
+
+#     def save_model(self, request, obj, form, change):
+#         if not obj.pk:
+#             obj.creado_por = request.user
+#         obj.modificado_por = request.user
+#         super().save_model(request, obj, form, change)
+
+#     def get_queryset(self, request):
+#         queryset = super().get_queryset(request)
+#         return queryset.select_related(
+#             'referencia',
+#             'referencia__paciente',
+#             'creado_por',
+#             'modificado_por',
+#         )
+
+#     def paciente(self, obj):
+#         return (
+#             f"{obj.referencia.paciente.primer_nombre} "
+#             f"{obj.referencia.paciente.primer_apellido}"
+#         )
+#     paciente.short_description = "Paciente"
+
+
+# admin.site.register(ControlCalidadReferencia, ControlCalidadReferenciaAdmin)
+
+
+
+
+
 admin.site.register(Respuesta, RespuestaAdmin)
-
-
-
-
 
 
 admin.site.register(Motivo_envio, MotivoAdmin)

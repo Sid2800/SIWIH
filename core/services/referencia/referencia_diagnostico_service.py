@@ -153,6 +153,7 @@ class RefDiagnosticoService:
                     diag_res = diagnostico.get('idDiagDB', 0)
                     detalle = diagnostico.get('detalle')
 
+                    print(diag_res)
                     if diag_res and diag_res > 0:
                         try:
                             respuesta_diagnostico = Respuesta_diagnostico.objects.get(

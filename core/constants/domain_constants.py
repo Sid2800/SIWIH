@@ -58,6 +58,7 @@ class UsoUnidadC(str, Enum):
     GENERAL = "general"
     DEFUNCION = "defuncion"
     OBITO = "obito"
+    REFERENCIA = "referencia"
 
 class LogApp:
     GENERAL = "general"

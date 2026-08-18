@@ -2,15 +2,19 @@ import json
 from django import forms
 from datetime import date
 from django.utils.timezone import localtime, localdate
-from .models import Referencia, Respuesta
+from .models import Referencia, Respuesta, ControlCalidadReferencia
 from clinico.models import Diagnostico
 from servicio.models import Institucion_salud, Area_atencion
 from referencia.models import Referencia_especialidad
 from core.services.paciente_service import PacienteService
 from core.services.servicio_service import ServicioService
+from core.constants.choices_constants import TipoControlCalidadReferencia
 from core.validators.fecha_validator import validar_fecha
 from core.validators.paciente import validar_paciente
+from servicio.validators import validar_instancia_area_atencion, validar_instancia_unidad_clinica_activa, validar_unidad_clinica_activa
 from .validators import validar_instituciones_origen_destino, validar_diagnosticos_json, validar_referencia_para_respuesta
+from core.validators.main_validator import validar_entero_positivo, validar_booleano
+from rrhh.validators import validar_personal_salud_activo
 from django.db.models import Q
 
 
@@ -28,8 +32,31 @@ class ReferenciaCreateForm(forms.ModelForm):
     idReferencia = forms.CharField(widget=forms.HiddenInput(), required=False)
     idSeguimiento = forms.CharField(widget=forms.HiddenInput(), required=False)
 
+    # control de calidad
+    formato_correcto = forms.BooleanField(required=False)
+    letra_legible = forms.BooleanField(required=False)
+    datos_completos = forms.BooleanField(required=False)
+    manchones_borrones = forms.BooleanField(required=False, label="Manchones Borrones")
+    firma_sello = forms.BooleanField(required=False, label="Firma y Sello")
 
-    
+    CAMPOS_CONTROL_CALIDAD = (
+        "formato_correcto",
+        "letra_legible",
+        "datos_completos",
+        "manchones_borrones",
+        "firma_sello",
+    )
+
+    personal_salud_refiere_id = forms.IntegerField(
+        required=False,
+        widget=forms.HiddenInput()
+    )
+
+    unidad_clinica_responsable_id = forms.IntegerField(
+        required=False,
+        widget=forms.HiddenInput()
+    )
+        
     fecha_elaboracion = forms.DateTimeField(
         initial=localtime,  # devuelve datetime con tu zona local
         widget=forms.DateTimeInput(
@@ -63,7 +90,37 @@ class ReferenciaCreateForm(forms.ModelForm):
 
     class Meta:
         model = Referencia
-        fields = ["fecha_elaboracion", "fecha_recepcion", "tipo","institucion_origen", "institucion_destino", "atencion_requerida", "motivo","motivo_detalle","elaborada_por","oportuna","justificada","observaciones","especialidad_destino","unidad_clinica_refiere","motivo_no_atencion"]
+        fields = [
+                # Fechas
+                "fecha_elaboracion",
+                "fecha_recepcion",
+
+                # Datos generales
+                "tipo",
+                "institucion_origen",
+                "institucion_destino",
+                "atencion_requerida",
+
+                # Motivo
+                "motivo",
+                "motivo_detalle",
+
+                # Elaboración
+                "elaborada_por",
+
+                # Calidad
+                "oportuna",
+                "justificada",
+                "formato_sinar",
+
+                # Destino
+                "especialidad_destino",
+                "unidad_clinica_refiere",
+                "motivo_no_atencion",
+
+                # Observaciones
+                "observaciones",
+            ]
 
 
     def asignar_propiedades_campos_paciente(self):
@@ -107,6 +164,7 @@ class ReferenciaCreateForm(forms.ModelForm):
             'placeholder': 'Institucion Origen'
         })
         self.fields['motivo_no_atencion'].widget = forms.HiddenInput()
+
 
 
         if self.instance and self.instance.pk:
@@ -203,7 +261,13 @@ class ReferenciaCreateForm(forms.ModelForm):
         fecha_recepcion = cleaned_data.get("fecha_recepcion")
         especialidad_destino = cleaned_data.get("especialidad_destino")
         unidad_clinica = cleaned_data.get('unidad_clinica_refiere')
-        atencion_requerida = self.cleaned_data.get("atencion_requerida")
+        atencion_requerida = cleaned_data.get("atencion_requerida")
+        personal_salud_refiere_id = cleaned_data.get("personal_salud_refiere_id")
+        unidad_clinica_responsable_id = cleaned_data.get("unidad_clinica_responsable_id")
+
+
+
+
         if atencion_requerida is None:
             raise forms.ValidationError("Debe indicar la atencion requerida")
         
@@ -229,6 +293,7 @@ class ReferenciaCreateForm(forms.ModelForm):
         if tipo_ref == 1:  # Enviada
             cleaned_data['justificada'] = None
             cleaned_data['oportuna'] = None
+            cleaned_data['formato_sinar'] = None
             cleaned_data['fecha_recepcion'] = None
             cleaned_data['motivo_no_atencion'] = None
 
@@ -240,6 +305,29 @@ class ReferenciaCreateForm(forms.ModelForm):
                     raise forms.ValidationError("Unidad clínica inactiva")
             else:
                 raise forms.ValidationError("Debe indicar el área que refiere")
+            
+            # validar que si es enviada debe consigar que profesional la digito 
+            if not personal_salud_refiere_id:
+                raise forms.ValidationError("Debe indicar el profesional de salud que elaboró la referencia.")  
+            
+            validar_entero_positivo(personal_salud_refiere_id, "personal_salud_refiere")
+            personal_salud = validar_personal_salud_activo(personal_salud_refiere_id)
+            cleaned_data["personal_salud_refiere"] = personal_salud
+            cleaned_data["elaborada_por"] = personal_salud.tipo_personal_salud
+
+            # control de calidad
+            criterios_calidad = {}
+            for campo in self.CAMPOS_CONTROL_CALIDAD:
+                valor = validar_booleano(
+                    self.data.get(campo),
+                    campo
+                )
+
+                cleaned_data[campo] = valor          # Reemplaza el True de BooleanField
+                criterios_calidad[campo] = valor     # Construye el objeto
+            cleaned_data["control_calidad"] = criterios_calidad
+
+
 
         else: #recibida
             cleaned_data['especialidad_destino'] = None
@@ -256,9 +344,15 @@ class ReferenciaCreateForm(forms.ModelForm):
                 cleaned_data['oportuna'] = oportuna
             else:
                 raise forms.ValidationError("Debe indicar los datos de calidad (Justificada, Oportuna).")
-            
-    
 
+            cleaned_data["formato_sinar"] = validar_booleano(
+                self.data.get("formato_sinar"),
+                "Formato SINAR"
+            )
+            
+            validar_entero_positivo(unidad_clinica_responsable_id, "Unidad Clinica Responsable")
+            unidad_clinica_responsable = validar_unidad_clinica_activa(unidad_clinica_responsable_id)
+            cleaned_data["unidad_clinica_responsable"] = unidad_clinica_responsable
 
         #verificamos si es un paciente aceptable 
         cleaned_data['paciente'] = validar_paciente(id_paciente)
@@ -272,6 +366,7 @@ class ReferenciaCreateForm(forms.ModelForm):
         self.diagnosticos_validados = validar_diagnosticos_json(diagnosticos_json)
 
         return cleaned_data
+
 
 
 class ReferenciaEditForm(ReferenciaCreateForm):
@@ -292,6 +387,29 @@ class ReferenciaEditForm(ReferenciaCreateForm):
             if self.instance.institucion_destino:
                 qs_activas = qs_activas | Institucion_salud.objects.filter(pk=self.instance.institucion_destino.pk)
 
+            # Inicializar el campo oculto del personal de salud que refiere
+            if self.instance.personal_salud_refiere_id:
+                self.fields["personal_salud_refiere_id"].initial = (
+                    self.instance.personal_salud_refiere_id
+                )
+
+            # Inicializar el campo oculto de la unidad clínica responsable
+            if self.instance.unidad_clinica_responsable_id:
+                self.fields["unidad_clinica_responsable_id"].initial = (
+                    self.instance.unidad_clinica_responsable_id
+                )
+
+
+            # PASARA LA DATA DE CALIDAD SI SE ENCUETRA 
+            control = getattr(self.instance, "control_calidad", None)
+
+            if control:
+                self.fields["formato_correcto"].initial = control.formato_correcto
+                self.fields["letra_legible"].initial = control.letra_legible
+                self.fields["datos_completos"].initial = control.datos_completos
+                self.fields["manchones_borrones"].initial = control.manchones_borrones
+                self.fields["firma_sello"].initial = control.firma_sello
+
 
         self.fields['institucion_origen'].queryset = qs_activas.distinct()
         self.fields['institucion_origen'].widget.attrs.update({
@@ -311,8 +429,6 @@ class ReferenciaEditForm(ReferenciaCreateForm):
         id_paciente = cleaned_data.get('idPaciente')
         tipo = cleaned_data.get('tipo')
         referencia_vieja = self.instance
-
-        
 
         try:
             id_paciente = int(id_paciente)
@@ -414,6 +530,12 @@ class RespuestaCreateForm(forms.ModelForm):
 
     idRespuesta = forms.CharField(widget=forms.HiddenInput(), required=False)
 
+    personal_salud_responde_id = forms.IntegerField( 
+        required=False,
+        widget=forms.HiddenInput()
+
+    )
+
     # campos si es que repeusta inicia una referncia enviada
     seguimiento_referencia_institucion_destino = forms.ModelChoiceField(
         queryset=Institucion_salud.objects.none(),
@@ -435,6 +557,26 @@ class RespuestaCreateForm(forms.ModelForm):
         label="Especialidad Destino"
     )
 
+    # control de calidad
+    formato_correcto = forms.BooleanField(required=False)
+    letra_legible = forms.BooleanField(required=False)
+    datos_completos = forms.BooleanField(required=False)
+    manchones_borrones = forms.BooleanField(
+        required=False,
+        label="Manchones Borrones"
+    )
+    firma_sello = forms.BooleanField(
+        required=False,
+        label="Firma y Sello"
+    )
+
+    CAMPOS_CONTROL_CALIDAD_RESPUESTA = (
+        "formato_correcto",
+        "letra_legible",
+        "datos_completos",
+        "manchones_borrones",
+        "firma_sello",
+    )
 
     class Meta:
         model = Respuesta
@@ -480,11 +622,19 @@ class RespuestaCreateForm(forms.ModelForm):
         )
         qs_especialidades_referencia = Referencia_especialidad.objects.filter(estado=True)
 
+
+        #controles de calidad se agregan aca porque la vista no tiene constex vive dentrio de referencia
+        self.campos_control_calidad = [
+            self[campo]
+            for campo in self.CAMPOS_CONTROL_CALIDAD_RESPUESTA
+        ]
+
         initial_institucion = None
         initial_especialidad = None
         readonly = False  
 
         if self.instance and self.instance.pk:
+
             if self.instance.seguimiento_referencia:
                 # ---- Institución destino ----
                 qs_extra = Institucion_salud.objects.filter(
@@ -498,6 +648,26 @@ class RespuestaCreateForm(forms.ModelForm):
                     initial_especialidad = self.instance.seguimiento_referencia.especialidad_destino.pk
 
                 readonly = True
+
+
+                
+            # Inicializar el campo oculto del personal de salud que reponde
+            self.fields["personal_salud_responde_id"].initial = (
+                self.instance.personal_salud_responde_id
+            )
+
+
+            #inital para los controles de calidad 
+            control = getattr(self.instance, "control_calidad", None) # se usa referencia para apuntart al control de cliada no la respuesta
+
+            if control:
+
+                self.fields["formato_correcto"].initial = control.formato_correcto
+                self.fields["letra_legible"].initial = control.letra_legible
+                self.fields["datos_completos"].initial = control.datos_completos
+                self.fields["manchones_borrones"].initial = control.manchones_borrones
+                self.fields["firma_sello"].initial = control.firma_sello
+            
 
         # Asignar querysets
         self.fields['seguimiento_referencia_especialidad_destino'].queryset = qs_especialidades_referencia.distinct()
@@ -598,8 +768,12 @@ class RespuestaCreateForm(forms.ModelForm):
     def clean(self):
         cleaned_data = super().clean()
 
+      
+
         # Campos clave
         tipo_referencia = int(self.data.get("tipo")) if self.data.get("tipo") is not None else None
+        personal_salud_responde_id = cleaned_data.get("personal_salud_responde_id")
+
 
         # Fechas
         fecha_elaboracion = cleaned_data.get("fecha_elaboracion")  # datetime
@@ -624,17 +798,20 @@ class RespuestaCreateForm(forms.ModelForm):
         if tipo_referencia == 0 : # recibida
             if fecha_atencion and fecha_elaboracion and fecha_atencion > fecha_elaboracion:
                 raise forms.ValidationError("La fecha de atención no puede ser posterior a la fecha de elaboración.")
-
-            if not area_capta:
-                raise forms.ValidationError("El área que capta la referencia es obligatoria.")
             
-            if not unidad_clinica_responde:
-                raise forms.ValidationError("Debe indicar un área de respuesta para la respuesta.")
+
+            cleaned_data["area_capta"] = validar_instancia_area_atencion(area_capta)
+            cleaned_data["unidad_clinica_responde"] = validar_instancia_unidad_clinica_activa(unidad_clinica_responde)
+
+            # Validar el profesional de salud que elaboró la respuesta
+            if not personal_salud_responde_id:
+                raise forms.ValidationError("Debe indicar el profesional de salud que elaboró la respuesta.") 
+            validar_entero_positivo(personal_salud_responde_id, "personal_salud_responde")
+            personal_salud = validar_personal_salud_activo(personal_salud_responde_id)
+            cleaned_data["personal_salud_responde"] = personal_salud
+            cleaned_data["elaborada_por"] = personal_salud.tipo_personal_salud
+
             
-            if unidad_clinica_responde.estado != 1:
-                raise forms.ValidationError("Unidad clínica inactiva")
-
-
             # BLOQUEO DE CAMBIO SI YA EXISTE UNA REFERENCIA ENVIADA
             if self.instance.pk and self.instance.seguimiento_referencia:
                 if seguimiento != 2:  # solo válido si mantiene tipo "referencia enviada"
@@ -671,7 +848,22 @@ class RespuestaCreateForm(forms.ModelForm):
             else:
                 raise forms.ValidationError("Debe indicar al menos un tipo de seguimiento")
 
-                
+
+            # control de calidad
+            criterios_calidad = {}
+            for campo in self.CAMPOS_CONTROL_CALIDAD_RESPUESTA:
+                valor = validar_booleano(
+                    self.data.get(campo),
+                    campo
+                )
+
+                cleaned_data[campo] = valor             # Reemplaza el True de BooleanField
+                criterios_calidad[campo] = valor        # Construye el objeto
+            cleaned_data["control_calidad"] = criterios_calidad
+
+
+
+
         elif tipo_referencia == 1:  # enviada
             # Validaciones futuras para tipo enviada
             if not institucion_destino:
@@ -687,6 +879,7 @@ class RespuestaCreateForm(forms.ModelForm):
         except (TypeError, json.JSONDecodeError):
             raise forms.ValidationError("Los diagnósticos no son válidos.")
 
+        
         if not diagnosticos:
             raise forms.ValidationError("Debe enviar al menos un estudio.")
 
@@ -706,6 +899,7 @@ class RespuestaCreateForm(forms.ModelForm):
             if codigo not in estudios_existentes_ids:
                 raise forms.ValidationError(f"El código de diagnostico {codigo} no existe en la base de datos.")
 
+        print(f"sin validar {diagnosticos}") 
         self.diagnosticos_validados = diagnosticos
         
         return cleaned_data

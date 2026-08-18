@@ -2,7 +2,8 @@ from django.db import models
 from paciente.models import Paciente
 from servicio.models import Institucion_salud, Sala, Area_atencion, ServiciosAux, Unidad_clinica
 from clinico.models import Tipo_personal_salud, Diagnostico, Condicion_paciente
-from core.constants.choices_constants import AtencionRequerida, MetodoSeguimiento, FuenteSeguimiento
+from rrhh.models import PersonalSalud
+from core.constants.choices_constants import AtencionRequerida, MetodoSeguimiento, FuenteSeguimiento, TipoControlCalidadReferencia
 from django.contrib.auth.models import User
 from django.utils import timezone
 
@@ -99,6 +100,25 @@ class Referencia(models.Model):
         blank=True,
     )
 
+    # NUEVO
+    personal_salud_refiere = models.ForeignKey(
+        PersonalSalud,
+        related_name="referencias_realizadas",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        verbose_name="Personal que refiere"
+    )
+
+    # Unidad clínica responsable de responder (solo para referencias tipo recibida)
+    unidad_clinica_responsable = models.ForeignKey(
+        Unidad_clinica,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="referencias_recibidas_responsables"
+    )
+
     # Área que refiere (solo para referencias tipo enviada)
     unidad_clinica_refiere = models.ForeignKey(Unidad_clinica, on_delete=models.PROTECT, null=True, blank=True, related_name="referencias_enviadas")
     
@@ -117,6 +137,12 @@ class Referencia(models.Model):
         (2, "NO"),
         (3, "N/C"),
     )
+
+    formato_sinar = models.BooleanField(
+        null=True,
+        blank=True
+    )
+    
     oportuna =  models.PositiveSmallIntegerField(
         choices=OPCIONES_CALIDAD, null=True, blank=True, verbose_name="Oportuna"
         )
@@ -272,6 +298,17 @@ class Respuesta(models.Model):
         null=True,
         blank=True,
     )
+
+    # NUEVO
+    personal_salud_responde = models.ForeignKey(
+        PersonalSalud,
+        related_name="respuestas_realizadas",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        verbose_name="Personal de salud que responde"
+    )
+
     motivo = models.ForeignKey(
         Motivo_envio,
         related_name="respuestas",
@@ -337,3 +374,81 @@ class Respuesta_diagnostico(models.Model):
 
     def __str__(self):
         return f"{self.respuesta.id} - {self.diagnostico.nombre_diagnostico}"
+
+
+
+class ControlCalidadReferencia(models.Model):
+
+    referencia = models.OneToOneField(
+        Referencia,
+        on_delete=models.CASCADE,
+        related_name="control_calidad"
+    )
+
+    formato_correcto = models.BooleanField(default=False)
+    letra_legible = models.BooleanField(default=False)
+    datos_completos = models.BooleanField(default=False)
+    manchones_borrones = models.BooleanField(default=False)
+    firma_sello = models.BooleanField(default=False)
+
+    fecha_creado = models.DateTimeField(auto_now_add=True)
+    fecha_modificado = models.DateTimeField(auto_now=True)
+
+    creado_por = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="controles_calidad_creados"
+    )
+
+    modificado_por = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="controles_calidad_modificados"
+    )
+
+    class Meta:
+        db_table = "referencia_referencia_control_calidad"
+        verbose_name = "Control de calidad"
+        verbose_name_plural = "Controles de calidad"
+
+    def __str__(self):
+        return f"Control de calidad - Referencia #{self.referencia_id}"
+
+
+
+class ControlCalidadRespuesta(models.Model):
+
+    respuesta = models.OneToOneField(
+        Respuesta,
+        on_delete=models.CASCADE,
+        related_name="control_calidad"
+    )
+
+    formato_correcto = models.BooleanField(default=False)
+    letra_legible = models.BooleanField(default=False)
+    datos_completos = models.BooleanField(default=False)
+    manchones_borrones = models.BooleanField(default=False)
+    firma_sello = models.BooleanField(default=False)
+
+    fecha_creado = models.DateTimeField(auto_now_add=True)
+    fecha_modificado = models.DateTimeField(auto_now=True)
+
+    creado_por = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="controles_calidad_respuesta_creados"
+    )
+
+    modificado_por = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="controles_calidad_respuesta_modificados"
+    )
+
+    class Meta:
+        db_table = "referencia_respuesta_control_calidad"
+        verbose_name = "Control de calidad de respuesta"
+        verbose_name_plural = "Controles de calidad de respuesta"
+
+    def __str__(self):
+        return f"Control de calidad - Respuesta #{self.respuesta_id}"
