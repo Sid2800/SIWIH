@@ -98,7 +98,6 @@ function prefillEgreso(eg, ing) {
     $('#eg-egr-servicio').val(eg.egreso_servicio_id || '');
     cargarSalas(eg.egreso_servicio_id, eg.egreso_sala_id);
     $('#eg-fecha-egreso').val(eg.fecha_egreso || '');
-    $('#eg-hora-egreso').val(eg.hora_egreso || '');
     $('#eg-fecha-ingreso').val(eg.fecha_ingreso || ing.fecha_ingreso || '');
     $('#eg-cond-num').val(eg.condicion_egreso_num != null ? eg.condicion_egreso_num : '');
     $('#eg-razon-num').val(eg.razon_egreso_num != null ? eg.razon_egreso_num : '');
@@ -289,7 +288,6 @@ function guardar() {
         egreso_servicio_id: $('#eg-egr-servicio').val() || null,
         egreso_sala_id: $('#eg-egr-sala').val() || null,
         fecha_egreso: $('#eg-fecha-egreso').val(),
-        hora_egreso: $('#eg-hora-egreso').val(),
         fecha_ingreso: $('#eg-fecha-ingreso').val(),
         condicion_egreso_num: $('#eg-cond-num').val() || null,
         razon_egreso_num: $('#eg-razon-num').val() || null,

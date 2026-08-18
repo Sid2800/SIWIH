@@ -124,6 +124,11 @@ def _rango_periodo(periodo, fecha_ref, desde, hasta):
       - (otro/todos): sin filtro -> (None, None)
     """
     ref = _parse_fecha(fecha_ref) or date.today()
+    if periodo == 'hoy':
+        return date.today(), date.today()
+    if periodo == 'ayer':
+        ayer = date.today() - timedelta(days=1)
+        return ayer, ayer
     if periodo == 'dia':
         return ref, ref
     if periodo == 'semana':
@@ -691,7 +696,10 @@ def guardar_egreso_api(request, detalle_id):
             eg.lugar_accidente = (body.get('lugar_accidente') or '').strip() or None
             eg.egreso_servicio_id = _entero(body.get('egreso_servicio_id'))
             eg.egreso_sala_id = _entero(body.get('egreso_sala_id'))
-            eg.hora_egreso = _parse_hora(body.get('hora_egreso'))
+            # La hora no se pide en la hoja: se guarda automáticamente (hora local
+            # del momento de registro) y no se muestra al personal.
+            if eg.hora_egreso is None:
+                eg.hora_egreso = timezone.localtime().time()
             eg.condicion_egreso_num = _entero(body.get('condicion_egreso_num'))
             eg.razon_egreso_num = _entero(body.get('razon_egreso_num'))
             eg.referido_institucion_id = _entero(body.get('referido_institucion_id'))
@@ -1051,6 +1059,76 @@ def marcar_devueltos_api(request, lote_id):
         return JsonResponse({"success": True, "lote_id": lote.id, "marcados": marcados})
     except Exception as e:
         log_error(f"Error en marcar_devueltos_api ({lote_id}): {e}", app=LogApp.EGRESOS)
+        return JsonResponse({"error": "Error interno del servidor"}, status=500)
+
+
+@csrf_protect
+@require_POST
+def capturar_parcial_api(request, lote_id):
+    """
+    Recepción PARCIAL: de un lote regresaron solo algunos expedientes. Admisión
+    captura (registra) los devueltos cerrando este lote con ellos, y los que NO
+    regresaron vuelven a Estadística en un lote nuevo (continuación) para que los
+    devuelva más adelante.
+
+    Ej.: de 10 regresaron 7 -> se cierra este lote con esos 7 (ya en Admisión) y
+    los 3 pendientes pasan a un lote nuevo abierto del mismo usuario de
+    Estadística (siguen físicamente en Estadística).
+    """
+    if not _tiene_permiso_admision(request.user):
+        return JsonResponse({"error": "Sin permisos"}, status=403)
+
+    lote = get_object_or_404(
+        LoteEgreso.objects.prefetch_related('detalles'), id=lote_id
+    )
+    if lote.estado != LoteEgreso.EN_REVISION:
+        return JsonResponse({"error": "El lote no está en revisión"}, status=400)
+
+    detalles = list(lote.detalles.all())
+    devueltos = [d for d in detalles if d.estado == LoteEgresoDetalle.DEVUELTO]
+    pendientes = [d for d in detalles if d.estado != LoteEgresoDetalle.DEVUELTO]
+
+    if not devueltos:
+        return JsonResponse(
+            {"error": "No hay expedientes devueltos para capturar"}, status=400
+        )
+
+    try:
+        nuevo_lote_id = None
+        with transaction.atomic():
+            # Los pendientes vuelven a Estadística en un lote de continuación.
+            if pendientes:
+                nuevo = LoteEgreso.objects.create(
+                    usuario_estadistica=lote.usuario_estadistica,
+                    observaciones=(f"Continuación del lote #{lote.id}: expedientes "
+                                   f"que no se habían devuelto a Admisión."),
+                )
+                LoteEgresoDetalle.objects.filter(
+                    id__in=[d.id for d in pendientes]
+                ).update(lote=nuevo)
+                nuevo_lote_id = nuevo.id
+
+            # Se cierra este lote con los devueltos (recepción registrada).
+            lote.estado = LoteEgreso.CERRADO
+            lote.usuario_admision = request.user
+            lote.fecha_captura_admision = timezone.now()
+            lote.save(update_fields=['estado', 'usuario_admision', 'fecha_captura_admision'])
+
+        log_info(
+            f"Lote #{lote.id} capturado parcial por {request.user.username}: "
+            f"{len(devueltos)} devueltos, {len(pendientes)} vuelven a Estadística"
+            + (f" (lote #{nuevo_lote_id})" if nuevo_lote_id else ""),
+            app=LogApp.EGRESOS,
+        )
+        return JsonResponse({
+            "success": True,
+            "cerrado": lote.id,
+            "devueltos": len(devueltos),
+            "regresan_estadistica": len(pendientes),
+            "nuevo_lote": nuevo_lote_id,
+        })
+    except Exception as e:
+        log_error(f"Error en capturar_parcial_api ({lote_id}): {e}", app=LogApp.EGRESOS)
         return JsonResponse({"error": "Error interno del servidor"}, status=500)
 
 

@@ -15,23 +15,27 @@ const _idsDerecha = new Set();   // expediente_id elegidos
 const _selIzq = new Set();       // marcados (resaltados) en la izquierda
 const _selDer = new Set();
 
-let _periodo = 'todos';   // filtro por fecha de ingreso activo
+// Por defecto se cargan los ingresos de AYER (normalmente se llena lo del día anterior).
+let _periodo = 'ayer';
+
+// La fecha de referencia solo aplica a semana/mes/año.
+function _usaFechaRef(p) { return p === 'semana' || p === 'mes' || p === 'anio'; }
 
 $(document).ready(function () {
     $('#cap-fecha').val(new Date().toLocaleString('es-HN', { hour12: false }));
-    // Fecha de referencia por defecto: hoy (oculta mientras el filtro sea "Todos").
+    // Fecha de referencia por defecto: hoy (oculta salvo semana/mes/año).
     $('#cap-fecha-ref').val(new Date().toISOString().slice(0, 10));
     $('#cap-fecha-ref-cont').hide();
     cargarIngresos();
 
-    // Filtro por período (día/semana/mes/año/rango/todos).
+    // Filtro por período (ayer/hoy/semana/mes/año/rango/todos).
     $('.egresos-periodo').on('click', function () {
         _periodo = $(this).data('periodo');
         $('.egresos-periodo').removeClass('egresos-periodo--activa');
         $(this).addClass('egresos-periodo--activa');
-        // Rango muestra desde/hasta; el resto usa la fecha de referencia.
+        // Rango muestra desde/hasta; semana/mes/año usan la fecha de referencia.
         $('.egresos-rango-campo').toggle(_periodo === 'rango');
-        $('#cap-fecha-ref-cont').toggle(_periodo !== 'rango' && _periodo !== 'todos');
+        $('#cap-fecha-ref-cont').toggle(_usaFechaRef(_periodo));
         cargarIngresos();
     });
     $('#cap-fecha-ref, #cap-fecha-desde, #cap-fecha-hasta').on('change', cargarIngresos);

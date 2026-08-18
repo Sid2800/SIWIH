@@ -96,12 +96,17 @@ function loteHtml(lote, detallesVisibles) {
                         data-lote="${lote.lote_id}">
                     <i class="bi bi-box-arrow-in-left"></i> Marcar seleccionados como devueltos
                 </button>
+                ${(lote.devueltos > 0 && !lote.todos_devueltos) ? `
+                <button type="button" class="formularioBotones-boton egresos-btn-parcial"
+                        data-lote="${lote.lote_id}">
+                    <i class="bi bi-scissors"></i> Capturar parcial (${lote.devueltos} de ${lote.total})
+                </button>` : ''}
                 <button type="button" class="formularioBotones-boton egresos-btn-cerrar"
                         data-lote="${lote.lote_id}" ${lote.todos_devueltos ? '' : 'disabled'}>
                     <i class="bi bi-lock-fill"></i> Cerrar lote
                 </button>
                 ${lote.todos_devueltos ? '' :
-                    '<span class="egresos-cerrar-nota">El lote se cierra cuando regresan todos</span>'}
+                    '<span class="egresos-cerrar-nota">Cierre total cuando regresan todos, o capture parcial</span>'}
             </footer>
         </section>`;
 }
@@ -154,6 +159,49 @@ $(document).on('click', '.egresos-btn-marcar', function () {
     }).fail(function (xhr) {
         const err = xhr.responseJSON ? xhr.responseJSON.error : 'No se pudo marcar';
         toastr.error(err);
+    });
+});
+
+// Capturar recepción parcial: cierra el lote con los devueltos; los pendientes
+// vuelven a Estadística en un lote nuevo.
+$(document).on('click', '.egresos-btn-parcial', function () {
+    const loteId = $(this).data('lote');
+    const lote = _lotes.find(l => l.lote_id === loteId);
+    const pendientes = lote ? (lote.total - lote.devueltos) : 0;
+    Swal.fire({
+        title: `¿Capturar recepción parcial del lote #${loteId}?`,
+        html: `Se registran los <strong>${lote ? lote.devueltos : ''}</strong> expedientes devueltos
+               (quedan en Admisión) y los <strong>${pendientes}</strong> pendientes
+               <strong>vuelven a Estadística</strong> en un lote nuevo para devolverlos después.`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: '<i class="bi bi-scissors"></i> Sí, capturar parcial',
+        cancelButtonText: '<i class="bi bi-x-circle-fill"></i> Cancelar',
+        customClass: {
+            popup: 'contenedor-modal',
+            title: 'contener-modal-titulo',
+            confirmButton: 'contener-modal-boton-confirmar',
+            cancelButton: 'contener-modal-boton-cancelar',
+        },
+        didOpen: () => {
+            const a = document.querySelector('.swal2-actions');
+            if (a) a.classList.add('contener-modal-contenedor-botones');
+        }
+    }).then(function (result) {
+        if (!result.isConfirmed) return;
+        $.ajax({
+            url: urlConId(window.urls.egresos_capturar_parcial_api, loteId),
+            method: 'POST',
+            headers: { 'X-CSRFToken': window.CSRF_TOKEN },
+        }).done(function (resp) {
+            if (!resp.success) return;
+            toastr.success(`Lote #${resp.cerrado} cerrado con ${resp.devueltos} devuelto(s). ` +
+                `${resp.regresan_estadistica} vuelven a Estadística.`);
+            cargarLotes();
+        }).fail(function (xhr) {
+            const err = xhr.responseJSON ? xhr.responseJSON.error : 'No se pudo capturar parcial';
+            toastr.error(err);
+        });
     });
 });
 
