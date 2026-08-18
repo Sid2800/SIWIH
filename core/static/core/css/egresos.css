@@ -268,3 +268,49 @@
 .egresos-recepcion-item { justify-content: flex-start; }
 .egresos-rec-check { margin-left: auto; }
 .listbox li.egresos-recepcion-item:hover .egresos-rec-check { color: var(--blanco); }
+
+
+/* ============================================================
+   FORMULARIO HC-13 — secciones nuevas
+   ============================================================ */
+/* Datos de ingreso: bloque de solo lectura, tono distinto. */
+.egresos-solo-lectura { background: var(--colorContendor); opacity: 0.97; }
+.egresos-solo-lectura legend i { color: var(--colorBoton); margin-right: 0.3rem; }
+
+/* Leyenda de condición/razón de egreso (números). */
+.egresos-leyenda {
+    list-style: none; margin: 0.4rem 0 0; padding: 0;
+    font-size: 1.1rem; opacity: 0.8; line-height: 1.5;
+}
+.egresos-leyenda b { display: inline-block; min-width: 1.2rem; }
+
+.egresos-nota-inline {
+    flex-basis: 100%; margin: 0 0 0.6rem; font-size: 1.2rem; opacity: 0.75;
+}
+.egresos-nota-inline i { color: var(--colorBoton); }
+
+/* Institución (Referido a): contenedor relativo para el dropdown. */
+.egresos-inst-campo { position: relative; }
+.egresos-inst-campo .egresos-diag-sugerencias { top: 100%; }
+
+/* Personal que atendió el parto: checkboxes en rejilla. */
+.egresos-personal {
+    display: flex; flex-wrap: wrap; gap: 0.5rem 1.4rem;
+    padding: 0.4rem 0;
+}
+
+/* Filas de procedimiento quirúrgico y de producto del embarazo. */
+.egresos-proc-fila, .egresos-prod-fila {
+    display: flex; gap: 0.6rem; align-items: center; margin-bottom: 0.6rem;
+    flex-wrap: wrap;
+}
+.egresos-proc-dia, .egresos-proc-mes { flex: 0 0 5rem; }
+.egresos-proc-anio { flex: 0 0 7rem; }
+.egresos-proc-codigo { flex: 0 0 9rem; }
+.egresos-proc-desc { flex: 1 1 14rem; min-width: 0; }
+.egresos-prod-sexo, .egresos-prod-cond { flex: 0 0 10rem; }
+.egresos-prod-peso { flex: 0 0 10rem; }
+
+@media (max-width: 768px) {
+    .egresos-proc-fila > *, .egresos-prod-fila > * { flex-basis: 100%; }
+}

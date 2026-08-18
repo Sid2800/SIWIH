@@ -1,7 +1,7 @@
 {% extends 'core/base.html' %}
 {% load static %}
 
-{% block title %}Datos del Egreso{% endblock title %}
+{% block title %}Hoja de Hospitalización — Egreso{% endblock title %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'core/css/egresos.css' %}">
@@ -9,38 +9,53 @@
 
 {% block content %}
 {% comment %}
-Formulario de egreso de UN expediente tomado (un detalle de lote). Los datos del
-paciente y la fecha/área de ingreso vienen precargados; Estadística completa lo
-propio del egreso. Los diagnósticos son ilimitados (código CIE10 + descripción).
+Formulario de egreso (HC-13). Arriba, los DATOS DE INGRESO ya registrados (solo
+lectura). Debajo, lo que Estadística completa de la hoja de hospitalización.
 {% endcomment %}
 <div class="contenedor2 egresos-form-page">
     {% include 'egresos/_tabs.html' with activo='llenado' %}
     <div class="tituloFormulario sexp-margin-bottom-15">
         <div class="tituloFormulario-texto">
             <i class="bi bi-clipboard-plus"></i>
-            <h2 class="sin-margen">Datos del Egreso</h2>
+            <h2 class="sin-margen">Hoja de Hospitalización — Egreso</h2>
         </div>
         <div class="tituloFormulario-subrallado"></div>
     </div>
 
-    <!-- Datos del paciente / expediente (solo lectura, precargados) -->
-    <fieldset class="recepcionIngresoCampos">
-        <legend>Paciente y expediente</legend>
-        <div class="formularioCampo">
-            <label>Expediente</label>
-            <input type="text" id="eg-expediente" class="formularioCampo-text" disabled>
-        </div>
-        <div class="formularioCampo">
-            <label>Identidad</label>
-            <input type="text" id="eg-identidad" class="formularioCampo-text" disabled>
-        </div>
-        <div class="formularioCampo">
-            <label>Nombre</label>
-            <input type="text" id="eg-nombre" class="formularioCampo-text" disabled>
-        </div>
+    <!-- ============ DATOS DE INGRESO (solo lectura) ============ -->
+    <fieldset class="recepcionIngresoCampos egresos-solo-lectura">
+        <legend><i class="bi bi-lock-fill"></i> Datos de ingreso (ya registrados)</legend>
+        <div class="formularioCampo"><label>Expediente</label>
+            <input type="text" id="eg-expediente" class="formularioCampo-text" disabled></div>
+        <div class="formularioCampo"><label>Identidad</label>
+            <input type="text" id="eg-identidad" class="formularioCampo-text" disabled></div>
+        <div class="formularioCampo egresos-form-ancho"><label>Nombre</label>
+            <input type="text" id="eg-nombre" class="formularioCampo-text" disabled></div>
+        <div class="formularioCampo"><label>Fecha de nacimiento</label>
+            <input type="text" id="eg-fnac" class="formularioCampo-text" disabled></div>
+        <div class="formularioCampo"><label>Edad (al ingreso)</label>
+            <input type="text" id="eg-edad-ing" class="formularioCampo-text" disabled></div>
+        <div class="formularioCampo"><label>Sexo</label>
+            <input type="text" id="eg-sexo-ing" class="formularioCampo-text" disabled></div>
+        <div class="formularioCampo"><label>Teléfono</label>
+            <input type="text" id="eg-tel" class="formularioCampo-text" disabled></div>
+        <div class="formularioCampo"><label>Estado civil</label>
+            <input type="text" id="eg-ecivil" class="formularioCampo-text" disabled></div>
+        <div class="formularioCampo"><label>Ocupación</label>
+            <input type="text" id="eg-ocup" class="formularioCampo-text" disabled></div>
+        <div class="formularioCampo"><label>Fecha de ingreso</label>
+            <input type="text" id="eg-fing" class="formularioCampo-text" disabled></div>
+        <div class="formularioCampo"><label>Hora de ingreso</label>
+            <input type="text" id="eg-hing" class="formularioCampo-text" disabled></div>
+        <div class="formularioCampo"><label>Servicio de ingreso</label>
+            <input type="text" id="eg-serv-ing" class="formularioCampo-text" disabled></div>
+        <div class="formularioCampo"><label>Sala de ingreso</label>
+            <input type="text" id="eg-sala-ing" class="formularioCampo-text" disabled></div>
+        <div class="formularioCampo"><label>Cama</label>
+            <input type="text" id="eg-cama" class="formularioCampo-text" disabled></div>
     </fieldset>
 
-    <!-- Encabezado del renglón + área -->
+    <!-- ============ CENSO ============ -->
     <fieldset class="recepcionIngresoCampos">
         <legend>Datos del censo</legend>
         <div class="formularioCampo">
@@ -55,28 +70,6 @@ propio del egreso. Los diagnósticos son ilimitados (código CIE10 + descripció
             <label for="eg-pagina">Página (libro)</label>
             <input type="text" id="eg-pagina" class="formularioCampo-text" maxlength="20" autocomplete="off">
         </div>
-    </fieldset>
-
-    <!-- Fechas y estancia -->
-    <fieldset class="recepcionIngresoCampos">
-        <legend>Fechas</legend>
-        <div class="formularioCampo">
-            <label for="eg-fecha-ingreso">Fecha de ingreso</label>
-            <input type="date" id="eg-fecha-ingreso" class="formularioCampo-text">
-        </div>
-        <div class="formularioCampo">
-            <label for="eg-fecha-egreso">Fecha de egreso <span class="egresos-req">*</span></label>
-            <input type="date" id="eg-fecha-egreso" class="formularioCampo-text">
-        </div>
-        <div class="formularioCampo">
-            <label>Días de estancia</label>
-            <input type="text" id="eg-dias" class="formularioCampo-text" disabled>
-        </div>
-    </fieldset>
-
-    <!-- Datos clínicos -->
-    <fieldset class="recepcionIngresoCampos">
-        <legend>Datos clínicos</legend>
         <div class="formularioCampo">
             <label for="eg-edad">Edad</label>
             <input type="number" min="0" id="eg-edad" class="formularioCampo-text" autocomplete="off">
@@ -89,69 +82,188 @@ propio del egreso. Los diagnósticos son ilimitados (código CIE10 + descripció
                 <option value="M">Mujer</option>
             </select>
         </div>
+    </fieldset>
+
+    <!-- ============ DIAGNÓSTICO DE INGRESO ============ -->
+    <fieldset class="recepcionIngresoCampos egresos-diag-fs">
+        <legend>Diagnóstico de ingreso (CIE10)</legend>
+        <div class="egresos-diag-grupo">
+            <div id="eg-diag-ingreso" class="egresos-diag-lista"></div>
+            <button type="button" class="formularioBotones-boton egresos-btn-add" data-tipo="INGRESO">
+                <i class="bi bi-plus-circle"></i> Agregar diagnóstico de ingreso
+            </button>
+        </div>
+    </fieldset>
+
+    <!-- ============ ACCIDENTE O VIOLENCIA ============ -->
+    <fieldset class="recepcionIngresoCampos">
+        <legend>Accidente o violencia</legend>
+        <div class="formularioCampo egresos-form-ancho">
+            <label for="eg-causa">Causa de accidente o violencia</label>
+            <input type="text" id="eg-causa" class="formularioCampo-text" list="dl-causas"
+                   placeholder="Escriba y elija de la lista" autocomplete="off">
+            <datalist id="dl-causas">
+                {% for c in causas_accidente %}<option value="{{ c }}"></option>{% endfor %}
+            </datalist>
+        </div>
+        <div class="formularioCampo egresos-form-ancho">
+            <label for="eg-lugar">Lugar de accidente o violencia</label>
+            <input type="text" id="eg-lugar" class="formularioCampo-text" list="dl-lugares"
+                   placeholder="Escriba y elija de la lista" autocomplete="off">
+            <datalist id="dl-lugares">
+                {% for l in lugares_accidente %}<option value="{{ l }}"></option>{% endfor %}
+            </datalist>
+        </div>
+    </fieldset>
+
+    <!-- ============ EGRESO DE ============ -->
+    <fieldset class="recepcionIngresoCampos">
+        <legend>Egreso de</legend>
         <div class="formularioCampo">
-            <label for="eg-condicion">Condición al egreso</label>
-            <select id="eg-condicion" class="formularioCampo-text">
+            <label for="eg-egr-servicio">Servicio</label>
+            <select id="eg-egr-servicio" class="formularioCampo-text"></select>
+        </div>
+        <div class="formularioCampo">
+            <label for="eg-egr-sala">Sala</label>
+            <select id="eg-egr-sala" class="formularioCampo-text"></select>
+        </div>
+        <div class="formularioCampo">
+            <label for="eg-fecha-egreso">Fecha de egreso <span class="egresos-req">*</span></label>
+            <input type="date" id="eg-fecha-egreso" class="formularioCampo-text">
+        </div>
+        <div class="formularioCampo">
+            <label for="eg-hora-egreso">Hora de egreso</label>
+            <input type="time" id="eg-hora-egreso" class="formularioCampo-text">
+        </div>
+        <div class="formularioCampo">
+            <label for="eg-fecha-ingreso">Fecha de ingreso</label>
+            <input type="date" id="eg-fecha-ingreso" class="formularioCampo-text">
+        </div>
+        <div class="formularioCampo">
+            <label>Días de estancia</label>
+            <input type="text" id="eg-dias" class="formularioCampo-text" disabled>
+        </div>
+    </fieldset>
+
+    <!-- ============ DIAGNÓSTICOS DE EGRESO ============ -->
+    <fieldset class="recepcionIngresoCampos egresos-diag-fs">
+        <legend>Diagnósticos de egreso (CIE10)</legend>
+        <div class="egresos-diag-grupo">
+            <div id="eg-diag-egreso" class="egresos-diag-lista"></div>
+            <button type="button" class="formularioBotones-boton egresos-btn-add" data-tipo="EGRESO">
+                <i class="bi bi-plus-circle"></i> Agregar diagnóstico de egreso
+            </button>
+        </div>
+    </fieldset>
+
+    <!-- ============ PROCEDIMIENTOS QUIRÚRGICOS ============ -->
+    <fieldset class="recepcionIngresoCampos egresos-diag-fs">
+        <legend>Procedimientos quirúrgicos</legend>
+        <p class="egresos-nota-inline"><i class="bi bi-info-circle"></i>
+            El catálogo de códigos aún no está cargado: por ahora escriba el código.</p>
+        <div class="egresos-diag-grupo">
+            <div id="eg-proc-lista" class="egresos-diag-lista"></div>
+            <button type="button" class="formularioBotones-boton" id="eg-proc-add">
+                <i class="bi bi-plus-circle"></i> Agregar procedimiento
+            </button>
+        </div>
+    </fieldset>
+
+    <!-- ============ CONDICIÓN Y RAZÓN DE EGRESO ============ -->
+    <fieldset class="recepcionIngresoCampos">
+        <legend>Condición y razón de egreso</legend>
+        <div class="formularioCampo">
+            <label for="eg-cond-num">Condición de egreso (número)</label>
+            <input type="number" min="1" id="eg-cond-num" class="formularioCampo-text" autocomplete="off">
+            <ul class="egresos-leyenda">
+                {% for num, label in condiciones_egreso.items %}<li><b>{{ num }}</b> {{ label }}</li>{% endfor %}
+            </ul>
+        </div>
+        <div class="formularioCampo">
+            <label for="eg-razon-num">Razón de egreso (número)</label>
+            <input type="number" min="1" id="eg-razon-num" class="formularioCampo-text" autocomplete="off">
+            <ul class="egresos-leyenda">
+                {% for num, label in razones_egreso.items %}<li><b>{{ num }}</b> {{ label }}</li>{% endfor %}
+            </ul>
+        </div>
+    </fieldset>
+
+    <!-- ============ REFERIDO / AUTOPSIA ============ -->
+    <fieldset class="recepcionIngresoCampos">
+        <legend>Referencia y autopsia</legend>
+        <div class="formularioCampo egresos-form-ancho egresos-inst-campo">
+            <label for="eg-referido">Referido a (institución)</label>
+            <input type="text" id="eg-referido" class="formularioCampo-text"
+                   placeholder="Buscar institución / hospital" autocomplete="off">
+            <input type="hidden" id="eg-referido-id">
+            <div class="egresos-diag-sugerencias" id="eg-referido-sug" style="display:none;"></div>
+        </div>
+        <div class="formularioCampo">
+            <label for="eg-autopsia">¿Autopsia?</label>
+            <select id="eg-autopsia" class="formularioCampo-text">
+                <option value="no">No</option>
+                <option value="si">Sí</option>
+            </select>
+        </div>
+    </fieldset>
+
+    <!-- ============ PRODUCTO DEL EMBARAZO (obstétrico) ============ -->
+    <fieldset class="recepcionIngresoCampos egresos-diag-fs">
+        <legend>Datos del producto del embarazo</legend>
+        <div class="formularioCampo">
+            <label for="eg-parto">Parto o aborto</label>
+            <select id="eg-parto" class="formularioCampo-text">
                 <option value="">—</option>
-                <option value="V">Vivo</option>
-                <option value="M">Muerto</option>
+                <option value="PARTO">Parto</option>
+                <option value="ABORTO">Aborto</option>
             </select>
         </div>
         <div class="formularioCampo">
-            <label for="eg-peso">Peso (gramos)</label>
-            <input type="number" min="0" id="eg-peso" class="formularioCampo-text" autocomplete="off">
+            <label for="eg-num-emb">N.º de embarazo (incl. este)</label>
+            <input type="number" min="1" id="eg-num-emb" class="formularioCampo-text" autocomplete="off">
         </div>
-    </fieldset>
-
-    <!-- Operación -->
-    <fieldset class="recepcionIngresoCampos">
-        <legend>Operación (si aplica)</legend>
         <div class="formularioCampo">
-            <label for="eg-op-codigo">Código de operación</label>
-            <input type="text" id="eg-op-codigo" class="formularioCampo-text" maxlength="20"
-                   placeholder="Ej. 7499" autocomplete="off">
+            <label for="eg-gestacion">Período gestacional (semanas)</label>
+            <input type="number" min="0" id="eg-gestacion" class="formularioCampo-text" autocomplete="off">
         </div>
-        <div class="formularioCampo egresos-form-ancho">
-            <label for="eg-op-desc">Descripción de la operación</label>
-            <input type="text" id="eg-op-desc" class="formularioCampo-text" maxlength="200"
-                   placeholder="Se completa según el código" autocomplete="off">
-        </div>
-    </fieldset>
-
-    <!-- Referencia -->
-    <fieldset class="recepcionIngresoCampos">
-        <legend>Referencia</legend>
         <div class="formularioCampo">
-            <label for="eg-tipo-ref">Tipo</label>
-            <select id="eg-tipo-ref" class="formularioCampo-text">
-                <option value="">Ninguna</option>
-                <option value="TRAE">Trae referencia</option>
-                <option value="REFERIDO">Referido a</option>
-            </select>
+            <label for="eg-consultas">Total consultas prenatales</label>
+            <input type="number" min="0" id="eg-consultas" class="formularioCampo-text" autocomplete="off">
         </div>
+
         <div class="formularioCampo egresos-form-ancho">
-            <label for="eg-ref-texto">Institución</label>
-            <input type="text" id="eg-ref-texto" class="formularioCampo-text" maxlength="200" autocomplete="off">
+            <label>Personal que atendió el parto</label>
+            <div class="egresos-personal">
+                {% for p in personal_parto %}
+                <label class="egresos-check-inline">
+                    <input type="checkbox" class="eg-personal" value="{{ p }}"> {{ p }}
+                </label>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="egresos-diag-grupo egresos-form-ancho">
+            <h4 class="sin-margen">Productos (recién nacidos)</h4>
+            <div id="eg-prod-lista" class="egresos-diag-lista"></div>
+            <button type="button" class="formularioBotones-boton" id="eg-prod-add">
+                <i class="bi bi-plus-circle"></i> Agregar producto
+            </button>
         </div>
     </fieldset>
 
-    <!-- Solo áreas de observación (OA/OP) -->
+    <!-- ============ OBSERVACIÓN (OA/OP) ============ -->
     <fieldset class="recepcionIngresoCampos egresos-solo-observacion" style="display:none;">
         <legend>Observación (OA/OP)</legend>
         <div class="formularioCampo">
             <label for="eg-epicrisis">¿Tiene epicrisis?</label>
             <select id="eg-epicrisis" class="formularioCampo-text">
-                <option value="">—</option>
-                <option value="si">Sí</option>
-                <option value="no">No</option>
+                <option value="">—</option><option value="si">Sí</option><option value="no">No</option>
             </select>
         </div>
         <div class="formularioCampo">
             <label for="eg-ir-sala">¿Debería ir a sala?</label>
             <select id="eg-ir-sala" class="formularioCampo-text">
-                <option value="">—</option>
-                <option value="si">Sí</option>
-                <option value="no">No</option>
+                <option value="">—</option><option value="si">Sí</option><option value="no">No</option>
             </select>
         </div>
         <div class="formularioCampo egresos-form-ancho">
@@ -160,28 +272,7 @@ propio del egreso. Los diagnósticos son ilimitados (código CIE10 + descripció
         </div>
     </fieldset>
 
-    <!-- Diagnósticos (ilimitados) -->
-    <fieldset class="recepcionIngresoCampos egresos-diag-fs">
-        <legend>Diagnósticos</legend>
-
-        <div class="egresos-diag-grupo">
-            <h4 class="sin-margen">Diagnóstico de ingreso</h4>
-            <div id="eg-diag-ingreso" class="egresos-diag-lista"></div>
-            <button type="button" class="formularioBotones-boton egresos-btn-add" data-tipo="INGRESO">
-                <i class="bi bi-plus-circle"></i> Agregar diagnóstico de ingreso
-            </button>
-        </div>
-
-        <div class="egresos-diag-grupo">
-            <h4 class="sin-margen">Diagnósticos de egreso</h4>
-            <div id="eg-diag-egreso" class="egresos-diag-lista"></div>
-            <button type="button" class="formularioBotones-boton egresos-btn-add" data-tipo="EGRESO">
-                <i class="bi bi-plus-circle"></i> Agregar diagnóstico de egreso
-            </button>
-        </div>
-    </fieldset>
-
-    <!-- Estado y comentario -->
+    <!-- ============ ESTADO ============ -->
     <fieldset class="recepcionIngresoCampos">
         <legend>Estado</legend>
         <div class="formularioCampo">
@@ -191,7 +282,7 @@ propio del egreso. Los diagnósticos son ilimitados (código CIE10 + descripció
         </div>
         <div class="formularioCampo egresos-form-ancho" id="recepcionIngresoObservaciones">
             <label for="eg-comentario">Comentario</label>
-            <textarea id="eg-comentario" cols="40" rows="6" maxlength="500"
+            <textarea id="eg-comentario" cols="40" rows="5" maxlength="500"
                       class="formularioCampo-text" placeholder="Comentario (opcional)"></textarea>
         </div>
     </fieldset>
@@ -206,7 +297,7 @@ propio del egreso. Los diagnósticos son ilimitados (código CIE10 + descripció
     </div>
 </div>
 
-<!-- Molde de fila de diagnóstico -->
+<!-- Molde: fila de diagnóstico CIE10 -->
 <template id="eg-diag-tpl">
     <div class="egresos-diag-fila">
         <div class="egresos-diag-buscador">
@@ -217,6 +308,36 @@ propio del egreso. Los diagnósticos son ilimitados (código CIE10 + descripció
         <input type="text" class="formularioCampo-text egresos-diag-desc"
                placeholder="Descripción del diagnóstico" autocomplete="off">
         <button type="button" class="formularioBotones-boton egresos-diag-quitar" title="Quitar">
+            <i class="bi bi-x-circle"></i>
+        </button>
+    </div>
+</template>
+
+<!-- Molde: fila de procedimiento quirúrgico -->
+<template id="eg-proc-tpl">
+    <div class="egresos-proc-fila">
+        <input type="number" min="1" max="31" class="formularioCampo-text egresos-proc-dia" placeholder="Día">
+        <input type="number" min="1" max="12" class="formularioCampo-text egresos-proc-mes" placeholder="Mes">
+        <input type="number" min="1900" class="formularioCampo-text egresos-proc-anio" placeholder="Año">
+        <input type="text" class="formularioCampo-text egresos-proc-codigo" placeholder="Código" maxlength="20">
+        <input type="text" class="formularioCampo-text egresos-proc-desc" placeholder="Descripción">
+        <button type="button" class="formularioBotones-boton egresos-fila-quitar" title="Quitar">
+            <i class="bi bi-x-circle"></i>
+        </button>
+    </div>
+</template>
+
+<!-- Molde: fila de producto del embarazo -->
+<template id="eg-prod-tpl">
+    <div class="egresos-prod-fila">
+        <select class="formularioCampo-text egresos-prod-sexo">
+            <option value="">Sexo</option><option value="H">Hombre</option><option value="M">Mujer</option>
+        </select>
+        <select class="formularioCampo-text egresos-prod-cond">
+            <option value="">Condición</option><option value="V">Vivo</option><option value="M">Muerto</option>
+        </select>
+        <input type="number" min="0" class="formularioCampo-text egresos-prod-peso" placeholder="Peso (g)">
+        <button type="button" class="formularioBotones-boton egresos-fila-quitar" title="Quitar">
             <i class="bi bi-x-circle"></i>
         </button>
     </div>
