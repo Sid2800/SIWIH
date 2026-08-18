@@ -264,10 +264,18 @@
     border-radius: 0.5rem; font-size: 1.3rem;
 }
 
-/* Fila de recepción: el check "Regresó" va al final. */
+/* Fila de recepción: la acción (checkbox o "devuelto") va al final. */
 .egresos-recepcion-item { justify-content: flex-start; }
-.egresos-rec-check { margin-left: auto; }
-.listbox li.egresos-recepcion-item:hover .egresos-rec-check { color: var(--blanco); }
+.egresos-rec-accion { margin-left: auto; display: inline-flex; align-items: center; gap: 0.5rem; }
+.egresos-rec-check { white-space: nowrap; }
+.listbox li.egresos-recepcion-item:hover .egresos-rec-accion { color: var(--blanco); }
+
+.egresos-link-deshacer {
+    background: none; border: none; cursor: pointer;
+    color: var(--colorBoton); font-size: 1.15rem; text-decoration: underline;
+    padding: 0;
+}
+.listbox li.egresos-recepcion-item:hover .egresos-link-deshacer { color: var(--blanco); }
 
 
 /* ============================================================

@@ -43,6 +43,8 @@ urlpatterns = [
          name='egresos_lotes_para_recepcion_api'),
     path('api/marcar-devuelto/<int:detalle_id>/', views.marcar_devuelto_api,
          name='egresos_marcar_devuelto_api'),
+    path('api/marcar-devueltos/<int:lote_id>/', views.marcar_devueltos_api,
+         name='egresos_marcar_devueltos_api'),
     path('api/cerrar-lote/<int:lote_id>/', views.cerrar_lote_api,
          name='egresos_cerrar_lote_api'),
 ]

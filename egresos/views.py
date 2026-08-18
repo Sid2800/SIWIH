@@ -1006,6 +1006,56 @@ def marcar_devuelto_api(request, detalle_id):
 
 @csrf_protect
 @require_POST
+def marcar_devueltos_api(request, lote_id):
+    """
+    Marca como devueltos VARIOS expedientes seleccionados del lote de una sola
+    vez (los que Admisión recibió). Cada uno vuelve a ADMISIÓN y queda
+    DISPONIBLE. Los que se quedan más tiempo simplemente no se seleccionan.
+    """
+    if not _tiene_permiso_admision(request.user):
+        return JsonResponse({"error": "Sin permisos"}, status=403)
+
+    try:
+        body = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Datos inválidos"}, status=400)
+
+    lote = get_object_or_404(LoteEgreso, id=lote_id)
+    if lote.estado != LoteEgreso.EN_REVISION:
+        return JsonResponse({"error": "El lote no está en revisión"}, status=400)
+
+    detalle_ids = [i for i in (body.get('detalle_ids') or []) if i]
+    if not detalle_ids:
+        return JsonResponse({"error": "Seleccione al menos un expediente"}, status=400)
+
+    try:
+        detalles = (
+            LoteEgresoDetalle.objects
+            .filter(id__in=detalle_ids, lote=lote, estado=LoteEgresoDetalle.PRESTADO)
+            .select_related('expediente')
+        )
+        marcados = 0
+        with transaction.atomic():
+            for d in detalles:
+                d.estado = LoteEgresoDetalle.DEVUELTO
+                d.fecha_devolucion = timezone.now()
+                if d.expediente_id:
+                    devolver_a_admision(d.expediente, request.user)
+                d.save(update_fields=['estado', 'fecha_devolucion'])
+                marcados += 1
+
+        log_info(
+            f"Lote #{lote.id}: {marcados} expediente(s) devueltos por "
+            f"{request.user.username}", app=LogApp.EGRESOS,
+        )
+        return JsonResponse({"success": True, "lote_id": lote.id, "marcados": marcados})
+    except Exception as e:
+        log_error(f"Error en marcar_devueltos_api ({lote_id}): {e}", app=LogApp.EGRESOS)
+        return JsonResponse({"error": "Error interno del servidor"}, status=500)
+
+
+@csrf_protect
+@require_POST
 def cerrar_lote_api(request, lote_id):
     """
     Admisión cierra el lote: solo cuando TODOS los expedientes fueron devueltos.
