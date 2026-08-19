@@ -177,6 +177,15 @@
             </li>
             {% endif %}
 
+            {% if request.user|tiene_unidades_config:"ENCUESTAS_VISUALIZACION_UNIDADES" %}
+            <li>
+               <a href="{% url 'encuestas_inicio' %}" class="bn-navegacion__enlace">
+                  <i class="bi bi-clipboard2-check bn-navegacion-enlace__logo"></i>
+                  <span class="bn-navegacion-enlace__texto">Encuestas</span>
+               </a>
+            </li>
+            {% endif %}
+
 
 
             <li>

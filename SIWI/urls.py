@@ -36,5 +36,6 @@ urlpatterns = [
 
 
     path('s_exp/',include('s_exp.urls')),
+    path('encuestas/',include('encuestas.urls')),
     path('admin/', admin.site.urls),
 ]

@@ -1,0 +1,61 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Encuestas de Satisfacción{% endblock title %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'core/css/encuestas.css' %}">
+{% endblock extra_css %}
+
+{% block content %}
+{% comment %}
+Inicio del módulo de Encuestas (UAU). Encabezado según el tema (V_C color en
+claro, V_B blanco en oscuro) y combobox para elegir el servicio a encuestar.
+{% endcomment %}
+<div class="contenedor2 encuestas-page">
+
+    <!-- Encabezado institucional (cambia con el tema). -->
+    <div class="encuestas-encabezado">
+        <img src="{% static 'core/img/ENCABEZADO_V_C.png' %}" alt="Encabezado"
+             class="encuestas-enc-img encuestas-enc-img--color">
+        <img src="{% static 'core/img/ENCABEZADO_V_B.png' %}" alt="Encabezado"
+             class="encuestas-enc-img encuestas-enc-img--blanco">
+    </div>
+
+    <div class="tituloFormulario sexp-margin-bottom-15">
+        <div class="tituloFormulario-texto">
+            <i class="bi bi-clipboard2-check"></i>
+            <h2 class="sin-margen">Encuestas de Satisfacción</h2>
+        </div>
+        <div class="tituloFormulario-subrallado"></div>
+    </div>
+
+    <p class="encuestas-ayuda">
+        <i class="bi bi-info-circle"></i>
+        <span>Elija el servicio al que corresponde la encuesta. El encuestador es
+        usted (usuario del sistema); no se solicita por separado.</span>
+    </p>
+
+    <fieldset class="recepcionIngresoCampos encuestas-inicio-campos">
+        <legend>Nueva encuesta</legend>
+        <div class="formularioCampo">
+            <label for="enc-servicio">Servicio a encuestar</label>
+            <select id="enc-servicio" class="formularioCampo-text">
+                <option value="">— Seleccione el servicio —</option>
+                {% for cod, nombre in servicios %}
+                <option value="{{ cod }}">{{ nombre }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="formularioCampo encuestas-inicio-boton">
+            <button type="button" class="formularioBotones-boton" id="enc-continuar">
+                <i class="bi bi-arrow-right-circle"></i> <span>Continuar</span>
+            </button>
+        </div>
+    </fieldset>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script src="{% static 'core/scripts/encuestas/inicio.js' %}"></script>
+{% endblock extra_js %}

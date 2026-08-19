@@ -393,3 +393,16 @@ MAPEO_CAMAS_HISTORIALES_UNIDADES = ["ADMI"]
 # [2026-05-28] Acceso al dashboard operativo de KPIs/gráficas en tiempo real.
 MAPEO_CAMAS_DASHBOARD_ROLES = []
 MAPEO_CAMAS_DASHBOARD_UNIDADES = ["ADMI"]
+
+
+# -----------------------------
+# PERMISOS APP ENCUESTAS
+# -----------------------------
+# Encuestas de satisfacción levantadas por la Unidad de Atención al Usuario.
+# Mismo mecanismo del resto de módulos (tiene_unidades_config /
+# UnidadRolRequiredMixin / verificar_permisos_usuario): no se inventa nada nuevo.
+#   - Solo la UAU ve el módulo.
+#   - Cada usuario ingresa y ve SUS encuestas; el personal is_staff (supervisión
+#     de UAU) ve todas (se resuelve en la vista, no aquí).
+ENCUESTAS_VISUALIZACION_ROLES = ["admin", "digitador", "directivo"]
+ENCUESTAS_VISUALIZACION_UNIDADES = ["UAU"]   # Unidad de Atención al Usuario

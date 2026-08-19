@@ -78,6 +78,7 @@ class LogApp:
     AGENDA = "agenda"
     
     S_EXP = "s_exp"          # Solicitud/Préstamo de Expedientes
+    ENCUESTAS = "encuestas"  # Encuestas de satisfacción (UAU)
 
 class EstadoTemporalPeriodo(str, Enum):
     FUTURO = "FUTURO"
