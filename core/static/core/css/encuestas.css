@@ -77,3 +77,69 @@ body.darkmode .encuestas-enc-img--blanco { display: inline-block; }
     border-top: 2px solid var(--colorLinea);
     padding-top: 1rem;
 }
+
+/* ---- Lista de encuestas ---- */
+.encuestas-tabla-cont { overflow-x: auto; }
+.encuestas-tabla {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 1.35rem;
+}
+.encuestas-tabla th, .encuestas-tabla td {
+    border: 1px solid var(--colorLinea);
+    padding: 0.5rem 0.7rem;
+    text-align: left;
+    vertical-align: top;
+}
+.encuestas-tabla thead th {
+    background: var(--colorContendor);
+    color: var(--colorTablacelda);
+    white-space: nowrap;
+}
+.encuestas-tabla tbody tr:hover { background: var(--colorContendor); }
+
+.encuestas-pct {
+    display: inline-block; padding: 0.1rem 0.6rem; border-radius: 1rem;
+    font-weight: 700; color: #fff; white-space: nowrap;
+}
+.encuestas-pct--ok { background: #1f7a3d; }
+.encuestas-pct--med { background: #b8860b; }
+.encuestas-pct--bajo { background: #b23b3b; }
+
+.encuestas-btn-ver { font-size: 1.15rem; padding: 0.25rem 0.7rem; white-space: nowrap; }
+.encuestas-vacio { padding: 1.6rem; text-align: center; opacity: 0.6; font-size: 1.5rem; }
+
+/* ---- Modal de detalle ---- */
+.encuestas-modal-overlay {
+    position: fixed; inset: 0; z-index: 1000;
+    background: rgba(0, 0, 0, 0.55);
+    display: flex; align-items: center; justify-content: center;
+    padding: 1.5rem;
+}
+.encuestas-modal {
+    background: var(--colorFondo, #fff);
+    border: 1px solid var(--colorLinea);
+    border-radius: 0.7rem;
+    max-width: 70rem; width: 100%; max-height: 85vh;
+    display: flex; flex-direction: column;
+    box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.4);
+}
+body.darkmode .encuestas-modal { background: var(--colorContendor); }
+.encuestas-modal-cab {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 0.9rem 1.2rem; border-bottom: 1px solid var(--colorLinea);
+}
+.encuestas-modal-cerrar {
+    background: none; border: none; cursor: pointer;
+    color: var(--colorTablacelda); font-size: 1.6rem;
+}
+.encuestas-modal-cuerpo { padding: 1rem 1.2rem; overflow-y: auto; }
+.encuestas-meta-fila {
+    display: flex; flex-wrap: wrap; gap: 0.4rem 1.4rem; margin-bottom: 1rem;
+    font-size: 1.3rem;
+}
+.encuestas-tabla-detalle { font-size: 1.25rem; }
+.encuestas-pt {
+    display: inline-block; margin-left: 0.4rem; padding: 0 0.5rem;
+    border-radius: 0.4rem; background: var(--colorLinea); font-weight: 700;
+}

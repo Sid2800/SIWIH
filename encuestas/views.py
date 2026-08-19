@@ -7,12 +7,13 @@ guardado con calificación por puntos. Solo la UAU ve el módulo; cada usuario v
 sus encuestas y el personal `is_staff` (supervisión) las ve todas.
 """
 import json
+from datetime import datetime
 
 from django.db import transaction
 from django.http import JsonResponse
-from django.shortcuts import redirect
+from django.shortcuts import redirect, get_object_or_404
 from django.views.generic import TemplateView
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
 from django.views.decorators.csrf import csrf_protect
 
 from core.mixins import UnidadRolRequiredMixin
@@ -148,7 +149,6 @@ def guardar_encuesta_api(request):
     if not definicion:
         return JsonResponse({"error": "Servicio de encuesta no válido"}, status=400)
 
-    from datetime import datetime
     try:
         fecha = datetime.strptime((body.get('fecha') or '').strip(), '%Y-%m-%d').date()
     except (ValueError, TypeError):
@@ -185,3 +185,102 @@ def guardar_encuesta_api(request):
     except Exception as e:
         log_error(f"Error en guardar_encuesta_api: {e}", app=LogApp.ENCUESTAS)
         return JsonResponse({"error": "Error interno del servidor"}, status=500)
+
+
+# =============================================================================
+# Lista de encuestas ingresadas (cada usuario las suyas; is_staff todas)
+# =============================================================================
+class MisEncuestasView(UnidadRolRequiredMixin, TemplateView):
+    """Lista de encuestas ingresadas por el usuario (o todas, si es staff)."""
+    template_name = 'encuestas/lista.html'
+    required_roles = ENCUESTAS_VISUALIZACION_ROLES
+    required_unidades = ENCUESTAS_VISUALIZACION_UNIDADES
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['servicios'] = Encuesta.SERVICIOS
+        ctx['ve_todas'] = _ve_todas_las_encuestas(self.request.user)
+        return ctx
+
+
+@require_GET
+def mis_encuestas_api(request):
+    """
+    Devuelve las encuestas visibles para el usuario. Cada usuario ve las suyas;
+    el personal is_staff (supervisión) ve todas. Filtros: servicio, desde, hasta.
+    """
+    if not _tiene_permiso_encuestas(request.user):
+        return JsonResponse({"error": "Sin permisos"}, status=403)
+
+    try:
+        qs = Encuesta.objects.select_related('creado_por').order_by('-fecha', '-id')
+        if not _ve_todas_las_encuestas(request.user):
+            qs = qs.filter(creado_por=request.user)
+
+        servicio = (request.GET.get('servicio') or '').strip()
+        if servicio:
+            qs = qs.filter(servicio=servicio)
+
+        def _fecha(v):
+            try:
+                return datetime.strptime((v or '').strip(), '%Y-%m-%d').date()
+            except (ValueError, TypeError):
+                return None
+        desde, hasta = _fecha(request.GET.get('desde')), _fecha(request.GET.get('hasta'))
+        if desde:
+            qs = qs.filter(fecha__gte=desde)
+        if hasta:
+            qs = qs.filter(fecha__lte=hasta)
+
+        display = dict(Encuesta.SERVICIOS)
+        data = [{
+            "id": e.id,
+            "servicio": e.servicio,
+            "servicio_nombre": display.get(e.servicio, e.servicio),
+            "subservicio": e.subservicio or '',
+            "fecha": e.fecha.isoformat(),
+            "porcentaje": (float(e.porcentaje_satisfaccion)
+                           if e.porcentaje_satisfaccion is not None else None),
+            "encuestador": (e.creado_por.get_full_name() or e.creado_por.username),
+        } for e in qs[:500]]
+
+        return JsonResponse({"data": data, "total": len(data)})
+    except Exception as e:
+        log_error(f"Error en mis_encuestas_api: {e}", app=LogApp.ENCUESTAS)
+        return JsonResponse({"error": "Error interno del servidor"}, status=500)
+
+
+@require_GET
+def detalle_encuesta_api(request, encuesta_id):
+    """Detalle (solo lectura) de una encuesta: sus respuestas. Dueño o staff."""
+    if not _tiene_permiso_encuestas(request.user):
+        return JsonResponse({"error": "Sin permisos"}, status=403)
+
+    encuesta = get_object_or_404(
+        Encuesta.objects.select_related('creado_por'), id=encuesta_id
+    )
+    if encuesta.creado_por_id != request.user.id and not _ve_todas_las_encuestas(request.user):
+        return JsonResponse({"error": "No puede ver esta encuesta"}, status=403)
+
+    display = dict(Encuesta.SERVICIOS)
+    respuestas = [{
+        "codigo": r.codigo,
+        "numero": r.numero,
+        "texto": r.texto_pregunta or '',
+        "respuesta": r.respuesta or '',
+        "puntaje": r.puntaje,
+    } for r in encuesta.respuestas.all().order_by('numero', 'codigo')]
+
+    return JsonResponse({
+        "id": encuesta.id,
+        "servicio": encuesta.servicio,
+        "servicio_nombre": display.get(encuesta.servicio, encuesta.servicio),
+        "subservicio": encuesta.subservicio or '',
+        "fecha": encuesta.fecha.isoformat(),
+        "tipo_encuestado": encuesta.tipo_encuestado or '',
+        "identidad": encuesta.identidad or '',
+        "porcentaje": (float(encuesta.porcentaje_satisfaccion)
+                       if encuesta.porcentaje_satisfaccion is not None else None),
+        "encuestador": (encuesta.creado_por.get_full_name() or encuesta.creado_por.username),
+        "respuestas": respuestas,
+    })

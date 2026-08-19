@@ -1,0 +1,89 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Encuestas ingresadas{% endblock title %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'core/css/encuestas.css' %}">
+{% endblock extra_css %}
+
+{% block content %}
+{% comment %}
+Lista de encuestas ingresadas. Cada usuario ve las suyas; el personal is_staff
+(supervisión) las ve todas (y con la columna Encuestador).
+{% endcomment %}
+<div class="contenedor2 encuestas-page encuestas-lista-page" data-ve-todas="{{ ve_todas|yesno:'1,0' }}">
+    <div class="tituloFormulario sexp-margin-bottom-15">
+        <div class="tituloFormulario-texto">
+            <i class="bi bi-list-check"></i>
+            <h2 class="sin-margen">Encuestas ingresadas</h2>
+        </div>
+        <div class="tituloFormulario-subrallado"></div>
+    </div>
+
+    {% if ve_todas %}
+    <p class="encuestas-ayuda"><i class="bi bi-eye"></i>
+        <span>Como supervisión, está viendo <strong>todas</strong> las encuestas.</span></p>
+    {% else %}
+    <p class="encuestas-ayuda"><i class="bi bi-person"></i>
+        <span>Está viendo <strong>sus</strong> encuestas ingresadas.</span></p>
+    {% endif %}
+
+    <fieldset class="recepcionIngresoCampos">
+        <legend>Filtros</legend>
+        <div class="formularioCampo">
+            <label for="lst-servicio">Servicio</label>
+            <select id="lst-servicio" class="formularioCampo-text">
+                <option value="">Todos</option>
+                {% for cod, nombre in servicios %}<option value="{{ cod }}">{{ nombre }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="formularioCampo">
+            <label for="lst-desde">Desde</label>
+            <input type="date" id="lst-desde" class="formularioCampo-text">
+        </div>
+        <div class="formularioCampo">
+            <label for="lst-hasta">Hasta</label>
+            <input type="date" id="lst-hasta" class="formularioCampo-text">
+        </div>
+    </fieldset>
+
+    <div class="encuestas-tabla-cont">
+        <table class="encuestas-tabla">
+            <thead>
+                <tr>
+                    <th>#</th><th>Servicio</th><th>Sub-servicio</th><th>Fecha</th>
+                    <th>Satisfacción</th>
+                    {% if ve_todas %}<th>Encuestador</th>{% endif %}
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody id="lst-cuerpo"></tbody>
+        </table>
+    </div>
+    <p id="lst-vacio" class="encuestas-vacio" style="display:none;">No hay encuestas.</p>
+
+    <div class="recepcionIngresoBotones">
+        <a href="{% url 'encuestas_inicio' %}" class="formularioBotones-boton encuestas-btn-secundario">
+            <i class="bi bi-arrow-left-circle"></i> <span>Volver</span>
+        </a>
+    </div>
+</div>
+
+<!-- Modal de detalle (solo lectura) -->
+<div id="enc-detalle-overlay" class="encuestas-modal-overlay" style="display:none;">
+    <div class="encuestas-modal">
+        <div class="encuestas-modal-cab">
+            <h3 id="enc-detalle-titulo" class="sin-margen">Detalle</h3>
+            <button type="button" class="encuestas-modal-cerrar" id="enc-detalle-cerrar">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+        <div id="enc-detalle-cuerpo" class="encuestas-modal-cuerpo"></div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script src="{% static 'core/scripts/encuestas/lista.js' %}"></script>
+{% endblock extra_js %}
