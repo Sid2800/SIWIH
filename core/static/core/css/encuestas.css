@@ -35,3 +35,35 @@ body.darkmode .encuestas-enc-img--blanco { display: inline-block; }
 /* Fila de inicio: combobox + botón alineados. */
 .encuestas-inicio-campos { align-items: flex-end; }
 .encuestas-inicio-boton { display: flex; align-items: flex-end; }
+
+/* ---- Formulario de encuesta ---- */
+.encuestas-req { color: #c0392b; font-weight: 700; }
+
+.encuestas-preguntas { display: block; }
+
+.encuestas-pregunta {
+    padding: 0.8rem 0;
+    border-bottom: 1px solid var(--colorLinea);
+}
+.encuestas-pregunta:last-child { border-bottom: none; }
+.encuestas-enunciado {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.45rem;
+    color: var(--colorTablacelda);
+    line-height: 1.4;
+}
+.encuestas-opciones {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1.6rem;
+}
+.encuestas-opcion {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 1.35rem;
+    white-space: nowrap;
+    cursor: pointer;
+}
+.encuestas-resp-texto { max-width: 40rem; }
+.encuestas-btn-secundario { background: var(--colorLinea); }

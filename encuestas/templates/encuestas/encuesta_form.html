@@ -1,0 +1,104 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Encuesta — {{ nombre_servicio }}{% endblock title %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'core/css/encuestas.css' %}">
+{% endblock extra_css %}
+
+{% block content %}
+{% comment %}
+Formulario genérico de encuesta. Las preguntas se pintan desde la definición del
+servicio (encuestas.catalogos). El encuestador es el usuario del sistema.
+{% endcomment %}
+<div class="contenedor2 encuestas-page encuestas-form-page" data-servicio="{{ servicio }}">
+
+    <div class="encuestas-encabezado">
+        <img src="{% static 'core/img/ENCABEZADO_V_C.png' %}" alt="Encabezado"
+             class="encuestas-enc-img encuestas-enc-img--color">
+        <img src="{% static 'core/img/ENCABEZADO_V_B.png' %}" alt="Encabezado"
+             class="encuestas-enc-img encuestas-enc-img--blanco">
+    </div>
+
+    <div class="tituloFormulario sexp-margin-bottom-15">
+        <div class="tituloFormulario-texto">
+            <i class="bi bi-clipboard2-check"></i>
+            <h2 class="sin-margen">Encuesta de Satisfacción — {{ nombre_servicio }}</h2>
+        </div>
+        <div class="tituloFormulario-subrallado"></div>
+    </div>
+
+    <!-- Datos de la encuesta -->
+    <fieldset class="recepcionIngresoCampos">
+        <legend>Datos</legend>
+        <div class="formularioCampo">
+            <label for="enc-fecha">Fecha de la encuesta <span class="encuestas-req">*</span></label>
+            <input type="date" id="enc-fecha" class="formularioCampo-text">
+        </div>
+        {% if subservicios %}
+        <div class="formularioCampo">
+            <label for="enc-subservicio">Sub-servicio</label>
+            <select id="enc-subservicio" class="formularioCampo-text">
+                <option value="">— Seleccione —</option>
+                {% for s in subservicios %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+            </select>
+        </div>
+        {% endif %}
+        {% if pide_tipo_encuestado %}
+        <div class="formularioCampo">
+            <label for="enc-tipo">¿El encuestado es paciente o familiar?</label>
+            <select id="enc-tipo" class="formularioCampo-text">
+                <option value="">—</option>
+                <option value="Paciente">Paciente</option>
+                <option value="Familiar">Familiar</option>
+            </select>
+        </div>
+        {% endif %}
+        {% if pide_identidad %}
+        <div class="formularioCampo">
+            <label for="enc-identidad">Identidad del encuestado</label>
+            <input type="text" id="enc-identidad" class="formularioCampo-text" maxlength="50" autocomplete="off">
+        </div>
+        {% endif %}
+    </fieldset>
+
+    <!-- Preguntas -->
+    <fieldset class="recepcionIngresoCampos encuestas-preguntas">
+        <legend>Preguntas</legend>
+        {% for p in preguntas %}
+        <div class="encuestas-pregunta" data-codigo="{{ p.codigo }}"
+             {% if p.numero %}data-numero="{{ p.numero }}"{% endif %}>
+            <p class="encuestas-enunciado">
+                {% if p.numero %}<b>{{ p.numero }}.</b> {% endif %}{{ p.texto }}
+            </p>
+            {% if p.tipo == 'texto' %}
+            <input type="text" class="formularioCampo-text encuestas-resp-texto"
+                   name="{{ p.codigo }}" autocomplete="off" placeholder="Tu respuesta...">
+            {% else %}
+            <div class="encuestas-opciones">
+                {% for op in p.lista_opciones %}
+                <label class="encuestas-opcion">
+                    <input type="radio" name="{{ p.codigo }}" value="{{ op }}"> {{ op }}
+                </label>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </fieldset>
+
+    <div class="recepcionIngresoBotones">
+        <a href="{% url 'encuestas_inicio' %}" class="formularioBotones-boton encuestas-btn-secundario">
+            <i class="bi bi-arrow-left-circle"></i> <span>Volver</span>
+        </a>
+        <button type="button" class="formularioBotones-boton" id="enc-guardar">
+            <i class="bi bi-check-square-fill"></i> <span>Guardar encuesta</span>
+        </button>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script src="{% static 'core/scripts/encuestas/encuesta_form.js' %}"></script>
+{% endblock extra_js %}
