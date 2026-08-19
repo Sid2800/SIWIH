@@ -67,6 +67,9 @@ servicio (encuestas.catalogos). El encuestador es el usuario del sistema.
     <fieldset class="recepcionIngresoCampos encuestas-preguntas">
         <legend>Preguntas</legend>
         {% for p in preguntas %}
+        {% if p.tipo == 'seccion' %}
+        <h3 class="encuestas-seccion-titulo">{{ p.texto }}</h3>
+        {% else %}
         <div class="encuestas-pregunta" data-codigo="{{ p.codigo }}"
              {% if p.numero %}data-numero="{{ p.numero }}"{% endif %}>
             <p class="encuestas-enunciado">
@@ -85,6 +88,7 @@ servicio (encuestas.catalogos). El encuestador es el usuario del sistema.
             </div>
             {% endif %}
         </div>
+        {% endif %}
         {% endfor %}
     </fieldset>
 

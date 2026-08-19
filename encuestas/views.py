@@ -98,9 +98,12 @@ def _calificar_y_guardar_respuestas(encuesta, definicion, respuestas):
     calcula el puntaje (100/85/70/55) con la tabla del catálogo. El % de
     satisfacción de la encuesta es (puntos 100 y 85) / (nº numeradas * 100).
     """
+    entra_consolidado = definicion.get('consolidado', True)
     filas = []
     numerados_puntajes = []
     for item in definicion['preguntas']:
+        if item.get('tipo') == 'seccion':
+            continue
         valor = (respuestas.get(item['codigo']) or '').strip()
         if not valor:
             continue
@@ -115,7 +118,9 @@ def _calificar_y_guardar_respuestas(encuesta, definicion, respuestas):
             texto_pregunta=item.get('texto', '')[:300],
             respuesta=valor[:200],
             puntaje=puntaje,
-            cuenta_consolidado=es_numerada,
+            # Solo cuenta para el consolidado mensual si la encuesta lo integra
+            # (Usuario Externo NO) y la pregunta es numerada.
+            cuenta_consolidado=bool(es_numerada and entra_consolidado),
         ))
     EncuestaRespuesta.objects.bulk_create(filas)
 
