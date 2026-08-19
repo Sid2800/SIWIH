@@ -74,7 +74,7 @@ def calcular_estado_garantia(dispositivo, hoy=None, pausas=None):
     if pausas is None:
         pausas = list(dispositivo.pausas_garantia.all())
 
-    abierta = next((p for p in pausas if p.fecha_retorno is None), None)
+    abierta = next((p for p in pausas if p.esta_abierta), None)
 
     # Solo las pausas cerradas suman: de las abiertas todavia no se sabe
     # cuanto duraran.

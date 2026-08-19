@@ -6144,6 +6144,11 @@ a.equipos-submenu__opcion:hover {
 .equipos-registro__campos {
    display: grid;
    gap: 1rem;
+   /* Mas aire entre columnas que entre filas: dos campos lado a lado con solo
+      1rem de por medio se leen como un unico control alargado. Entre filas si
+      basta, porque ahi separa la etiqueta del campo de arriba. Son 2rem para
+      igualar el bloque de datos adicionales, que ya usaba esa medida. */
+   column-gap: 2rem;
 }
 
 .equipos-registro__campos--dos {
@@ -6155,6 +6160,18 @@ a.equipos-submenu__opcion:hover {
    flex-direction: column;
    gap: .35rem;
    min-width: 0;
+}
+
+/* Los controles del proyecto heredan content-box, asi que con width:100% el
+   relleno y el borde se suman POR FUERA de la columna: un select de 418px se
+   dibujaba de 431 y no solo se comia el gap, sino que invadia 3px al campo
+   vecino. Se corrige solo dentro del formulario de equipos porque
+   .formularioCampo-select y .formularioCampo-text son clases compartidas con
+   el resto de modulos. */
+.equipos-registro__campo input,
+.equipos-registro__campo select,
+.equipos-registro__campo textarea {
+   box-sizing: border-box;
 }
 
 .equipos-registro__campo[hidden] {
@@ -6183,6 +6200,35 @@ a.equipos-submenu__opcion:hover {
 
 .equipos-registro__campo .formularioCampo-text::placeholder {
    font-size: 1.35rem;
+}
+
+/* Datos adicionales usa controles de varios tipos. Una altura comun evita
+   que los selects nativos, Select2 y campos de texto deformen cada fila. */
+.equipos-registro__opcionales--datos .equipos-registro__campos {
+   align-items: start;
+   column-gap: 2rem;
+   row-gap: .8rem;
+}
+
+.equipos-registro__opcionales--datos .equipos-registro__campo {
+   width: 100%;
+}
+
+.equipos-registro__opcionales--datos .formularioCampo-text:not(textarea),
+.equipos-registro__opcionales--datos .formularioCampo-select,
+.equipos-registro__opcionales--datos .formularioCampo-date,
+.equipos-registro__opcionales--datos .equipos-registro__costo,
+.equipos-registro__opcionales--datos .select2-container,
+.equipos-registro__opcionales--datos .select2-selection {
+   box-sizing: border-box;
+   height: 3.2rem !important;
+   min-height: 3.2rem !important;
+}
+
+.equipos-registro__opcionales--datos .formularioCampo-text:not(textarea),
+.equipos-registro__opcionales--datos .formularioCampo-select,
+.equipos-registro__opcionales--datos .formularioCampo-date {
+   flex: 0 0 3.2rem;
 }
 
 .equipos-registro__campo textarea.formularioCampo-text {

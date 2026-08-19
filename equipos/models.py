@@ -32,7 +32,25 @@ def normalizar_inventario_bienes_nacionales(valor):
 
 
 def normalizar_inventario_numero_ficha(valor):
-    return normalizar_codigo_inventario(valor, "inventario número de ficha")
+    valor = (valor or "").strip()
+
+    if not valor:
+        return None
+
+    if valor.upper().startswith("F/"):
+        valor = valor[2:].strip()
+
+    if not valor.isdigit():
+        raise ValidationError(
+            "La ficha debe contener únicamente números después de F/."
+        )
+
+    if len(valor) > 15:
+        raise ValidationError(
+            "La ficha no puede contener más de 15 números."
+        )
+
+    return f"F/{valor}"
 
 
 def normalizar_nombre_catalogo(valor):
@@ -500,14 +518,6 @@ class Dispositivo(models.Model):
             return ""
         return f"{self.costo_adquisicion:,.2f}"
 
-    @property
-    def modelo_nombre(self):
-        # El modelo puede ser desconocido. En vez de crear una fila de catalogo
-        # para representarlo, se deja en NULL y se muestra asi en pantalla.
-        if self.modelo_id:
-            return self.modelo.nombre
-        return "INDEFINIDO"
-
     def clean(self):
         # Validaciones de negocio antes de guardar.
         # Aqui se normalizan opcionales y se revisan duplicados flexibles.
@@ -921,7 +931,7 @@ class PausaGarantia(models.Model):
     @property
     def dias(self):
         """Dias que suma al vencimiento. Una pausa abierta todavia no suma."""
-        if self.fecha_retorno is None:
+        if self.esta_abierta:
             return 0
         return (self.fecha_retorno - self.fecha_salida).days
 
@@ -963,7 +973,7 @@ class PausaGarantia(models.Model):
                     "La salida no puede ser anterior al registro del equipo."
                 )
 
-        if self.dispositivo_id and self.fecha_retorno is None:
+        if self.dispositivo_id and self.esta_abierta:
             abierta = PausaGarantia.objects.filter(
                 dispositivo_id=self.dispositivo_id,
                 fecha_retorno__isnull=True,
@@ -980,7 +990,7 @@ class PausaGarantia(models.Model):
     def save(self, *args, **kwargs):
         # Mantiene la columna que hace cumplir la unicidad en el motor.
         self.equipo_con_pausa_abierta = (
-            self.dispositivo_id if self.fecha_retorno is None else None
+            self.dispositivo_id if self.esta_abierta else None
         )
         self.full_clean()
 

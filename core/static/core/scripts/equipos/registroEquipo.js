@@ -30,10 +30,6 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('foto_general_contenido')
         || document.getElementById('imagen_contenido_dispositivo')
     );
-    const estadoFoto = (
-        document.getElementById('foto_general_estado')
-        || document.getElementById('imagen_estado_dispositivo')
-    );
     const tipoImagen = document.getElementById('tipo_imagen_dispositivo');
     const guardarImagen = document.getElementById('guardar_imagen_dispositivo');
     let previewUrl = null;
@@ -55,7 +51,6 @@ document.addEventListener('DOMContentLoaded', function () {
         previewFoto.src = previewUrl;
         previewFoto.hidden = false;
         contenidoFoto.hidden = true;
-        estadoFoto.textContent = 'Foto lista en formato WebP.';
         if (guardarImagen) {
             guardarImagen.disabled = false;
         }
@@ -91,11 +86,6 @@ document.addEventListener('DOMContentLoaded', function () {
         );
 
         if (!archivoWebp) {
-            return;
-        }
-
-        if (typeof DataTransfer === 'undefined') {
-            mostrarErrorFoto('Este navegador no permite preparar la foto.');
             return;
         }
 

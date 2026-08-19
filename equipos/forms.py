@@ -480,7 +480,9 @@ class DispositivoCreateForm(forms.ModelForm):
                 attrs={
                     "class": "formularioCampo-text",
                     "id": "inventario_numero_ficha",
-                    "placeholder": "Ej. F/212300",
+                    "placeholder": "212300",
+                    "inputmode": "numeric",
+                    "maxlength": "15",
                 }
             ),
             "estado": forms.Select(
@@ -555,6 +557,13 @@ class DispositivoCreateForm(forms.ModelForm):
             kwargs["initial"] = initial
 
         super().__init__(*args, **kwargs)
+
+        # F/ se muestra como prefijo fijo en el HTML; el usuario solo edita
+        # los digitos. Al guardar, el normalizador vuelve a agregarlo.
+        if not self.is_bound:
+            ficha = str(self.initial.get("inventario_numero_ficha") or "").strip()
+            if ficha.upper().startswith("F/"):
+                self.initial["inventario_numero_ficha"] = ficha[2:].strip()
 
         # Los catalogos inactivos no se muestran para nuevos registros, pero si
         # el equipo ya usa uno, se conserva en la edicion para no romper historico.

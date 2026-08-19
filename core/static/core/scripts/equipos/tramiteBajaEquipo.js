@@ -29,7 +29,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const capturarFicha = document.getElementById('capturar_ficha_firmada');
     const previewFicha = document.getElementById('ficha_firmada_preview');
     const contenidoFicha = document.getElementById('ficha_firmada_contenido');
-    const estadoFicha = document.getElementById('ficha_firmada_estado');
     const formularioBaja = document.querySelector('.equipos-baja__formulario');
     const botonGenerar = document.getElementById('generar_ficha_pdf');
     const botonConfirmar = document.getElementById('confirmar_baja_dispositivo');
@@ -56,7 +55,6 @@ document.addEventListener('DOMContentLoaded', function () {
         previewFicha.src = previewUrl;
         previewFicha.hidden = false;
         contenidoFicha.hidden = true;
-        estadoFicha.textContent = 'Ficha lista en formato WebP.';
     }
 
     async function prepararFicha(inputOrigen) {
@@ -82,11 +80,6 @@ document.addEventListener('DOMContentLoaded', function () {
         );
 
         if (!archivoWebp) {
-            return;
-        }
-
-        if (typeof DataTransfer === 'undefined') {
-            mostrarError('Este navegador no permite preparar la ficha.');
             return;
         }
 
