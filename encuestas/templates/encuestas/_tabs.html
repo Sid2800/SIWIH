@@ -1,0 +1,18 @@
+{% comment %}
+Pestañas del módulo Encuestas. Se incluye con la pestaña activa, p. ej.:
+  {% include 'encuestas/_tabs.html' with activo='encuestas' %}
+{% endcomment %}
+<nav class="encuestas-tabs">
+    <a href="{% url 'encuestas_inicio' %}"
+       class="encuestas-tab{% if activo == 'encuestas' %} encuestas-tab--activa{% endif %}">
+        <i class="bi bi-clipboard2-check"></i> Encuestas
+    </a>
+    <a href="{% url 'encuestas_lista' %}"
+       class="encuestas-tab{% if activo == 'ingresadas' %} encuestas-tab--activa{% endif %}">
+        <i class="bi bi-list-check"></i> Encuestas ingresadas
+    </a>
+    <a href="{% url 'encuestas_reportes' %}"
+       class="encuestas-tab{% if activo == 'reportes' %} encuestas-tab--activa{% endif %}">
+        <i class="bi bi-bar-chart-line"></i> Reportes
+    </a>
+</nav>

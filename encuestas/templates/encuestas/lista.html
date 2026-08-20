@@ -13,6 +13,7 @@ Lista de encuestas ingresadas. Cada usuario ve las suyas; el personal is_staff
 (supervisión) las ve todas (y con la columna Encuestador).
 {% endcomment %}
 <div class="contenedor2 encuestas-page encuestas-lista-page" data-ve-todas="{{ ve_todas|yesno:'1,0' }}">
+    {% include 'encuestas/_tabs.html' with activo='ingresadas' %}
     <div class="tituloFormulario sexp-margin-bottom-15">
         <div class="tituloFormulario-texto">
             <i class="bi bi-list-check"></i>
@@ -62,12 +63,6 @@ Lista de encuestas ingresadas. Cada usuario ve las suyas; el personal is_staff
         </table>
     </div>
     <p id="lst-vacio" class="encuestas-vacio" style="display:none;">No hay encuestas.</p>
-
-    <div class="recepcionIngresoBotones">
-        <a href="{% url 'encuestas_inicio' %}" class="formularioBotones-boton encuestas-btn-secundario">
-            <i class="bi bi-arrow-left-circle"></i> <span>Volver</span>
-        </a>
-    </div>
 </div>
 
 <!-- Modal de detalle (solo lectura) -->

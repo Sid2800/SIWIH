@@ -19,6 +19,29 @@
 body.darkmode .encuestas-enc-img--color { display: none; }
 body.darkmode .encuestas-enc-img--blanco { display: inline-block; }
 
+/* Pestañas del módulo (Encuestas · Ingresadas · Reportes). */
+.encuestas-tabs {
+    display: flex; flex-wrap: wrap; gap: 0.4rem;
+    border-bottom: 2px solid var(--colorLinea);
+    margin-bottom: 1.4rem;
+}
+.encuestas-tab {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    padding: 0.6rem 1.2rem; font-size: 1.35rem; text-decoration: none;
+    color: var(--colorTablacelda);
+    border: 1px solid transparent; border-bottom: none;
+    border-radius: 0.5rem 0.5rem 0 0; margin-bottom: -2px; opacity: 0.75;
+}
+.encuestas-tab:hover { opacity: 1; background: var(--colorContendor); }
+.encuestas-tab--activa {
+    opacity: 1; font-weight: 700; color: var(--colorBoton);
+    background: var(--colorContendor);
+    border-color: var(--colorLinea); border-bottom: 2px solid var(--colorContendor);
+}
+
+.encuestas-cargando { padding: 1.2rem; font-size: 1.4rem; opacity: 0.75; }
+.encuestas-cargando i { color: var(--colorBoton); margin-right: 0.4rem; }
+
 .encuestas-ayuda {
     margin: 0 0 1rem 0;
     padding: 0.8rem 1rem;

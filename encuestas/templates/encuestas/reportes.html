@@ -1,0 +1,28 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Reportes de Encuestas{% endblock title %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'core/css/encuestas.css' %}">
+{% endblock extra_css %}
+
+{% block content %}
+<div class="contenedor2 encuestas-page">
+    {% include 'encuestas/_tabs.html' with activo='reportes' %}
+
+    <div class="tituloFormulario sexp-margin-bottom-15">
+        <div class="tituloFormulario-texto">
+            <i class="bi bi-bar-chart-line"></i>
+            <h2 class="sin-margen">Reportes de Encuestas</h2>
+        </div>
+        <div class="tituloFormulario-subrallado"></div>
+    </div>
+
+    <p class="encuestas-vacio">
+        <i class="bi bi-cone-striped"></i> Reportes en construcción.
+        Aquí irán el consolidado por servicio/subservicio, secciones,
+        cumplimiento vs. metas y la exportación a Excel.
+    </p>
+</div>
+{% endblock content %}

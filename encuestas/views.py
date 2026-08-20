@@ -60,6 +60,22 @@ class EncuestasInicioView(UnidadRolRequiredMixin, TemplateView):
 # =============================================================================
 # Formulario de una encuesta (genérico, según definición del servicio)
 # =============================================================================
+def _contexto_form(definicion):
+    """Contexto para pintar el formulario de una encuesta (pantalla o fragmento)."""
+    preguntas = [
+        {**item, 'lista_opciones': catalogos.opciones_de(item)}
+        for item in definicion['preguntas']
+    ]
+    return {
+        'servicio': definicion['servicio'],
+        'nombre_servicio': definicion['nombre'],
+        'subservicios': definicion.get('subservicios') or [],
+        'pide_tipo_encuestado': definicion.get('pide_tipo_encuestado', False),
+        'pide_identidad': definicion.get('pide_identidad', False),
+        'preguntas': preguntas,
+    }
+
+
 class EncuestaFormView(UnidadRolRequiredMixin, TemplateView):
     """Formulario de una encuesta; las preguntas salen de encuestas.catalogos."""
     template_name = 'encuestas/encuesta_form.html'
@@ -74,18 +90,35 @@ class EncuestaFormView(UnidadRolRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        d = self.definicion
-        # Resolver opciones de cada pregunta para pintarlas en la plantilla.
-        preguntas = []
-        for item in d['preguntas']:
-            preguntas.append({**item, 'lista_opciones': catalogos.opciones_de(item)})
-        ctx['servicio'] = d['servicio']
-        ctx['nombre_servicio'] = d['nombre']
-        ctx['subservicios'] = d.get('subservicios') or []
-        ctx['pide_tipo_encuestado'] = d.get('pide_tipo_encuestado', False)
-        ctx['pide_identidad'] = d.get('pide_identidad', False)
-        ctx['preguntas'] = preguntas
+        ctx.update(_contexto_form(self.definicion))
         return ctx
+
+
+@require_GET
+def encuesta_fragmento(request, servicio):
+    """Devuelve solo el formulario (datos + preguntas) de un servicio, en HTML.
+
+    Se usa para cargar las preguntas en la pestaña 'Encuestas' apenas se elige el
+    servicio, sin recargar la página ni botón intermedio.
+    """
+    if not _tiene_permiso_encuestas(request.user):
+        return JsonResponse({"error": "Sin permisos"}, status=403)
+    definicion = catalogos.definicion(servicio)
+    if not definicion:
+        return JsonResponse({"error": "Servicio no válido"}, status=400)
+    from django.template.loader import render_to_string
+    html = render_to_string(
+        'encuestas/_form_fragmento.html', _contexto_form(definicion), request=request
+    )
+    from django.http import HttpResponse
+    return HttpResponse(html)
+
+
+class ReportesView(UnidadRolRequiredMixin, TemplateView):
+    """Pestaña de reportes (en construcción)."""
+    template_name = 'encuestas/reportes.html'
+    required_roles = ENCUESTAS_VISUALIZACION_ROLES
+    required_unidades = ENCUESTAS_VISUALIZACION_UNIDADES
 
 
 # =============================================================================

@@ -9,12 +9,12 @@
 
 {% block content %}
 {% comment %}
-Inicio del módulo de Encuestas (UAU). Encabezado según el tema (V_C color en
-claro, V_B blanco en oscuro) y combobox para elegir el servicio a encuestar.
+Pestaña "Encuestas": encabezado + combobox de servicio. Al elegir el servicio se
+cargan sus preguntas al instante (sin botón intermedio).
 {% endcomment %}
 <div class="contenedor2 encuestas-page">
+    {% include 'encuestas/_tabs.html' with activo='encuestas' %}
 
-    <!-- Encabezado institucional (cambia con el tema). -->
     <div class="encuestas-encabezado">
         <img src="{% static 'core/img/ENCABEZADO_V_C.png' %}" alt="Encabezado"
              class="encuestas-enc-img encuestas-enc-img--color">
@@ -22,21 +22,13 @@ claro, V_B blanco en oscuro) y combobox para elegir el servicio a encuestar.
              class="encuestas-enc-img encuestas-enc-img--blanco">
     </div>
 
-    <div class="tituloFormulario sexp-margin-bottom-15">
-        <div class="tituloFormulario-texto">
-            <i class="bi bi-clipboard2-check"></i>
-            <h2 class="sin-margen">Encuestas de Satisfacción</h2>
-        </div>
-        <div class="tituloFormulario-subrallado"></div>
-    </div>
-
     <p class="encuestas-ayuda">
         <i class="bi bi-info-circle"></i>
-        <span>Elija el servicio al que corresponde la encuesta. El encuestador es
+        <span>Elija el servicio y se cargarán sus preguntas. El encuestador es
         usted (usuario del sistema); no se solicita por separado.</span>
     </p>
 
-    <fieldset class="recepcionIngresoCampos encuestas-inicio-campos">
+    <fieldset class="recepcionIngresoCampos">
         <legend>Nueva encuesta</legend>
         <div class="formularioCampo">
             <label for="enc-servicio">Servicio a encuestar</label>
@@ -47,21 +39,13 @@ claro, V_B blanco en oscuro) y combobox para elegir el servicio a encuestar.
                 {% endfor %}
             </select>
         </div>
-        <div class="formularioCampo encuestas-inicio-boton">
-            <button type="button" class="formularioBotones-boton" id="enc-continuar">
-                <i class="bi bi-arrow-right-circle"></i> <span>Continuar</span>
-            </button>
-        </div>
     </fieldset>
 
-    <div class="recepcionIngresoBotones">
-        <a href="{% url 'encuestas_lista' %}" class="formularioBotones-boton encuestas-btn-secundario">
-            <i class="bi bi-list-check"></i> <span>Ver encuestas ingresadas</span>
-        </a>
-    </div>
+    <!-- Aquí se cargan las preguntas del servicio elegido. -->
+    <div id="enc-form-cont"></div>
 </div>
 {% endblock content %}
 
 {% block extra_js %}
-<script src="{% static 'core/scripts/encuestas/inicio.js' %}"></script>
+<script src="{% static 'core/scripts/encuestas/encuestas_form.js' %}"></script>
 {% endblock extra_js %}

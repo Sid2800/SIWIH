@@ -1,12 +1,31 @@
 /**
- * Formulario de encuesta (genérico). Recoge las respuestas por código y las
- * envía. El servicio va en data-servicio del contenedor.
+ * Pestaña "Encuestas": al elegir el servicio se cargan sus preguntas al
+ * instante (fragmento) y se pueden guardar. Sirve también para la página
+ * independiente /encuestas/nueva/<servicio>/ (el fragmento ya viene renderizado).
  */
 $(document).ready(function () {
-    // Fecha por defecto: hoy.
-    $('#enc-fecha').val(new Date().toISOString().slice(0, 10));
-    $('#enc-guardar').on('click', guardarEncuesta);
+    ponerFechaHoy();
+
+    // Cargar preguntas al elegir el servicio (sin botón intermedio).
+    $(document).on('change', '#enc-servicio', function () {
+        const servicio = $(this).val();
+        const $cont = $('#enc-form-cont');
+        if (!servicio) { $cont.empty(); return; }
+        const url = window.urls.encuestas_fragmento.replace(/\/0\/$/, '/' + servicio + '/');
+        $cont.html('<p class="encuestas-cargando"><i class="bi bi-hourglass-split"></i> Cargando preguntas…</p>');
+        $.ajax({ url: url, method: 'GET' })
+            .done(function (html) { $cont.html(html); ponerFechaHoy(); })
+            .fail(function () { $cont.html('<p class="encuestas-vacio">No se pudieron cargar las preguntas.</p>'); });
+    });
+
+    // Guardar (delegado: el botón puede venir de un fragmento cargado luego).
+    $(document).on('click', '#enc-guardar', guardarEncuesta);
 });
+
+function ponerFechaHoy() {
+    const $f = $('#enc-fecha');
+    if ($f.length && !$f.val()) $f.val(new Date().toISOString().slice(0, 10));
+}
 
 function recogerRespuestas() {
     const resp = {};
@@ -25,8 +44,8 @@ function recogerRespuestas() {
 }
 
 function guardarEncuesta() {
-    const $page = $('.encuestas-form-page');
-    const servicio = $page.data('servicio');
+    const servicio = $('.encuestas-form-cont').data('servicio');
+    if (!servicio) { toastr.warning('Elija primero el servicio.'); return; }
     if (!$('#enc-fecha').val()) { toastr.warning('Indique la fecha de la encuesta.'); return; }
 
     const payload = {
@@ -49,7 +68,7 @@ function guardarEncuesta() {
         if (!resp.success) { $btn.prop('disabled', false); return; }
         const s = resp.porcentaje_satisfaccion;
         toastr.success('Encuesta guardada' + (s != null ? ` (satisfacción ${s}%).` : '.'));
-        setTimeout(function () { window.location.href = window.urls.encuestas_inicio; }, 900);
+        setTimeout(function () { window.location.href = window.urls.encuestas_lista; }, 900);
     }).fail(function (xhr) {
         $btn.prop('disabled', false);
         const err = xhr.responseJSON ? xhr.responseJSON.error : 'Error al guardar';
