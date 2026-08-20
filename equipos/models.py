@@ -907,11 +907,6 @@ class PausaGarantia(models.Model):
         ]
         constraints = [
             models.CheckConstraint(
-                condition=Q(fecha_retorno__isnull=True)
-                | Q(fecha_retorno__gte=models.F("fecha_salida")),
-                name="equipo_pausa_retorno_no_anterior",
-            ),
-            models.CheckConstraint(
                 condition=~Q(motivo=""),
                 name="equipo_pausa_motivo_no_vacio",
             ),
@@ -959,12 +954,6 @@ class PausaGarantia(models.Model):
             errores["observaciones_retorno"] = (
                 "Debe indicar las observaciones del retorno."
             )
-
-        if self.fecha_retorno and self.fecha_salida:
-            if self.fecha_retorno < self.fecha_salida:
-                errores["fecha_retorno"] = (
-                    "El retorno no puede ser anterior a la salida."
-                )
 
         if self.dispositivo_id and self.fecha_salida:
             registro = self.dispositivo.fecha_creado
