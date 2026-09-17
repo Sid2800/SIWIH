@@ -1,4 +1,4 @@
-
+from django.core.exceptions import ValidationError
 from django.db import models
 
 
@@ -102,6 +102,27 @@ class EstadoCupoAgenda(models.IntegerChoices):
     # eliminación de configuración o cambios de horario
     INACTIVO = 4, "INACTIVO"
 
+class TipoMovimientoCita(models.IntegerChoices):
+
+    # Se utiliza cuando una cita obtiene un cupo por primera vez.
+    ASIGNACION = 1, "ASIGNACION"
+
+    # Se utiliza cuando la cita pierde el cupo que tenía asignado
+    # por una situación de agenda, pero la cita continúa vigente
+    # y debe ser reprogramada.
+    CANCELACION_CUPO = 2, "CANCELACION CUPO"
+
+    # Se utiliza cuando una cita cambia de un cupo a otro.
+    # Puede ocurrir directamente por solicitud del paciente,
+    # por decisión del personal o después de una cancelación de cupo.
+    REPROGRAMACION = 3, "REPROGRAMACION"
+
+    # Se utiliza cuando se cancela definitivamente la cita.
+    # El cupo que tenía asignado se libera para poder ser utilizado
+    # por otra cita.
+    CANCELACION_CITA = 4, "CANCELACION CITA"
+
+    
 
 class TipoAusencia(models.IntegerChoices):
     VACACIONES = 1, "VACACIONES"
@@ -109,7 +130,26 @@ class TipoAusencia(models.IntegerChoices):
     PERMISO = 3, "PERMISO"
     CAPACITACION = 4, "CAPACITACIÓN"
     CONGRESO = 5, "CONGRESO"
-    OTROS = 6, "OTROS"
+    PROFILACTICA = 6, "PROFILÁCTICA"
+    OTROS = 7, "OTROS"
+    FERIADO = 8, "FERIADO"
+
+    @classmethod
+    def opciones(cls):
+        return [
+            {
+                "value": value,
+                "texto": label
+            }
+            for value, label in cls.choices
+        ]
+
+    @classmethod
+    def validar(cls, tipo):
+        if tipo not in cls.values:
+            raise ValidationError("El tipo de ausencia no es válido.")
+
+        return cls(tipo)
 
 
 class EstadoMapeoCategoria(models.TextChoices):

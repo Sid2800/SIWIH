@@ -3,21 +3,44 @@
 /*Tabla  MODALES*/  
 
 /*Colores para la clasifiacion*/
-.icon-amarillo { color: #d39e00; border-color: #d39e00; } /* Amarillo oscuro */
-.icon-azul { color: #0a58ca; border-color: #0a58ca; } /* Azul oscuro */
-.icon-morado { color: #5a2ca0; border-color: #5a2ca0; } /* Morado oscuro */
-.icon-naranja { color: #b45309; border-color: #b45309; } /* Naranja oscuro */
-.icon-rojo { color: #a71d2a; border-color: #a71d2a; } /* Rojo oscuro */
-.icon-verde { color: #146c43; border-color: #146c43; } /* Verde oscuro */
-.icon-gris { color: #6c757d; border-color: #6c757d; } /* Gris (para null) */
+/* Colores para la clasificación */
+:root {
+--color-amarillo: #d39e00;
+--color-azul: #0a58ca;
+--color-morado: #5a2ca0;
+--color-naranja: #b45309;
+--color-rojo: #a71d2a;
+--color-verde: #146c43;
+--color-gris: #6c757d;
 
-.icon-amarillo-tenue { background-color: rgba(211, 158, 0, .15); }
-.icon-azul-tenue { background-color: rgba(10, 88, 202, .15); }
-.icon-morado-tenue { background-color: rgba(90, 44, 160, .15); }
-.icon-naranja-tenue { background-color: rgba(180, 83, 9, .15); }
-.icon-rojo-tenue { background-color: rgba(167, 29, 42, .15); }
-.icon-verde-tenue { background-color: rgba(20, 108, 67, .15); }
-.icon-gris-tenue { background-color: rgba(108, 117, 125, .15); }
+
+--color-amarillo-tenue: rgba(211, 158, 0, .15);
+--color-azul-tenue: rgba(10, 88, 202, .15);
+--color-morado-tenue: rgba(90, 44, 160, .15);
+--color-naranja-tenue: rgba(180, 83, 9, .15);
+--color-rojo-tenue: rgba(167, 29, 42, .15);
+--color-verde-tenue: rgba(20, 108, 67, .15);
+--color-gris-tenue: rgba(108, 117, 125, .15);
+
+}
+
+
+
+.icon-amarillo { color: var(--color-amarillo); border-color: var(--color-amarillo); }
+.icon-azul { color: var(--color-azul); border-color: var(--color-azul); }
+.icon-morado { color: var(--color-morado); border-color: var(--color-morado); }
+.icon-naranja { color: var(--color-naranja); border-color: var(--color-naranja); }
+.icon-rojo { color: var(--color-rojo); border-color: var(--color-rojo); }
+.icon-verde { color: var(--color-verde); border-color: var(--color-verde); }
+.icon-gris { color: var(--color-gris); border-color: var(--color-gris); }
+
+.icon-amarillo-tenue { background-color: var(--color-amarillo-tenue); }
+.icon-azul-tenue { background-color: var(--color-azul-tenue); }
+.icon-morado-tenue { background-color: var(--color-morado-tenue); }
+.icon-naranja-tenue { background-color: var(--color-naranja-tenue); }
+.icon-rojo-tenue { background-color: var(--color-rojo-tenue); }
+.icon-verde-tenue { background-color: var(--color-verde-tenue); }
+.icon-gris-tenue { background-color: var(--color-gris-tenue); }
 
 
 
@@ -1396,6 +1419,7 @@ font-size: 1.6rem;
 }
 
 .datatable-agenda-boton{
+   padding-top: .7rem;
    width: 3.8rem;
    height: 3.8rem;
    font-size: 2.5rem;
@@ -2825,6 +2849,7 @@ select[disabled] {
 .modalDiaLaboralControlesCupos,
 .modalDiaLaboralContenedorCupos,
 .modalAtencionCampos,
+.modalAusenciaCampos,
 .sectorCamposModal,
 .modalCadaverDefuncionPacienteCampos,
 .modalDefuncionResponsableCampos,
@@ -2834,12 +2859,12 @@ select[disabled] {
 .modalSeguimientoTIC,
 .modalNoAtencion{
    width: 100%;
-   padding: 2.5rem 1.5rem 1.5rem 1.5rem;
+   padding: 2.1rem 1.5rem 1.5rem 1.5rem;
    margin: 0;
    border-radius: .5rem;
    display: flex;
    flex-direction: column;
-   row-gap: 2rem;
+   row-gap: 1.5rem;
    font-size: 1.5rem;
    margin-bottom: 1rem;
    font-family: var(--fuenteTablaTitulo);
@@ -4933,6 +4958,7 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
 .contenedor-modal-obito,
 .contenedor-modal-periodo-laboral,
 .contenedor-modal-dia-laboral,
+.contenedor-modal-ausencia,
 .contenedor-modal-procesos{
    background-color: var(--colorContendor);
    width: 98%;
@@ -4940,6 +4966,7 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
 
 
 .contenedor-modal-galeria.swal2-popup,
+.contenedor-modal-ausencia.swal2-popup,
 .contenedor-modal-periodo-laboral.swal2-popup{
    grid-template-columns: 1fr;
 }
@@ -4953,7 +4980,8 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
 
 .contenedor-modal-galeria .tituloFormulario-subrallado,
 .contenedor-modal-obito .tituloFormulario-subrallado,
-.contenedor-modal-periodo-laboral .tituloFormulario-subrallado
+.contenedor-modal-periodo-laboral .tituloFormulario-subrallado,
+.contenedor-modal-ausencia .tituloFormulario-subrallado,
 .contenedor-modal-procesos .tituloFormulario-subrallado{
    margin-bottom: 1.2rem;
    height: .3rem;
@@ -5021,6 +5049,7 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
    .contenedor-modal-galeria,
    .contenedor-modal-obito,
    .contenedor-modal-periodo-laboral,
+   .contenedor-modal-ausencia,
    .contenedor-modal-procesos{
       width: 54rem !important
    }
@@ -5053,23 +5082,212 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
 >>>>>>>>>>>>>>>>>>>>>   APP DE AGENDA MEDICA
 */
 
+/* 
+...>>>>>>>>>>>>>> TITULO PERZONALIZADO 
 
-/*
-----------------   MODAL PERIODO LABORAL
 */
 
-  .modalPeriodoLaboralCampos .formularioCampoModal{
+.tituloFormulario.agenda-medica-header {
+   display: grid;
+   grid-template-columns: 1fr auto;
+   row-gap: .5rem;
+}
+
+.agenda-medica-header .tituloFormulario-texto .agenda-medica-titulos {
+   display: flex;
+   flex-direction: column;
+   justify-content: flex-start;
+   text-align: left;
+   row-gap: .3rem;
+}
+
+.agenda-medica-header .tituloFormulario-texto .agenda-medica-titulos .agenda-medica-subtitulo{
+   font-size: 1.8rem;
+   font-weight: 600;
+   color: var(--colorInputReadonlyTexto);
+   opacity: .8;
+}
+
+.tituloFormulario.agenda-medica-header .tituloFormulario-subrallado {
+   grid-column: 1 / -1;
+}
+
+
+/* LISTADO DE AGENDA */
+.agenda-medica-listados {
+   display: flex;
+   justify-content: end;
+   align-items: end;
+   margin-bottom: -.4rem;
+}
+
+
+/* BOTONES */
+.agenda-medica-listados .agenda-medica-listado {
+   display: flex;
+   min-width: 20rem;
+   justify-content: center;
+   align-items: center;
+   padding: .5rem 1rem;
+   column-gap: 1.2rem;
+   background-color: transparent;
+   color: var(--colorTextoMenu);
+   border-radius: .8rem .8rem 0 0;
+   border: .15rem solid transparent;
+   cursor: pointer;
+   transition: all .2s ease;
+   text-decoration: none;
+}
+
+
+/* ICONOS */
+.agenda-medica-listados .agenda-medica-listado i {
+   font-size: 3.2rem;
+   color: var(--colorTextoMenu);
+   transition: color .2s ease;
+}
+
+
+/* TEXTO */
+.agenda-medica-listados .agenda-medica-listado span {
+   font-family: var(--fuenteTablaCuerpo);
+   font-size: 1.5rem;
+   font-weight: 600;
+}
+
+
+/* BOTÓN ACTIVO */
+.agenda-medica-listados .agenda-medica-listado.activo {
+   background-color: var(--colorBoton);
+   color: var(--blanco);
+}
+
+.agenda-medica-listados .agenda-medica-listado.activo i {
+   color: var(--blanco);
+}
+
+
+/* HOVER BOTÓN INACTIVO */
+.agenda-medica-listados .agenda-medica-listado:not(.activo):hover {
+   background-color: var(--colorTextoMenu);
+   color: var(--blanco);
+}
+
+.agenda-medica-listados .agenda-medica-listado:not(.activo):hover i {
+   color: var(--blanco);
+}
+
+
+
+/* 
+.>>>>>>>>>>> DATA TABLE LISTADO DE PERIODOSO LABORALES
+*/
+
+
+/* parte superior datatables */
+
+.superior-agenda-medica{
+   display: flex;
+   flex-direction: column;
+   justify-content: space-between;
+   align-items: center;
+   gap: 1rem;
+   margin-bottom: 1.5rem;
+}
+
+.superior-agenda-medica .dt-buttons{
+   margin: 0;
+   display: flex;
+   column-gap: .8rem;
+   justify-content: flex-start;
+   min-width: 25rem;
+}
+
+.superior-agenda-medica .dt-buttons .boton-accion-principal{
+   border-radius: .5rem;
+}
+
+.superior-agenda-medica .dt-buttons .boton-accion-principal{
+      padding: 0 1rem;
+      font-size: 2.5rem;
+      background-color: var(--colorBoton);
+      color: var(--blanco);
+      display: flex;
+      column-gap: 1rem;
+      align-items: center;
+      justify-content: space-around;
+      height: 100%;
+      border-radius: .5rem;
+}
+
+.superior-agenda-medica .form-label{
+   font-size: 1.5rem;
+   text-transform: none;
+   font-family: var(--fuenteTablaCuerpo);
+   font-weight: 600;
+   margin-left: .5rem;
+} 
+
+
+
+.superior-agenda-medica .dt-buttons .boton-accion-principal:hover {
+   background-color: var(--colorTextoMenu);
+   color: var(--negro);
+} 
+
+
+
+.superior-agenda-medica .boton-exportacion {
+   border: var(--colorTablaceldaBorde) solid .15rem;
+   font-size: 2.8rem;
+   padding: .4rem;
+   /* background-color: #005c63; */
+}
+
+.superior-agenda-medica .boton-exportacion span{
+   padding: 0 .3rem;
+}
+
+
+@media (min-width: 65rem) {
+   .superior-agenda-medica .contenedorSegmentacion {
+      width: 90%;
+   }
+}
+
+
+@media (min-width: 85rem) {
+   .superior-agenda-medica{
+      flex-direction: row;
+      column-gap: 4rem;
+   }
+   .superior-agenda-medica .contenedorSegmentacion {
+      width: 100%;
+   }
+}
+
+
+
+
+/*
+----------------   MODAL PERIODO LABORAL ///    AUSENCIA
+*/
+
+   .modalPeriodoLaboralCampos .formularioCampoModal,
+   .modalAusenciaCampos .formularioCampoModal{
       display: grid;
       grid-template-columns: 1fr;
    }
 
-   .modalPeriodoLaboralCampos .formularioCampoModalRangoFecha{
+   .modalPeriodoLaboralCampos .formularioCampoModalRangoFecha,
+   .modalAusenciaCampos .formularioCampoModalRangoFecha{ 
       display: flex;
       flex-direction: column;
       row-gap: .3rem;
    }
 
-   #periodoLaboral__estado{
+   #periodoLaboral__estado,
+   #ausencia__estado{
       border-bottom: 0.1rem solid var(--colorTextoMenu);
    }
 
@@ -5092,7 +5310,8 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
    }
 
 
-   .formularioCampoModalPeriodoEstado{
+   .formularioCampoModalPeriodoEstado,
+   .formularioCampoModalAusenciaEstado{
       display: flex;
       flex-direction: row;
       justify-content: space-around;
@@ -5101,8 +5320,16 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
    }
 
    
-   .periodo-estado-oculto{
+   .periodo-estado-oculto,
+   .ausencia-estado-oculto{
       display: none !important;
+   }
+
+   #modal-ausencia-observaciones{
+      height: auto;
+      max-height: 8rem;
+      min-height: 3rem;
+      resize: none;
    }
 
 
@@ -5112,6 +5339,7 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
       padding-top: 1.5rem;
    }
 
+   .contenedor-modal-ausencia,
    .contenedor-modal-periodo-laboral{
       width: 50rem;
       display: flex !important;
@@ -5123,11 +5351,14 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
    }
    
 
-   .modalPeriodoLaboralCampos .formularioCampoModal{
+   .modalPeriodoLaboralCampos .formularioCampoModal,
+   .modalAusenciaCampos .formularioCampoModal{
       grid-template-columns: 1fr 3fr;
    }
 
-   .modalPeriodoLaboralCampos .formularioCampoModalRangoFecha{
+   .modalPeriodoLaboralCampos .formularioCampoModalRangoFecha,
+   .modalAusenciaCampos .formularioCampoModalRangoFecha{
+
       display: flex;
       flex-direction: row;
       justify-content: center;
@@ -5135,7 +5366,8 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
       
    }
 
-   .modalPeriodoLaboralCampos .formularioCampoModalRangoFecha label{
+   .modalPeriodoLaboralCampos .formularioCampoModalRangoFecha label,
+   .modalAusenciaCampos .formularioCampoModalRangoFecha  label{
       width: 5rem;
       text-align: center;
    }
@@ -5271,7 +5503,6 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
 .configurarPeriodoContenedorTarjetaDiasSemana{
    grid-column: 1 / -1;
    border: .15rem solid var(--color-Scroll-Hover);
-   border: .15rem solid #ccc;
    border-radius: 1rem 0 1rem 0;
    transition: all 0.3s ease;
 }
@@ -5295,12 +5526,19 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
    max-width: 16rem;
    transition: box-shadow 0.2s ease, transform 0.15s ease, opacity 0.2s ease;
    cursor: pointer;
-   row-gap: 1.8rem;
-
+   justify-content: space-between;
+   border-color: var(--color-verde-tenue);
 }
+
+.configurar-periodo-dia-tarjeta.quirugico{
+   border-color: var(--color-azul-tenue);
+}
+
+
 
 .configurar-periodo-dia-tarjeta.tarjeta-no-configurada{
    background-color: var(--colorTablaHover);
+   border-color: var(--color-amarillo-tenue);
 }
 
 .configurar-periodo-dia-tarjeta-header{
@@ -5318,12 +5556,48 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
 }
 
 .configurar-periodo-dia-tarjeta-header-estado{
-   font-size: 2.2rem;
+   font-size: 1.8rem;
    position: absolute;
    right: -.6rem;
    top: -.5rem;
-   padding: .4rem;
+   /* padding: .4rem; */
+   background-color: var(--color-verde-tenue);
+   border-radius: 50%;
+   width: 3rem;
+   height: 3rem;
+   display: flex;
+   justify-content: center;
+   align-items: center;
+
 }
+
+.configurar-periodo-dia-tarjeta.quirugico .configurar-periodo-dia-tarjeta-header-estado{
+   background-color: var(--color-azul-tenue);
+}
+
+.configurar-periodo-dia-tarjeta.tarjeta-no-configurada .configurar-periodo-dia-tarjeta-header-estado{
+   background-color: var(--color-amarillo-tenue)
+}
+
+.configurar-periodo-dia-tarjeta-header-estado i{
+   color: var(--color-verde);
+}
+
+.configurar-periodo-dia-tarjeta.quirugico .configurar-periodo-dia-tarjeta-header-estado span{
+   color: var(--color-azul);
+   font-size: 2.7rem;
+}
+
+
+.configurar-periodo-dia-tarjeta.tarjeta-no-configurada .configurar-periodo-dia-tarjeta-header-estado i{
+   color: var(--color-amarillo);
+
+}
+
+
+
+
+
 
 .configurar-periodo-dia-tarjeta-body{
    display: flex;
@@ -5344,6 +5618,12 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
 .dia-info-item span{
    white-space: nowrap;
 }
+
+
+.dia-info-item .material-symbols-outlined{
+   font-size: 2.5rem;
+}
+
 
 
 
@@ -5367,18 +5647,43 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
    display: flex;
    justify-content: center;
    align-items: center;
+   border-top: .15rem solid var(--colorTablaceldaBorde);
+   padding-top: 1rem;
+   column-gap: .5rem;
 }
 
+/* botonde peroznaliazdo tarjeta dia laboral */
 .configurar-periodo-dia-tarjeta-boton{
-   width: 12rem;
+   width: 10rem;
+   border-radius: .6rem;
 }
 
+.configurar-periodo-dia-tarjeta-boton-secundario{
+   width: 3.2rem;
+   height: 100%;
+   padding: .1rem .3rem;
+   color: var(--color-rojo);
+   background-color: var(--color-rojo-tenue);
+
+}
+
+.configurar-periodo-dia-tarjeta-boton-secundario.definir-quirurgico{
+   background-color: var(--color-azul-tenue);
+}
+
+.configurar-periodo-dia-tarjeta-boton-secundario .material-symbols-outlined{
+   font-size: 2.6rem;
+   padding: 0;
+   margin: 0;
+   color: var(--color-azul);
+}
 .configurar-periodo-dia-tarjeta-boton i{
    font-size: 1.8rem;
+   padding-top: .2rem;
 }
 
 .configurar-periodo-dia-tarjeta-boton span{
-   font-size: 1.2rem;
+   font-size: 1.1rem;
 }
 
 
@@ -5456,8 +5761,6 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
    display: flex;
    padding: 1.5rem 1rem;
 }
-
-
 
 
 
@@ -5547,6 +5850,9 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
    }
 
 }
+
+
+
 
 /*TABLA DE RESULTASDO , MUESTRA OPCIONES FIJAS */
 
@@ -5719,4 +6025,13 @@ tbody tr:last-child .botonTablaBajar{
       font-size: 1.3rem;
       padding: 0.6rem 1rem;
    }
+}
+
+
+
+.datatable-ausencia-tipo {
+    display: inline-block;
+    padding-left: .8rem;
+    border-left: .4rem solid #adb5bd;
+    font-weight: 500;
 }

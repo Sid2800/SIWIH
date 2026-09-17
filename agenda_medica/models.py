@@ -92,9 +92,12 @@ class Dia_laboral(models.Model):
             estado=EstadoCupoAgenda.INACTIVO
         ).count()
 
+    @property
+    def es_quirurgico(self):
+        return hasattr(self, "dia_quirurgico")
+
 
     class Meta: 
-        unique_together = ("periodo_laboral", "dia_semana") 
         ordering = ["dia_semana"]
         verbose_name = "Dia laboral"
         verbose_name_plural = "Dias laborales"
@@ -114,12 +117,25 @@ class Dia_laboral(models.Model):
             if self.hora_inicio < self.periodo_laboral.jornada_laboral.hora_inicio or self.hora_fin > self.periodo_laboral.jornada_laboral.hora_fin: 
                 raise ValidationError("El horario del día debe estar dentro de la jornada definida.")
             
+        #validamos que no exista otro dia laboral activo para el mismo periodo y dia de semana
+        if self.estado == EstadoRegistro.ACTIVO:
+            existe = Dia_laboral.objects.filter(
+                periodo_laboral=self.periodo_laboral,
+                dia_semana=self.dia_semana,
+                estado=EstadoRegistro.ACTIVO
+            ).exclude(pk=self.pk).exists()
+
+            if existe:
+                raise ValidationError(
+                    "Ya existe un día laboral activo para este período y día de semana."
+                )
+                
     def __str__(self): 
         return f"{self.get_dia_semana_display()} - {self.periodo_laboral}"
     
 
 class Configuracion_cupo(models.Model):
-    dia_laboral = models.ForeignKey(Dia_laboral, verbose_name=("Dia laboral"), on_delete=models.CASCADE, related_name="cupos")
+    dia_laboral = models.ForeignKey(Dia_laboral, verbose_name=("Dia laboral"), on_delete=models.CASCADE, related_name="configuraciones_cupo")
     tipo_atencion = models.ForeignKey(Tipo_atencion, verbose_name="Tipo Atencion", on_delete=models.PROTECT)
     cupos = models.PositiveSmallIntegerField(verbose_name="Cupos")
     duracion_minutos = models.PositiveSmallIntegerField()
@@ -168,6 +184,19 @@ class Ausencia(models.Model):
     creado_por = models.ForeignKey(User, on_delete=models.PROTECT, related_name='ausencias_creadas', null=True, blank=True)
     fecha_modificado = models.DateTimeField(verbose_name="Fecha Editado", auto_now=True )
     modificado_por = models.ForeignKey(User, on_delete=models.PROTECT, related_name='ausencias_modificadas', null=True, blank=True )
+
+
+    @property
+    def estado_temporal(self):
+        hoy = date.today()
+
+        if hoy < self.fecha_inicio:
+            return EstadoTemporalPeriodo.FUTURO.value
+        elif self.fecha_inicio <= hoy <= self.fecha_fin:
+            return EstadoTemporalPeriodo.EN_EJECUCION.value
+        else:
+            return  EstadoTemporalPeriodo.FINALIZADO.value
+
     
     class Meta:
         verbose_name = "Ausencia"
@@ -186,6 +215,36 @@ class Ausencia(models.Model):
             f"{self.fecha_inicio} - {self.fecha_fin}"
         )
 
+
+class Dia_quirurgico(models.Model):
+    dia_laboral = models.OneToOneField(Dia_laboral, on_delete=models.CASCADE, related_name="dia_quirurgico")
+    estado = models.SmallIntegerField( choices=EstadoRegistro.choices, default=EstadoRegistro.ACTIVO)
+    fecha_creado = models.DateTimeField(verbose_name="Fecha Creado", auto_now_add=True)
+    creado_por = models.ForeignKey(User, on_delete=models.PROTECT, related_name="dias_quirurgicos_creados", null=True, blank=True)
+    fecha_modificado = models.DateTimeField(verbose_name="Fecha Editado", auto_now=True)
+    modificado_por = models.ForeignKey(User, on_delete=models.PROTECT, related_name="dias_quirurgicos_modificados", null=True, blank=True)
+
+    class Meta:
+        ordering = [
+            "dia_laboral__dia_semana"
+        ]
+        verbose_name = "Dia quirurgico"
+        verbose_name_plural = "Dias quirurgicos"
+
+        indexes = [
+            models.Index(
+                fields=["estado"]
+            ),
+        ]
+
+    def __str__(self):
+
+        return (
+            f"{self.dia_laboral.get_dia_semana_display()} - "
+            f"{self.dia_laboral.periodo_laboral}"
+        )
+
+    
 
 class Cupo_agenda(models.Model):
     personal_salud = models.ForeignKey(PersonalSalud, on_delete=models.PROTECT, related_name="cupos_agenda")
@@ -208,7 +267,6 @@ class Cupo_agenda(models.Model):
     def especialidad(self):
         return self.personal_salud.especialidad
     
-
 
     class Meta:
         verbose_name = "Cupo agenda"

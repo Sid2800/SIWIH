@@ -130,6 +130,66 @@ async function confirmarAccion(config = {}) {
 }
 
 
+async function informarCambios(config = {}) {
+
+   const {
+      titulo = "Cambios realizados",
+      mensajes = [],
+      icono = "info",
+      boton = "Entendido"
+   } = config;
+
+   const iconos = {
+      warning: "bi-exclamation-triangle",
+      danger: "bi-exclamation-octagon",
+      success: "bi-check-circle",
+      info: "bi-info-circle"
+   };
+
+   const claseIcono = iconos[icono] || "bi-info-circle";
+
+   const htmlMensajes = mensajes.map(
+      mensaje => `<li>${mensaje}</li>`
+   ).join("");
+
+   await Swal.fire({
+      title: `<i class="bi ${claseIcono}"></i>${titulo}`,
+      html: `
+         <div class="tituloFormulario-subrallado"></div>
+         <div class="contener-modal-mensajes-confirmacion">
+               <ul class="contener-modal-lista-confirmacion">
+                  ${htmlMensajes}
+               </ul>
+         </div>
+      `,
+      confirmButtonText: `<i class="bi bi-check-circle-fill"></i> ${boton}`,
+      customClass: {
+         icon: "contenedor-modal-icon",
+         popup: "contenedor-modal",
+         title: "contener-modal-titulo",
+         confirmButton: "contener-modal-boton-confirmar"
+      },
+      didOpen: () => {
+         const actionsContainer = document.querySelector(".swal2-actions");
+
+         if (actionsContainer) {
+               actionsContainer.classList.add(
+                  "contener-modal-contenedor-botones-min"
+               );
+         }
+
+         const htmlContainer = document.querySelector(".swal2-html-container");
+
+         if (htmlContainer) {
+               htmlContainer.classList.add(
+                  "contener-modal-contenedor-html"
+               );
+         }
+      }
+   });
+}
+
+
 function renderDatosContexto(containerId, datos = {}) {
 
    const header = document.getElementById(containerId);
@@ -179,16 +239,29 @@ const API_URLS = {
    listarObitosPaciente: urls["listarObitosPaciente"],
    listarUnidadClinica: urls["listarUnidadClinica"],
    listarAgendaMedicaAPI: urls["listarAgendaMedicaAPI"],
+   listarAusenciasAPI: urls["listarAusenciasAPI"],
    listarPersonalClinicoAPI: urls["listarPersonalClinicoAPI"],
    listarJornadaLaboralAPI: urls["listarJornadaLaboralAPI"],
    guardarPeriodoLaboral: urls["guardarPeriodoLaboral"],
    validarImpactoPeriodoLaboral: urls["validarImpactoPeriodoLaboral"],
    validarImpactoDiaLaboral: urls["validarImpactoDiaLaboral"],
    obtenerPeriodoLaboral: urls["obtenerPeriodoLaboral"],
+   obtenerAusencia: urls["obtenerAusencia"],
    listarTiposAtencion: urls["listarTiposAtencion"],
-   guardarDiaPeriodoLaboral: urls["guardarDiaPeriodoLaboral"],
+   guardarDiaLaboral: urls["guardarDiaLaboral"],
+   guardarAusencia: urls["guardarAusencia"],
+   eliminarDiaLaboral: urls["eliminarDiaLaboral"],
    obtenerDiaLaboral: urls["obtenerDiaLaboral"],
    editarPeriodoLaboral: urls["editarPeriodoLaboral"],
+   configurarPeridoLaboral: urls["configurarPeridoLaboral"],
+   agendaMedicaAPI: urls["agendaMedicaAPI"],
+   definirDiaQuirugico: urls["definirDiaQuirugico"],
+   quitarDiaQuiurgico: urls["quitarDiaQuiurgico"],
+   listarTiposAusencia: urls["listarTiposAusencia"],
+   validarImpactoAusencia: urls["validarImpactoAusencia"],
+   editarAusencia: urls["editarAusencia"]
+
+   
 
 };
 

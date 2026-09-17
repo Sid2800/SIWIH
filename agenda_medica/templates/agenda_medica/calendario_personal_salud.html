@@ -1,0 +1,175 @@
+{% extends 'core/base.html'%}
+
+
+
+{% block title %}CALENDARIO{% endblock title %}
+
+{% block content %}
+   <div class="contenedor2" style="height: 100%;"> 
+
+      <div class="tituloFormulario" style="margin-bottom: 2rem;">
+         <div class="tituloFormulario-texto"> 
+               <i class="bi bi-calendar3"></i>
+               <h2 class="sin-margen">Agenda Medica</h2>
+         </div>
+         <div class="tituloFormulario-subrallado"></div>
+      </div>
+
+      <div class="agenda-medica-calendario">
+
+         <div class="agenda-medica-calendario__filtros">
+
+            <div class="agenda-medica-calendario__selector-personal-dia">
+
+               <div class="agenda-medica-calendario__selector-personal">
+                  <label for="seleccionarPersonalSalud">
+                     Personal de salud
+                  </label>
+
+                  <div id="seleccionarPersonalSalud"></div>
+               </div>
+
+               <div class="agenda-medica-calendario__selector-fecha">
+                  <label for="fechaSeleccionada">
+                     Fecha
+                  </label>
+
+                  <div id="fechaSeleccionada"></div>
+               </div>
+
+               <div class="agenda-medica-calendario__filtros-estado">
+
+                  <span class="agenda-medica-calendario__filtros-titulo">
+                     <i class="bi bi-funnel-fill"></i>
+                     Estado del cupo
+                  </span>
+
+                  
+                  <label
+                     class="ck-formulario agenda-filtro-cupo--libre"
+                     for="chk-cupo-libre"
+                     >
+                     <input
+                        type="checkbox"
+                        id="chk-cupo-libre"
+                        class="ck-formulario__checkbox"
+                        checked
+                     >
+
+                     <div class="ck-formulario__base">
+                        <div class="ck-formulario__bolita"></div>
+                     </div>
+
+                     <span class="ck-formulario__label">
+                        <i class="bi bi-circle-fill"></i>
+                        Libres
+                     </span>
+                  </label>
+
+
+                  <label
+                     class="ck-formulario agenda-filtro-cupo--programada"
+                     for="chk-cupo-programada"
+                     >
+                     <input
+                        type="checkbox"
+                        id="chk-cupo-programada"
+                        class="ck-formulario__checkbox"
+                        checked
+                     >
+
+                     <div class="ck-formulario__base">
+                        <div class="ck-formulario__bolita"></div>
+                     </div>
+
+                     <span class="ck-formulario__label">
+                        <i class="bi bi-circle-fill"></i>
+                        Programadas
+                     </span>
+                  </label>
+
+
+                  <label
+                     class="ck-formulario agenda-filtro-cupo--reprogramada"
+                     for="chk-cupo-reprogramada"
+                     >
+                     <input
+                        type="checkbox"
+                        id="chk-cupo-reprogramada"
+                        class="ck-formulario__checkbox"
+                        checked
+                     >
+
+                     <div class="ck-formulario__base">
+                        <div class="ck-formulario__bolita"></div>
+                     </div>
+
+                     <span class="ck-formulario__label">
+                        <i class="bi bi-circle-fill"></i>
+                        Reprogramadas
+                     </span>
+                  </label>
+
+
+                  <label
+                     class="ck-formulario agenda-filtro-cupo--ausencia"
+                     for="chk-cupo-ausencia"
+                     >
+                     <input
+                        type="checkbox"
+                        id="chk-cupo-ausencia"
+                        class="ck-formulario__checkbox"
+                        checked
+                     >
+
+                     <div class="ck-formulario__base">
+                        <div class="ck-formulario__bolita"></div>
+                     </div>
+
+                     <span class="ck-formulario__label">
+                        <i class="bi bi-circle-fill"></i>
+                        Ausencias
+                     </span>
+                  </label>
+
+               </div>
+
+            </div>
+
+         </div>
+
+         <div
+            class="agenda-medica-calendario__calendario"
+            id="calendario"
+         ></div>
+
+      </div>
+   
+
+   </div>
+
+
+
+   
+{% endblock content %}
+
+{% load static %}
+
+
+{% block extra_js %}
+{% load static %}
+
+<script> 
+   const idPersonal = {{ personal_salud_id }}
+</script>
+
+
+<link rel="stylesheet" href="{% static 'core/timegridjs/css/timegrid.css' %}">
+<script src="{% static 'core/timegridjs/js/core/icons.js' %}"></script>
+<script src="{% static 'core/timegridjs/js/core/index.js' %}"></script>
+
+<script src="{% static 'core/scripts/helpers/agenda_helpers.js' %}"></script>
+<script src="{% static 'core/scripts/features/calendario_personal_salud.js' %}"></script>
+<link rel="stylesheet" href="{% static 'core/css/agenda/calendario_personal_salud.css' %}">
+
+{% endblock extra_js %}

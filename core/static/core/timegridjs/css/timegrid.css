@@ -1,3 +1,7 @@
+/*==================================
+   TimeGrid - Container
+==================================*/
+
 .tg-container{
 
    /*==============================
@@ -7,13 +11,17 @@
    --tg-color-primary: #0d6efd;
    --tg-color-primary-hover: rgba(13,110,253,.10);
    --tg-color-primary-active: rgba(13,110,253,.90);
+   --tg-color-month-stripe: rgba(13, 110, 253, .03);
+
+   --tg-color-month-groups-border: rgba(13, 110, 253, .20);
+   --tg-color-month-group-background: rgba(25, 135, 84, .18);
 
    --tg-color-border: #b0b6be;
    --tg-color-border-active: #032334;
 
    --tg-color-background: #ffffff;
-   --tg-color-header-background: rgba(15,23,42,.025);
-   --tg-color-time-background: rgba(60, 64, 67, .03);
+   --tg-color-header-background: rgba(15,23,42,.030);
+   --tg-color-time-background: rgba(60,64,67,.035);
 
    --tg-color-text: #212529;
    --tg-color-text-secondary: #64748b;
@@ -43,16 +51,24 @@
       Dimensiones
    ==============================*/
 
-   --tg-time-width: 70px;
+   --tg-time-width: 50px;
    --tg-header-height: 85px;
-   --tg-row-height: 6px;
+   --tg-row-height: 8px;
+   --tg-month-row-height: 18px;
+
+   /*==============================
+      Layout
+   ==============================*/
 
    display: flex;
    flex-direction: column;
+   row-gap: 3rem;
+
    padding: 15px 10px;
+
+   background: var(--tg-color-background);
    border-radius: 10px;
    box-shadow: var(--tg-shadow-md);
-   row-gap: 3rem;
 }
 
 
@@ -73,8 +89,9 @@
    display: flex;
 }
 
+
 /*==================================
-   Título
+   Header - Título
 ==================================*/
 
 .tg-title{
@@ -98,8 +115,9 @@
    padding-left: 4.4rem;
 }
 
+
 /*==================================
-   Navegación
+   Header - Navegación
 ==================================*/
 
 .tg-header-center{
@@ -119,10 +137,13 @@
    height: 4rem;
 
    padding: .3rem .5rem;
+
    border: .1rem solid var(--tg-color-border);
    border-radius: var(--tg-radius-md);
+
    background: transparent;
    box-shadow: var(--tg-shadow-md);
+
    cursor: pointer;
    text-align: center;
    font-weight: 600;
@@ -151,12 +172,15 @@
 .tg-navigation button svg{
    width: 2.5rem;
    height: 2.5rem;
+
    margin-top: .3rem;
+
    flex-shrink: 0;
 }
 
+
 /*==================================
-   Vistas
+   Header - Vistas
 ==================================*/
 
 .tg-header-right{
@@ -166,13 +190,17 @@
 
 .tg-views{
    display: flex;
-   column-gap: .5rem;
+   /* column-gap: .5rem; */
+
+   border: .1rem solid var(--tg-color-border);
+   border-radius: var(--tg-radius-sm);
+
+   box-shadow: var(--tg-shadow-sm);
 }
 
 .tg-view-option{
-   border: .1rem solid var(--tg-color-border);
-   border-radius: var(--tg-radius-sm);
-   box-shadow: var(--tg-shadow-sm);
+   
+
    cursor: pointer;
 
    transition:
@@ -182,12 +210,12 @@
       transform .15s ease;
 }
 
-.tg-view-option:active{
-   transform: scale(.96);
-}
-
 .tg-view-option:hover{
    background: var(--tg-color-primary-hover);
+}
+
+.tg-view-option:active{
+   transform: scale(.96);
 }
 
 .tg-view-option:has(.tg-view-input:checked){
@@ -201,12 +229,13 @@
 }
 
 .tg-view-content{
-   width: 5rem;
-   height: 6rem;
    display: flex;
    flex-direction: column;
    justify-content: center;
    align-items: center;
+
+   width: 5rem;
+   height: 6rem;
 
    row-gap: .2rem;
    padding: .6rem .8rem;
@@ -215,6 +244,7 @@
 .tg-view-content svg{
    width: 3.5rem;
    height: 3.5rem;
+
    flex-shrink: 0;
 }
 
@@ -223,8 +253,18 @@
    font-weight: 600;
 }
 
+
 /*==================================
-   Encabezado de la semana
+   Grid
+==================================*/
+
+.tg-week{
+   position: relative;
+}
+
+
+/*==================================
+   Grid - Encabezado de días
 ==================================*/
 
 .tg-week-day-header{
@@ -233,60 +273,94 @@
    justify-content: center;
    align-items: center;
 
-   row-gap: .4rem;
+   row-gap: .1rem;
    padding: .5rem 1rem;
+
    background: var(--tg-color-header-background);
+
    border-bottom: .1rem solid var(--tg-color-border);
 }
 
 .tg-week-day-header-number{
-   align-self: center;
-   font-size: 3.2rem;
+   display: flex;
+   justify-content: center;
+   align-items: center;
+   width: 50px;
+   height: 50px;
+
+   box-sizing: border-box;
+   border-radius: 50%;
+
+   font-size: 28px;
    font-weight: 700;
    line-height: 1;
+
    color: var(--tg-color-text);
 }
 
-.tg-week-time-header{
-   width: var(--tg-time-width);
-   background: rgba(15, 23, 42, .085);
-   border-right: .1rem solid var(--tg-color-border);
-   border-bottom: .1rem solid var(--tg-color-border);
-   box-sizing: border-box;
+.tg-day-number-today{
+   border: 2px solid var(--tg-color-border-active);
+}
+
+.tg-day-number-selected{
+   color: var(--tg-color-text-active);
+   background-color: var(--tg-color-primary-active);
 }
 
 
+/*==================================
+   Grid - Encabezado de horas
+==================================*/
+
+.tg-week-time-header{
+   width: var(--tg-time-width);
+
+   box-sizing: border-box;
+
+   background: rgba(15,23,42,.085);
+
+   border-right: .1rem solid var(--tg-color-border);
+   border-bottom: .1rem solid var(--tg-color-border);
+}
 
 
 /*==================================
-  Columna de horas
+   Grid - Columna de horas
 ==================================*/
 
 .tg-week-time{
    width: var(--tg-time-width);
-   background: var(--tg-color-time-background);
-   color: var(--tg-color-text-secondary);
-   text-align: right;
+
+   box-sizing: border-box;
+
    padding: .2rem .8rem 0 0;
+
+   background: var(--tg-color-time-background);
+
    border-right: .1rem solid var(--tg-color-border);
    border-bottom: .1rem solid var(--tg-color-border);
 
-   box-sizing: border-box;
+   color: var(--tg-color-text-secondary);
+
+   text-align: right;
+
    font-size: 1.4rem;
    font-weight: 600;
 }
 
 
-.tg-week{
-   position: relative;
-}
+/*==================================
+   Grid - Líneas de intervalos
+==================================*/
 
 .tg-week::before{
    content: "";
+
    position: absolute;
 
    left: var(--tg-time-width);
    right: 0;
+
    top: var(--tg-header-height);
    bottom: 0;
 
@@ -296,9 +370,423 @@
       repeating-linear-gradient(
          to bottom,
          transparent 0,
-         transparent calc(var(--tg-row-height) * var(--tg-interval-rows) - 1px),
-         var(--tg-color-border) calc(var(--tg-row-height) * var(--tg-interval-rows) - 1px),
-         var(--tg-color-border) calc(var(--tg-row-height) * var(--tg-interval-rows))
+         transparent calc(
+            var(--tg-row-height) * var(--tg-interval-rows) - 1px
+         ),
+         var(--tg-color-border) calc(
+            var(--tg-row-height) * var(--tg-interval-rows) - 1px
+         ),
+         var(--tg-color-border) calc(
+            var(--tg-row-height) * var(--tg-interval-rows)
+         )
       );
 }
 
+.tg-month-grid::after{
+   content: "";
+
+   position: absolute;
+
+   left: 0;
+   right: 0;
+
+   top: var(--tg-header-height);
+   bottom: 0;
+
+   pointer-events: none;
+
+   background:
+      repeating-linear-gradient(
+         to right,
+         var(--tg-color-month-stripe) 0,
+         var(--tg-color-month-stripe) calc(100% / 7),
+         transparent calc(100% / 7),
+         transparent calc(200% / 7)
+      );
+}
+
+/*==================================
+   Month
+==================================*/
+
+.tg-month{
+   position: relative;
+}
+
+.tg-month::before{
+   content: "";
+
+   position: absolute;
+
+   left: 0;
+   right: 0;
+
+   top: var(--tg-header-height);
+   bottom: 0;
+
+   pointer-events: none;
+
+   background:
+      repeating-linear-gradient(
+         to bottom,
+         transparent 0,
+         transparent calc(
+            var(--tg-month-row-height) * var(--tg-interval-rows) - 1px
+         ),
+         var(--tg-color-border) calc(
+            var(--tg-month-row-height) * var(--tg-interval-rows) - 1px
+         ),
+         var(--tg-color-border) calc(
+            var(--tg-month-row-height) * var(--tg-interval-rows)
+         )
+      );
+}
+
+.tg-month-grid .tg-week-day-header{
+   font-size: 24px;
+   font-weight: 600;
+}
+
+
+/*==================================
+   Month - Número del día
+==================================*/
+
+.tg-month-day-number{
+   display: flex;
+   justify-content: center;
+   align-items: center;
+
+   align-self: start;
+   justify-self: end;
+
+   width: 32px;
+
+   height: 32px;
+
+   margin-top: 3px;
+   margin-right: 10px;
+
+   border-radius: 50%;
+
+   font-size: 18px;
+   font-weight: 700;
+   line-height: .4;
+
+   z-index: 2;
+}
+
+.tg-month-day-number-other{
+   color: var(--tg-color-text-secondary);
+}
+
+.tg-month-day-number-today{
+   border: 2px solid var(--tg-color-border-active);
+}
+
+
+/*==================================
+   Entries
+==================================*/
+
+.tg-entry{
+   margin-block: .5px;
+   position: relative;
+   display: flex;
+   /* align-items: flex-start; */
+   align-items: center;
+   box-sizing: border-box;
+   min-width: 0;
+   overflow: hidden;
+   padding: 6px 8px;
+   border: 1px solid #adb5bd;
+   border-radius: 4px;
+
+   background-color: beige;
+   color: #212529;
+
+   opacity: .95;
+   cursor: pointer;
+   font-size: 14px;
+   line-height: 1.2;
+   column-gap: 8px;
+}
+
+.tg-entry-day{
+   align-items: center;
+}
+
+
+   .tg-entry-day .tg-entry__content .tg-entry__subtitle{
+      display: none;
+   }
+
+
+
+
+
+.tg-entry__content{
+   display: flex;
+   align-items: center;
+
+   column-gap: 17px;
+   row-gap: 5px;
+}
+
+.tg-entry__header{
+   display: flex;
+   align-items: center;
+   flex-wrap: wrap;
+
+   min-width: 0;
+
+   column-gap: 17px;
+   row-gap: 3px;
+}
+
+.tg-entry__title{
+   min-width: 0;
+
+   font-weight: 600;
+
+   white-space: nowrap;
+   overflow: hidden;
+   text-overflow: ellipsis;
+}
+
+.tg-entry__subtitle{
+   font-size: .9em;
+   opacity: .85;
+
+}
+
+.tg-entry__description{
+   display: none;
+
+   font-size: 12px;
+   font-weight: 400;
+   line-height: 1.2;
+
+   opacity: .90;
+}
+
+.tg-entry__icon{
+   display: inline-flex;
+
+   width: 20px;
+   height: 20px;
+
+   flex: 0 0 16px;
+}
+
+.tg-entry__icon svg{
+   width: 100%;
+   height: 100%;
+
+   filter: drop-shadow(0 0 .6px rgba(0,0,0,.8));
+}
+
+
+/*==================================
+   Entries - Modificadores
+==================================*/
+
+.tg-entry.tg-entry--compact{
+   padding: 1px 8px;
+   background-color: beige;
+   font-size: 12px;
+}
+
+.tg-entry--compact .tg-entry__icon{
+   width: 12px;
+   height: 12px;
+
+   flex-basis: 12px;
+}
+
+.tg-entry--extended .tg-entry__content{
+   flex-direction: column;
+   align-items: flex-start;
+}
+
+.tg-entry-week .tg-entry__subtitle{
+   display: none;
+}
+
+.tg-entry-week.tg-entry--extended .tg-entry__subtitle{
+   display: inline;
+}
+
+.tg-entry--selected{
+   box-shadow: 0 0 0 2px var(--tg-color-primary);
+}
+
+.tg-entry--disabled{
+   filter: grayscale(1);
+   opacity: .65;
+
+   cursor: not-allowed;
+}
+
+.tg-month-entry{
+   padding: 1px 3px;
+
+   position: relative;
+
+   display: flex;
+   flex-direction: column;
+
+   width: 100%;
+   height: 100%;
+
+   overflow: hidden;
+
+}
+
+.tg-month-entry-total{
+   display: flex;
+   align-items: center;
+   justify-content: center;
+
+   column-gap: .35rem;
+
+   width: fit-content;
+   padding: .2rem .6rem;
+
+   background-color: var(--tg-color-primary-hover);
+   border-radius: 10px;
+
+   margin: 5px 0 0 5px;
+
+   font-weight: 600;
+}
+
+.tg-month-entry-total span{
+   font-size: 1.5rem;
+   font-weight: 600;
+   line-height: 1;
+}
+
+.tg-month-entry-total svg{
+   height: 22px;
+   width: 22px;
+}
+
+.tg-month-entry-groups{
+   display: flex;
+   flex-direction: column;
+   flex: 1;
+   min-height: 0;
+   margin-top: 4px;
+   padding: 2px;
+   border-top: 1.5px solid var(--tg-color-month-groups-border);
+   overflow: hidden;
+   row-gap: 3px;
+}
+
+.tg-month-entry-groups .tg-entry--extended{
+   height: 100%;
+}
+
+
+.tg-month-entry-group{
+   width: 100%;
+   display: flex;
+   background-color: var(--tg-color-month-group-background);
+   color: var(--tg-color-text);
+   border-radius: 8px;
+   font-size: 13px;
+   padding: 2px 7px;
+   justify-content: space-between;
+   min-width: 0;
+   overflow: hidden;
+   border: 2px solid rgba(25, 135, 84, 0.45);
+}
+
+.tg-month-entry-group-total{
+   font-weight: 700;
+   
+}
+
+.tg-entry-group__icon{
+   display: inline-flex;
+   align-items: center;
+   justify-content: center;
+
+   width: 16px;
+   height: 16px;
+
+   flex: 0 0 16px;
+
+   color: var(--tg-color-text-secondary);
+}
+
+.tg-entry-group__icon svg{
+   width: 100%;
+   height: 100%;
+}
+
+.tg-month-entry-group-title{
+   min-width: 0;
+   font-weight: 600;
+   white-space: nowrap;
+   overflow: hidden;
+   text-overflow: ellipsis;
+   font-size: 12px;
+
+}
+
+
+
+
+
+
+.tg-month-entry-more{
+   flex: 1;
+
+   display: flex;
+   justify-content: center;
+   align-items: center;
+
+   color: var(--tg-color-primary);
+   font-size: 12px;
+   font-weight: 600;
+
+
+   padding: 1px 8px;
+   font-size: 12px;
+}
+
+
+/*==================================
+   Responsive
+==================================*/
+
+
+
+@media (min-width: 42rem){
+   .tg-entry-day .tg-entry__content .tg-entry__subtitle{
+      display: block;
+   }
+}
+
+@media (min-width: 54rem){
+
+   .tg-container{
+      --tg-time-width: 70px;
+   }
+
+   .tg-entry--extended .tg-entry__description{
+      display: block;
+   }
+
+  
+
+}
+/* 
+@media (min-width: 60rem){
+
+   .tg-entry{
+      align-items: center;
+   }
+} */

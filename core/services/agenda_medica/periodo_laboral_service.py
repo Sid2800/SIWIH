@@ -1,9 +1,9 @@
 
-from django.db.models.functions import ExtractYear
-from agenda_medica.models import Periodo_laboral, Dia_laboral, Cupo_agenda
 
+from agenda_medica.models import Periodo_laboral, Dia_laboral, Cupo_agenda
+from cita.models import Historial_cita
 from datetime import date, timedelta
-from core.constants.choices_constants import EstadoRegistro, DiaSemana, EstadoCupoAgenda
+from core.constants.choices_constants import EstadoRegistro, DiaSemana, EstadoCupoAgenda, TipoMovimientoCita
 from django.core.exceptions import ValidationError
 from core.constants.domain_constants import AccionImpactoPeriodoLaboral, TipoCambioFechaPeriodo
 from django.db import transaction
@@ -11,8 +11,8 @@ from core.constants.domain_constants import LogApp
 from core.utils.utilidades_logging import *
 from core.utils.utilidades_fechas import obtener_fechas_por_dia_semana
 from types import SimpleNamespace
-from django.db.models import Sum, Count, Value, Q
-from django.db.models.functions import Coalesce
+from django.db.models import Sum, Count, Value, Q, Prefetch
+from django.db.models.functions import Coalesce, ExtractYear
 from itertools import groupby
 from operator import attrgetter
 
@@ -65,18 +65,21 @@ class PeriodoLaboralService :
                 periodo_laboral_id=id_periodo,
                 estado=EstadoRegistro.ACTIVO
             )
+            .select_related(
+                "dia_quirurgico"
+            )
             .annotate(
                 total_cupos_configurados=Coalesce(
                     Sum(
-                        "cupos__cupos",
-                        filter=~Q(cupos__estado=EstadoCupoAgenda.INACTIVO)
+                        "configuraciones_cupo__cupos",
+                        filter=Q(configuraciones_cupo__estado=EstadoRegistro.ACTIVO)
                     ),
                     Value(0)
                 ),
                 total_tipos=Coalesce(
                     Count(
-                        "cupos",
-                        filter=Q(cupos__estado=EstadoRegistro.ACTIVO)
+                        "configuraciones_cupo",
+                        filter=Q(configuraciones_cupo__estado=EstadoRegistro.ACTIVO)
                     ),
                     Value(0)
                 )
@@ -85,6 +88,64 @@ class PeriodoLaboralService :
         )
         return dias_laborales
     
+    @staticmethod
+    def obtener_configuraciones_para_rango(personal_id, fecha_inicio, fecha_final):
+
+        periodos = (
+            Periodo_laboral.objects
+            .filter(
+                personal_salud_id=personal_id,
+                estado=EstadoRegistro.ACTIVO,
+                fecha_inicio__lte=fecha_final,
+                fecha_fin__gte=fecha_inicio,
+            )
+            .prefetch_related(
+                Prefetch(
+                    "dias_laborales",
+                    queryset=Dia_laboral.objects.filter(
+                        estado=EstadoRegistro.ACTIVO
+                    ).prefetch_related(
+                        "configuraciones_cupo"
+                    )
+                )
+            )
+            .order_by("fecha_inicio")
+        )
+
+
+        resultado = []
+
+        for periodo in periodos:
+
+            inicio = max(periodo.fecha_inicio, fecha_inicio)
+            fin = min(periodo.fecha_fin, fecha_final)
+
+            dias_configurados = {
+                dia.dia_semana: dia
+                for dia in periodo.dias_laborales.all()
+            }
+
+            fecha = inicio
+
+            while fecha <= fin:
+                dia_laboral = dias_configurados.get(fecha.weekday() + 1)
+
+                if dia_laboral:
+                    resultado.append({
+                        "fecha": fecha,
+                        "dia_laboral": dia_laboral,
+                        "configuraciones": [
+                            configuracion
+                            for configuracion
+                            in dia_laboral.configuraciones_cupo.all()
+                            if configuracion.estado == EstadoRegistro.ACTIVO
+                        ]
+                    })
+
+                fecha += timedelta(days=1)
+
+        return resultado
+
 
     
     @staticmethod
@@ -94,16 +155,40 @@ class PeriodoLaboralService :
         agrupados por fecha.
 
         """
+
+
+        historiales = (
+                Historial_cita.objects
+                .filter(
+                    actual=True,
+                    tipo_movimiento__in=[
+                        TipoMovimientoCita.ASIGNACION,
+                        TipoMovimientoCita.REPROGRAMACION,
+                    ]
+                )
+                .select_related(
+                    "cita"
+                )
+            )
+        
         cupos = (
             Cupo_agenda.objects
             .filter(
                 configuracion_cupo__dia_laboral__periodo_laboral=periodo_laboral,
                 configuracion_cupo__dia_laboral__dia_semana=dia_numero,
-                estado=EstadoCupoAgenda.DISPONIBLE
+                estado__in=[EstadoCupoAgenda.DISPONIBLE, EstadoCupoAgenda.ASIGNADO]
             )
             .select_related(
                 "configuracion_cupo",
                 "configuracion_cupo__dia_laboral",
+            )
+            .prefetch_related(
+                Prefetch(
+                    "historial_citas",
+                    queryset=historiales,
+                    to_attr="historial_actual"
+                )
+
             )
             .order_by(
                 "configuracion_cupo__dia_laboral__dia_semana",
@@ -112,6 +197,7 @@ class PeriodoLaboralService :
                 "id"
             )
         )
+
         return [
             list(grupo)
                 for _, grupo in groupby(
@@ -119,11 +205,12 @@ class PeriodoLaboralService :
                     key=attrgetter("fecha")
                 )
             ]
+    
 
     @staticmethod
     def construir_dias_semana_ui(id_periodo):
 
-
+        periodo = PeriodoLaboralService.obtener_periodo_laboral(id_periodo)
         dias_laborales_qs = PeriodoLaboralService.obtener_dias_configurados(id_periodo)
         # Convertir queryset a mapa:
         # {1: objeto_lunes, 5: objeto_viernes}
@@ -136,25 +223,44 @@ class PeriodoLaboralService :
         dias_semana = []
 
         for ndia, nombredia in DiaSemana.choices:
+
+            fechas_dia = obtener_fechas_por_dia_semana(
+                periodo.fecha_inicio,
+                periodo.fecha_fin,
+                ndia 
+            )
+
+            if not fechas_dia:
+                continue
+
             dia = dias_map.get(ndia)
+
             if dia:
+                dia_quirurgico = hasattr(
+                    dia,
+                    "dia_quirurgico"
+                )
+
                 dias_semana.append({
-                "numero_dia": ndia,
-                "id":dia.id,
-                "nombre_dia": nombredia,
-                "configurado": True,
-                "hora_inicio": dia.hora_inicio,
-                "hora_fin": dia.hora_fin,
-                "total_cupos": dia.total_cupos_configurados,
-                "total_tipos": dia.total_tipos,
-            })
-                
+                    "numero_dia": ndia,
+                    "id": dia.id,
+                    "nombre_dia": nombredia,
+                    "configurado": True,
+                    "hora_inicio": dia.hora_inicio,
+                    "hora_fin": dia.hora_fin,
+                    "total_cupos": dia.total_cupos_configurados,
+                    "total_tipos": dia.total_tipos,
+                    "quirurgico": dia_quirurgico,
+                })
+
             else:
                 dias_semana.append({
-                "numero_dia": ndia,
-                "nombre_dia": nombredia,
-                "configurado": False,
-            })
+                    "numero_dia": ndia,
+                    "nombre_dia": nombredia,
+                    "configurado": False,
+                    "quirurgico": False,
+                })
+
         return dias_semana
 
 

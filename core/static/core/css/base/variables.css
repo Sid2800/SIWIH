@@ -11,6 +11,7 @@
    --colorMenuHover: rgb(230, 230, 230);
    --colorMenuTextoHover: rgb(0, 0, 0);
    --colorLinea: rgb(231, 231, 231);
+   --color-borde-suave: rgba(13, 110, 253, 0.20);
 
    --colorSwitchBase: rgb(201, 202, 206);
    --colorSwitchBolita: rgb(241, 241, 241);
@@ -112,6 +113,7 @@
    --negro-hover: #d9d9d9;
    --blanco-apagado: #2a2a2a;
    --negro-suave: #2f343a;
+   --color-borde-suave: rgba(96, 165, 250, 0.35);
    
 
    --colorTextoMenu: rgb(120, 120, 127);

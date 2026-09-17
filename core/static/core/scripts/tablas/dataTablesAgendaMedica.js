@@ -3,6 +3,71 @@ document.addEventListener("DOMContentLoaded", () => {
     
     const API_PERIODO = {
         listarAgendaMedicaAPI: API_URLS.listarAgendaMedicaAPI,
+        listarAusenciaAPI: API_URLS.listarAusenciasAPI
+    };
+
+
+    const botonesPeriodoLaboral = [
+        {
+            text: '<i class="bi bi-plus-lg boton-accion-principal"><span class="form-label">Nuevo periodo</span></i>',
+            titleAttr: 'Agregar Periodo Laboral',
+            action: async function (e, dt, button, config) {
+                await ManejarPeriodoLaboral.open();
+                table.ajax.reload(null, false);
+            }
+        },
+        {
+            text: '<i class="bi bi-pencil boton-exportacion"></i>',
+            titleAttr: 'Editar Periodo Laboral',
+            action: async function (e, dt, button, config) {
+                await editarPeriodo();
+            }
+        },
+        {
+            text: '<i class="bi-gear-fill boton-exportacion"></i>',
+            titleAttr: 'Configurar Periodo Laboral',
+            action: function (e, dt, button, config) {
+                configurarPeriodo();
+            }
+        }
+    ];
+
+
+    const botonesAusencia = [
+        {
+            text: '<i class="bi bi-plus-lg boton-accion-principal"><span class="form-label">Nueva ausencia</span></i>',
+            titleAttr: 'Agregar Ausencia',
+            action: async function (e, dt, button, config) {
+                const resultado =await ManejarAusencia.open();
+
+                if (!resultado || !resultado.isConfirmed) {
+                    console.log("");
+                    return;
+                }
+
+                const mensajes = construirMensajesCambios(resultado.value);
+
+
+                await informarCambios({
+                    titulo: "Ausencia creada correctamente",
+                    mensajes: mensajes,
+                    icono: "info"
+                });
+                AusenciaTable.ajax.reload(null, false);
+            }
+        },
+        {
+            text: '<i class="bi bi-pencil boton-exportacion"></i>',
+            titleAttr: 'Editar Ausencia',
+            action: async function (e, dt, button, config) {
+                // await editarAusencia();
+            }
+        }
+    ];
+
+
+    const obtenerBotonesAgendaMedica = (esAusencia) => {
+        return esAusencia ? botonesAusencia : botonesPeriodoLaboral;
     };
 
 
@@ -31,37 +96,9 @@ document.addEventListener("DOMContentLoaded", () => {
         processing: "Procesando...",
         emptyTable: "No hay datos disponibles en la tabla",
     },
-    dom: '<"superior "B<"contenedorSegmentacion">>t<"inferior"lip><"clear">', // oraganizacion de la estructra de la tabla
+    dom: '<"superior-agenda-medica"B<"contenedorSegmentacion">>t<"inferior"lip><"clear">', // oraganizacion de la estructra de la tabla
     
-    buttons: [
-        
-        {
-        text: '<i class="bi bi-plus-square boton-exportacion"></i>',  // Icono o texto para el botón
-        titleAttr: 'Agregar Periodo Laboral',
-        action: async function ( e, dt, button, config ) {
-            await ManejarPeriodoLaboral.open();
-            table.ajax.reload(null, false);
-        }
-        },
-        {
-        text: '<i class="bi bi-pencil boton-exportacion" ></i>',  // Icono o texto para el botón
-        titleAttr: 'Editar Periodo Laboral',
-        action: async function ( e, dt, button, config ) {
-            await editarPeriodo();
-    
-        }
-        },  
-        {
-        text: '<i class="bi-gear-fill boton-exportacion" ></i>',  // Icono o texto para el botón
-        titleAttr: 'Editar Periodo Laboral',
-        action: function ( e, dt, button, config ) {
-            configurarPeriodo();
-    
-        }
-        },  
-
-        
-    ],
+    buttons: obtenerBotonesAgendaMedica(esAusencia), // botones de la tabla
     
     };
 
@@ -95,7 +132,7 @@ document.addEventListener("DOMContentLoaded", () => {
             },
             {
                 data: "jornada_laboral__nombre_jornada_laboral",
-                title: "Jornada Laboral",
+                title: "Jornada",
                 responsivePriority: 5,
             },
             {
@@ -149,6 +186,228 @@ document.addEventListener("DOMContentLoaded", () => {
             },
     ];
 
+    const ausenciaColumnas =[
+        {
+            data: null,
+            responsivePriority: 1,
+            render: function (data) {
+                if (data) {
+                    let nombre = concatenarLimpio(
+                        data.personal_salud__empleado__primer_nombre,
+                        data.personal_salud__empleado__segundo_nombre,
+                        data.personal_salud__empleado__primer_apellido,
+                        data.personal_salud__empleado__segundo_apellido
+                    );
+
+                    return nombre ? `${nombre.substring(0, 30)}` : "---";
+                }
+                return "---";
+            }
+        },
+        {
+            data: "personal_salud__especialidad__nombre_especialidad",
+            title: "Especialidad",
+            responsivePriority: 3,
+        },
+        {
+            data: "periodo",
+            title: "Periodo laboral",
+            responsivePriority: 4,
+        },
+        {
+            data: "dias",
+            title: "Dias",
+            orderable: false,
+            searchable: false,
+            responsivePriority: 5,
+        },
+        {
+            data: "tipo_label",
+            title: "Tipo",
+            responsivePriority: 2,
+
+            render: function (data, type, row) {
+                return `
+                    <span
+                        class="datatable-ausencia-tipo"
+                        style="
+                            background-color: ${row.colores_tipo.color};
+                            border-color: ${row.colores_tipo.borderColor};
+                        "
+                    >
+                        ${data}
+                    </span>
+                `;
+            },
+        },
+
+        {
+            data: "estado_temporal",
+            title: "Estado",
+            responsivePriority: 5,
+            render: function (data) {
+                if (data === "F") {
+                    return `
+                        <span title="Finalizado" class="DatatableIconoAgendaEstado">
+                            <i class="bi bi-circle-fill icon-gris"></i> CONCLUIDO
+                        </span>
+                    `;
+                } else if (data === "E") {
+                    return `
+                        <span title="Ejecucion" class="DatatableIconoAgendaEstado">
+                            <i class="bi bi-circle-fill icon-verde"></i> EJECUCION
+                        </span>
+                    `;
+                } else if (data === "U") {
+                    return `
+                        <span title="Futuro" class="DatatableIconoAgendaEstado">
+                            <i class="bi bi-circle-fill icon-amarillo"></i> FUTURO
+                        </span>
+                    `;
+                }
+            },
+        },
+
+        {
+            data: "id",
+            visible: false
+        },
+
+
+
+    ];
+
+
+    let AusenciaTable;
+    const initAusenciaDataTable = (tableId, ajaxUrl, columns) => {
+        if (document.getElementById(tableId)) {
+            // Inicialización de la tabla
+            AusenciaTable = $(`#${tableId}`).DataTable({
+                ...commonOptions,
+                ajax: {
+                    url: ajaxUrl,
+                    type: 'GET',
+                    data: function(d) {
+                        d.search_value = document.getElementById('busquedaListadoPeriodoLaboral')?.value || '';
+                        d.anio = document.getElementById('selectAnio')?.value || '';
+                        d.estado = document.getElementById('selectEstado')?.value || '';
+                        d.tipo = document.getElementById('selectTipo')?.value || '';
+                    }
+                },
+                columns: columns,
+            });
+
+            const hoyDate = new Date();
+
+            const hoy = hoyDate.toISOString().split('T')[0];
+
+            const contenedorSegmentacion = document.querySelector('.contenedorSegmentacion');
+
+            // Label y input anio 
+            const label1 = document.createElement('label');
+            label1.textContent = "Año";
+            label1.htmlFor = 'selectAnio';
+            contenedorSegmentacion.appendChild(label1);
+
+            const selectAnio = document.createElement('select');
+            selectAnio.id = 'selectAnio';
+            selectAnio.name = 'selectAnio';
+            selectAnio.className = 'formularioCampo-select';
+            contenedorSegmentacion.appendChild(selectAnio);
+
+
+            if (typeof anios_ausencias !== 'undefined' && anios_ausencias.length > 0) {
+                anios_ausencias.forEach((anio, index) => {
+                    const option = document.createElement('option');
+                    option.value = anio;
+                    option.textContent = anio;
+                    if (index === 0) {
+                        option.selected = true;
+                    }
+                    selectAnio.appendChild(option);
+                });
+            }
+
+            // Label y input tipo
+            const label2 = document.createElement('label');
+            label2.textContent = "Tipo";
+            label2.htmlFor = 'selectTipo';
+            contenedorSegmentacion.appendChild(label2);
+
+            const selectTipo = document.createElement('select');
+            selectTipo.id = 'selectTipo';
+            selectTipo.name = 'selectTipo';
+            selectTipo.className = 'formularioCampo-select';
+            contenedorSegmentacion.appendChild(selectTipo);
+
+            if (typeof tipos_ausencia !== 'undefined' && tipos_ausencia.length > 0) {
+
+                const optionTodos = document.createElement('option');
+
+                optionTodos.value = '0';
+                optionTodos.textContent = 'Todos';
+                optionTodos.selected = true;
+
+                selectTipo.appendChild(optionTodos);
+
+                tipos_ausencia.forEach((tipo, index) => {
+                    const option = document.createElement('option');
+                    option.value = tipo.value;
+                    option.textContent = tipo.texto;
+                    selectTipo.appendChild(option);
+                });
+            }
+
+            // Input de texto para búsqueda
+            const inputBusqueda = document.createElement('input');
+            inputBusqueda.type = 'text';
+            inputBusqueda.id = 'busquedaListadoPeriodoLaboral';
+            inputBusqueda.name = 'busquedaListadoPeriodoLaboral';
+            inputBusqueda.className = 'formularioCampo-text';
+            inputBusqueda.placeholder = 'Busqueda';
+            contenedorSegmentacion.appendChild(inputBusqueda);
+
+             // Botón de búsqueda
+            const buscarBtn = document.createElement('a');
+            buscarBtn.id = 'buscarBtn';
+            buscarBtn.className = 'formularioBotones-boton';
+            buscarBtn.innerHTML = '<i class="bi bi-search"></i><span>Buscar</span>';
+            document.querySelector('.superior-agenda-medica').appendChild(buscarBtn);
+
+            buscarBtn.addEventListener('click', function () {
+                AusenciaTable.ajax.reload();
+            });
+            
+            // Selección de fila al hacer clic
+            AusenciaTable.on('click', 'tbody tr', (e) => {
+                let row = e.currentTarget;
+                let classList = row.classList;
+
+                if (classList.contains('child')) return;
+
+                // limpiar selección anterior
+                AusenciaTable.rows('.selected').nodes().each((r) => {
+                    r.classList.remove('selected');
+                });
+
+                // toggle selección
+                if (!classList.contains('selected')) {
+                    classList.add('selected');
+                } else {
+                    classList.remove('selected');
+                }
+            });
+
+            AusenciaTable.on('dblclick','tbody tr', async function name(params) {
+                await editarAusencia();
+            }
+
+            )
+            
+        }
+    }
+
+
     
     let table;
     const initDataTable = (tableId, ajaxUrl, columns) => {
@@ -167,12 +426,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     }
                 },
                 columns: columns,
-                /*
-                columnDefs: [
-                    { targets: 5, className: 'datatable-agenda-celda-boton' },
 
-                ],*/
-                //order: [[0, "desc"]],
             });
 
             const hoyDate = new Date();
@@ -257,7 +511,7 @@ document.addEventListener("DOMContentLoaded", () => {
             buscarBtn.id = 'buscarBtn';
             buscarBtn.className = 'formularioBotones-boton';
             buscarBtn.innerHTML = '<i class="bi bi-search"></i><span>Buscar</span>';
-            document.querySelector('.superior').appendChild(buscarBtn);
+            document.querySelector('.superior-agenda-medica').appendChild(buscarBtn);
 
             buscarBtn.addEventListener('click', function () {
                 table.ajax.reload();
@@ -270,34 +524,42 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 if (classList.contains('child')) return;
 
-                // limpiar selección anterior
                 table.rows('.selected').nodes().each((r) => {
                     r.classList.remove('selected');
                 });
 
-                // toggle selección
                 if (!classList.contains('selected')) {
                     classList.add('selected');
                 } else {
                     classList.remove('selected');
                 }
             });
-            
 
-            // Doble clic en fila para redirección
-            table.on('dblclick', 'tr', function() {
+
+            // Doble clic en fila para configurar período
+            table.on('dblclick', 'tbody tr', function () {
                 const data = table.row(this).data();
-                console.log(data);
-                /*
                 if (data) {
-                    
-                    const id = data.id;
-                    let nombreSlug = slugify(
-                        `${data.paciente__primer_nombre}-${data.paciente__primer_apellido}`
-                    ).substring(0, 30);
-                    var editarUrl = API_REFERENCIA.editarReferencia.replace('0', id).replace('slug', nombreSlug);
-                    window.location.href = editarUrl;
-                }*/
+                    configurarPeriodo();
+                }
+            });
+
+
+            // Acciones de la fila
+            table.on('click', 'tbody .datatable-agenda-boton', async function (e) {
+                e.stopPropagation();
+                const accion = this.dataset.action;
+                const id = this.dataset.id;
+
+                if (accion === 'editar') {
+
+                    await ManejarPeriodoLaboral.open({
+                        titulo: "Editar Periodo Laboral",
+                        periodoID: id
+                    });
+
+                    table.ajax.reload(null, false);
+                }
             });
 
             
@@ -328,32 +590,46 @@ document.addEventListener("DOMContentLoaded", () => {
     
 
 
-
     // Inicializar tabla de evaluacionrx
     initDataTable("data_table_agenda_medica", API_PERIODO.listarAgendaMedicaAPI, periodoColumnas);
+    initAusenciaDataTable("data_table_agenda_medica_ausencia",API_PERIODO.listarAusenciaAPI,ausenciaColumnas);
 
 
-    const tbody = document.querySelector('#data_table_agenda_medica tbody');
 
-    tbody.addEventListener('click',async function (e) {
-        const boton = e.target.closest('.datatable-agenda-boton');
+    async function editarAusencia(){
 
-        if (!boton) return;
+        const selectedRow = AusenciaTable.row('.selected').data();
 
-        e.stopPropagation(); // evita que dispare selección de fila
+        if (!selectedRow) {
+            toastr.error("No hay ninguna fila seleccionada.");
+            return;
+        }
+    
+        const resultado = await ManejarAusencia.open({
+            titulo: "Editar Ausencia",
+            ausenciaID: selectedRow.id
+        });
 
-        const accion = boton.dataset.action;
-        const id = boton.dataset.id;
 
-        if (accion === 'editar') {
-            await ManejarPeriodoLaboral.open({
-                titulo: "Editar Periodo Laboral",
-                periodoID: id
+        if (!resultado || !resultado.isConfirmed) {
+            return;
+        }
+
+
+        console.log(resultado);
+
+        const mensajes = construirMensajesCambios(resultado.value);
+
+        await informarCambios({
+                titulo: "Ausencia editada correctamente",
+                mensajes: mensajes,
+                icono: "info"
             });
 
-            table.ajax.reload(null, false);
-        }
-    });
+
+
+        AusenciaTable.ajax.reload(null, false);
+    }
 
 
     
@@ -377,15 +653,16 @@ document.addEventListener("DOMContentLoaded", () => {
     
     function configurarPeriodo(){
         const selectedRow = table.row('.selected').data();
-
         if (selectedRow) {
-            console.log(selectedRow.id);
-            // imprimirFormatoGenerico(selectedRow.id,API_URLS.reporteFormatoReferencia,"Referencia");
+            let nombreSlug = slugify(
+                    `${selectedRow.personal_salud__empleado__primer_nombre}-${selectedRow.personal_salud__empleado__primer_apellido}`
+                ).substring(0, 30);
+
+            window.location.href = API_URLS.configurarPeridoLaboral.replace('0', selectedRow.id).replace('slug',nombreSlug);
         } else {
             toastr.error("No hay ninguna fila seleccionada.");
         }
     }
-
 
 
 });

@@ -318,6 +318,9 @@ def obtener_fechas_por_dia_semana(fecha_inicio, fecha_fin, dia_semana ):
         fecha_actual += timedelta(days=1)
 
     return fechas
+
+
+
 # 2026-05-29: extraido de mapeo_camas/views.py (refactor B). Helpers globales
 def hora_local_iso(dt):
     """Convierte un datetime aware a ISO en zona horaria local; '' si es falsy."""

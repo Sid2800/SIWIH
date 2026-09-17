@@ -79,6 +79,10 @@ class PersonalSalud(models.Model):
         default=False,
         db_index=True
     )
+    puede_operar = models.BooleanField(
+        default=False,
+        db_index=True
+    )
     tipo_personal_salud = models.ForeignKey(
         Tipo_personal_salud,
         on_delete=models.PROTECT,
@@ -124,7 +128,8 @@ class PersonalSalud(models.Model):
 
     class Meta:
         indexes = [
-            models.Index(fields=["puede_agendar_citas"])
+            models.Index(fields=["puede_agendar_citas"]),
+            models.Index(fields=["puede_operar"]),
         ]
 
 class PersonalNoClinico(models.Model):

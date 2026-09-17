@@ -18,17 +18,18 @@ class DiaSemanaMap {
 
 }
 
+const EstadoTemporalPeriodo = {
+        FUTURO: 'FUTURO',
+        EN_EJECUCION: 'EN_EJECUCION',
+        CONCLUIDO: 'FINALIZADO',
+    };
+
 
 const ManejarPeriodoLaboral = (function (){
     let modalTitulo = "";
     let modalPeriodoID = null;
     let periodoRegistro = null;
 
-    const EstadoTemporalPeriodo = {
-        FUTURO: 'FUTURO',
-        EN_EJECUCION: 'EN_EJECUCION',
-        FINALIZADO: 'FINALIZADO',
-    };
 
     async function open(config ={}) {
         const {
@@ -305,7 +306,6 @@ const ManejarPeriodoLaboral = (function (){
             if (!response.ok){
                 throw new Error(data.error);
             }
-            console.table(data);
             return data;
         } catch (error) {
             toastr.error(
@@ -326,7 +326,6 @@ const ManejarPeriodoLaboral = (function (){
         const fechaFinal = document.getElementById("modal-periodo-fecha-final");
         const jornada = document.getElementById("modal-periodo-laboral-jornada");
 
-  
         slect.setValue(periodo.id_personal_clinico);
         fechaInicio.value = periodo.fecha_inicio || "";
         fechaFinal.value = periodo.fecha_final || "";
@@ -697,7 +696,7 @@ const ManejarDiaLaboral = (function (){
                         </div>
                     </fieldset>
 
-                    <fieldset class="modalPeriodoLaboralCampos" id="modal-campos-defuncion-registros" style="display: none;">
+                    <fieldset class="modalPeriodoLaboralCampos" id="modal-campos-ausencia" style="display: none;">
                     <legend>Detalles del registro</legend>
                     <div class="formularioCampoModal">
                         <label for="Fregistro">Actualizado</label>
@@ -1184,7 +1183,6 @@ const ManejarDiaLaboral = (function (){
             return;
         }
 
-        console.log(opciones.value);
 
         const nuevo = {
             id: null, // null mientras no exista en BD,
@@ -1349,18 +1347,12 @@ const ManejarDiaLaboral = (function (){
                     case "REDUCCION_CUPOS":
                         descripcion = `
                             Se eliminarán <strong>${item.cupos}</strong> cupos.
-                            ${item.citas > 0
-                                ? `<br><strong>${item.citas}</strong> citas deberán ser reprogramadas.`
-                                : ""}
-                        `;
+                            <br>Algunas citas podrían requerir reprogramación.`;
                         break;
                     case "DURACION":
                         descripcion = `
                             Se actualizará el horario de <strong>${item.cupos}</strong> cupos.
-                            ${item.citas > 0
-                                ? `<br><strong>${item.citas}</strong> citas modificarán su horario.`
-                                : ""}
-                        `;
+                            <br> Algunas citas modificarán su horario.`;
                         break;
                 }
                 html += `
@@ -1448,7 +1440,7 @@ const ManejarDiaLaboral = (function (){
         
         if (confirmado){
 
-            await editarDiaLaboral(formData, resultado.f_modificado);
+            return await editarDiaLaboral(formData, resultado.f_modificado);
             
         }else{
             return false
@@ -1469,7 +1461,7 @@ const ManejarDiaLaboral = (function (){
 
             const configuraciones = obtenerConfiguracionesGuardar();
 
-            const response = await fetch(API_URLS.guardarDiaPeriodoLaboral, {
+            const response = await fetch(API_URLS.guardarDiaLaboral, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -1555,7 +1547,8 @@ const ManejarDiaLaboral = (function (){
                     "No se pudo guardar el día laboral"
                 );
             }
-            
+
+            return data
 
         } catch (error) {
             toastr.error(error.message, "Error al guardar el dia laboral ");
@@ -1570,5 +1563,763 @@ const ManejarDiaLaboral = (function (){
 
 
     return {  open };
+
+})();
+
+
+
+
+
+const ManejarAusencia = (function (){
+    let modalTitulo = "";
+    let modalAusenciaID = null;
+    let ausenciaRegistro = null;
+    let controles = {};
+
+    
+
+    async function open(config ={}) {
+        const {
+            titulo = "Agregar Ausencia",
+            ausenciaID = null,
+        } = config;
+
+        modalTitulo = titulo;
+        modalAusenciaID = ausenciaID;
+        ausenciaRegistro = null;
+
+        const modal = await Swal.fire({
+            title: `<i class="bi bi-calendar2-x"></i> ${titulo}`,
+            html: `
+                <div class="tituloFormulario-subrallado"></div>
+                <form method="post" class="formulario" id="formulario-modal-ausencia">
+                    <fieldset class="modalAusenciaCampos">
+                        <legend>Personal de Salud</legend>
+
+                        <div class="formularioCampoModal">
+                            <label for="modal-ausencia-personal-salud">Nombre:</label>
+                            <div id="modal-ausencia-personal-salud" class="" name="personal_salud"></div>
+                            </select>
+                        </div>
+
+                        <div class="formularioCampoModal">
+                            <label for="modal-ausencia-especialidad">Especialidad:</label>
+                            <input type="text" id="modal-ausencia-especialidad" class="formularioCampo-text" name="especialidad" readonly>
+                            </select>
+                        </div>
+                        
+
+                        <input type="hidden" id="modal-ausencia-id" name="idAusencia">
+                    </fieldset>
+                    
+
+                    <fieldset class="modalAusenciaCampos">
+                        <legend>Ausencia</legend>
+
+                        <div id="ausencia__estado" class="formularioCampoModal ausencia-estado-oculto" >
+                            <label >Estado:</label>
+
+                            <div class="formularioCampoModalAusenciaEstado">
+                                <div class="estado-indicador">
+                                    <i id="modalAusenciaEstadoIndicarIcono" class="bi bi-circle-fill icon-gris"></i>
+                                    <span id="modalAusenciaEstadoIndicadorTexto">#####</span>
+                                </div>
+
+                                <label class="ck-formulario" for="chk-ausencia-estado">
+                                    <input type="checkbox" id="chk-ausencia-estado" class="ck-formulario__checkbox" hidden="">
+                                    <div class="ck-formulario__base">
+                                        <div class="ck-formulario__bolita"></div>
+                                    </div>
+                                    <span class="ck-formulario__label">Activo</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        
+                        <div class="formularioCampoModal">
+                            <label for="modal-periodo-fecha-inicial">Rango:</label>
+
+                            <div class="formularioCampoModalRangoFecha">
+                                <input type="date" id="modal-periodo-fecha-inicial" name="fecha_inicial"  class="formularioCampo-date" required>
+                                <label >al</label>
+                                <input type="date" id="modal-periodo-fecha-final" name="fecha_final" class="formularioCampo-date">
+                            </div>
+
+                        </div>
+
+                        <div class="formularioCampoModal">
+                            <label for="modal-ausencia-tipo">Tipo:</label>
+                            <select id="modal-ausencia-tipo" class="formularioCampo-select" name="tipo">
+                            </select>
+                        </div>
+
+                        <div class="formularioCampoModal">
+                            <label for="modal-ausencia-observaciones">Observaciones:</label>
+                            <textarea
+                                id="modal-ausencia-observaciones"
+                                class="formularioCampo-select"
+                                name="observaciones"
+                                rows="2"
+                            ></textarea>
+                        </div>
+                            
+
+                    </fieldset>
+
+
+                    <fieldset class="modalAusenciaCampos" id="modal-campos-ausencia-registros" style="display: none;">
+                    <legend>Detalles del registro</legend>
+                    <div class="formularioCampoModal">
+                        <label for="Fregistro">Actualizado</label>
+                        <input type="text" id="modal-ausencia-detalles-registro" class="formularioCampo-text" disabled>
+                    </div>
+                    </fieldset>
+                </form>
+            `,
+            showCancelButton: true,
+            showCloseButton: true,
+            showLoaderOnConfirm: true,
+            confirmButtonText: '<i class="bi bi-floppy-fill"></i> Guardar',
+            cancelButtonText: '<i class="bi bi-x-circle-fill"></i> Cancelar',
+            customClass: {
+                popup: 'contenedor-modal-ausencia',
+                title: 'contener-modal-titulo',
+                confirmButton: 'contener-modal-boton-confirmar',
+                cancelButton: 'contener-modal-boton-cancelar'
+
+            },
+            didOpen: () => inicializar(),
+            preConfirm: async () => {
+                return await procesarGuardado();
+            },
+        });
+
+
+        return modal
+    }
+
+
+    function inicializarControles(){
+        controles = {
+            personalSalud: document.getElementById('modal-ausencia-personal-salud'),
+            especialidad: document.getElementById("modal-ausencia-especialidad"),
+            fechaInicio: document.getElementById("modal-periodo-fecha-inicial"),
+            fechaFinal: document.getElementById("modal-periodo-fecha-final"),
+            tipo: document.getElementById("modal-ausencia-tipo"),
+            observaciones: document.getElementById("modal-ausencia-observaciones"),
+            botonGuardar:  Swal.getConfirmButton(),
+            edicion: {
+                detallesRegistro: document.getElementById("modal-ausencia-detalles-registro"),
+                fieldsetRegistro: document.getElementById("modal-campos-ausencia-registros"),
+                contenderControlesEstado: document.getElementById("ausencia__estado"),
+                textoEstado: document.getElementById('modalAusenciaEstadoIndicadorTexto'),
+                iconoEstado: document.getElementById('modalAusenciaEstadoIndicarIcono'),
+                estadoRegistroObjeto: document.getElementById('chk-ausencia-estado')
+            }
+        }
+    }
+
+
+
+    async function inicializar(){
+
+        inicializarControles();
+        
+        // const personalSalud = document.getElementById("modal-ausencia-personal-salud");
+
+        const hoy = fechaManana(false)
+
+        // Traer, el persona clinico
+        //#region inizialiar general
+        let data = await PersonalClinicoLoader.cargar();
+
+        const opciones = data.map(item => ({
+            value: item.id,
+            label: item.nombre,
+            customData: item.especialidad__nombre_especialidad,
+            description: item.especialidad__nombre_especialidad
+        }));
+
+
+        if (controles.personalSalud.virtualSelect) {
+            controles.personalSalud.virtualSelect.destroy();
+        }
+
+        // inicializar el vistual select 
+        VirtualSelect.init({
+            ele: controles.personalSalud,
+            options: opciones,
+            hasOptionDescription: true,
+            searchPlaceholderText: 'Buscar...',
+            search: true,
+            placeholder: 'Seleccione',
+            additionalClasses: 'custom-wrapper',
+            additionalDropboxClasses: 'custom-dropbox',
+        }); 
+
+        // // listnere de select 
+        const slect = controles.personalSalud;
+        slect._changeHandler  = function (){
+            const options = slect.getSelectedOptions();
+            console.log(options)
+            if (!options) { 
+                controles.especialidad.value = ""; 
+                return; 
+            }
+            controles.especialidad.value = options.customData || "";
+        }
+        slect.addEventListener('change', slect._changeHandler)
+
+        // jtipo de ausencia 
+        await TipoAusenciaLoader.cargar(controles.tipo);
+
+        // // definir las fechas iniciales max y demas 
+        controles.fechaInicio.value = hoy;
+        controles.fechaInicio.min = hoy;
+
+        controles.fechaFinal.min = hoy;
+        controles.fechaFinal.value = hoy;
+
+            
+        // //#endregion
+
+
+
+        // // region para cargar el modo edicion del modal
+
+
+        if (modalAusenciaID){
+            ausenciaRegistro = await traerAusencia();
+            if (!ausenciaRegistro){
+                return;
+            }
+            
+            llenarAusencia(ausenciaRegistro);
+
+            return;
+        }
+        // //#endregion
+
+
+        
+
+    }
+
+    // function manejarResultadoGuardado(resultado) {
+        
+    //     if (resultado.guardo === true) {
+        
+    //         toastr.success(
+    //             "Periodo procesado correctamente"
+    //         );
+    //         return true;
+    //     }
+
+    //     if (resultado.guardo === false) {
+    //         toastr.info(
+    //             "Los datos consignados son idénticos a los registrados"
+    //         );
+    //         return false;
+    //     }
+
+    //     toastr.warning(
+    //         "No se pudo determinar el resultado del proceso"
+    //     );
+    //     return false;
+
+    // }
+
+    async function procesarGuardado() {
+        Swal.resetValidationMessage();
+        
+        const formData = validarCampos();
+        if (!formData){
+            return
+        }
+
+
+        const resultadoImpacto = await validarImpactoAusencia(formData);
+
+        if (!resultadoImpacto) {
+            return false;
+        }
+
+        const impacto = resultadoImpacto.resultado;
+
+        // sin impacto en edicion
+        if (!impacto.cambios && ausenciaRegistro) {
+            toastr.info(
+                "No se realizaron cambios en el registro.",
+                "Sin cambios"
+            );
+            return false;
+        }
+
+
+        // Sin impacto: guardar directamente
+        if (!impacto.impacto) {
+            const resultado = ausenciaRegistro
+                ? await editarAusencia(formData)
+                : await registrarAusencia(formData);
+
+            
+
+            if (!resultado?.resultado?.success) {
+                return false;
+            }
+
+            return resultado.resultado;
+        }
+
+        // Hay impacto: solicitar confirmación
+        const mensajes = construirMensajesImpacto(impacto);
+
+        const titulo = ausenciaRegistro
+            ? "Confirmar edición de ausencia"
+            : "Confirmar registro de ausencia";
+
+        const confirmado = await confirmarAccion({
+            titulo: titulo,
+            mensajes: mensajes,
+            icono: "question"
+        });
+
+        if (!confirmado) {
+            return false;
+        }
+
+        // Guardar después de confirmar
+        const resultado = ausenciaRegistro
+            ? await editarAusencia(formData)
+            : await registrarAusencia(formData);
+
+        if (!resultado?.resultado?.success) {
+
+            return false;
+        }
+
+        return resultado.resultado;
+    }
+    
+
+
+    async function traerAusencia() {
+
+        if (!modalAusenciaID){
+            return;
+        }
+
+        try {
+            const response = await fetch(
+                `${API_URLS.obtenerAusencia}?id=${modalAusenciaID}`,
+                {
+                    method: "GET",
+                    headers: {
+                        "Content-Type": "application/json",
+                    }
+                }
+            );
+
+            const data = await response.json();
+            if (!response.ok){
+                throw new Error(data.error);
+            }
+
+            return data;
+        } catch (error) {
+            toastr.error(
+                error.message,
+                "Error al obtener la ausencia"
+            );
+        }
+    }
+
+
+    function llenarAusencia(ausencia) {
+
+        if (!ausencia){
+            return;
+        }
+
+        controles.personalSalud.setValue(ausencia.id_personal_clinico);
+        controles.fechaInicio.value = ausencia.fecha_inicio || "";
+        controles.fechaFinal.value = ausencia.fecha_final || "";
+        controles.tipo.value = ausencia.id_tipo;
+        controles.observaciones.value = ausencia.observaciones || "";
+
+        mostrarLLenarCamposExlusivosEdicion(
+            {
+            "modificado_por": ausencia.modificado_por,
+            "fecha_modificado": ausencia.fecha_modificado,
+            "estadoRegistro": ausencia.estado,
+            "estadoTemporal": ausencia.ejecucion, 
+
+            }
+        )
+
+        aplicarRestriccionesAusencia(ausencia.ejecucion);
+
+
+    }
+
+    function mostrarLLenarCamposExlusivosEdicion(objeto ={}){
+        const {
+            modificado_por = null,
+            fecha_modificado = null,
+            estadoRegistro = null,
+            estadoTemporal = null,
+        } = objeto;
+
+
+        const controlesEdicion = controles.edicion;
+
+        controlesEdicion.detallesRegistro.value = (
+            concatenarLimpio(
+                modificado_por, ' | ',
+                formatFecha(fecha_modificado)
+            ) || ""
+        );
+
+        controlesEdicion.iconoEstado.classList.remove(
+            'icon-verde',
+            'icon-amarillo',
+            'icon-rojo',
+            'icon-gris'
+        );
+
+        controlesEdicion.estadoRegistroObjeto.checked = Boolean(estadoRegistro);
+
+        switch (estadoTemporal) {
+            case EstadoTemporalPeriodo.FUTURO:
+                controlesEdicion.textoEstado.textContent = 'Futuro';
+                controlesEdicion.iconoEstado.classList.add('icon-amarillo');
+                break;
+
+            case EstadoTemporalPeriodo.EN_EJECUCION:
+                controlesEdicion.textoEstado.textContent = 'En Ejecucion';
+                controlesEdicion.iconoEstado.classList.add('icon-verde');
+                break;
+
+            case EstadoTemporalPeriodo.CONCLUIDO:
+                controlesEdicion.textoEstado.textContent = 'Concluido';
+                controlesEdicion.iconoEstado.classList.add('icon-gris');
+                break;
+
+            default:
+            controlesEdicion.iconoEstado.classList.add('icon-rojo');
+        }
+
+        controlesEdicion.fieldsetRegistro.style.display = 'block';
+        controlesEdicion.contenderControlesEstado.classList.remove('ausencia-estado-oculto');
+    }
+
+    function aplicarRestriccionesAusencia(estadoTemporal){
+
+        // compos generales no dependenientes
+        controles.fechaInicio.readOnly = false;
+        controles.fechaFinal.readOnly = false;
+        controles.edicion.estadoRegistroObjeto.disabled = false;
+
+        // componentes generales
+        controles.personalSalud.disable();
+        controles.tipo.disabled=false;
+
+        switch (estadoTemporal) {
+            case EstadoTemporalPeriodo.EN_EJECUCION:
+                controles.fechaInicio.readOnly = true;
+                controles.edicion.estadoRegistroObjeto.disabled = true;
+
+                break;
+
+            case EstadoTemporalPeriodo.CONCLUIDO:
+                controles.fechaInicio.readOnly = true;
+                controles.fechaFinal.readOnly = true;
+                controles.edicion.estadoRegistroObjeto.disabled = true;
+                controles.tipo.disabled=true;
+                controles.observaciones.disabled=true;
+                controles.botonGuardar.disabled=true;
+                break;
+        }
+
+    }
+
+
+    function  validarCampos() {
+        const personal = controles.personalSalud.value;
+        const tipo = controles.tipo.value;
+        const fechaInicio = controles.fechaInicio.value;
+        const fechaFinal = controles.fechaFinal.value;
+        const observaciones = controles.observaciones.value;
+        const estadoRegistro = controles.edicion.estadoRegistroObjeto.checked;
+
+
+        if (!personal) {
+            Swal.showValidationMessage("Debe seleccionar un medico");
+            return false;
+        }
+
+        if (!tipo) {
+            Swal.showValidationMessage("Debe seleccionar un tipo de ausencia");
+            return false;
+        }
+        
+        if (fechaFinal && fechaFinal < fechaInicio) {
+            Swal.showValidationMessage("La fecha final no puede ser menor que la inicial");
+            return false;
+        }
+
+        const estadoTemporal = ausenciaRegistro
+                                ? ausenciaRegistro.ejecucion : null;
+
+            
+
+        if (estadoTemporal === EstadoTemporalPeriodo.EN_EJECUCION) {
+
+            if (fechaInicio !== ausenciaRegistro.fecha_inicio) {
+                Swal.showValidationMessage(
+                    "No se permite modificar la fecha inicial de una ausencia en ejecución."
+                );
+                return false;
+            }
+
+            if (!estadoRegistro) {
+                Swal.showValidationMessage(
+                    "No es posible desactivar una ausencia en ejecución."
+                );
+                return false;
+            }
+        }
+
+        if (estadoTemporal === EstadoTemporalPeriodo.CONCLUIDO) {
+            Swal.showValidationMessage(
+                "No se puede modificar una ausencia que ya ha finalizado."
+            );
+            return false;
+        }
+
+        
+    
+
+        const fechaModificado = ausenciaRegistro
+                                ? ausenciaRegistro.fecha_modificado
+                                : null;
+                                
+        const ausenciaID = ausenciaRegistro
+                        ? ausenciaRegistro.id
+                        : null;
+ 
+
+        return  {
+                ausenciaID,
+                personal,
+                tipo,
+                fechaInicio,
+                fechaFinal,
+                estadoRegistro,
+                observaciones,
+                estadoTemporal,
+                fechaModificado,
+            };
+    }
+
+    async function validarImpactoAusencia(formData){
+
+        if (!formData){
+            return
+        }
+
+        try {
+                const csrfToken = window.CSRF_TOKEN;
+                const response = await fetch(API_URLS.validarImpactoAusencia, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": csrfToken 
+                },
+                body: JSON.stringify({
+                    ausenciaID: formData.ausenciaID,
+                    personalSalud: formData.personal, 
+                    fechaInicio: formData.fechaInicio,
+                    fechaFinal: formData.fechaFinal,
+                    tipo: formData.tipo,
+                    estado: formData.estadoRegistro,
+                    observaciones: formData.observaciones
+                })
+                });
+                
+                const data = await response.json();
+
+
+                // VALIDACIONES CONTROLADAS
+                if (response.status === 400) {
+                    toastr.warning(data.error, "Error de Validacion");
+                    return false;
+                }
+
+                // ERRORES REALES
+                if (response.status >= 500) {
+                    throw new Error(
+                        data.error ||
+                        "No se pudo validar la ausencia "
+                    );
+                }
+
+                return data;
+
+            } catch (error) {
+                toastr.error( error.message, "Error al validar  la ausencia");
+            }
+    }
+
+
+    function construirMensajesImpacto(impacto) {
+
+        const mensajes = [];
+
+
+        if (impacto.cupos.eliminados > 0 || impacto.cupos.creados > 0) {
+            mensajes.push(`
+                <strong>Impacto en la agenda</strong>
+                <br>
+                <ul>
+                    ${impacto.cupos.eliminados > 0
+                        ? `<li>
+                            Se bloquearán 
+                            <strong>${impacto.cupos.eliminados}</strong> cupos.
+                        </li>`
+                        : ""}
+                    ${impacto.cupos.creados > 0
+                        ? `<li>
+                            Se crearán 
+                            <strong>${impacto.cupos.creados}</strong> cupos nuevos.
+                        </li>`
+                        : ""}
+                    ${impacto.citas.sin_cupo > 0
+                        ? `<li>
+                            <strong>${impacto.citas.sin_cupo}</strong>
+                            citas quedarán sin cupo.
+                        </li>`
+                        : ""}
+                </ul>
+            `);
+        }
+
+        mensajes.push(`
+            <strong>¿Desea aplicar estos cambios?</strong>
+        `);
+
+        return mensajes;
+    }
+
+    async function registrarAusencia(formData){
+
+        if (!formData){
+            return
+        }
+
+
+        try {
+            const csrfToken = window.CSRF_TOKEN;
+
+            const response = await fetch(API_URLS.guardarAusencia, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": csrfToken
+                },
+                body: JSON.stringify({
+                    personalSalud: formData.personal,
+                    fechaInicio: formData.fechaInicio,
+                    fechaFinal: formData.fechaFinal,
+                    tipo: formData.tipo,
+                    estado: formData.estadoRegistro,
+                })
+            });
+
+            const data = await response.json();
+
+            // VALIDACIONES CONTROLADAS
+            if (response.status === 400) {
+                toastr.warning(data.error, "Error de Validación");
+                return false;
+            }
+
+            // ERRORES REALES
+            if (response.status >= 500) {
+                throw new Error(
+                    data.error || "No se pudo guardar la ausencia"
+                );
+            }
+
+            return data;
+
+        } catch (error) {
+            toastr.error(
+                error.message,
+                "Error al guardar la ausencia"
+            );
+            return false;
+        }
+    }
+
+    async function editarAusencia(formData){
+        if (!formData){
+            return
+        }
+
+        console.log("llma a editar")
+
+
+        try {
+            const csrfToken = window.CSRF_TOKEN;
+
+            console.log(formData);
+
+            const response = await fetch(API_URLS.editarAusencia, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": csrfToken
+                },
+                body: JSON.stringify({
+                    ausenciaID: formData.ausenciaID,
+                    personalSalud: formData.personal,
+                    fechaInicio: formData.fechaInicio,
+                    fechaFinal: formData.fechaFinal,
+                    tipo: formData.tipo,
+                    estado: formData.estadoRegistro,
+                    observaciones: formData.observaciones,
+                    fechaModificado: formData.fechaModificado,
+                })
+            });
+
+            const data = await response.json();
+
+            // VALIDACIONES CONTROLADAS
+            if (response.status === 400) {
+                toastr.warning(data.error, "Error de Validación");
+                return false;
+            }
+
+            // ERRORES REALES
+            if (response.status >= 500) {
+                throw new Error(
+                    data.error || "No se pudo editar la ausencia"
+                );
+            }
+
+            return data;
+
+        } catch (error) {
+            toastr.error(
+                error.message,
+                "Error al editar la ausencia"
+            );
+            return false;
+        }
+    
+    }
+
+    return { open };
 
 })();

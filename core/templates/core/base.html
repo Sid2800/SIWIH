@@ -475,11 +475,36 @@
          listarJornadaLaboralAPI: "{% url 'listar_jornada_laboral' %}",
          guardarPeriodoLaboral: "{% url 'guardar_periodo_laboral' %}",
          editarPeriodoLaboral: "{% url 'editar_periodo_laboral' %}",
+         configurarPeridoLaboral: "{% url 'configurar_periodo' pk=0 slug='slug' %}",
          validarImpactoPeriodoLaboral: "{% url 'validar_impacto-periodo_laboral' %}",
          validarImpactoDiaLaboral: "{% url 'validar_impacto_dia_laboral' %}",
          obtenerPeriodoLaboral: "{% url 'obtener_periodo_laboral' %}",
-         guardarDiaPeriodoLaboral: "{% url 'guardar_dia_periodo_laboral' %}",
+         obtenerAusencia: "{% url 'obtener_ausencia' %}",
+
+
+
+         guardarDiaLaboral: "{% url 'guardar_dia_laboral' %}",
          obtenerDiaLaboral: "{% url 'obtener_dia_laboral' %}",
+         eliminarDiaLaboral: "{% url 'eliminar_dia_laboral' %}",
+         agendaMedicaAPI: "{% url 'agenda_medica_api' %}",
+         definirDiaQuirugico: "{% url 'definir_dia_quirurgico' %}",
+         quitarDiaQuiurgico: "{% url 'quitar_dia_quirurgico' %}",
+
+
+         
+         guardarAusencia: "{% url 'guardar_ausencia' %}",
+         editarAusencia: "{% url 'editar_ausencia' %}",
+
+
+
+         
+         validarImpactoAusencia: "{% url 'validar_impacto_ausencia' %}",
+         listarAusencias: "{% url 'listar_ausencias' %}",
+         listarAusenciasAPI : "{% url 'listar_ausencias_API'%}",
+         listarTiposAusencia: "{% url 'listar_tipos_ausencia' %}",
+
+
+         
 
          /* ---------------- S_EXP (Préstamos de Expedientes) ---------------- */
          s_exp_dashboard: "{% url 's_exp_dashboard' %}",
@@ -548,8 +573,9 @@
 
    <script src="{% static 'core/virtual-select/js/virtual-select.min.js' %}"></script>
 
-   <script src="{% static 'core/flatpickr/js/es.js' %}"></script>
+
    <script src="{% static 'core/flatpickr/js/flatpickr.js' %}"></script>
+   <script src="{% static 'core/flatpickr/js/es.js' %}"></script>
 
    <!-- ALERTAS -->
 

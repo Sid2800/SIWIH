@@ -1,0 +1,188 @@
+
+#fechaSeleccionada{
+   display: none;
+}
+
+.agenda-medica-calendario{
+   --agenda-color-libre: rgba(34, 197, 94, 1);
+   --agenda-icon-color-ausencia: rgba(239, 68, 68, 1);
+   --agenda-color-programada: rgba(59, 130, 246, 1);
+   --agenda-color-reprogramada: rgba(245, 158, 11, 1);
+
+
+
+   display: flex;
+   gap: 1rem;
+
+ 
+}
+
+.agenda-medica-calendario__filtros{
+   display: flex;
+   align-self: flex-start;
+   
+}
+
+.agenda-medica-calendario__selector-personal-dia{
+   display: grid;
+   grid-template-columns: 1fr;
+   column-gap: 1rem;
+   row-gap: 1rem;
+
+} 
+
+.agenda-medica-calendario__selector-personal{
+   display: grid;
+   grid-template-columns: 1fr;
+   row-gap: .5rem;
+}
+
+
+
+
+/* //////////////...././././././././././ */
+
+
+/* ========================================
+   FILTROS
+======================================== */
+
+.agenda-medica-calendario__filtros-estado {
+
+   border-radius: .6rem;
+   padding: 1rem 1.8rem 1.5rem;
+   display: flex;
+   flex-direction: column;
+   row-gap: .8rem;
+   border: 1.5px solid var(--tg-color-month-groups-border);
+   background-color: rgba(255, 255, 255, .65);
+}
+
+
+/* ----------------------------------------
+   TÍTULO
+---------------------------------------- */
+
+.agenda-medica-calendario__filtros-titulo {
+
+   display: flex;
+   justify-content: center;
+   align-items: center;
+   column-gap: .8rem;
+   text-transform: uppercase;
+   font-weight: 600;
+   font-size: 1.6rem;
+   letter-spacing: .03em;
+   border-bottom: 1.5px solid var(--color-borde-suave);
+   margin-bottom: .7rem;
+   padding: .5rem .5rem .9rem;
+
+}
+
+
+.agenda-medica-calendario__filtros-titulo i {
+   color: cadetblue;
+   font-size: 1.8rem;
+
+}
+
+
+/* ----------------------------------------
+   OPCIONES
+---------------------------------------- */
+
+.agenda-medica-calendario__filtros-estado .ck-formulario {
+   column-gap: 2.2rem;
+   transition: opacity .2s ease;
+
+}
+
+
+.agenda-medica-calendario__filtros-estado .ck-formulario__label {
+   display: flex;
+   justify-content: center;
+   align-items: center;
+   column-gap: 1rem;
+   text-transform: uppercase;
+   font-size: 1.4rem;
+}
+
+
+/* ----------------------------------------
+   SWITCH     
+---------------------------------------- */
+
+.agenda-medica-calendario__filtros-estado
+.ck-formulario__checkbox:checked
++ .ck-formulario__base {
+
+   background-color: cadetblue;
+
+}
+
+
+.agenda-medica-calendario__filtros-estado
+.ck-formulario__checkbox:checked
++ .ck-formulario__base
+.ck-formulario__bolita {
+
+   border-color: cadetblue;
+
+}
+
+
+/* ----------------------------------------
+   ESTADO DESACTIVADO
+---------------------------------------- */
+
+.agenda-medica-calendario__filtros-estado
+.ck-formulario:has(
+   .ck-formulario__checkbox:not(:checked)
+) {
+   opacity: .45;
+
+}
+
+
+/* ----------------------------------------
+   COLORES DE ESTADO
+---------------------------------------- */
+
+.agenda-medica-calendario__filtros-estado
+.ck-formulario__label i {
+   font-size: 1.8rem;
+
+}
+
+
+.agenda-filtro-cupo--libre
+.ck-formulario__label i {
+   color: var(--agenda-color-libre);
+}
+
+
+.agenda-filtro-cupo--programada
+.ck-formulario__label i {
+   color: var(--agenda-color-programada);
+}
+
+
+.agenda-filtro-cupo--reprogramada
+.ck-formulario__label i {
+   color: var(--agenda-color-reprogramada);
+}
+
+
+.agenda-filtro-cupo--ausencia
+.ck-formulario__label i {
+   color: var(--agenda-icon-color-ausencia);
+}
+
+
+/* ========================================
+   CALENDARIO
+======================================== */
+
+.agenda-medica-calendario__calendario {
+   width: 100%;
+}
