@@ -35,7 +35,7 @@ def configurar_locale():
         if platform.system() == "Windows":
             locale.setlocale(locale.LC_TIME, "Spanish_Spain.1252")
         else:
-            locale.setlocale(locale.LC_TIME, "es_ES.UTF-8")
+            locale.setlocale(locale.LC_TIME, "es_HN.utf8")
     except locale.Error:
         # Evita fallos en servidores sin locale español configurado
         pass
