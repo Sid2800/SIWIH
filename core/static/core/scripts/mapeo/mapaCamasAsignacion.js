@@ -1030,11 +1030,18 @@ document.addEventListener("DOMContentLoaded", function () {
     // Esta bandera define toda la estructura del modal.
     var esOcupada = estadoActual === "OCUPADA" || estadoActual === "PRE_ALTA";
 
-    if (window.MAPA_ROL_INTENTOS_RESTRINGIDO && !esOcupada) {
+    // [2026-09-15] Permitir ocupar camas vacias con un ingreso activo.
+    // Las validaciones de ingreso y permisos se completan en el backend.
+    if (
+      window.MAPA_ROL_INTENTOS_RESTRINGIDO
+      && !esOcupada
+      && estadoActual !== "VACIA"
+      && estadoActual !== "FUERA_SERVICIO"
+    ) {
       await Swal.fire({
         icon: "warning",
         title: "Accion no permitida",
-        text: "Este rol solo puede mover pacientes o manejar pre-altas desde camas ocupadas.",
+        text: "Este rol solo puede ocupar camas vacias con un ingreso activo, mover pacientes o manejar pre-altas.",
         confirmButtonText: "Entendido"
       });
       return;
@@ -1043,6 +1050,12 @@ document.addEventListener("DOMContentLoaded", function () {
     // ── HTML para cama VACIA (u otro estado sin paciente) ────────────────────
     // Permite cambiar el estado; si se elige OCUPADA aparece busqueda de paciente
     var estadosDisponibles = ESTADOS_FILTRO_INGRESO.slice();
+    // [2026-09-15] Consulta externa no aplica a cambios manuales restringidos.
+    if (window.MAPA_ROL_INTENTOS_RESTRINGIDO) {
+      estadosDisponibles = estadosDisponibles.filter(function (estado) {
+        return estado !== "CONSULTA_EXTERNA";
+      });
+    }
     if (estadosDisponibles.indexOf("OCUPADA") === -1) {
       estadosDisponibles.push("OCUPADA");
     }
@@ -1051,7 +1064,7 @@ document.addEventListener("DOMContentLoaded", function () {
     if (estadoActual && estadosDisponibles.indexOf(estadoActual) === -1) {
       estadosDisponibles.unshift(estadoActual);
     }
-    if (window.MAPA_ROL_INTENTOS_RESTRINGIDO && esOcupada) {
+    if (window.MAPA_ROL_INTENTOS_RESTRINGIDO && (esOcupada || estadoActual === "FUERA_SERVICIO")) {
       // [2026-07-08] FUERA_SERVICIO permitido para rol restringido
       estadosDisponibles = ["VACIA", "PRE_ALTA", "FUERA_SERVICIO"];
     }
