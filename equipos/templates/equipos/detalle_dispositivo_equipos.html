@@ -234,12 +234,30 @@
             <h3><i class="bi bi-info-circle"></i> Datos generales</h3>
             <dl class="equipos-detalle__datos">
                 <div><dt>Tipo</dt><dd>{{ dispositivo.tipo }}</dd></div>
+                {# La categoria pertenece al tipo; aqui solo se muestra. #}
+                <div>
+                    <dt>Categoría</dt>
+                    <dd>
+                        {{ dispositivo.tipo.categoria }}
+                        {% for secundaria in dispositivo.tipo.categorias_secundarias.all %}
+                            + {{ secundaria }}
+                        {% endfor %}
+                    </dd>
+                </div>
                 <div><dt>Tipo de tecnología</dt><dd>{{ dispositivo.get_tipo_tecnologia_display|default:"SIN DEFINIR"|upper }}</dd></div>
                 <div><dt>Marca</dt><dd>{{ dispositivo.marca|default:"INDEFINIDO" }}</dd></div>
                 <div><dt>Modelo</dt><dd>{{ dispositivo.modelo|default:"INDEFINIDO" }}</dd></div>
                 <div><dt>Area gestora</dt><dd>{{ dispositivo.area_gestora|default:"INDEFINIDO" }}</dd></div>
-                <div><dt>Color principal</dt><dd>{{ dispositivo.color|default:"INDEFINIDO" }}</dd></div>
-                <div><dt>Color secundario</dt><dd>{{ dispositivo.color_secundario|default:"No indicado" }}</dd></div>
+                <div>
+                    <dt>Colores</dt>
+                    <dd>
+                        {% for color in dispositivo.colores.all %}
+                            {{ color }}{% if not forloop.last %} / {% endif %}
+                        {% empty %}
+                            NO INDICADO
+                        {% endfor %}
+                    </dd>
+                </div>
                 <div><dt>Número de serie</dt><dd>{{ dispositivo.numero_serie|default:"INDEFINIDO" }}</dd></div>
                 <div><dt>Inventario de bienes nacionales</dt><dd>{{ dispositivo.inventario_bienes_nacionales|default:"NO APLICA" }}</dd></div>
                 <div><dt>Ficha</dt><dd>{{ dispositivo.inventario_numero_ficha|default:"NO APLICA" }}</dd></div>
@@ -258,12 +276,22 @@
                     <dd>{{ dispositivo.procedencia.nombre }}</dd>
                 </div>
                 <div>
-                    <dt>Número de referencia</dt>
+                    <dt>Número de factura o acta</dt>
                     <dd>{{ dispositivo.numero_referencia|default:"No indicado" }}</dd>
                 </div>
                 <div>
                     <dt>Teléfono</dt>
                     <dd>{{ dispositivo.procedencia.telefono|default:"No indicado" }}</dd>
+                </div>
+                <div>
+                    <dt>Vida útil</dt>
+                    <dd>
+                        {% if dispositivo.vida_util_anios %}
+                            {{ dispositivo.vida_util_anios }} año{{ dispositivo.vida_util_anios|pluralize:"s" }}
+                        {% else %}
+                            No indicada
+                        {% endif %}
+                    </dd>
                 </div>
             </dl>
         </section>
@@ -291,6 +319,18 @@
                             </span>
                         </dd>
                     </div>
+                    {% if dispositivo.fecha_inicio_garantia %}
+                        <div>
+                            <dt>Inicio</dt>
+                            <dd>{{ dispositivo.fecha_inicio_garantia|date:"d/m/Y" }}</dd>
+                        </div>
+                    {% endif %}
+                    {% if dispositivo.garantia_meses %}
+                        <div>
+                            <dt>Duración</dt>
+                            <dd>{{ dispositivo.garantia_meses }} mes{{ dispositivo.garantia_meses|pluralize:"es" }}</dd>
+                        </div>
+                    {% endif %}
                     <div>
                         <dt>Según contrato</dt>
                         <dd>{{ garantia.fin_contrato|date:"d/m/Y" }}</dd>
@@ -361,19 +401,23 @@
         <section class="equipos-detalle__tarjeta">
             <h3><i class="bi bi-geo-alt"></i> Ubicación y responsable</h3>
             <dl class="equipos-detalle__datos">
+                {# El tipo sale del propio catalogo de ubicaciones, no de dos
+                   columnas excluyentes como antes. #}
                 <div>
                     <dt>Tipo de área</dt>
                     <dd>
-                        {% if asignacion_actual.area_clinica %}
-                            Clínica
-                        {% elif asignacion_actual.unidad_no_clinica %}
-                            No clínica
+                        {% if asignacion_actual %}
+                            {{ asignacion_actual.ubicacion.get_tipo_display }}
                         {% else %}
                             Sin asignación
                         {% endif %}
                     </dd>
                 </div>
-                <div><dt>Área</dt><dd>{{ asignacion_actual.ubicacion|default:"Sin asignación" }}</dd></div>
+                <div><dt>Unidad o área</dt><dd>{{ asignacion_actual.ubicacion|default:"Sin asignación" }}</dd></div>
+                <div>
+                    <dt>Ubicación física</dt>
+                    <dd>{{ asignacion_actual.ubicacion_fisica|default:"No indicada" }}</dd>
+                </div>
                 <div><dt>Empleado a cargo</dt><dd>{{ asignacion_actual.responsable|default:"Sin responsable" }}</dd></div>
             </dl>
         </section>

@@ -48,6 +48,29 @@
                     </label>
                     {{ form_tipo.nombre }}
                 </div>
+                {% comment %}
+                   La categoria se define aqui, una sola vez por tipo, y no en
+                   cada equipo: todos los monitores de signos vitales son
+                   equipo medico, asi que preguntarlo en cada registro solo
+                   abre la puerta a que dos iguales queden clasificados
+                   distinto.
+                {% endcomment %}
+                <div class="equipos-registro__campo">
+                    <label for="categoria_tipo_catalogo">Categoría principal *</label>
+                    {{ form_tipo.categoria }}
+                    <p class="equipos-registro__ayuda">
+                        {{ form_tipo.categoria.help_text }}
+                    </p>
+                </div>
+                <div class="equipos-registro__campo">
+                    <label for="categorias_secundarias_tipo_catalogo">
+                        También pertenece a
+                    </label>
+                    {{ form_tipo.categorias_secundarias }}
+                    <p class="equipos-registro__ayuda">
+                        {{ form_tipo.categorias_secundarias.help_text }}
+                    </p>
+                </div>
                 <button class="formularioBotones-boton equipos-catalogo__boton"
                         type="submit">
                     {% if tipo_editado %}

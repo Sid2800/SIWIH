@@ -1,3 +1,6 @@
+from calendar import monthrange
+from datetime import date, timedelta
+
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
@@ -5,8 +8,8 @@ from django.db import models
 from django.db.models import F, Q
 from django.utils import timezone
 
+from expediente.models import ExpedienteUbicacion
 from rrhh.models import Empleado
-from servicio.models import Area_atencion, Unidad
 
 # Helpers de normalizacion.
 # Se ejecutan antes de guardar para evitar datos repetidos con espacios,
@@ -138,8 +141,93 @@ DIAS_AVISO_GARANTIA = 90
 
 # Catalogos administrables desde las pantallas del modulo o Django admin.
 # El campo activo oculta opciones nuevas sin borrar historico ya usado.
+class CategoriaEquipo(models.Model):
+    """Gran familia del equipo: medico, informatica, electrico...
+
+    La categoria cuelga del tipo, no del equipo. Un "MONITOR DE SIGNOS
+    VITALES" es medico siempre, asi que se decide una vez en el catalogo y no
+    en cada uno de los monitores que se registren: menos capturas y ningun
+    equipo clasificado al reves que otro igual.
+
+    Es un catalogo como los demas y se administra igual (agregar, renombrar,
+    desactivar). Determina quien da mantenimiento y a que reporte entra el
+    equipo, por eso cada tipo tiene una sola categoria principal.
+    """
+
+    nombre = models.CharField(max_length=100, unique=True)
+    descripcion = models.CharField(max_length=250, blank=True)
+    activo = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        db_table = "equipo_categoria"
+        verbose_name = "Categoria de equipo"
+        verbose_name_plural = "Categorias de equipo"
+        ordering = ["nombre"]
+
+    def clean(self):
+        self.nombre = normalizar_nombre_catalogo(self.nombre)
+        if not self.nombre:
+            raise ValidationError({"nombre": "Debe ingresar la categoria."})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.nombre
+
+
+class UbicacionFisica(models.Model):
+    """Zona concreta donde esta el aparato: "SALA 3 - CAMA 12", "BODEGA B".
+
+    La unidad de servicio dice de quien es el equipo; esto dice donde hay que
+    ir a buscarlo. Se escribe la primera vez y queda en el catalogo con su
+    identificador, de modo que la siguiente vez se elige en lugar de volver a
+    teclearla: asi "Sala 3" y "SALA 3" no acaban siendo dos lugares distintos.
+    """
+
+    nombre = models.CharField(max_length=120, unique=True)
+    descripcion = models.CharField(max_length=250, blank=True)
+    activo = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        db_table = "equipo_ubicacion_fisica"
+        verbose_name = "Ubicacion fisica"
+        verbose_name_plural = "Ubicaciones fisicas"
+        ordering = ["nombre"]
+
+    def clean(self):
+        self.nombre = normalizar_nombre_catalogo(self.nombre)
+        if not self.nombre:
+            raise ValidationError({"nombre": "Debe ingresar la ubicacion fisica."})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.nombre
+
+
 class TipoDispositivo(models.Model):
     nombre = models.CharField(max_length=100, unique=True)
+    # Categoria principal: la que manda. Define el area responsable del
+    # mantenimiento y no admite ambiguedad, por eso es una sola y obligatoria.
+    categoria = models.ForeignKey(
+        CategoriaEquipo,
+        on_delete=models.PROTECT,
+        related_name="tipos",
+        verbose_name="Categoria principal",
+    )
+    # Los equipos hibridos existen: un ecografo con estacion de trabajo es
+    # medico e informatico a la vez. Se registran aqui para que aparezcan en
+    # las busquedas de ambas categorias sin discutir cual es "la" categoria.
+    categorias_secundarias = models.ManyToManyField(
+        CategoriaEquipo,
+        blank=True,
+        related_name="tipos_secundarios",
+        verbose_name="Categorias secundarias",
+    )
     descripcion = models.CharField(max_length=250, blank=True)
     activo = models.BooleanField(default=True, db_index=True)
 
@@ -147,7 +235,7 @@ class TipoDispositivo(models.Model):
         db_table = "equipo_tipo_dispositivo"
         verbose_name = "Tipo de equipo"
         verbose_name_plural = "Tipos de equipo"
-        ordering = ["nombre"]
+        ordering = ["categoria__nombre", "nombre"]
 
     def clean(self):
         # clean() centraliza reglas del modelo. Django lo ejecuta desde full_clean().
@@ -155,11 +243,20 @@ class TipoDispositivo(models.Model):
         if not self.nombre:
             raise ValidationError({"nombre": "Debe ingresar el tipo de equipo."})
 
+        if self.categoria_id is None:
+            raise ValidationError({"categoria": "Debe indicar la categoria."})
+
     def save(self, *args, **kwargs):
         # full_clean() hace que estas reglas apliquen tambien desde admin, shell
         # o vistas, no solo desde un formulario web.
         self.full_clean()
         return super().save(*args, **kwargs)
+
+    @property
+    def categorias(self):
+        """Principal mas secundarias, para mostrar la clasificacion completa."""
+        secundarias = list(self.categorias_secundarias.all())
+        return [self.categoria, *secundarias] if self.categoria_id else secundarias
 
     def __str__(self):
         return self.nombre
@@ -386,22 +483,16 @@ class Dispositivo(models.Model):
         related_name="dispositivos",
     )
     numero_referencia = models.CharField(max_length=100, null=True, blank=True)
-    color = models.ForeignKey(
+    # Lista abierta en lugar de principal y secundario: un equipo puede ser
+    # blanco con gris y azul, y decidir cual de los tres es "el principal" era
+    # una pregunta sin respuesta que ademas limitaba a dos. Sin colores
+    # tampoco es un hueco: hay equipos que nadie describe por color.
+    colores = models.ManyToManyField(
         ColorDispositivo,
-        on_delete=models.PROTECT,
+        blank=True,
         related_name="dispositivos",
-        null=True,
-        blank=True,
-    )
-    # Muchos equipos son de un solo color, asi que este queda en NULL y no se
-    # rellena con INDEFINIDO: no tenerlo es un dato valido, no un hueco.
-    color_secundario = models.ForeignKey(
-        ColorDispositivo,
-        on_delete=models.PROTECT,
-        related_name="dispositivos_color_secundario",
-        null=True,
-        blank=True,
-        verbose_name="Color secundario",
+        db_table="equipo_dispositivo_color",
+        verbose_name="Colores",
     )
     numero_serie = models.CharField(max_length=100, unique=True, null=True, blank=True)
     inventario_bienes_nacionales = models.CharField(
@@ -421,8 +512,12 @@ class Dispositivo(models.Model):
         default=EstadoDispositivo.OPERATIVO,
         db_index=True,
     )
+    # Arranca en MEDIA para no frenar la captura: quien registra en la sala no
+    # siempre sabe cuan critico es el aparato, y dejarlo obligatorio hacia que
+    # se eligiera cualquiera. Se corrige despues desde la edicion.
     criticidad = models.PositiveSmallIntegerField(
         choices=CriticidadDispositivo.choices,
+        default=CriticidadDispositivo.MEDIA,
         db_index=True,
     )
     frecuencia_mantenimiento_meses = models.PositiveSmallIntegerField(
@@ -432,11 +527,32 @@ class Dispositivo(models.Model):
         help_text="Cantidad de meses entre mantenimientos preventivos.",
     )
     fecha_instalacion = models.DateField(null=True, blank=True)
-    # La garantia se guarda como la fecha que dice el contrato, no como una
-    # duracion: las reales no vienen siempre en anios enteros. Este dato no se
-    # toca nunca; el vencimiento efectivo lo calcula garantia_service sumandole
-    # los dias que el equipo estuvo pausado, para poder mostrar por separado lo
-    # que firmo el proveedor y el ajuste posterior.
+    # Inicio de la cobertura. Casi siempre coincide con la instalacion, pero no
+    # se deduce de ella: hay equipos instalados meses despues de recibidos y
+    # contratos que arrancan el dia de la entrega.
+    fecha_inicio_garantia = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Inicio de garantía",
+        help_text="Día en que empezó a correr la garantía.",
+    )
+    # Duracion pactada, cuando el contrato habla en anios o meses. Guardarla
+    # permite explicar de donde sale el vencimiento, en vez de mostrar una
+    # fecha suelta que despues nadie sabe justificar.
+    garantia_meses = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1)],
+        verbose_name="Duración de garantía (meses)",
+        help_text="Meses de cobertura. Vacío si el contrato solo da la fecha.",
+    )
+    # El vencimiento es el dato que manda y siempre queda guardado aqui: si hay
+    # inicio y duracion se calcula solo, y si el contrato trae una fecha suelta
+    # se escribe a mano. Puede quedar en el pasado, porque tambien se registran
+    # equipos viejos cuya garantia ya vencio y saberlo sigue siendo util.
+    # garantia_service le suma despues los dias que el equipo estuvo pausado
+    # por reparacion, para mostrar por separado lo que firmo el proveedor y el
+    # ajuste posterior.
     fecha_fin_garantia = models.DateField(
         null=True,
         blank=True,
@@ -450,6 +566,14 @@ class Dispositivo(models.Model):
         null=True,
         blank=True,
         validators=[MinValueValidator(0)],
+    )
+    # Anios de vida util esperada. Activo fijo lo pide para la depreciacion y
+    # junto con la fecha de instalacion permite anticipar reemplazos.
+    vida_util_anios = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1)],
+        verbose_name="Vida útil (años)",
     )
     observaciones = models.TextField(blank=True)
     fecha_creado = models.DateTimeField(auto_now_add=True)
@@ -491,6 +615,24 @@ class Dispositivo(models.Model):
                 | Q(costo_adquisicion__gte=0),
                 name="bio_disp_costo_no_negativo",
             ),
+            models.CheckConstraint(
+                condition=Q(garantia_meses__isnull=True)
+                | Q(garantia_meses__gt=0),
+                name="equipo_disp_garantia_meses_positiva",
+            ),
+            models.CheckConstraint(
+                condition=Q(vida_util_anios__isnull=True)
+                | Q(vida_util_anios__gt=0),
+                name="equipo_disp_vida_util_positiva",
+            ),
+            # El vencimiento nunca puede quedar antes del inicio. Se comprueba
+            # en el motor porque la fecha tambien se puede escribir a mano.
+            models.CheckConstraint(
+                condition=Q(fecha_inicio_garantia__isnull=True)
+                | Q(fecha_fin_garantia__isnull=True)
+                | Q(fecha_fin_garantia__gte=F("fecha_inicio_garantia")),
+                name="equipo_disp_garantia_fechas_coherentes",
+            ),
         ]
 
     @property
@@ -518,6 +660,30 @@ class Dispositivo(models.Model):
             return ""
         return f"{self.costo_adquisicion:,.2f}"
 
+    def _calcular_fin_garantia(self):
+        """Deriva el vencimiento cuando hay inicio y duracion pactada.
+
+        La duracion se cuenta en meses y no en dias: un contrato de dos anios
+        vence el mismo dia del mes, no 730 dias despues. El ultimo dia de
+        cobertura es la vispera de cumplirse el plazo, asi que una garantia de
+        12 meses iniciada el 1 de marzo vence el 28 de febrero: el 1 de marzo
+        siguiente ya esta fuera.
+        """
+        if not self.fecha_inicio_garantia or not self.garantia_meses:
+            return
+
+        inicio = self.fecha_inicio_garantia
+        total_meses = inicio.month - 1 + self.garantia_meses
+        anio = inicio.year + total_meses // 12
+        mes = total_meses % 12 + 1
+
+        # Un inicio el 31 de enero con 1 mes no puede caer en un 31 de
+        # febrero: se toma el ultimo dia del mes que corresponda.
+        ultimo_dia = monthrange(anio, mes)[1]
+        dia = min(inicio.day, ultimo_dia)
+
+        self.fecha_fin_garantia = date(anio, mes, dia) - timedelta(days=1)
+
     def clean(self):
         # Validaciones de negocio antes de guardar.
         # Aqui se normalizan opcionales y se revisan duplicados flexibles.
@@ -532,15 +698,25 @@ class Dispositivo(models.Model):
             # catalogo INDEFINIDO.
             self.marca = obtener_catalogo_indefinido(MarcaDispositivo)
 
-        if self.color_id is None:
-            self.color = obtener_catalogo_indefinido(ColorDispositivo)
+        # La garantia se resuelve antes de validar fechas: con inicio y
+        # duracion el vencimiento se calcula y no se le pide al usuario. Si el
+        # contrato solo trae la fecha final, se respeta la que escribio. No se
+        # exige que el vencimiento sea futuro: se registran equipos instalados
+        # hace anios y su garantia vencida es un dato, no un error.
+        self._calcular_fin_garantia()
 
-        # Se compara despues de resolver el principal: si el usuario deja el
-        # principal vacio y elige INDEFINIDO como secundario, acaban siendo el
-        # mismo y hay que avisarlo igual.
-        if self.color_secundario_id and self.color_secundario_id == self.color_id:
-            errores["color_secundario"] = (
-                "El color secundario debe ser diferente del color principal"
+        if (
+            self.fecha_inicio_garantia
+            and self.fecha_fin_garantia
+            and self.fecha_fin_garantia < self.fecha_inicio_garantia
+        ):
+            errores["fecha_fin_garantia"] = (
+                "El vencimiento no puede ser anterior al inicio de la garantía."
+            )
+
+        if self.garantia_meses and not self.fecha_inicio_garantia:
+            errores["fecha_inicio_garantia"] = (
+                "Indique el inicio de la garantía para calcular su vencimiento."
             )
 
         # El modelo es opcional porque a veces se desconoce; en ese caso queda
@@ -705,26 +881,41 @@ class BajaDispositivo(models.Model):
 
 
 class AsignacionDispositivo(models.Model):
-    # Historial de ubicacion/responsable.
-    # Solo una asignacion debe quedar activa por equipo: fecha_fin = NULL.
+    """Historial de quien responde por el equipo y donde esta.
+
+    Solo una asignacion queda activa por equipo: la que tiene fecha_fin NULL.
+
+    La ubicacion apunta al catalogo compartido expediente_ubicacion, el mismo
+    que usa el prestamo de expedientes. Antes habia dos columnas excluyentes
+    (area clinica o unidad no clinica) y cada consulta tenia que preguntar por
+    las dos; ese catalogo ya resuelve ambos casos en una sola fila con un solo
+    identificador y su propio campo tipo, que dice si el punto es clinico o no
+    sin mirar las llaves. Si falta una unidad en el catalogo se agrega con
+    "python manage.py poblar_ubicaciones".
+    """
+
     dispositivo = models.ForeignKey(
         Dispositivo,
         on_delete=models.PROTECT,
         related_name="asignaciones",
     )
-    area_clinica = models.ForeignKey(
-        Area_atencion,
+    ubicacion = models.ForeignKey(
+        "expediente.ExpedienteUbicacion",
         on_delete=models.PROTECT,
         related_name="asignaciones_dispositivos_equipos",
-        null=True,
-        blank=True,
+        verbose_name="Unidad o área",
+        help_text="Punto clínico o no clínico donde queda cargado el equipo.",
     )
-    unidad_no_clinica = models.ForeignKey(
-        Unidad,
+    # La unidad dice de quien es el equipo; esta dice donde hay que ir a
+    # buscarlo. Es opcional porque no todo equipo tiene un sitio fijo, y sale
+    # de un catalogo para que la misma sala no se escriba de tres maneras.
+    ubicacion_fisica = models.ForeignKey(
+        UbicacionFisica,
         on_delete=models.PROTECT,
         related_name="asignaciones_dispositivos_equipos",
         null=True,
         blank=True,
+        verbose_name="Ubicación física",
     )
     responsable = models.ForeignKey(
         Empleado,
@@ -757,25 +948,14 @@ class AsignacionDispositivo(models.Model):
                 fields=["dispositivo", "fecha_fin"],
                 name="bio_asig_disp_fecha_fin_idx",
             ),
+            # Sostiene la pregunta mas frecuente del inventario: que equipos
+            # hay ahora mismo en tal unidad.
             models.Index(
-                fields=["area_clinica", "fecha_fin"],
-                name="bio_asig_area_fecha_fin_idx",
-            ),
-            models.Index(
-                fields=["unidad_no_clinica", "fecha_fin"],
-                name="bio_asig_unidad_fecha_fin_idx",
+                fields=["ubicacion", "fecha_fin"],
+                name="equipo_asig_ubicacion_fin_idx",
             ),
         ]
         constraints = [
-            # Un equipo se ubica en un area clinica o en una unidad no clinica,
-            # nunca en ambas al mismo tiempo.
-            models.CheckConstraint(
-                condition=(
-                    Q(area_clinica__isnull=False, unidad_no_clinica__isnull=True)
-                    | Q(area_clinica__isnull=True, unidad_no_clinica__isnull=False)
-                ),
-                name="bio_asig_una_ubicacion",
-            ),
             models.CheckConstraint(
                 condition=Q(fecha_fin__isnull=True)
                 | Q(fecha_fin__gte=F("fecha_inicio")),
@@ -789,21 +969,17 @@ class AsignacionDispositivo(models.Model):
         return self.fecha_fin is None
 
     @property
-    def ubicacion(self):
-        # Permite mostrar una sola columna "ubicacion" sin importar el tipo de area.
-        return self.area_clinica or self.unidad_no_clinica
+    def es_clinica(self):
+        """Si el equipo esta cargado a un punto clinico o administrativo."""
+        if not self.ubicacion_id:
+            return None
+        return self.ubicacion.tipo == ExpedienteUbicacion.TIPO_CLINICA
 
     def clean(self):
-        # Reglas de consistencia: exactamente una ubicacion, fechas coherentes
-        # y una sola asignacion activa por equipo.
+        # Reglas de consistencia: fechas coherentes y una sola asignacion
+        # activa por equipo. La ubicacion ya es una sola FK obligatoria, asi
+        # que no hay nada excluyente que comprobar aqui.
         errores = {}
-        tiene_area_clinica = self.area_clinica_id is not None
-        tiene_unidad_no_clinica = self.unidad_no_clinica_id is not None
-
-        if tiene_area_clinica == tiene_unidad_no_clinica:
-            errores["area_clinica"] = (
-                "Debe seleccionar exactamente una ubicación clínica o no clínica."
-            )
 
         if self.fecha_inicio and self.fecha_fin and self.fecha_fin < self.fecha_inicio:
             errores["fecha_fin"] = (

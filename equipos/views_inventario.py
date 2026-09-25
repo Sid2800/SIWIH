@@ -17,6 +17,7 @@ from .forms import DispositivoCreateForm, ImagenDispositivoForm
 from .models import (
     AreaGestora,
     AsignacionDispositivo,
+    CategoriaEquipo,
     Dispositivo,
     EstadoDispositivo,
     MarcaDispositivo,
@@ -117,6 +118,9 @@ def registrar_dispositivo(request):
                 dispositivo.creado_por = request.user
                 dispositivo.modificado_por = request.user
                 dispositivo.save()
+                # Los colores son una relacion aparte y commit=False no los
+                # guarda: sin esta llamada el equipo quedaria sin ninguno.
+                form.save_m2m()
 
                 _crear_asignacion_dispositivo(
                     dispositivo,
@@ -190,8 +194,8 @@ def _crear_asignacion_dispositivo(dispositivo, form, usuario, observaciones):
     # por DispositivoCreateForm.clean().
     return AsignacionDispositivo.objects.create(
         dispositivo=dispositivo,
-        area_clinica=form.cleaned_data.get("area_clinica"),
-        unidad_no_clinica=form.cleaned_data.get("unidad_no_clinica"),
+        ubicacion=form.cleaned_data["ubicacion"],
+        ubicacion_fisica=form.cleaned_data.get("ubicacion_fisica"),
         responsable=form.cleaned_data["responsable"],
         observaciones=observaciones,
         creado_por=usuario,
@@ -201,18 +205,19 @@ def _crear_asignacion_dispositivo(dispositivo, form, usuario, observaciones):
 
 def _datos_asignacion_cambiaron(asignacion_actual, form):
     # Si ubicacion o responsable no cambiaron, editar el equipo no crea una
-    # asignacion duplicada.
+    # asignacion duplicada. La zona fisica tambien cuenta: mover el aparato de
+    # sala es un traslado y merece quedar en el historial.
     if not asignacion_actual:
         return True
 
-    area_clinica = form.cleaned_data.get("area_clinica")
-    unidad_no_clinica = form.cleaned_data.get("unidad_no_clinica")
+    ubicacion = form.cleaned_data["ubicacion"]
+    ubicacion_fisica = form.cleaned_data.get("ubicacion_fisica")
     responsable = form.cleaned_data["responsable"]
 
     return (
-        asignacion_actual.area_clinica_id != getattr(area_clinica, "pk", None)
-        or asignacion_actual.unidad_no_clinica_id
-        != getattr(unidad_no_clinica, "pk", None)
+        asignacion_actual.ubicacion_id != ubicacion.pk
+        or asignacion_actual.ubicacion_fisica_id
+        != getattr(ubicacion_fisica, "pk", None)
         or asignacion_actual.responsable_id != responsable.pk
     )
 
@@ -250,8 +255,9 @@ def _prefetch_asignacion_activa():
         queryset=AsignacionDispositivo.objects.filter(
             fecha_fin__isnull=True
         ).select_related(
-            "area_clinica__servicio",
-            "unidad_no_clinica",
+            "ubicacion__unidad_clinica__area_atencion__servicio",
+            "ubicacion__unidad_no_clinica",
+            "ubicacion_fisica",
             "responsable",
         ),
         to_attr="asignacion_activa_lista",
@@ -265,9 +271,8 @@ def _obtener_dispositivos_base():
         "marca",
         "modelo",
         "area_gestora",
-        "color",
         "procedencia",
-    ).prefetch_related(_prefetch_asignacion_activa())
+    ).prefetch_related("colores", _prefetch_asignacion_activa())
 
 
 def _aplicar_busqueda_dispositivos(dispositivos, consulta):
@@ -278,7 +283,7 @@ def _aplicar_busqueda_dispositivos(dispositivos, consulta):
     filtro_busqueda = (
         Q(tipo__nombre__icontains=consulta)
         | Q(marca__nombre__icontains=consulta)
-        | Q(color__nombre__icontains=consulta)
+        | Q(colores__nombre__icontains=consulta)
         | Q(inventario_bienes_nacionales__icontains=consulta)
         | Q(inventario_numero_ficha__icontains=consulta)
     )
@@ -327,6 +332,7 @@ def listado_dispositivos(request):
     # pagina resultados y renderiza la tabla.
     consulta = request.GET.get("q", "").strip()
     filtro_estado = request.GET.get("estado", "").strip()
+    filtro_categoria = request.GET.get("categoria", "").strip()
     filtro_tipo = request.GET.get("tipo", "").strip()
     filtro_marca = request.GET.get("marca", "").strip()
     filtro_modelo = request.GET.get("modelo", "").strip()
@@ -343,6 +349,16 @@ def listado_dispositivos(request):
     else:
         dispositivos = dispositivos.exclude(estado=EstadoDispositivo.DADO_DE_BAJA)
 
+
+    # Filtra por categoria del tipo, contando tambien los hibridos: un
+    # ecografo con estacion de trabajo debe salir al pedir INFORMATICA aunque
+    # su categoria principal sea MEDICO.
+    categoria_id = _parametro_entero(filtro_categoria)
+    if categoria_id:
+        dispositivos = dispositivos.filter(
+            Q(tipo__categoria_id=categoria_id)
+            | Q(tipo__categorias_secundarias=categoria_id)
+        )
 
     tipo_id = _parametro_entero(filtro_tipo)
     if tipo_id:
@@ -385,6 +401,7 @@ def listado_dispositivos(request):
             "filtros": {
                 "q": consulta,
                 "estado": filtro_estado,
+                "categoria": filtro_categoria,
                 "tipo": filtro_tipo,
                 "marca": filtro_marca,
                 "modelo": filtro_modelo,
@@ -394,6 +411,9 @@ def listado_dispositivos(request):
                 {"value": str(valor), "label": etiqueta}
                 for valor, etiqueta in EstadoDispositivo.choices
             ],
+            "categoria_choices": CategoriaEquipo.objects.filter(
+                activo=True
+            ).order_by("nombre"),
             "tipo_choices": TipoDispositivo.objects.filter(activo=True).order_by(
                 "nombre"
             ),
@@ -447,11 +467,11 @@ def detalle_dispositivo(request, dispositivo_id):
             "marca",
             "modelo",
             "area_gestora",
-            "color",
             "procedencia",
+            "tipo__categoria",
             "baja__registrado_por",
             "orden_trabajo_baja__creado_por",
-        ),
+        ).prefetch_related("colores", "tipo__categorias_secundarias"),
         pk=dispositivo_id,
     )
 
@@ -512,9 +532,8 @@ def editar_dispositivo(request, dispositivo_id):
             "marca",
             "modelo",
             "area_gestora",
-            "color",
             "procedencia",
-        ),
+        ).prefetch_related("colores"),
         pk=dispositivo_id,
     )
 
@@ -541,6 +560,7 @@ def editar_dispositivo(request, dispositivo_id):
             dispositivo = form.save(commit=False)
             dispositivo.modificado_por = request.user
             dispositivo.save()
+            form.save_m2m()
 
             _actualizar_asignacion_dispositivo(
                 dispositivo,

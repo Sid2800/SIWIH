@@ -167,32 +167,72 @@ document.addEventListener('DOMContentLoaded', function () {
         }, { once: true });
     });
 
-    // Muestra solo el selector de area que corresponde al tipo elegido.
-    const tipoArea = document.getElementById('tipo_area_dispositivo');
-    const campoClinica = document.getElementById('campo_area_clinica');
-    const campoNoClinica = document.getElementById('campo_area_no_clinica');
-    const areaClinica = document.getElementById('area_clinica_dispositivo');
-    const areaNoClinica = document.getElementById('area_no_clinica_dispositivo');
+    // La garantia se calcula en pantalla igual que la calculara el servidor,
+    // para que el usuario vea el vencimiento antes de guardar. El calculo de
+    // verdad lo hace el modelo: esto es solo un anticipo.
+    const inicioGarantia = document.getElementById('inicio_garantia_dispositivo');
+    const mesesGarantia = document.getElementById('garantia_meses_dispositivo');
+    const finGarantia = document.getElementById('garantia_dispositivo');
+    const ayudaGarantia = document.getElementById('ayuda_garantia_dispositivo');
 
-    function actualizarSelectorArea() {
-        const mostrarClinica = tipoArea.value === 'clinica';
-        const mostrarNoClinica = tipoArea.value === 'no_clinica';
+    function sumarMeses(fechaTexto, meses) {
+        // El plazo se cuenta en meses de calendario, no en dias: dos anios
+        // vencen el mismo dia del mes. El ultimo dia cubierto es la vispera
+        // de cumplirse el plazo.
+        const partes = fechaTexto.split('-').map(Number);
+        const inicio = new Date(partes[0], partes[1] - 1, partes[2]);
+        const fin = new Date(inicio.getFullYear(), inicio.getMonth() + meses, inicio.getDate());
 
-        campoClinica.hidden = !mostrarClinica;
-        campoNoClinica.hidden = !mostrarNoClinica;
-        areaClinica.disabled = !mostrarClinica;
-        areaNoClinica.disabled = !mostrarNoClinica;
-
-        if (!mostrarClinica) {
-            areaClinica.value = '';
+        // Un 31 de enero mas un mes no existe: el navegador lo desborda al mes
+        // siguiente, asi que se retrocede al ultimo dia del mes esperado.
+        const mesEsperado = (inicio.getMonth() + meses) % 12;
+        if (fin.getMonth() !== mesEsperado) {
+            fin.setDate(0);
         }
-        if (!mostrarNoClinica) {
-            areaNoClinica.value = '';
+
+        fin.setDate(fin.getDate() - 1);
+
+        const mes = String(fin.getMonth() + 1).padStart(2, '0');
+        const dia = String(fin.getDate()).padStart(2, '0');
+        return `${fin.getFullYear()}-${mes}-${dia}`;
+    }
+
+    function actualizarGarantia() {
+        if (!inicioGarantia || !mesesGarantia || !finGarantia) {
+            return;
+        }
+
+        const meses = parseInt(mesesGarantia.value, 10);
+        const calculada = inicioGarantia.value && !Number.isNaN(meses);
+
+        // Con duracion elegida el vencimiento no se teclea: se muestra ya
+        // resuelto y de solo lectura, para que nadie lo contradiga a mano.
+        finGarantia.readOnly = calculada;
+
+        if (calculada) {
+            finGarantia.value = sumarMeses(inicioGarantia.value, meses);
+        }
+
+        if (!ayudaGarantia) {
+            return;
+        }
+
+        if (calculada) {
+            ayudaGarantia.textContent = 'Calculado desde el inicio y la duración.';
+            ayudaGarantia.hidden = false;
+        } else if (inicioGarantia.value) {
+            ayudaGarantia.textContent = 'Elija una duración o escriba la fecha del contrato.';
+            ayudaGarantia.hidden = false;
+        } else {
+            ayudaGarantia.hidden = true;
         }
     }
 
-    tipoArea.addEventListener('change', actualizarSelectorArea);
-    actualizarSelectorArea();
+    if (inicioGarantia && mesesGarantia && finGarantia) {
+        inicioGarantia.addEventListener('change', actualizarGarantia);
+        mesesGarantia.addEventListener('change', actualizarGarantia);
+        actualizarGarantia();
+    }
 
     // Select2 consulta empleados por AJAX para no cargar toda la tabla en el HTML.
     const responsableSelect = $('#responsable_dispositivo');
@@ -231,6 +271,73 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             }
         });
+    }
+
+    // Al elegir al responsable se consulta su ficha en RRHH: se muestra si es
+    // personal clinico y en que unidad esta, y se sugiere la ubicacion. Es una
+    // sugerencia: la unidad dice donde trabaja la persona, y el aparato puede
+    // estar en un punto de atencion mas concreto, asi que solo se rellena
+    // cuando el campo esta vacio y nunca pisa lo que el usuario ya eligio.
+    const ubicacionSelect = document.getElementById('ubicacion_dispositivo');
+    const datosResponsable = document.getElementById('datos_responsable_dispositivo');
+
+    function describirEmpleado(datos) {
+        if (!datosResponsable) {
+            return;
+        }
+
+        const partes = [datos.tipo_personal];
+
+        if (datos.unidad) {
+            partes.push(datos.unidad);
+        }
+
+        datosResponsable.textContent = partes.join(' · ');
+        datosResponsable.hidden = false;
+    }
+
+    async function consultarDatosEmpleado(empleadoId) {
+        const url = datosResponsable
+            ? datosResponsable.dataset.urlDatos
+            : '';
+
+        if (!url || !empleadoId) {
+            return;
+        }
+
+        try {
+            const respuesta = await fetch(
+                `${url}?empleado_id=${encodeURIComponent(empleadoId)}`,
+                { headers: { 'X-Requested-With': 'XMLHttpRequest' } }
+            );
+
+            if (!respuesta.ok) {
+                return;
+            }
+
+            const datos = await respuesta.json();
+            describirEmpleado(datos);
+
+            if (ubicacionSelect && !ubicacionSelect.value && datos.ubicacion_sugerida) {
+                ubicacionSelect.value = String(datos.ubicacion_sugerida);
+            }
+        } catch (error) {
+            // Que falle la sugerencia no debe estorbar el registro: la
+            // ubicacion se elige a mano, que es el flujo normal de todos modos.
+            if (datosResponsable) {
+                datosResponsable.hidden = true;
+            }
+        }
+    }
+
+    if (responsableSelect.length) {
+        responsableSelect.on('change', function () {
+            consultarDatosEmpleado(responsableSelect.val());
+        });
+
+        if (responsableSelect.val()) {
+            consultarDatosEmpleado(responsableSelect.val());
+        }
     }
 
     // Marca y modelo son dos Select2 encadenados. Los catalogos se cargan por
@@ -317,6 +424,52 @@ document.addEventListener('DOMContentLoaded', function () {
             placeholder: 'Buscar o elegir tipo de equipo',
             sinResultados: 'No se encontraron tipos de equipo'
         });
+    }
+
+    // La categoria no se captura: pertenece al tipo. Se muestra para que quien
+    // registra note de inmediato si eligio el tipo equivocado, antes de llenar
+    // el resto de la ficha.
+    const categoriaTipo = document.getElementById('categoria_tipo_dispositivo');
+
+    async function mostrarCategoriaTipo(tipoId) {
+        const url = categoriaTipo ? categoriaTipo.dataset.urlCategoria : '';
+
+        if (!url || !tipoId) {
+            if (categoriaTipo) {
+                categoriaTipo.hidden = true;
+            }
+            return;
+        }
+
+        try {
+            const respuesta = await fetch(
+                `${url}?tipo_id=${encodeURIComponent(tipoId)}`,
+                { headers: { 'X-Requested-With': 'XMLHttpRequest' } }
+            );
+
+            if (!respuesta.ok) {
+                categoriaTipo.hidden = true;
+                return;
+            }
+
+            const datos = await respuesta.json();
+            const etiquetas = [datos.categoria].concat(datos.secundarias || []);
+
+            categoriaTipo.textContent = `Categoría: ${etiquetas.join(' + ')}`;
+            categoriaTipo.hidden = false;
+        } catch (error) {
+            categoriaTipo.hidden = true;
+        }
+    }
+
+    if (tipoSelect.length) {
+        tipoSelect.on('change', function () {
+            mostrarCategoriaTipo(tipoSelect.val());
+        });
+
+        if (tipoSelect.val()) {
+            mostrarCategoriaTipo(tipoSelect.val());
+        }
     }
 
     // La procedencia se busca contra el servidor igual que las anteriores. El

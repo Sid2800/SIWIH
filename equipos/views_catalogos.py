@@ -94,9 +94,9 @@ def catalogo_marcas_modelos(request):
 
     # Los tipos comparten pantalla con marcas y modelos porque son el mismo
     # tipo de tarea: mantener los catalogos que alimentan el formulario.
-    tipos = TipoDispositivo.objects.annotate(
+    tipos = TipoDispositivo.objects.select_related("categoria").annotate(
         total_equipos=Count("dispositivos"),
-    ).order_by("-activo", "nombre")
+    ).order_by("-activo", "categoria__nombre", "nombre")
 
     return render(
         request,

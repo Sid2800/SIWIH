@@ -56,6 +56,24 @@
     {# Filtros GET: views.py lee estos parametros y devuelve la tabla paginada. #}
     <form class="equipos-listado__controles" id="equipos-listado-filtros" method="get">
         <div class="equipos-listado__filtros">
+            {# La categoria es el filtro mas grueso: separa equipo medico de
+               informatica o electrico. Incluye los hibridos, asi que un
+               ecografo con estacion de trabajo aparece en las dos. #}
+            <div class="equipos-listado__filtro">
+                <div class="equipos-listado__campo-icono">
+                    <i class="bi bi-diagram-3"></i>
+                    <select class="formularioCampo-select"
+                            id="filtro_categoria"
+                            name="categoria">
+                        <option value="">Todas las categorías</option>
+                        {% for categoria in categoria_choices %}
+                            <option value="{{ categoria.id }}" {% if filtros.categoria == categoria.id|stringformat:"s" %}selected{% endif %}>
+                                {{ categoria.nombre }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
             <div class="equipos-listado__filtro">
                 <div class="equipos-listado__campo-icono">
                     <i class="bi bi-funnel"></i>

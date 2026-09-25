@@ -14,6 +14,7 @@ from .models import (
     TipoDispositivo,
 )
 from .decorators import exige_formularios_equipos_json
+from .services.personal_service import resolver_datos_personal
 from .view_helpers import registrar_errores_vista
 
 
@@ -149,6 +150,80 @@ def buscar_modelos(request):
         lambda modelo: {"id": modelo.id, "text": modelo.nombre},
     )
     return _respuesta_select2(pagina)
+
+
+@exige_formularios_equipos_json
+@login_required
+@registrar_errores_vista("Error al consultar la categoria del tipo de equipo")
+def categoria_tipo(request):
+    """Categorias del tipo elegido, para confirmarlas en el formulario.
+
+    La categoria no se captura: la trae el tipo. Se devuelve para mostrarla y
+    que quien registra note de inmediato si eligio el tipo equivocado, antes
+    de llenar el resto de la ficha.
+    """
+    tipo_id = (request.GET.get("tipo_id") or "").strip()
+
+    if not tipo_id.isdigit():
+        return JsonResponse({"error": "Debe indicar el tipo."}, status=400)
+
+    tipo = (
+        TipoDispositivo.objects
+        .select_related("categoria")
+        .prefetch_related("categorias_secundarias")
+        .filter(pk=int(tipo_id))
+        .first()
+    )
+
+    if tipo is None:
+        return JsonResponse({"error": "Tipo no encontrado."}, status=404)
+
+    return JsonResponse({
+        "categoria": tipo.categoria.nombre,
+        "secundarias": [
+            categoria.nombre
+            for categoria in tipo.categorias_secundarias.all()
+        ],
+    })
+
+
+@exige_formularios_equipos_json
+@login_required
+@registrar_errores_vista("Error al consultar los datos del empleado")
+def datos_empleado(request):
+    """Unidad y tipo de personal del empleado, para sugerir la ubicacion.
+
+    Es una sugerencia, no una imposicion: la unidad dice a que equipo de
+    trabajo pertenece la persona, y el aparato puede estar en un punto de
+    atencion mas concreto. El formulario preselecciona y el usuario corrige.
+    """
+    empleado_id = (request.GET.get("empleado_id") or "").strip()
+
+    if not empleado_id.isdigit():
+        return JsonResponse({"error": "Debe indicar el empleado."}, status=400)
+
+    empleado = (
+        Empleado.objects
+        .select_related(
+            "personal_salud_empleado__servicio_unidad",
+            "personal_no_clinico__servicio_unidad",
+        )
+        .filter(pk=int(empleado_id))
+        .first()
+    )
+
+    if empleado is None:
+        return JsonResponse({"error": "Empleado no encontrado."}, status=404)
+
+    datos = resolver_datos_personal(empleado)
+
+    return JsonResponse({
+        "tipo_personal": datos.tipo_personal,
+        "unidad": datos.nombre_unidad,
+        "ubicacion_sugerida": (
+            datos.ubicacion_sugerida.pk if datos.ubicacion_sugerida else None
+        ),
+    })
 
 
 @exige_formularios_equipos_json

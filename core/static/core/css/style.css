@@ -6188,6 +6188,52 @@ a.equipos-submenu__opcion:hover {
    font-weight: 700;
 }
 
+/* Linea informativa bajo un campo: la categoria que trae el tipo, la unidad
+   del empleado o de donde sale el vencimiento calculado. Es un dato derivado,
+   no algo que el usuario deba llenar, y por eso se ve mas apagado. */
+.equipos-registro__ayuda {
+   color: var(--gris-texto, #6b7280);
+   font-size: 1.15rem;
+   margin: .3rem 0 0;
+}
+
+/* Grupos de casillas (colores del equipo, categorias secundarias). Se usan en
+   lugar de un select multiple porque en tablet no hay tecla Ctrl con la que
+   marcar varias opciones, y aqui cada opcion es un blanco tocable. */
+.equipos-registro__casillas {
+   display: flex;
+   flex-wrap: wrap;
+   gap: .4rem 1.4rem;
+   list-style: none;
+   margin: .2rem 0 0;
+   padding: 0;
+}
+
+.equipos-registro__casillas li {
+   align-items: center;
+   display: flex;
+   gap: .45rem;
+}
+
+.equipos-registro__casillas label {
+   font-size: 1.25rem;
+   font-weight: 500;
+   margin: 0;
+}
+
+.equipos-registro__casillas input[type="checkbox"] {
+   height: 1.6rem;
+   margin: 0;
+   width: 1.6rem;
+}
+
+/* Un vencimiento calculado se muestra, no se teclea: el gris avisa de que el
+   campo esta en modo lectura sin llegar a parecer deshabilitado. */
+.equipos-registro__campo .formularioCampo-date[readonly] {
+   background-color: var(--gris-claro, #f3f4f6);
+   cursor: default;
+}
+
 .equipos-registro__campo .formularioCampo-text,
 .equipos-registro__campo .formularioCampo-select,
 .equipos-registro__campo .formularioCampo-date {

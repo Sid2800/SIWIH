@@ -57,8 +57,9 @@ def _obtener_asignacion_actual(dispositivo):
     return dispositivo.asignaciones.filter(
         fecha_fin__isnull=True
     ).select_related(
-        "area_clinica__servicio",
-        "unidad_no_clinica",
+        "ubicacion__unidad_clinica__area_atencion__servicio",
+        "ubicacion__unidad_no_clinica",
+        "ubicacion_fisica",
         "responsable",
     ).first()
 def _obtener_baja_dispositivo(dispositivo):

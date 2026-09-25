@@ -5,12 +5,13 @@ from django.utils import timezone
 
 from core.constants.choices_constants import EstadoRegistro
 from core.validators.image_validator import validar_imagen_basica
+from expediente.models import ExpedienteUbicacion
 from rrhh.models import Empleado
-from servicio.models import Area_atencion, Unidad
 
 from .models import (
     AreaGestora,
     BajaDispositivo,
+    CategoriaEquipo,
     ColorDispositivo,
     CriticidadDispositivo,
     Dispositivo,
@@ -22,6 +23,7 @@ from .models import (
     TipoDispositivo,
     TipoProcedencia,
     TipoTecnologiaDispositivo,
+    UbicacionFisica,
     normalizar_inventario_bienes_nacionales,
     normalizar_inventario_numero_ficha,
     normalizar_nombre_catalogo,
@@ -132,6 +134,47 @@ class SelectRemoto(forms.Select):
 class EmpleadoChoiceField(forms.ModelChoiceField):
     def label_from_instance(self, empleado):
         return f"{empleado.dni} - {empleado.nombre_completo}"
+
+
+class IteradorUbicaciones(forms.models.ModelChoiceIterator):
+    """Separa el catalogo de ubicaciones en clinicas y no clinicas.
+
+    Son cuarenta y tantas opciones de dos naturalezas distintas. En una lista
+    corrida hay que leerlas todas para encontrar la propia; agrupadas, el
+    usuario salta directo a su mitad. El tipo ya viene en la fila, asi que no
+    hace falta consultar nada mas para armar los grupos.
+    """
+
+    def __iter__(self):
+        if self.field.empty_label is not None:
+            yield ("", self.field.empty_label)
+
+        clinicas = []
+        no_clinicas = []
+
+        for ubicacion in self.queryset:
+            destino = (
+                clinicas
+                if ubicacion.tipo == ExpedienteUbicacion.TIPO_CLINICA
+                else no_clinicas
+            )
+            destino.append(self.choice(ubicacion))
+
+        if clinicas:
+            yield ("Áreas clínicas", clinicas)
+
+        if no_clinicas:
+            yield ("Unidades no clínicas", no_clinicas)
+
+
+class UbicacionChoiceField(forms.ModelChoiceField):
+    iterator = IteradorUbicaciones
+
+    def label_from_instance(self, ubicacion):
+        # El catalogo antepone "[CLÍNICA]" a su nombre. Dentro de un grupo que
+        # ya se llama asi, el prefijo solo alarga cada linea.
+        texto = str(ubicacion)
+        return texto.split("] ", 1)[-1] if texto.startswith("[") else texto
 
 
 class BajaDispositivoForm(forms.ModelForm):
@@ -270,46 +313,47 @@ class ImagenDispositivoForm(forms.Form):
 class DispositivoCreateForm(forms.ModelForm):
     # Este mismo formulario se reutiliza para registrar y editar equipos.
     # Ademas de campos de Dispositivo, maneja la asignacion inicial/actual.
-    TIPO_AREA_CHOICES = [
-        ("clinica", "Área clínica"),
-        ("no_clinica", "Área no clínica"),
-    ]
     FRECUENCIA_CHOICES = [
         (1, "Mensual"),
         (3, "Trimestral"),
         (6, "Semestral"),
         (12, "Anual"),
     ]
+    # Duraciones que aparecen en los contratos reales. "Otra" deja escribir el
+    # vencimiento a mano para los casos que no encajan en meses redondos.
+    GARANTIA_CHOICES = [
+        ("", "Sin garantía"),
+        (6, "6 meses"),
+        (12, "1 año"),
+        (24, "2 años"),
+        (36, "3 años"),
+        (60, "5 años"),
+    ]
 
-    tipo_area = forms.ChoiceField(
-        choices=TIPO_AREA_CHOICES,
-        label="Tipo de área",
+    ubicacion = UbicacionChoiceField(
+        queryset=ExpedienteUbicacion.objects.none(),
+        label="Unidad o área",
         widget=forms.Select(
             attrs={
                 "class": "formularioCampo-select",
-                "id": "tipo_area_dispositivo",
+                "id": "ubicacion_dispositivo",
             }
         ),
     )
-    area_clinica = forms.ModelChoiceField(
-        queryset=Area_atencion.objects.none(),
+    # Texto libre con sugerencias: la zona se escribe la primera vez y queda
+    # en el catalogo con su identificador, asi la siguiente vez se elige de la
+    # lista en lugar de volver a teclearla.
+    ubicacion_fisica = forms.CharField(
         required=False,
-        label="Área clínica",
-        widget=forms.Select(
+        max_length=120,
+        label="Ubicación física",
+        widget=forms.TextInput(
             attrs={
-                "class": "formularioCampo-select",
-                "id": "area_clinica_dispositivo",
-            }
-        ),
-    )
-    unidad_no_clinica = forms.ModelChoiceField(
-        queryset=Unidad.objects.none(),
-        required=False,
-        label="Área no clínica",
-        widget=forms.Select(
-            attrs={
-                "class": "formularioCampo-select",
-                "id": "area_no_clinica_dispositivo",
+                "class": "formularioCampo-text",
+                "id": "ubicacion_fisica_dispositivo",
+                "list": "ubicaciones_fisicas_equipos",
+                "placeholder": "Ej. SALA 3 - CAMA 12",
+                "autocomplete": "off",
             }
         ),
     )
@@ -334,6 +378,22 @@ class DispositivoCreateForm(forms.ModelForm):
             attrs={
                 "class": "formularioCampo-select",
                 "id": "frecuencia_dispositivo",
+            }
+        ),
+    )
+    # La duracion se elige de una lista y el vencimiento lo calcula el modelo.
+    # Antes se pedia la fecha final y quien registraba tenia que contar anios
+    # de cabeza desde la factura, que es justo donde se equivocaba.
+    garantia_meses = forms.TypedChoiceField(
+        choices=GARANTIA_CHOICES,
+        coerce=int,
+        empty_value=None,
+        required=False,
+        label="Duración de la garantía",
+        widget=forms.Select(
+            attrs={
+                "class": "formularioCampo-select",
+                "id": "garantia_meses_dispositivo",
             }
         ),
     )
@@ -378,19 +438,21 @@ class DispositivoCreateForm(forms.ModelForm):
             "tipo_tecnologia",
             "marca",
             "modelo",
+            "colores",
             "area_gestora",
             "modalidad_procedencia",
             "procedencia",
             "numero_referencia",
-            "color",
-            "color_secundario",
             "numero_serie",
             "inventario_bienes_nacionales",
             "inventario_numero_ficha",
             "estado",
             "criticidad",
             "frecuencia_mantenimiento_meses",
+            "vida_util_anios",
             "fecha_instalacion",
+            "fecha_inicio_garantia",
+            "garantia_meses",
             "fecha_fin_garantia",
             "costo_adquisicion",
             "observaciones",
@@ -447,16 +509,12 @@ class DispositivoCreateForm(forms.ModelForm):
                     "placeholder": "Opcional",
                 }
             ),
-            "color": forms.Select(
+            # Casillas y no un multiple nativo: en un select multiple hay que
+            # saber que se marca con Ctrl, y en tablet no hay Ctrl.
+            "colores": forms.CheckboxSelectMultiple(
                 attrs={
-                    "class": "formularioCampo-select",
-                    "id": "color_dispositivo",
-                }
-            ),
-            "color_secundario": forms.Select(
-                attrs={
-                    "class": "formularioCampo-select",
-                    "id": "color_secundario_dispositivo",
+                    "class": "equipos-registro__casillas",
+                    "id": "colores_dispositivo",
                 }
             ),
             "numero_serie": forms.TextInput(
@@ -505,8 +563,17 @@ class DispositivoCreateForm(forms.ModelForm):
                 },
                 format="%Y-%m-%d",
             ),
-            # Se elige del calendario porque la garantia real es la fecha que
-            # dice el contrato, no siempre un numero redondo de anios.
+            "fecha_inicio_garantia": forms.DateInput(
+                attrs={
+                    "class": "formularioCampo-date",
+                    "id": "inicio_garantia_dispositivo",
+                    "type": "date",
+                },
+                format="%Y-%m-%d",
+            ),
+            # Solo se escribe cuando el contrato da una fecha suelta que no
+            # cuadra con meses redondos. Con inicio y duracion lo calcula el
+            # modelo y el campo se muestra de solo lectura.
             "fecha_fin_garantia": forms.DateInput(
                 attrs={
                     "class": "formularioCampo-date",
@@ -514,6 +581,16 @@ class DispositivoCreateForm(forms.ModelForm):
                     "type": "date",
                 },
                 format="%Y-%m-%d",
+            ),
+            "vida_util_anios": forms.NumberInput(
+                attrs={
+                    "class": "formularioCampo-text",
+                    "id": "vida_util_dispositivo",
+                    "min": "1",
+                    "max": "60",
+                    "inputmode": "numeric",
+                    "placeholder": "Opcional",
+                }
             ),
             # El widget lo define CostoLempirasField mas abajo; aqui no se
             # declara para no pisarlo.
@@ -539,21 +616,15 @@ class DispositivoCreateForm(forms.ModelForm):
 
         if self.asignacion_actual and not formulario_vinculado:
             initial = kwargs.get("initial", {}).copy()
-
-            if self.asignacion_actual.area_clinica_id:
-                initial.setdefault("tipo_area", "clinica")
-                initial.setdefault(
-                    "area_clinica",
-                    self.asignacion_actual.area_clinica_id,
-                )
-            elif self.asignacion_actual.unidad_no_clinica_id:
-                initial.setdefault("tipo_area", "no_clinica")
-                initial.setdefault(
-                    "unidad_no_clinica",
-                    self.asignacion_actual.unidad_no_clinica_id,
-                )
-
+            initial.setdefault("ubicacion", self.asignacion_actual.ubicacion_id)
             initial.setdefault("responsable", self.asignacion_actual.responsable_id)
+
+            if self.asignacion_actual.ubicacion_fisica_id:
+                initial.setdefault(
+                    "ubicacion_fisica",
+                    self.asignacion_actual.ubicacion_fisica.nombre,
+                )
+
             kwargs["initial"] = initial
 
         super().__init__(*args, **kwargs)
@@ -583,10 +654,13 @@ class DispositivoCreateForm(forms.ModelForm):
                 filtro_modelo |= Q(pk=self.instance.modelo_id)
             if self.instance.area_gestora_id:
                 filtro_area_gestora |= Q(pk=self.instance.area_gestora_id)
-            if self.instance.color_id:
-                filtro_color |= Q(pk=self.instance.color_id)
-            if self.instance.color_secundario_id:
-                filtro_color |= Q(pk=self.instance.color_secundario_id)
+            # Un color desactivado despues del registro sigue apareciendo en la
+            # edicion del equipo que lo usa, para no borrarlo sin querer.
+            colores_en_uso = list(
+                self.instance.colores.values_list("pk", flat=True)
+            )
+            if colores_en_uso:
+                filtro_color |= Q(pk__in=colores_en_uso)
             if self.instance.procedencia_id:
                 filtro_procedencia |= Q(pk=self.instance.procedencia_id)
 
@@ -650,29 +724,21 @@ class DispositivoCreateForm(forms.ModelForm):
             ("", "Seleccione la modalidad"),
             *ModalidadProcedencia.choices,
         ]
-        # Los dos colores salen del mismo catalogo y comparten filtro, asi que
-        # un color nuevo queda disponible para ambos sin tocar nada mas.
-        self.fields["color"].queryset = ColorDispositivo.objects.filter(filtro_color)
-        self.fields["color"].empty_label = "Sin especificar"
-        self.fields["color_secundario"].queryset = ColorDispositivo.objects.filter(
-            filtro_color
-        )
-        self.fields["color_secundario"].empty_label = "Sin color secundario"
         self.fields["tipo_tecnologia"].choices = [
             ("", "Seleccione el tipo de tecnología"),
             *TipoTecnologiaDispositivo.choices,
         ]
-        # Sin garantia se expresa dejando la fecha vacia, no con una opcion.
+        # Sin garantia se expresa dejando los tres campos vacios. Y no se
+        # limita el calendario: se registran equipos instalados hace anios,
+        # con garantia ya vencida, y saber cuando vencio sigue siendo util.
         self.fields["fecha_fin_garantia"].required = False
 
-        # El calendario del navegador no ofrece dias pasados al dar de alta.
-        # En edicion no se limita: la garantia del equipo puede haber vencido
-        # desde que se registro, y el navegador marcaria como invalido un
-        # valor que ya estaba guardado, impidiendo tocar cualquier otro campo.
-        if self.instance.pk is None:
-            self.fields["fecha_fin_garantia"].widget.attrs["min"] = (
-                timezone.localdate().isoformat()
-            )
+        # INDEFINIDO queda fuera: con una lista de colores, "no se sabe" se
+        # expresa no marcando ninguno.
+        self.fields["colores"].required = False
+        self.fields["colores"].queryset = ColorDispositivo.objects.filter(
+            filtro_color
+        ).exclude(nombre="INDEFINIDO")
         self.fields["estado"].choices = [
             (EstadoDispositivo.OPERATIVO, EstadoDispositivo.OPERATIVO.label),
             (
@@ -691,23 +757,25 @@ class DispositivoCreateForm(forms.ModelForm):
         self.fields["criticidad"].choices = [
             *CriticidadDispositivo.choices,
         ]
-        filtro_area_clinica = Q(estado=EstadoRegistro.ACTIVO)
-        filtro_unidad_no_clinica = Q(estado=EstadoRegistro.ACTIVO)
+        # El catalogo de ubicaciones es compartido: si una fila se desactiva,
+        # la que ya usa el equipo se conserva para poder editarlo igual.
+        filtro_ubicacion = Q(estado=True)
 
-        if self.asignacion_actual:
-            if self.asignacion_actual.area_clinica_id:
-                filtro_area_clinica |= Q(pk=self.asignacion_actual.area_clinica_id)
-            if self.asignacion_actual.unidad_no_clinica_id:
-                filtro_unidad_no_clinica |= Q(
-                    pk=self.asignacion_actual.unidad_no_clinica_id
-                )
+        if self.asignacion_actual and self.asignacion_actual.ubicacion_id:
+            filtro_ubicacion |= Q(pk=self.asignacion_actual.ubicacion_id)
 
-        self.fields["area_clinica"].queryset = Area_atencion.objects.filter(
-            filtro_area_clinica
-        ).select_related("servicio")
-        self.fields["unidad_no_clinica"].queryset = Unidad.objects.filter(
-            filtro_unidad_no_clinica
-        ).order_by("nombre_unidad")
+        self.fields["ubicacion"].queryset = (
+            ExpedienteUbicacion.objects
+            .filter(filtro_ubicacion)
+            .select_related(
+                "unidad_clinica__area_atencion__servicio",
+                "unidad_clinica__sala",
+                "unidad_clinica__servicio_aux",
+                "unidad_clinica__establecimiento_ext",
+                "unidad_no_clinica",
+            )
+            .order_by("tipo", "id")
+        )
 
         responsable_id = None
         if self.is_bound:
@@ -728,9 +796,12 @@ class DispositivoCreateForm(forms.ModelForm):
                 filtro_responsable
             )
 
-        self.fields["area_clinica"].empty_label = "Seleccione el área clínica"
-        self.fields["unidad_no_clinica"].empty_label = "Seleccione el área no clínica"
+        self.fields["ubicacion"].empty_label = "Seleccione la unidad o área"
         self.fields["responsable"].empty_label = "Buscar empleado a cargo"
+        # El navegador la usa como lista de sugerencias del campo de zona.
+        self.ubicaciones_fisicas = UbicacionFisica.objects.filter(
+            activo=True
+        ).values_list("nombre", flat=True)
 
     def _resolver_marca_en_juego(self):
         """Marca vigente para acotar los modelos disponibles.
@@ -748,31 +819,33 @@ class DispositivoCreateForm(forms.ModelForm):
         valor = self.initial.get("marca")
         return int(valor) if str(valor or "").isdigit() else None
 
-    def clean_fecha_fin_garantia(self):
-        """Una garantia no puede nacer vencida.
+    def clean_ubicacion_fisica(self):
+        """Convierte lo escrito en una fila del catalogo de zonas.
 
-        Se rechaza una fecha pasada solo cuando se esta poniendo o cambiando.
-        Si el equipo ya la tenia guardada y ha vencido con el tiempo, se deja
-        pasar: de lo contrario no se podria editar nada de un equipo con la
-        garantia caducada, que es justo cuando mas se le toca.
+        El campo se teclea, pero no se guarda como texto: se busca la zona por
+        nombre normalizado y, si no existe, se crea. Asi "sala 3" y "SALA 3"
+        acaban siendo la misma fila y el siguiente registro la elige de la
+        lista de sugerencias en lugar de volver a escribirla.
         """
-        fecha = self.cleaned_data.get("fecha_fin_garantia")
-
-        if fecha is None:
-            return fecha
-
-        sin_cambios = (
-            self.instance.pk is not None
-            and self.instance.fecha_fin_garantia == fecha
+        nombre = normalizar_nombre_catalogo(
+            self.cleaned_data.get("ubicacion_fisica")
         )
 
-        if not sin_cambios and fecha < timezone.localdate():
-            raise forms.ValidationError(
-                "La garantía no puede vencer antes de hoy. Si el equipo ya no "
-                "tiene garantía, deje la fecha vacía."
-            )
+        if not nombre:
+            return None
 
-        return fecha
+        zona, _ = UbicacionFisica.objects.get_or_create(
+            nombre=nombre,
+            defaults={"activo": True},
+        )
+
+        if not zona.activo:
+            # Reutilizar una zona desactivada es mas sano que crear un
+            # duplicado: el nombre es unico y ya existe.
+            zona.activo = True
+            zona.save(update_fields=["activo"])
+
+        return zona
 
     def clean_numero_serie(self):
         # Una cadena vacia se guarda como NULL para permitir varios equipos sin serie.
@@ -806,24 +879,35 @@ class DispositivoCreateForm(forms.ModelForm):
         )
 
     def clean(self):
-        # Valida la ubicacion segun el tipo de area seleccionado por el usuario.
-        # El modelo vuelve a proteger la regla exacta antes de guardar.
-        cleaned_data = super().clean()
-        tipo_area = cleaned_data.get("tipo_area")
-        area_clinica = cleaned_data.get("area_clinica")
-        unidad_no_clinica = cleaned_data.get("unidad_no_clinica")
+        """Revisa la garantia como conjunto, no campo por campo.
 
-        if tipo_area == "clinica":
-            if not area_clinica:
-                self.add_error("area_clinica", "Debe seleccionar un área clínica.")
-            cleaned_data["unidad_no_clinica"] = None
-        elif tipo_area == "no_clinica":
-            if not unidad_no_clinica:
-                self.add_error(
-                    "unidad_no_clinica",
-                    "Debe seleccionar un área no clínica.",
-                )
-            cleaned_data["area_clinica"] = None
+        Los tres campos solo tienen sentido juntos: la duracion necesita un
+        inicio para poder contarse, y el vencimiento se escribe a mano unica-
+        mente cuando no hay duracion que lo calcule. El modelo hace la cuenta
+        al guardar; aqui se avisa antes para que el usuario lo corrija.
+        """
+        cleaned_data = super().clean()
+        inicio = cleaned_data.get("fecha_inicio_garantia")
+        meses = cleaned_data.get("garantia_meses")
+        fin = cleaned_data.get("fecha_fin_garantia")
+
+        if meses and not inicio:
+            self.add_error(
+                "fecha_inicio_garantia",
+                "Indique desde cuándo corre la garantía para calcular su "
+                "vencimiento.",
+            )
+        elif inicio and not meses and not fin:
+            self.add_error(
+                "fecha_fin_garantia",
+                "Elija una duración o escriba la fecha de vencimiento.",
+            )
+
+        if inicio and fin and fin < inicio:
+            self.add_error(
+                "fecha_fin_garantia",
+                "El vencimiento no puede ser anterior al inicio de la garantía.",
+            )
 
         return cleaned_data
 
@@ -995,7 +1079,18 @@ class TipoCatalogoForm(forms.ModelForm):
 
     class Meta:
         model = TipoDispositivo
-        fields = ["nombre", "descripcion"]
+        fields = ["nombre", "categoria", "categorias_secundarias", "descripcion"]
+        labels = {
+            "categoria": "Categoría principal",
+            "categorias_secundarias": "También pertenece a",
+        }
+        help_texts = {
+            "categoria": "Define qué área da el mantenimiento.",
+            "categorias_secundarias": (
+                "Solo para equipos híbridos, como un ecógrafo con estación "
+                "de trabajo."
+            ),
+        }
         widgets = {
             "nombre": forms.TextInput(
                 attrs={
@@ -1003,6 +1098,18 @@ class TipoCatalogoForm(forms.ModelForm):
                     "id": "nombre_tipo_catalogo",
                     "placeholder": "Ej. MONITOR DE SIGNOS VITALES",
                     "maxlength": 100,
+                }
+            ),
+            "categoria": forms.Select(
+                attrs={
+                    "class": "formularioCampo-select",
+                    "id": "categoria_tipo_catalogo",
+                }
+            ),
+            "categorias_secundarias": forms.CheckboxSelectMultiple(
+                attrs={
+                    "class": "equipos-registro__casillas",
+                    "id": "categorias_secundarias_tipo_catalogo",
                 }
             ),
             "descripcion": forms.TextInput(
@@ -1014,6 +1121,42 @@ class TipoCatalogoForm(forms.ModelForm):
                 }
             ),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # Una categoria desactivada no se ofrece para clasificar tipos nuevos,
+        # pero se conserva en la edicion del tipo que ya la usa.
+        filtro = Q(activo=True)
+
+        if self.instance.pk and self.instance.categoria_id:
+            filtro |= Q(pk=self.instance.categoria_id)
+
+        activas = CategoriaEquipo.objects.filter(filtro)
+        self.fields["categoria"].queryset = activas
+        self.fields["categoria"].empty_label = "Seleccione la categoría"
+        self.fields["categorias_secundarias"].queryset = activas
+        self.fields["categorias_secundarias"].required = False
+
+    def clean(self):
+        """Una categoria secundaria repetida no aporta nada.
+
+        La principal ya clasifica el tipo; volver a marcarla como secundaria
+        solo produce una etiqueta duplicada en las pantallas y en los
+        reportes.
+        """
+        cleaned_data = super().clean()
+        principal = cleaned_data.get("categoria")
+        secundarias = cleaned_data.get("categorias_secundarias")
+
+        if principal and secundarias and principal in secundarias:
+            self.add_error(
+                "categorias_secundarias",
+                "La categoría principal ya está incluida; no hace falta "
+                "repetirla aquí.",
+            )
+
+        return cleaned_data
 
     def clean_nombre(self):
         # normalizar_nombre_catalogo recorta espacios y pasa a mayusculas, asi

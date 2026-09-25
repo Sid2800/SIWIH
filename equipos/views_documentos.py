@@ -26,8 +26,6 @@ def ficha_activo_fijo_pdf(request, dispositivo_id):
             "marca",
             "modelo",
             "area_gestora",
-            "color",
-            "color_secundario",
             "procedencia",
         ),
         pk=dispositivo_id,
@@ -84,7 +82,6 @@ def qr_dispositivo(request, dispositivo_id):
             "marca",
             "modelo",
             "area_gestora",
-            "color",
         ),
         pk=dispositivo_id,
     )

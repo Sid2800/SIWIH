@@ -46,14 +46,10 @@ class FichaActivoFijoPdfService:
 
     @classmethod
     def _colores(cls, dispositivo):
-        principal = cls._texto(dispositivo.color)
-        secundario = cls._texto(
-            dispositivo.color_secundario,
-            permitir_vacio=True,
-        )
-        if secundario:
-            return f"{principal} / {secundario}"
-        return principal
+        # La casilla del formato es una sola linea: los colores del equipo se
+        # imprimen separados por barra, en el orden del catalogo.
+        nombres = [color.nombre for color in dispositivo.colores.all()]
+        return " / ".join(nombres) if nombres else cls.INDEFINIDO
 
     @classmethod
     def _precio(cls, dispositivo):
@@ -67,8 +63,12 @@ class FichaActivoFijoPdfService:
 
         Se imprime el vencimiento REAL, ya ajustado con las pausas: es la
         fecha hasta la que se puede reclamar al proveedor, que es lo que
-        interesa a quien tenga el papel en la mano. La duracion se expresa en
-        meses porque las garantias reales no caen siempre en anios enteros.
+        interesa a quien tenga el papel en la mano.
+
+        La duracion sale del contrato cuando esta registrada. Si solo se
+        conoce la fecha final, se estima desde el inicio de la garantia o, en
+        su defecto, desde el registro del equipo, y la cuenta en meses es
+        aproximada: 30,44 dias es el promedio de un mes del calendario.
         """
         from .garantia_service import calcular_estado_garantia
 
@@ -77,17 +77,28 @@ class FichaActivoFijoPdfService:
         if not estado.tiene_garantia:
             return cls.INDEFINIDO, cls.INDEFINIDO
 
-        registro = dispositivo.fecha_creado
-        if registro is None:
-            return cls.INDEFINIDO, estado.fin_real.strftime("%d/%m/%Y")
+        vencimiento = estado.fin_real.strftime("%d/%m/%Y")
 
-        if timezone.is_aware(registro):
-            registro = timezone.localtime(registro)
+        if dispositivo.garantia_meses:
+            meses = dispositivo.garantia_meses
+            return f"{meses} mes{'es' if meses != 1 else ''}", vencimiento
 
-        meses = round((estado.fin_real - registro.date()).days / 30.44)
-        duracion = f"{meses} mes{'es' if meses != 1 else ''}"
+        desde = dispositivo.fecha_inicio_garantia
 
-        return duracion, estado.fin_real.strftime("%d/%m/%Y")
+        if desde is None:
+            registro = dispositivo.fecha_creado
+
+            if registro is None:
+                return cls.INDEFINIDO, vencimiento
+
+            if timezone.is_aware(registro):
+                registro = timezone.localtime(registro)
+
+            desde = registro.date()
+
+        meses = round((estado.fin_real - desde).days / 30.44)
+
+        return f"{meses} mes{'es' if meses != 1 else ''}", vencimiento
 
     @classmethod
     def _departamento(cls, asignacion):

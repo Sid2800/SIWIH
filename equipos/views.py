@@ -23,6 +23,8 @@ from .views_autocomplete import (
     buscar_modelos,
     buscar_procedencias,
     buscar_tipos,
+    categoria_tipo,
+    datos_empleado,
 )
 from .views_bajas import (
     ficha_baja_dispositivo_pdf,
@@ -84,6 +86,8 @@ __all__ = [
     "buscar_marcas",
     "buscar_modelos",
     "buscar_empleados",
+    "categoria_tipo",
+    "datos_empleado",
     # catalogos
     "catalogo_marcas_modelos",
     "agregar_marca_catalogo",

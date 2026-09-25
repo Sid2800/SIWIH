@@ -175,4 +175,17 @@ urlpatterns = [
         views.buscar_modelos,
         name='buscar_modelos_equipos'
     ),
+
+    # La categoria del tipo y la ficha del empleado se consultan al vuelo: el
+    # formulario las muestra para confirmar, no se las pide al usuario.
+    path(
+        'categoria-tipo/',
+        views.categoria_tipo,
+        name='categoria_tipo_equipos'
+    ),
+    path(
+        'datos-empleado/',
+        views.datos_empleado,
+        name='datos_empleado_equipos'
+    ),
 ]

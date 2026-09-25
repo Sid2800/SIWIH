@@ -2,6 +2,7 @@ from django.contrib import admin
 
 from .models import (
     AreaGestora,
+    CategoriaEquipo,
     AsignacionDispositivo,
     BajaDispositivo,
     ColorDispositivo,
@@ -11,16 +12,33 @@ from .models import (
     OrdenTrabajoBajaDispositivo,
     Procedencia,
     TipoDispositivo,
+    UbicacionFisica,
 )
 
 
 # Catalogos base del modulo. El admin queda como respaldo administrativo;
 # tipos, marcas, modelos y procedencias tambien tienen pantallas operativas.
-@admin.register(TipoDispositivo)
-class TipoDispositivoAdmin(admin.ModelAdmin):
-    list_display = ("nombre", "activo")
+@admin.register(CategoriaEquipo)
+class CategoriaEquipoAdmin(admin.ModelAdmin):
+    list_display = ("nombre", "descripcion", "activo")
     list_filter = ("activo",)
     search_fields = ("nombre",)
+
+
+@admin.register(UbicacionFisica)
+class UbicacionFisicaAdmin(admin.ModelAdmin):
+    list_display = ("nombre", "descripcion", "activo")
+    list_filter = ("activo",)
+    search_fields = ("nombre",)
+
+
+@admin.register(TipoDispositivo)
+class TipoDispositivoAdmin(admin.ModelAdmin):
+    list_display = ("nombre", "categoria", "activo")
+    list_filter = ("categoria", "activo")
+    search_fields = ("nombre", "categoria__nombre")
+    autocomplete_fields = ("categoria",)
+    filter_horizontal = ("categorias_secundarias",)
 
 
 @admin.register(MarcaDispositivo)
@@ -71,7 +89,6 @@ class DispositivoAdmin(admin.ModelAdmin):
         "area_gestora",
         "modalidad_procedencia",
         "procedencia",
-        "color",
         "numero_serie",
         "inventario_bienes_nacionales",
         "inventario_numero_ficha",
@@ -85,7 +102,7 @@ class DispositivoAdmin(admin.ModelAdmin):
         "area_gestora",
         "modalidad_procedencia",
         "procedencia",
-        "color",
+        "colores",
         "tipo_tecnologia",
         "estado",
         "criticidad",
@@ -97,7 +114,7 @@ class DispositivoAdmin(admin.ModelAdmin):
         "area_gestora__nombre",
         "procedencia__nombre",
         "numero_referencia",
-        "color__nombre",
+        "colores__nombre",
         "numero_serie",
         "inventario_bienes_nacionales",
         "inventario_numero_ficha",
@@ -108,7 +125,6 @@ class DispositivoAdmin(admin.ModelAdmin):
         "modelo",
         "area_gestora",
         "procedencia",
-        "color",
         "creado_por",
         "modificado_por",
     )
@@ -192,7 +208,7 @@ class AsignacionDispositivoAdmin(admin.ModelAdmin):
         "fecha_inicio",
         "fecha_fin",
     )
-    list_filter = ("fecha_fin", "area_clinica", "unidad_no_clinica")
+    list_filter = ("fecha_fin", "ubicacion", "ubicacion_fisica")
     search_fields = (
         "dispositivo__tipo__nombre",
         "dispositivo__marca__nombre",
@@ -206,8 +222,10 @@ class AsignacionDispositivoAdmin(admin.ModelAdmin):
     )
     autocomplete_fields = (
         "dispositivo",
-        "area_clinica",
-        "unidad_no_clinica",
+        # La ubicacion sale de un catalogo compartido de pocas decenas de
+        # filas: un desplegable normal basta y evita depender del admin de
+        # expediente, que no declara search_fields.
+        "ubicacion_fisica",
         "responsable",
         "creado_por",
         "modificado_por",
