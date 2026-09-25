@@ -118,9 +118,9 @@ def registrar_dispositivo(request):
                 dispositivo.creado_por = request.user
                 dispositivo.modificado_por = request.user
                 dispositivo.save()
-                # Los colores son una relacion aparte y commit=False no los
-                # guarda: sin esta llamada el equipo quedaria sin ninguno.
-                form.save_m2m()
+                # Los colores van en su propia tabla y con su orden, asi que
+                # no los guarda ni form.save_m2m(): se escriben aparte.
+                dispositivo.definir_colores(form.cleaned_data["colores"])
 
                 _crear_asignacion_dispositivo(
                     dispositivo,
@@ -272,7 +272,7 @@ def _obtener_dispositivos_base():
         "modelo",
         "area_gestora",
         "procedencia",
-    ).prefetch_related("colores", _prefetch_asignacion_activa())
+    ).prefetch_related("colores_asignados__color", _prefetch_asignacion_activa())
 
 
 def _aplicar_busqueda_dispositivos(dispositivos, consulta):
@@ -471,7 +471,7 @@ def detalle_dispositivo(request, dispositivo_id):
             "tipo__categoria",
             "baja__registrado_por",
             "orden_trabajo_baja__creado_por",
-        ).prefetch_related("colores", "tipo__categorias_secundarias"),
+        ).prefetch_related("colores_asignados__color", "tipo__categorias_secundarias"),
         pk=dispositivo_id,
     )
 
@@ -533,7 +533,7 @@ def editar_dispositivo(request, dispositivo_id):
             "modelo",
             "area_gestora",
             "procedencia",
-        ).prefetch_related("colores"),
+        ).prefetch_related("colores_asignados__color"),
         pk=dispositivo_id,
     )
 
@@ -560,7 +560,7 @@ def editar_dispositivo(request, dispositivo_id):
             dispositivo = form.save(commit=False)
             dispositivo.modificado_por = request.user
             dispositivo.save()
-            form.save_m2m()
+            dispositivo.definir_colores(form.cleaned_data["colores"])
 
             _actualizar_asignacion_dispositivo(
                 dispositivo,

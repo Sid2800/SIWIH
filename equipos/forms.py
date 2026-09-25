@@ -167,6 +167,51 @@ class IteradorUbicaciones(forms.models.ModelChoiceIterator):
             yield ("Unidades no clínicas", no_clinicas)
 
 
+class ColoresOrdenadosField(forms.CharField):
+    """Recibe los colores del equipo en el orden en que se agregaron.
+
+    Llega como una lista de identificadores separados por coma ("7,3,12") que
+    arma el navegador conforme el usuario los va agregando de uno en uno. No
+    se usa un multiple de Django porque esos devuelven el orden del catalogo,
+    y aqui el orden es justamente el dato: el primero es el principal.
+    """
+
+    def to_python(self, valor):
+        texto = (valor or "").strip()
+
+        if not texto:
+            return []
+
+        identificadores = []
+
+        for parte in texto.split(","):
+            parte = parte.strip()
+
+            if not parte:
+                continue
+
+            if not parte.isdigit():
+                raise forms.ValidationError("La lista de colores no es válida.")
+
+            numero = int(parte)
+
+            # Un color repetido no aporta nada y romperia la unicidad de la
+            # tabla intermedia. Se descarta la repeticion, no la seleccion.
+            if numero not in identificadores:
+                identificadores.append(numero)
+
+        catalogo = ColorDispositivo.objects.in_bulk(identificadores)
+
+        if len(catalogo) != len(identificadores):
+            raise forms.ValidationError(
+                "Alguno de los colores elegidos ya no existe."
+            )
+
+        # in_bulk devuelve un diccionario sin orden util: se recorre la lista
+        # original para conservar el que eligio el usuario.
+        return [catalogo[numero] for numero in identificadores]
+
+
 class UbicacionChoiceField(forms.ModelChoiceField):
     iterator = IteradorUbicaciones
 
@@ -340,6 +385,16 @@ class DispositivoCreateForm(forms.ModelForm):
             }
         ),
     )
+    # El navegador mantiene aqui la lista en el orden en que el usuario fue
+    # agregando los colores. El campo va oculto: lo que se ve es el selector y
+    # la lista, igual que al capturar diagnosticos.
+    colores = ColoresOrdenadosField(
+        required=False,
+        label="Colores",
+        widget=forms.HiddenInput(
+            attrs={"id": "colores_dispositivo"},
+        ),
+    )
     # Texto libre con sugerencias: la zona se escribe la primera vez y queda
     # en el catalogo con su identificador, asi la siguiente vez se elige de la
     # lista en lugar de volver a teclearla.
@@ -438,7 +493,6 @@ class DispositivoCreateForm(forms.ModelForm):
             "tipo_tecnologia",
             "marca",
             "modelo",
-            "colores",
             "area_gestora",
             "modalidad_procedencia",
             "procedencia",
@@ -507,14 +561,6 @@ class DispositivoCreateForm(forms.ModelForm):
                     "class": "formularioCampo-text",
                     "id": "numero_referencia_dispositivo",
                     "placeholder": "Opcional",
-                }
-            ),
-            # Casillas y no un multiple nativo: en un select multiple hay que
-            # saber que se marca con Ctrl, y en tablet no hay Ctrl.
-            "colores": forms.CheckboxSelectMultiple(
-                attrs={
-                    "class": "equipos-registro__casillas",
-                    "id": "colores_dispositivo",
                 }
             ),
             "numero_serie": forms.TextInput(
@@ -733,12 +779,13 @@ class DispositivoCreateForm(forms.ModelForm):
         # con garantia ya vencida, y saber cuando vencio sigue siendo util.
         self.fields["fecha_fin_garantia"].required = False
 
-        # INDEFINIDO queda fuera: con una lista de colores, "no se sabe" se
-        # expresa no marcando ninguno.
-        self.fields["colores"].required = False
-        self.fields["colores"].queryset = ColorDispositivo.objects.filter(
+        # Opciones del selector de colores y lista ya elegida. INDEFINIDO
+        # queda fuera: con una lista, "no se sabe" se expresa no agregando
+        # ninguno.
+        self.colores_disponibles = ColorDispositivo.objects.filter(
             filtro_color
         ).exclude(nombre="INDEFINIDO")
+        self.colores_elegidos = self._resolver_colores_elegidos()
         self.fields["estado"].choices = [
             (EstadoDispositivo.OPERATIVO, EstadoDispositivo.OPERATIVO.label),
             (
@@ -802,6 +849,26 @@ class DispositivoCreateForm(forms.ModelForm):
         self.ubicaciones_fisicas = UbicacionFisica.objects.filter(
             activo=True
         ).values_list("nombre", flat=True)
+
+    def _resolver_colores_elegidos(self):
+        """Colores que el navegador debe pintar ya en la lista, en su orden.
+
+        En un envio con errores manda lo que venia en el POST, para no perder
+        lo que el usuario habia agregado. Al abrir la edicion, los del equipo
+        guardado.
+        """
+        if self.is_bound:
+            campo = self.fields["colores"]
+
+            try:
+                return campo.clean(self.data.get(self.add_prefix("colores")))
+            except forms.ValidationError:
+                return []
+
+        if self.instance and self.instance.pk:
+            return self.instance.colores_ordenados
+
+        return []
 
     def _resolver_marca_en_juego(self):
         """Marca vigente para acotar los modelos disponibles.

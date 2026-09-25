@@ -248,11 +248,12 @@
                 <div><dt>Marca</dt><dd>{{ dispositivo.marca|default:"INDEFINIDO" }}</dd></div>
                 <div><dt>Modelo</dt><dd>{{ dispositivo.modelo|default:"INDEFINIDO" }}</dd></div>
                 <div><dt>Area gestora</dt><dd>{{ dispositivo.area_gestora|default:"INDEFINIDO" }}</dd></div>
+                {# En orden: el primero es el principal, los demas lo acompanan. #}
                 <div>
                     <dt>Colores</dt>
                     <dd>
-                        {% for color in dispositivo.colores.all %}
-                            {{ color }}{% if not forloop.last %} / {% endif %}
+                        {% for fila in dispositivo.colores_asignados.all %}
+                            {{ fila.color }}{% if fila.es_principal %} (principal){% endif %}{% if not forloop.last %} / {% endif %}
                         {% empty %}
                             NO INDICADO
                         {% endfor %}

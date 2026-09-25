@@ -6197,7 +6197,100 @@ a.equipos-submenu__opcion:hover {
    margin: .3rem 0 0;
 }
 
-/* Grupos de casillas (colores del equipo, categorias secundarias). Se usan en
+/* Colores del equipo: selector, boton y lista numerada. Se agregan de uno en
+   uno como los diagnosticos, y el orden se ve porque es informacion: el
+   primero es el color con el que se reconoce el aparato. */
+.equipos-colores {
+   display: flex;
+   flex-direction: column;
+   gap: .5rem;
+   margin-top: .2rem;
+}
+
+.equipos-colores__agregar {
+   display: flex;
+   gap: .5rem;
+}
+
+.equipos-colores__agregar select {
+   flex: 1;
+   min-width: 0;
+}
+
+.equipos-colores__boton {
+   align-items: center;
+   background-color: var(--verde-oscuro, #0f766e);
+   border: none;
+   border-radius: .4rem;
+   color: #fff;
+   cursor: pointer;
+   display: flex;
+   font-size: 1.25rem;
+   gap: .35rem;
+   padding: 0 1rem;
+   white-space: nowrap;
+}
+
+.equipos-colores__boton:hover {
+   filter: brightness(1.1);
+}
+
+.equipos-colores__lista {
+   display: flex;
+   flex-direction: column;
+   gap: .35rem;
+   list-style: none;
+   margin: 0;
+   padding: 0;
+}
+
+.equipos-colores__item {
+   align-items: center;
+   background-color: var(--gris-claro, #f3f4f6);
+   border-radius: .4rem;
+   display: flex;
+   gap: .6rem;
+   padding: .4rem .6rem;
+}
+
+.equipos-colores__orden {
+   align-items: center;
+   background-color: var(--verde-oscuro, #0f766e);
+   border-radius: 50%;
+   color: #fff;
+   display: flex;
+   flex: 0 0 auto;
+   font-size: 1.1rem;
+   height: 2rem;
+   justify-content: center;
+   width: 2rem;
+}
+
+.equipos-colores__nombre {
+   flex: 1;
+   font-size: 1.3rem;
+}
+
+.equipos-colores__etiqueta {
+   background-color: var(--verde-oscuro, #0f766e);
+   border-radius: .3rem;
+   color: #fff;
+   font-size: 1rem;
+   padding: .15rem .45rem;
+   text-transform: uppercase;
+}
+
+.equipos-colores__quitar {
+   background: none;
+   border: none;
+   color: var(--rojo, #b91c1c);
+   cursor: pointer;
+   font-size: 1.2rem;
+   line-height: 1;
+   padding: .25rem;
+}
+
+/* Grupos de casillas (categorias secundarias del tipo de equipo). Se usan en
    lugar de un select multiple porque en tablet no hay tecla Ctrl con la que
    marcar varias opciones, y aqui cada opcion es un blanco tocable. */
 .equipos-registro__casillas {

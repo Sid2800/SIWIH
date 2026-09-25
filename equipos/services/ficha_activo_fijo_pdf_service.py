@@ -46,9 +46,10 @@ class FichaActivoFijoPdfService:
 
     @classmethod
     def _colores(cls, dispositivo):
-        # La casilla del formato es una sola linea: los colores del equipo se
-        # imprimen separados por barra, en el orden del catalogo.
-        nombres = [color.nombre for color in dispositivo.colores.all()]
+        # La casilla del formato es una sola linea: los colores se imprimen
+        # separados por barra y en el orden en que se registraron, con el
+        # principal primero.
+        nombres = [color.nombre for color in dispositivo.colores_ordenados]
         return " / ".join(nombres) if nombres else cls.INDEFINIDO
 
     @classmethod

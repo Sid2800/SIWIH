@@ -86,12 +86,55 @@
                     {{ form.modelo.errors }}
                 </div>
                 {% comment %}
-                   Los colores son una lista: un equipo puede ser blanco con
-                   gris y azul, y no hay que elegir cual es "el principal".
+                   Los colores se agregan de uno en uno, como los
+                   diagnosticos: el primero es el principal y los siguientes
+                   lo acompanan. El campo real es el oculto; lo que se ve es
+                   el selector, el boton y la lista que arma coloresEquipo.js.
                 {% endcomment %}
                 <div class="equipos-registro__campo equipos-registro__campo--completo">
-                    <label for="colores_dispositivo">Colores</label>
+                    <label for="selector_color_dispositivo">Colores</label>
                     {{ form.colores }}
+
+                    <div class="equipos-colores" id="colores_equipo">
+                        <div class="equipos-colores__agregar">
+                            <select class="formularioCampo-select"
+                                    id="selector_color_dispositivo">
+                                <option value="">Seleccione un color</option>
+                                {% for color in form.colores_disponibles %}
+                                    <option value="{{ color.pk }}">{{ color.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                            <button class="equipos-colores__boton"
+                                    id="agregar_color_dispositivo"
+                                    type="button">
+                                <i class="bi bi-plus-lg"></i>
+                                Agregar
+                            </button>
+                        </div>
+
+                        <ol class="equipos-colores__lista" id="lista_colores_dispositivo">
+                            {% for color in form.colores_elegidos %}
+                                <li class="equipos-colores__item" data-color-id="{{ color.pk }}">
+                                    <span class="equipos-colores__orden">{{ forloop.counter }}</span>
+                                    <span class="equipos-colores__nombre">{{ color.nombre }}</span>
+                                    {% if forloop.first %}
+                                        <span class="equipos-colores__etiqueta">Principal</span>
+                                    {% endif %}
+                                    <button class="equipos-colores__quitar"
+                                            type="button"
+                                            aria-label="Quitar {{ color.nombre }}">
+                                        <i class="bi bi-x-lg"></i>
+                                    </button>
+                                </li>
+                            {% endfor %}
+                        </ol>
+
+                        <p class="equipos-registro__ayuda equipos-colores__vacio"
+                           id="sin_colores_dispositivo"
+                           {% if form.colores_elegidos %}hidden{% endif %}>
+                            Sin colores. El primero que agregue será el principal.
+                        </p>
+                    </div>
                     {{ form.colores.errors }}
                 </div>
             </div>
@@ -525,4 +568,5 @@
 
 {% block media_js %}
 <script src="{% static 'core/scripts/equipos/registroEquipo.js' %}"></script>
+<script src="{% static 'core/scripts/equipos/coloresEquipo.js' %}"></script>
 {% endblock media_js %}

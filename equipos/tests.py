@@ -16,7 +16,7 @@ from django.test import TestCase
 from expediente.models import ExpedienteUbicacion
 from servicio.models import Unidad
 
-from .forms import TipoCatalogoForm
+from .forms import ColoresOrdenadosField, TipoCatalogoForm
 from .models import (
     TipoTecnologiaDispositivo,
     AreaGestora,
@@ -221,30 +221,94 @@ class UbicacionAsignacionTests(TestCase):
 
 
 class ColoresEquipoTests(TestCase):
-    """Los colores son una lista abierta, no un principal y un secundario."""
+    """Lista ordenada: el primero es el principal y los demas lo acompanan."""
 
-    def test_un_equipo_admite_varios_colores(self):
-        usuario = User.objects.create_user("tecnico", password="x")
-        categoria = CategoriaEquipo.objects.get(nombre="MOBILIARIO CLINICO")
-        tipo = TipoDispositivo.objects.create(
+    @classmethod
+    def setUpTestData(cls):
+        cls.usuario = User.objects.create_user("tecnico", password="x")
+        cls.tipo = TipoDispositivo.objects.create(
             nombre="CAMILLA",
-            categoria=categoria,
+            categoria=CategoriaEquipo.objects.get(nombre="MOBILIARIO CLINICO"),
         )
-        equipo = Dispositivo.objects.create(
-            tipo=tipo,
+        cls.procedencia = Procedencia.objects.create(
+            nombre="DONANTE",
+            tipo=TipoProcedencia.PERSONA,
+        )
+
+    def _crear_equipo(self):
+        return Dispositivo.objects.create(
+            tipo=self.tipo,
             tipo_tecnologia=TipoTecnologiaDispositivo.NO_ELECTRONICO,
             area_gestora=AreaGestora.objects.get(nombre="ANALOGICA"),
             modalidad_procedencia=ModalidadProcedencia.DONACION,
-            procedencia=Procedencia.objects.create(
-                nombre="DONANTE",
-                tipo=TipoProcedencia.PERSONA,
-            ),
-            creado_por=usuario,
-            modificado_por=usuario,
+            procedencia=self.procedencia,
+            creado_por=self.usuario,
+            modificado_por=self.usuario,
         )
 
+    def test_se_conserva_el_orden_en_que_se_agregaron(self):
+        equipo = self._crear_equipo()
         # El catalogo de colores ya viene sembrado por la migracion 0014.
-        colores = list(ColorDispositivo.objects.exclude(nombre="INDEFINIDO")[:3])
-        equipo.colores.set(colores)
+        por_nombre = {
+            color.nombre: color
+            for color in ColorDispositivo.objects.filter(
+                nombre__in=["BLANCO", "GRIS", "AZUL"]
+            )
+        }
 
-        self.assertEqual(equipo.colores.count(), 3)
+        # Se agregan en un orden distinto al alfabetico a proposito: lo que
+        # manda es el orden en que los eligio el usuario.
+        equipo.definir_colores([
+            por_nombre["GRIS"],
+            por_nombre["AZUL"],
+            por_nombre["BLANCO"],
+        ])
+
+        self.assertEqual(
+            [color.nombre for color in equipo.colores_ordenados],
+            ["GRIS", "AZUL", "BLANCO"],
+        )
+        self.assertEqual(equipo.color_principal.nombre, "GRIS")
+
+    def test_redefinir_los_colores_reemplaza_la_lista(self):
+        equipo = self._crear_equipo()
+        colores = list(ColorDispositivo.objects.exclude(nombre="INDEFINIDO")[:3])
+
+        equipo.definir_colores(colores)
+        equipo.definir_colores([colores[2]])
+
+        self.assertEqual(equipo.colores.count(), 1)
+        self.assertEqual(equipo.color_principal, colores[2])
+
+    def test_sin_colores_no_hay_principal(self):
+        equipo = self._crear_equipo()
+
+        self.assertIsNone(equipo.color_principal)
+        self.assertEqual(equipo.colores_ordenados, [])
+
+
+class ColoresOrdenadosFieldTests(TestCase):
+    """El campo recibe los identificadores en el orden del navegador."""
+
+    def test_conserva_el_orden_recibido_y_descarta_repetidos(self):
+        campo = ColoresOrdenadosField(required=False)
+        colores = list(ColorDispositivo.objects.exclude(nombre="INDEFINIDO")[:3])
+        primero, segundo, tercero = colores
+
+        entrada = f"{tercero.pk},{primero.pk},{tercero.pk},{segundo.pk}"
+
+        self.assertEqual(
+            campo.clean(entrada),
+            [tercero, primero, segundo],
+        )
+
+    def test_vacio_devuelve_lista_vacia(self):
+        campo = ColoresOrdenadosField(required=False)
+
+        self.assertEqual(campo.clean(""), [])
+
+    def test_rechaza_un_color_inexistente(self):
+        campo = ColoresOrdenadosField(required=False)
+
+        with self.assertRaises(ValidationError):
+            campo.clean("999999")

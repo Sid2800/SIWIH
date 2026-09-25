@@ -483,15 +483,16 @@ class Dispositivo(models.Model):
         related_name="dispositivos",
     )
     numero_referencia = models.CharField(max_length=100, null=True, blank=True)
-    # Lista abierta en lugar de principal y secundario: un equipo puede ser
-    # blanco con gris y azul, y decidir cual de los tres es "el principal" era
-    # una pregunta sin respuesta que ademas limitaba a dos. Sin colores
-    # tampoco es un hueco: hay equipos que nadie describe por color.
+    # Lista ordenada, no un principal y un secundario sueltos: los colores se
+    # agregan de uno en uno y el orden es el dato. El primero es el principal
+    # (el que se ve al mirar el aparato) y los siguientes son secundarios, sin
+    # tope de dos. Sin colores tampoco es un hueco: hay equipos que nadie
+    # describe por color.
     colores = models.ManyToManyField(
         ColorDispositivo,
+        through="DispositivoColor",
         blank=True,
         related_name="dispositivos",
-        db_table="equipo_dispositivo_color",
         verbose_name="Colores",
     )
     numero_serie = models.CharField(max_length=100, unique=True, null=True, blank=True)
@@ -650,6 +651,31 @@ class Dispositivo(models.Model):
         return "SIN TIPO"
 
     @property
+    def color_principal(self):
+        """El primero de la lista: el color con el que se reconoce el equipo."""
+        primero = self.colores_asignados.first()
+        return primero.color if primero else None
+
+    @property
+    def colores_ordenados(self):
+        """Colores en el orden en que se agregaron, principal primero."""
+        return [fila.color for fila in self.colores_asignados.all()]
+
+    def definir_colores(self, colores):
+        """Reescribe la lista completa respetando el orden recibido.
+
+        Se borra y se vuelve a insertar en lugar de comparar fila por fila:
+        son tres o cuatro colores, y cualquier cambio (agregar, quitar o
+        mover) altera la numeracion de los demas de todos modos.
+        """
+        self.colores_asignados.all().delete()
+
+        DispositivoColor.objects.bulk_create([
+            DispositivoColor(dispositivo=self, color=color, orden=posicion)
+            for posicion, color in enumerate(colores, start=1)
+        ])
+
+    @property
     def costo_formateado(self):
         # Honduras escribe el dinero con coma para los miles y punto para los
         # decimales: L 1,234.56. Django, con LANGUAGE_CODE = "es", localiza al
@@ -778,6 +804,60 @@ class Dispositivo(models.Model):
 
     def __str__(self):
         return f"{self.codigo} - {self.nombre}"
+
+
+class DispositivoColor(models.Model):
+    """Un color del equipo y el lugar que ocupa en la lista.
+
+    Existe como tabla propia y no como una relacion simple porque el orden es
+    informacion: el primero es el color con el que se reconoce el aparato y
+    los demas lo acompanan. Sin esta columna la base devolveria los colores en
+    el orden que quisiera y "blanco con gris" podria mostrarse como "gris con
+    blanco" de una pantalla a otra.
+    """
+
+    dispositivo = models.ForeignKey(
+        Dispositivo,
+        on_delete=models.CASCADE,
+        related_name="colores_asignados",
+    )
+    color = models.ForeignKey(
+        ColorDispositivo,
+        on_delete=models.PROTECT,
+        related_name="dispositivos_asignados",
+    )
+    # 1 es el principal. Se numera desde uno y no desde cero porque este valor
+    # se muestra en pantalla.
+    orden = models.PositiveSmallIntegerField(
+        validators=[MinValueValidator(1)],
+    )
+
+    class Meta:
+        db_table = "equipo_dispositivo_color"
+        verbose_name = "Color del equipo"
+        verbose_name_plural = "Colores del equipo"
+        ordering = ["orden"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["dispositivo", "color"],
+                name="equipo_disp_color_sin_repetir",
+            ),
+            models.UniqueConstraint(
+                fields=["dispositivo", "orden"],
+                name="equipo_disp_color_orden_unico",
+            ),
+            models.CheckConstraint(
+                condition=Q(orden__gt=0),
+                name="equipo_disp_color_orden_positivo",
+            ),
+        ]
+
+    @property
+    def es_principal(self):
+        return self.orden == 1
+
+    def __str__(self):
+        return f"{self.dispositivo.codigo} - {self.color} ({self.orden})"
 
 
 class OrdenTrabajoBajaDispositivo(models.Model):
