@@ -6028,14 +6028,15 @@ a.equipos-submenu__opcion:hover {
 
 /* Vista de registro de dispositivos equipos */
 
+/* Una seccion por fila, a lo ancho. En dos columnas, una seccion corta al
+   lado de una larga dejaba un hueco del alto de la diferencia -en la pantalla
+   de edicion, media pagina-, porque las secciones no tienen por que medir lo
+   mismo. Aqui el ancho se aprovecha repartiendo los campos dentro de cada
+   seccion, no poniendo secciones en paralelo. */
 .equipos-registro {
-   /* align-items: start evita que las tarjetas de una misma fila se estiren a
-      la altura de la mas alta. Sin esto, una seccion de 2 campos junto a otra
-      de 4 quedaba con la mitad inferior vacia. */
-   align-items: start;
    display: grid;
    gap: .9rem;
-   grid-template-columns: repeat(2, minmax(0, 1fr));
+   grid-template-columns: 1fr;
 }
 
 .equipos-registro__errores--general {
@@ -6153,6 +6154,15 @@ a.equipos-submenu__opcion:hover {
 
 .equipos-registro__campos--dos {
    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* Dentro de una seccion a lo ancho, los campos se reparten solos: dos en
+   tablet y tres o cuatro en un monitor. Las 24rem son lo que necesita el
+   selector de empleado para mostrar "1006199801227 - NOMBRE APELLIDO" sin
+   cortarlo, que es el campo mas largo del formulario. */
+.equipos-registro__seccion .equipos-registro__campos--dos,
+.equipos-registro__opcionales-cuerpo .equipos-registro__campos--dos {
+   grid-template-columns: repeat(auto-fit, minmax(min(24rem, 100%), 1fr));
 }
 
 .equipos-registro__campo {
@@ -6552,12 +6562,6 @@ a.equipos-submenu__opcion:hover {
    background-color: var(--blanco);
    border: .1rem solid var(--colorTablaceldaBorde);
    color: var(--negro);
-}
-
-@media (max-width: 1100px) {
-   .equipos-registro {
-      grid-template-columns: 1fr;
-   }
 }
 
 @media (max-width: 650px) {
@@ -8522,15 +8526,26 @@ button.equipos-imagenes__vista:hover img {
       align-items: stretch;
    }
 
-   .equipos-catalogo__panel {
-      min-height: 52rem;
+   /* El alto se calcula contra la ventana, no fijo: descontando la cabecera
+      de la pagina y el respiro de abajo, los paneles llegan hasta el borde
+      inferior en cualquier monitor. El minimo cubre las ventanas bajas. */
+   .equipos-catalogo {
+      min-height: max(52rem, calc(100vh - 21rem));
    }
 
-   /* La altura minima existe para igualar los tres pasos. En una pantalla de
+   .equipos-catalogo__panel {
+      height: 100%;
+   }
+
+   /* El alto calculado existe para igualar los tres pasos. En una pantalla de
       un solo panel, como procedencias, solo dejaria hueco muerto debajo de
       la lista. */
+   .equipos-catalogo--unico {
+      min-height: 0;
+   }
+
    .equipos-catalogo--unico .equipos-catalogo__panel {
-      min-height: auto;
+      height: auto;
    }
 
    .equipos-catalogo__lista {
