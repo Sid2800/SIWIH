@@ -8864,3 +8864,318 @@ p + .equipos-garantia__bloqueo {
 .equipos-catalogo__lista--fichas .equipos-catalogo__item--inactivo {
    opacity: .7;
 }
+
+/* ---------------------------------------------------------------------
+   Procedencias de equipos
+   Formulario a la izquierda y las ya registradas a la derecha, en PC. La
+   tarjeta lleva solo el nombre: los siete datos de una procedencia no caben
+   en una tarjeta legible y tampoco se consultan a diario, asi que un clic los
+   abre en un cuadro y el doble clic lleva a editar.
+   --------------------------------------------------------------------- */
+.equipos-procedencias {
+   align-items: start;
+   display: grid;
+   gap: 1.2rem;
+   grid-template-columns: 1fr;
+}
+
+.equipos-procedencias__conteo {
+   background-color: var(--negro);
+   border-radius: 2rem;
+   color: #fff;
+   font-size: 1.3rem;
+   padding: .1rem .8rem;
+}
+
+.equipos-procedencias__acciones {
+   align-items: center;
+   display: flex;
+   flex-wrap: wrap;
+   gap: 1.2rem;
+}
+
+.equipos-procedencias__tarjetas {
+   display: grid;
+   gap: .8rem;
+   grid-template-columns: repeat(auto-fill, minmax(min(24rem, 100%), 1fr));
+   list-style: none;
+   margin: 0;
+   padding: 0;
+}
+
+/* La tarjeta es un boton, no un enlace: su accion depende de si el clic es
+   simple o doble, y un enlace navegaria antes de poder distinguirlo. */
+.equipos-procedencias__tarjeta {
+   background-color: var(--blanco);
+   border: .1rem solid var(--colorLinea);
+   border-radius: 1rem;
+   cursor: pointer;
+   display: flex;
+   flex-direction: column;
+   gap: .3rem;
+   /* Alto comodo para el dedo en tablet, que es donde se consulta de pie. */
+   min-height: 6rem;
+   justify-content: center;
+   padding: 1.2rem 1.4rem;
+   text-align: left;
+   transition: border-color .15s ease, box-shadow .15s ease;
+   width: 100%;
+}
+
+.equipos-procedencias__tarjeta:hover,
+.equipos-procedencias__tarjeta:focus-visible {
+   border-color: var(--colorBoton);
+   box-shadow: 0 .2rem .8rem rgba(0, 0, 0, .08);
+}
+
+.equipos-procedencias__tarjeta--activa {
+   border-color: var(--colorBoton);
+   box-shadow: 0 0 0 .2rem var(--colorBoton);
+}
+
+.equipos-procedencias__tarjeta--inactiva {
+   opacity: .7;
+}
+
+.equipos-procedencias__nombre {
+   color: var(--negro);
+   font-size: 1.6rem;
+   font-weight: 700;
+   line-height: 1.3;
+   overflow-wrap: anywhere;
+}
+
+.equipos-procedencias__inactiva {
+   color: var(--colorTextoMenu);
+   font-size: 1.2rem;
+   text-transform: uppercase;
+}
+
+/* --- Cuadro de detalle --- */
+.equipos-procedencias__dialogo {
+   background-color: var(--blanco);
+   border: none;
+   border-radius: 1.2rem;
+   color: var(--negro);
+   max-height: 90vh;
+   max-width: min(52rem, 92vw);
+   padding: 0;
+   width: 100%;
+}
+
+.equipos-procedencias__dialogo::backdrop {
+   background-color: rgba(0, 0, 0, .45);
+}
+
+.equipos-procedencias__dialogo > header {
+   align-items: flex-start;
+   border-bottom: .1rem solid var(--colorLinea);
+   display: flex;
+   gap: 1rem;
+   justify-content: space-between;
+   padding: 1.4rem 1.6rem;
+}
+
+.equipos-procedencias__dialogo > header h3 {
+   font-size: 1.8rem;
+   margin: 0;
+   overflow-wrap: anywhere;
+}
+
+.equipos-procedencias__cerrar {
+   background: none;
+   border: none;
+   color: var(--colorTextoMenu);
+   cursor: pointer;
+   font-size: 1.6rem;
+   line-height: 1;
+   min-height: 4rem;
+   min-width: 4rem;
+}
+
+.equipos-procedencias__dialogo > dl {
+   display: grid;
+   gap: 0;
+   margin: 0;
+   padding: .6rem 1.6rem;
+}
+
+.equipos-procedencias__dialogo > dl > div {
+   border-bottom: .1rem solid var(--colorLinea);
+   display: flex;
+   flex-wrap: wrap;
+   gap: .2rem 1.2rem;
+   justify-content: space-between;
+   padding: .9rem 0;
+}
+
+.equipos-procedencias__dialogo > dl > div:last-child {
+   border-bottom: none;
+}
+
+.equipos-procedencias__dialogo dt {
+   color: var(--colorTextoMenu);
+   font-size: 1.35rem;
+}
+
+.equipos-procedencias__dialogo dd {
+   font-size: 1.45rem;
+   margin: 0;
+   overflow-wrap: anywhere;
+   text-align: right;
+}
+
+.equipos-procedencias__dialogo > footer {
+   border-top: .1rem solid var(--colorLinea);
+   display: flex;
+   flex-wrap: wrap;
+   gap: 1rem;
+   justify-content: flex-end;
+   padding: 1.2rem 1.6rem;
+}
+
+.equipos-procedencias__dialogo > footer .equipos-catalogo__boton {
+   text-decoration: none;
+}
+
+.equipos-procedencias__estado {
+   align-items: center;
+   background-color: var(--blanco);
+   border: .1rem solid var(--colorLinea);
+   border-radius: .5rem;
+   color: var(--negro);
+   cursor: pointer;
+   display: flex;
+   font-size: 1.35rem;
+   gap: .5rem;
+   min-height: 4rem;
+   padding: 0 1.2rem;
+}
+
+/* PC: formulario y lista lado a lado. La lista recibe algo mas de ancho para
+   que caben dos o tres tarjetas por fila. */
+@media (min-width: 1000px) {
+   .equipos-procedencias {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+   }
+}
+
+/* ---------------------------------------------------------------------
+   Letra mas grande en todo el modulo de equipos
+   Quien lleva el inventario pasa el dia en estas pantallas y no todos ven
+   bien de cerca. Al subir la letra se sube tambien el alto de los controles,
+   para que sigan siendo comodos de tocar en tablet.
+   --------------------------------------------------------------------- */
+.equipos-registro__campo label,
+.equipos-catalogo__campo > span {
+   font-size: 1.4rem;
+}
+
+.equipos-registro__campo .formularioCampo-text,
+.equipos-registro__campo .formularioCampo-select,
+.equipos-registro__campo .formularioCampo-date,
+.equipos-catalogo__fila .formularioCampo-text,
+.equipos-catalogo__campo .formularioCampo-select,
+.equipos-procedencias__campos .formularioCampo-text,
+.equipos-procedencias__campos .formularioCampo-select {
+   font-size: 1.5rem;
+   min-height: 4.2rem;
+}
+
+.equipos-registro__campo .formularioCampo-text::placeholder,
+.equipos-procedencias__campos .formularioCampo-text::placeholder {
+   font-size: 1.45rem;
+}
+
+.equipos-registro__ayuda,
+.equipos-catalogo__encabezado p {
+   font-size: 1.3rem;
+}
+
+.equipos-catalogo__encabezado h3,
+.equipos-registro__titulo {
+   font-size: 1.65rem;
+}
+
+.equipos-catalogo__nombre {
+   font-size: 1.5rem;
+}
+
+.equipos-catalogo__meta {
+   font-size: 1.25rem;
+}
+
+.equipos-catalogo__boton,
+.equipos-catalogo__cancelar,
+.equipos-colores__nombre {
+   font-size: 1.4rem;
+}
+
+.equipos-catalogo__icono,
+.equipos-colores__quitar {
+   font-size: 1.8rem;
+}
+
+.equipos-pasos__paso {
+   font-size: 1.35rem;
+}
+
+/* Select2 dibuja su propio control: sin esto el desplegable de tipo, marca o
+   modelo se quedaba con la letra pequena mientras el resto crecia. */
+.equipos-registro__campo .select2-container .select2-selection--single,
+.equipos-registro__campo .select2-container .select2-selection__rendered {
+   font-size: 1.5rem;
+   line-height: 4rem;
+   min-height: 4.2rem;
+}
+
+.select2-container .select2-results__option,
+.select2-container .select2-search__field {
+   font-size: 1.45rem;
+}
+
+/* ---------------------------------------------------------------------
+   Registrar y editar equipo: los seis pasos
+   Las cuatro primeras secciones eran tarjetas fijas y las dos ultimas
+   desplegables, asi que el formulario mezclaba dos tratamientos distintos.
+   Ahora los seis son desplegables con su numero: las que llevan campos
+   obligatorios arrancan abiertas -no tiene sentido esconder lo que hay que
+   llenar- y se cierran cuando ya estan completas, que es lo que acorta el
+   formulario en una tablet.
+   --------------------------------------------------------------------- */
+.equipos-registro__paso {
+   align-items: center;
+   background-color: var(--negro);
+   border-radius: 50%;
+   color: #fff;
+   display: flex;
+   flex: 0 0 auto;
+   font-size: 1.3rem;
+   height: 2.6rem;
+   justify-content: center;
+   width: 2.6rem;
+}
+
+.equipos-registro__opcionales-titulo {
+   align-items: center;
+   display: flex;
+   gap: .7rem;
+}
+
+/* Los tres desplegables de la cascada -tipo, marca y modelo- caben en una
+   sola fila en PC. Debajo de 30rem por columna pasan a dos y luego a una;
+   los colores van siempre a lo ancho, que es lo que necesita su lista. */
+.equipos-registro__seccion .equipos-registro__campos--tres,
+.equipos-registro__opcionales-cuerpo .equipos-registro__campos--tres {
+   display: grid;
+   column-gap: 2rem;
+   row-gap: 1rem;
+   grid-template-columns: repeat(auto-fit, minmax(min(26rem, 100%), 1fr));
+}
+
+/* Un paso abierto no lleva el fondo de un bloque opcional cerrado: se ve como
+   la tarjeta que era antes, para que el formulario no parezca una pila de
+   acordeones grises. */
+.equipos-registro__opcionales--paso[open] {
+   background-color: var(--blanco);
+}

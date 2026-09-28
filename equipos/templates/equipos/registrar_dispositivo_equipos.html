@@ -49,13 +49,21 @@
            lo demas puede completarse despues desde la edicion, para que un
            registro en la sala no se atasque por un dato que esta en oficina.
         {% endcomment %}
-        <section class="equipos-registro__seccion">
-            <h3 class="equipos-registro__titulo">
-                <i class="bi bi-info-circle"></i>
-                1 &middot; Qué equipo es
-            </h3>
+        <details class="equipos-registro__opcionales equipos-registro__opcionales--paso" open>
+            <summary class="equipos-registro__opcionales-resumen">
+                <h3 class="equipos-registro__opcionales-titulo">
+                    <span class="equipos-registro__paso">1</span>
+                    <i class="bi bi-info-circle"></i>
+                    Qué equipo es
+                </h3>
+                <span class="equipos-registro__opcionales-conteo">
+                    Tipo, marca, modelo y colores
+                </span>
+                <i class="bi bi-chevron-down equipos-registro__opcionales-flecha"></i>
+            </summary>
+            <div class="equipos-registro__opcionales-cuerpo">
 
-            <div class="equipos-registro__campos equipos-registro__campos--dos">
+            <div class="equipos-registro__campos equipos-registro__campos--tres">
                 {% comment %}
                    Los tres van en cascada y en este orden porque asi es la
                    realidad del catalogo: el tipo dice que marcas lo fabrican,
@@ -63,7 +71,7 @@
                    tipo tambien resuelve su categoria y su tecnologia, que no
                    se preguntan. Lo rellena registroEquipo.js.
                 {% endcomment %}
-                <div class="equipos-registro__campo equipos-registro__campo--completo">
+                <div class="equipos-registro__campo">
                     <label for="tipo_dispositivo">Tipo de equipo *</label>
                     {{ form.tipo }}
                     <p class="equipos-registro__ayuda"
@@ -135,15 +143,24 @@
                     {{ form.colores.errors }}
                 </div>
             </div>
-        </section>
+            </div>
+        </details>
 
 
         {% if not dispositivo %}
-            <section class="equipos-registro__seccion">
-                <h3 class="equipos-registro__titulo">
-                    <i class="bi bi-camera"></i>
-                    2 &middot; Foto general del equipo
-                </h3>
+            <details class="equipos-registro__opcionales equipos-registro__opcionales--paso" open>
+                <summary class="equipos-registro__opcionales-resumen">
+                    <h3 class="equipos-registro__opcionales-titulo">
+                        <span class="equipos-registro__paso">2</span>
+                        <i class="bi bi-camera"></i>
+                        Foto general del equipo
+                    </h3>
+                    <span class="equipos-registro__opcionales-conteo">
+                        Obligatoria al registrar
+                    </span>
+                    <i class="bi bi-chevron-down equipos-registro__opcionales-flecha"></i>
+                </summary>
+                <div class="equipos-registro__opcionales-cuerpo">
 
                 <div class="equipos-registro__campo">
                     <label for="foto_general_dispositivo">Foto general *</label>
@@ -186,7 +203,8 @@
                     </div>
                     {{ form.foto_general.errors }}
                 </div>
-            </section>
+                </div>
+            </details>
         {% endif %}
         {% comment %}
            Los tres identificadores juntos: es el momento en que se lee la
@@ -195,11 +213,19 @@
            deberia llenarse: sin ninguno, el equipo solo se puede identificar
            por su codigo interno y su foto.
         {% endcomment %}
-        <section class="equipos-registro__seccion">
-            <h3 class="equipos-registro__titulo">
-                <i class="bi bi-upc-scan"></i>
-                3 &middot; Cómo se identifica
-            </h3>
+        <details class="equipos-registro__opcionales equipos-registro__opcionales--paso" open>
+            <summary class="equipos-registro__opcionales-resumen">
+                <h3 class="equipos-registro__opcionales-titulo">
+                    <span class="equipos-registro__paso">3</span>
+                    <i class="bi bi-upc-scan"></i>
+                    Cómo se identifica
+                </h3>
+                <span class="equipos-registro__opcionales-conteo">
+                    Serie, ficha e inventario
+                </span>
+                <i class="bi bi-chevron-down equipos-registro__opcionales-flecha"></i>
+            </summary>
+            <div class="equipos-registro__opcionales-cuerpo">
 
             <div class="equipos-registro__campos equipos-registro__campos--dos">
                 <div class="equipos-registro__campo">
@@ -226,7 +252,8 @@
                     {{ form.inventario_bienes_nacionales.errors }}
                 </div>
             </div>
-        </section>
+            </div>
+        </details>
 
         {% comment %}
            El empleado va primero porque de el se deduce la unidad: al
@@ -234,11 +261,19 @@
            la ubicacion, que el usuario puede cambiar si el aparato esta en un
            punto de atencion mas concreto que la unidad donde trabaja.
         {% endcomment %}
-        <section class="equipos-registro__seccion">
-            <h3 class="equipos-registro__titulo">
-                <i class="bi bi-geo-alt"></i>
-                4 &middot; De quién es y dónde está
-            </h3>
+        <details class="equipos-registro__opcionales equipos-registro__opcionales--paso" open>
+            <summary class="equipos-registro__opcionales-resumen">
+                <h3 class="equipos-registro__opcionales-titulo">
+                    <span class="equipos-registro__paso">4</span>
+                    <i class="bi bi-geo-alt"></i>
+                    De quién es y dónde está
+                </h3>
+                <span class="equipos-registro__opcionales-conteo">
+                    Responsable, unidad y estado
+                </span>
+                <i class="bi bi-chevron-down equipos-registro__opcionales-flecha"></i>
+            </summary>
+            <div class="equipos-registro__opcionales-cuerpo">
 
             <div class="equipos-registro__campos equipos-registro__campos--dos">
                 <div class="equipos-registro__campo">
@@ -289,7 +324,8 @@
                     {{ form.criticidad.errors }}
                 </div>
             </div>
-        </section>
+            </div>
+        </details>
 
 
         {% comment %}
@@ -303,6 +339,7 @@
                  {% if form.modalidad_procedencia.errors or form.procedencia.errors or form.numero_referencia.errors or form.costo_adquisicion.errors or form.fecha_instalacion.errors or form.fecha_inicio_garantia.errors or form.garantia_meses.errors or form.fecha_fin_garantia.errors %}open{% endif %}>
             <summary class="equipos-registro__opcionales-resumen">
                 <h3 class="equipos-registro__opcionales-titulo">
+                    <span class="equipos-registro__paso">5</span>
                     <i class="bi bi-box-arrow-in-down"></i>
                     Procedencia y garantía
                 </h3>
@@ -384,6 +421,7 @@
                  {% if form.frecuencia_mantenimiento_meses.errors or form.vida_util_anios.errors or form.observaciones.errors %}open{% endif %}>
             <summary class="equipos-registro__opcionales-resumen">
                 <h3 class="equipos-registro__opcionales-titulo">
+                    <span class="equipos-registro__paso">6</span>
                     <i class="bi bi-sliders"></i>
                     Mantenimiento y notas
                 </h3>

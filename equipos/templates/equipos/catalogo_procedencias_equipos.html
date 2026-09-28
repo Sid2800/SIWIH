@@ -22,20 +22,28 @@
     </div>
 
     {% comment %}
-       Un solo panel a lo ancho: esta pantalla no es una cascada de pasos como
-       el catalogo de tipos, sino una sola lista. Con la rejilla de tres
-       columnas el panel se quedaba en un tercio del ancho y los siete campos
-       del formulario acababan en 100px cada uno.
+       Dos columnas en PC: el formulario a la izquierda y las procedencias ya
+       registradas a la derecha. Antes el formulario quedaba centrado con la
+       lista debajo y media pantalla en blanco a los lados; asi se llena el
+       ancho y se pueden dar de alta varias seguidas mirando las que ya hay.
+       En tablet y telefono se apilan, formulario primero.
     {% endcomment %}
-    <div class="equipos-catalogo equipos-catalogo--unico">
-        <section class="equipos-catalogo__panel">
-            <h3 class="equipos-registro__titulo">
-                <i class="bi bi-person-vcard"></i>
-                Personas y empresas
-            </h3>
+    <div class="equipos-procedencias">
+        <section class="equipos-catalogo__panel equipos-procedencias__formulario">
+            <header class="equipos-catalogo__encabezado">
+                <h3>
+                    <i class="bi bi-person-vcard"></i>
+                    {% if procedencia_editada %}
+                        Editar procedencia
+                    {% else %}
+                        Nueva procedencia
+                    {% endif %}
+                </h3>
+                <p>Empresas y personas que entregan equipo al hospital.</p>
+            </header>
 
             {% if request.user|puede_administrar_catalogo_equipos %}
-                <form class="equipos-catalogo__form equipos-catalogo__form--procedencias"
+                <form class="equipos-catalogo__form equipos-procedencias__campos"
                       method="post"
                       action="{% if procedencia_editada %}{% url 'editar_procedencia_equipos' procedencia_editada.pk %}{% else %}{% url 'agregar_procedencia_equipos' %}{% endif %}">
                     {% csrf_token %}
@@ -83,73 +91,73 @@
                         </div>
                     </div>
 
-                    <button class="equipos-catalogo__boton"
-                            type="submit">
-                        {% if procedencia_editada %}
-                            <i class="bi bi-check-lg"></i>
-                            Guardar cambios
-                        {% else %}
-                            <i class="bi bi-plus-lg"></i>
-                            Agregar procedencia
-                        {% endif %}
-                    </button>
+                    <div class="equipos-procedencias__acciones">
+                        <button class="equipos-catalogo__boton" type="submit">
+                            {% if procedencia_editada %}
+                                <i class="bi bi-check-lg"></i>
+                                Guardar cambios
+                            {% else %}
+                                <i class="bi bi-plus-lg"></i>
+                                Agregar procedencia
+                            {% endif %}
+                        </button>
 
-                    {% if procedencia_editada %}
-                        <a class="equipos-catalogo__cancelar"
-                           href="{% url 'catalogo_procedencias_equipos' %}">
-                            Cancelar
-                        </a>
-                    {% endif %}
+                        {% if procedencia_editada %}
+                            <a class="equipos-catalogo__cancelar"
+                               href="{% url 'catalogo_procedencias_equipos' %}">
+                                Cancelar edición
+                            </a>
+                        {% endif %}
+                    </div>
                 </form>
             {% endif %}
+        </section>
 
-            {% comment %}
-               El modificador --fichas es propio de procedencias: cada entidad
-               se dibuja como un recuadro con su borde. Marcas y modelos siguen
-               con la lista de filas, que ahi basta porque solo llevan nombre.
-            {% endcomment %}
-            <ul class="equipos-catalogo__lista equipos-catalogo__lista--columnas equipos-catalogo__lista--fichas">
+        {% comment %}
+           Tarjetas con el nombre y nada mas. Los siete datos de cada
+           procedencia no caben en una tarjeta legible y tampoco se consultan a
+           diario: un clic los abre en un cuadro, y el doble clic lleva a
+           editar. Asi la lista se recorre de un vistazo y el detalle esta a un
+           gesto de distancia.
+        {% endcomment %}
+        <section class="equipos-catalogo__panel equipos-procedencias__lista">
+            <header class="equipos-catalogo__encabezado">
+                <h3>
+                    <i class="bi bi-list-ul"></i>
+                    Registradas
+                    <span class="equipos-procedencias__conteo">{{ procedencias|length }}</span>
+                </h3>
+                <p>
+                    Un clic muestra los datos.
+                    {% if request.user|puede_administrar_catalogo_equipos %}
+                        Doble clic para editar.
+                    {% endif %}
+                </p>
+            </header>
+
+            <ul class="equipos-procedencias__tarjetas">
                 {% for procedencia in procedencias %}
-                    <li class="equipos-catalogo__item{% if procedencia_editada and procedencia.pk == procedencia_editada.pk %} equipos-catalogo__item--activo{% endif %}{% if not procedencia.activo %} equipos-catalogo__item--inactivo{% endif %}">
-                        {% if request.user|puede_administrar_catalogo_equipos %}
-                            <a class="equipos-catalogo__enlace"
-                               href="{% url 'catalogo_procedencias_equipos' %}?procedencia={{ procedencia.pk }}"
-                               title="Editar {{ procedencia.nombre }}">
-                                <span class="equipos-catalogo__nombre">
-                                    {{ procedencia.nombre }} · {{ procedencia.get_tipo_display }}
-                                </span>
-                                <span class="equipos-catalogo__meta">
-                                    RTN: {{ procedencia.rtn|default:"No indicado" }} ·
-                                    Tel: {{ procedencia.telefono|default:"No indicado" }} ·
-                                    {{ procedencia.total_equipos }} equipo{{ procedencia.total_equipos|pluralize }}
-                                </span>
-                            </a>
-                            <form method="post"
-                                  action="{% url 'cambiar_estado_procedencia_equipos' procedencia.pk %}">
-                                {% csrf_token %}
-                                <button class="equipos-catalogo__icono"
-                                        type="submit"
-                                        title="{% if procedencia.activo %}Desactivar{% else %}Reactivar{% endif %} {{ procedencia.nombre }}">
-                                    {% if procedencia.activo %}
-                                        <i class="bi bi-toggle-on"></i>
-                                    {% else %}
-                                        <i class="bi bi-toggle-off"></i>
-                                    {% endif %}
-                                </button>
-                            </form>
-                        {% else %}
-                            <span class="equipos-catalogo__enlace">
-                                <span class="equipos-catalogo__nombre">
-                                    {{ procedencia.nombre }} · {{ procedencia.get_tipo_display }}
-                                </span>
-                                <span class="equipos-catalogo__meta">
-                                    RTN: {{ procedencia.rtn|default:"No indicado" }} ·
-                                    Tel: {{ procedencia.telefono|default:"No indicado" }} ·
-                                    Contacto: {{ procedencia.contacto|default:"No indicado" }} ·
-                                    Correo: {{ procedencia.correo|default:"No indicado" }}
-                                </span>
-                            </span>
-                        {% endif %}
+                    <li>
+                        <button type="button"
+                                class="equipos-procedencias__tarjeta{% if procedencia_editada and procedencia.pk == procedencia_editada.pk %} equipos-procedencias__tarjeta--activa{% endif %}{% if not procedencia.activo %} equipos-procedencias__tarjeta--inactiva{% endif %}"
+                                data-id="{{ procedencia.pk }}"
+                                data-nombre="{{ procedencia.nombre }}"
+                                data-tipo="{{ procedencia.get_tipo_display }}"
+                                data-rtn="{{ procedencia.rtn|default:'' }}"
+                                data-telefono="{{ procedencia.telefono|default:'' }}"
+                                data-telefono-alterno="{{ procedencia.telefono_alterno|default:'' }}"
+                                data-contacto="{{ procedencia.contacto|default:'' }}"
+                                data-correo="{{ procedencia.correo|default:'' }}"
+                                data-equipos="{{ procedencia.total_equipos }}"
+                                data-activo="{{ procedencia.activo|yesno:'1,0' }}"
+                                {% if request.user|puede_administrar_catalogo_equipos %}
+                                    data-url-editar="{% url 'catalogo_procedencias_equipos' %}?procedencia={{ procedencia.pk }}"
+                                {% endif %}>
+                            <span class="equipos-procedencias__nombre">{{ procedencia.nombre }}</span>
+                            {% if not procedencia.activo %}
+                                <span class="equipos-procedencias__inactiva">Inactiva</span>
+                            {% endif %}
+                        </button>
                     </li>
                 {% empty %}
                     <li class="equipos-catalogo__vacio">
@@ -160,8 +168,52 @@
         </section>
     </div>
 </div>
+
+{% comment %}
+   El cuadro de detalle es un <dialog> del navegador: trae solo el cierre con
+   Escape, el fondo bloqueado y el foco atrapado, sin depender de ninguna
+   libreria. Se rellena con los datos que ya trae cada tarjeta, asi que
+   abrirlo no consulta al servidor.
+{% endcomment %}
+{% comment %}
+   La URL del cambio de estado se construye con un cero y el JavaScript lo
+   sustituye por el identificador real. Asi la ruta la sigue resolviendo
+   Django y no hay una copia escrita a mano en el script.
+{% endcomment %}
+<dialog class="equipos-procedencias__dialogo"
+        id="dialogo_procedencia"
+        data-url-estado="{% url 'cambiar_estado_procedencia_equipos' 0 %}">
+    <header>
+        <h3 id="dialogo_procedencia_nombre"></h3>
+        <button type="button"
+                class="equipos-procedencias__cerrar"
+                id="dialogo_procedencia_cerrar"
+                aria-label="Cerrar">
+            <i class="bi bi-x-lg"></i>
+        </button>
+    </header>
+
+    <dl id="dialogo_procedencia_datos"></dl>
+
+    <footer>
+        {% if request.user|puede_administrar_catalogo_equipos %}
+            <a class="equipos-catalogo__boton" id="dialogo_procedencia_editar" href="#">
+                <i class="bi bi-pencil"></i>
+                Editar
+            </a>
+        {% endif %}
+        <form method="post" id="dialogo_procedencia_estado">
+            {% csrf_token %}
+            <button class="equipos-procedencias__estado" type="submit">
+                <i class="bi bi-toggle-on"></i>
+                <span id="dialogo_procedencia_estado_texto">Desactivar</span>
+            </button>
+        </form>
+    </footer>
+</dialog>
 {% endblock content %}
 
 {% block extra_js %}
 <script src="{% static 'core/scripts/equipos/catalogoProcedencias.js' %}"></script>
+<script src="{% static 'core/scripts/equipos/detalleProcedencia.js' %}"></script>
 {% endblock extra_js %}
