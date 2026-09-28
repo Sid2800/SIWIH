@@ -9162,20 +9162,126 @@ p + .equipos-garantia__bloqueo {
    gap: .7rem;
 }
 
-/* Los tres desplegables de la cascada -tipo, marca y modelo- caben en una
-   sola fila en PC. Debajo de 30rem por columna pasan a dos y luego a una;
-   los colores van siempre a lo ancho, que es lo que necesita su lista. */
-.equipos-registro__seccion .equipos-registro__campos--tres,
-.equipos-registro__opcionales-cuerpo .equipos-registro__campos--tres {
-   display: grid;
-   column-gap: 2rem;
-   row-gap: 1rem;
-   grid-template-columns: repeat(auto-fit, minmax(min(26rem, 100%), 1fr));
-}
-
 /* Un paso abierto no lleva el fondo de un bloque opcional cerrado: se ve como
    la tarjeta que era antes, para que el formulario no parezca una pila de
    acordeones grises. */
 .equipos-registro__opcionales--paso[open] {
    background-color: var(--blanco);
+}
+
+/* ---------------------------------------------------------------------
+   Paso 1 del registro: la cascada y los colores
+   --------------------------------------------------------------------- */
+
+/* Columnas exactas y no auto-fit. Con auto-fit y un minimo de 26rem, un
+   monitor cabe cuatro pistas: se creaba una cuarta vacia y los tres
+   desplegables se quedaban en tres cuartos de la fila con un hueco a la
+   derecha. Aqui se declara cuantas columnas hay en cada tamano de pantalla. */
+.equipos-registro__campos--tres {
+   display: grid;
+   column-gap: 2rem;
+   row-gap: 1rem;
+   grid-template-columns: 1fr;
+}
+
+@media (min-width: 640px) {
+   .equipos-registro__campos--tres {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+   }
+}
+
+@media (min-width: 1000px) {
+   .equipos-registro__campos--tres {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+   }
+}
+
+/* Etiqueta y control centrados en su columna: los tres desplegables de la
+   cascada se leen como un grupo de tres y no como tres campos sueltos
+   alineados a la izquierda. */
+.equipos-registro__campos--tres .equipos-registro__campo {
+   align-items: center;
+   text-align: center;
+}
+
+.equipos-registro__campos--tres .equipos-registro__campo > label,
+.equipos-registro__campos--tres .equipos-registro__campo > p {
+   text-align: center;
+}
+
+.equipos-registro__campos--tres .equipos-registro__campo .formularioCampo-select,
+.equipos-registro__campos--tres .equipos-registro__campo .select2-container {
+   width: 100%;
+}
+
+/* El bloque de colores se centra y no pasa de 52rem. A fila completa, el
+   desplegable medía mas de mil pixeles para elegir una palabra de seis
+   letras, y el boton a su derecha quedaba diminuto en comparacion. */
+.equipos-colores {
+   margin: 0 auto;
+   max-width: 52rem;
+   width: 100%;
+}
+
+.equipos-registro__campo--completo > label[for="selector_color_dispositivo"] {
+   text-align: center;
+}
+
+.equipos-colores__vacio {
+   text-align: center;
+}
+
+/* El selector de color mide algo menos que los de la cascada: es una lista
+   de una palabra, no un nombre de equipo. */
+.equipos-colores__agregar .formularioCampo-select,
+.equipos-colores__agregar .select2-container {
+   font-size: 1.45rem;
+   min-height: 4rem;
+}
+
+/* ---------------------------------------------------------------------
+   Registrar y editar equipo: un punto mas de letra
+   Es la pantalla donde se pasa mas tiempo del modulo, y donde mas importa
+   que se lea sin acercarse.
+   --------------------------------------------------------------------- */
+.equipos-registro .equipos-registro__campo label {
+   font-size: 1.5rem;
+}
+
+.equipos-registro .equipos-registro__campo .formularioCampo-text,
+.equipos-registro .equipos-registro__campo .formularioCampo-select,
+.equipos-registro .equipos-registro__campo .formularioCampo-date,
+.equipos-registro .equipos-registro__campo .select2-container .select2-selection--single,
+.equipos-registro .equipos-registro__campo .select2-container .select2-selection__rendered {
+   font-size: 1.6rem;
+   min-height: 4.6rem;
+}
+
+.equipos-registro .equipos-registro__campo .select2-container .select2-selection__rendered {
+   line-height: 4.4rem;
+}
+
+.equipos-registro .equipos-registro__campo .formularioCampo-text::placeholder {
+   font-size: 1.55rem;
+}
+
+.equipos-registro__opcionales-titulo {
+   font-size: 1.75rem;
+}
+
+.equipos-registro__opcionales-conteo {
+   font-size: 1.3rem;
+}
+
+.equipos-registro .equipos-registro__ayuda {
+   font-size: 1.35rem;
+}
+
+.equipos-colores__nombre {
+   font-size: 1.5rem;
+}
+
+.equipos-colores__boton {
+   font-size: 1.45rem;
+   min-height: 4rem;
 }

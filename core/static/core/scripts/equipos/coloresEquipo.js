@@ -19,6 +19,33 @@ document.addEventListener('DOMContentLoaded', function () {
         return;
     }
 
+    // El selector se convierte en un Select2 para poder escribir el color en
+    // vez de recorrer la lista entera: el catalogo pasa de la docena y buscar
+    // "gris" es mas rapido que desplegarla y leerla. Si Select2 no estuviera
+    // cargado, el <select> nativo sigue funcionando igual.
+    const selectorJq = window.jQuery ? window.jQuery(selector) : null;
+
+    if (selectorJq && selectorJq.select2) {
+        selectorJq.select2({
+            width: '100%',
+            placeholder: 'Escriba o elija un color',
+            allowClear: true,
+            language: {
+                noResults: function () {
+                    return 'No se encontraron colores';
+                }
+            }
+        });
+    }
+
+    function limpiarSelector() {
+        selector.value = '';
+
+        if (selectorJq && selectorJq.select2) {
+            selectorJq.trigger('change.select2');
+        }
+    }
+
     function idsActuales() {
         return Array.from(lista.children).map(function (item) {
             return item.dataset.colorId;
@@ -51,9 +78,13 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
 
-        // Un color ya agregado no debe poder elegirse otra vez.
+        // Un color ya agregado no debe poder elegirse otra vez. Select2 no
+        // respeta el atributo hidden, asi que se deshabilita la opcion: eso
+        // si la saca de su desplegable y tambien del select nativo.
         Array.from(selector.options).forEach(function (opcion) {
-            opcion.hidden = opcion.value !== '' && ids.includes(opcion.value);
+            const usada = opcion.value !== '' && ids.includes(opcion.value);
+            opcion.hidden = usada;
+            opcion.disabled = usada;
         });
     }
 
@@ -88,7 +119,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const nombre = selector.options[selector.selectedIndex].textContent.trim();
         lista.append(crearItem(id, nombre));
-        selector.value = '';
+        limpiarSelector();
         sincronizar();
     });
 
