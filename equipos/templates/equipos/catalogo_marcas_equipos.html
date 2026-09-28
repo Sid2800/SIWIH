@@ -63,8 +63,8 @@
                   action="{% if tipo_editado %}{% url 'editar_tipo_equipos' tipo_editado.pk %}{% else %}{% url 'agregar_tipo_equipos' %}{% endif %}">
                 {% csrf_token %}
 
-                {# Nombre y boton en la misma linea: es el gesto mas repetido
-                   de la pantalla y no merece dos filas. #}
+                {% comment %} Nombre y boton en la misma linea: es el gesto mas repetido
+                   de la pantalla y no merece dos filas.                    {% endcomment %}
                 <div class="equipos-catalogo__fila">
                     <input class="formularioCampo-text"
                            id="nombre_tipo_catalogo"
@@ -122,10 +122,10 @@
             <ul class="equipos-catalogo__lista">
                 {% for tipo in tipos %}
                     <li class="equipos-catalogo__item{% if tipo_seleccionado and tipo.pk == tipo_seleccionado.pk %} equipos-catalogo__item--activo{% endif %}{% if not tipo.activo %} equipos-catalogo__item--inactivo{% endif %}">
-                        {# Pulsar el nombre selecciona; renombrar es un boton
+                        {% comment %} Pulsar el nombre selecciona; renombrar es un boton
                            aparte. Antes era la misma accion y elegir un tipo
                            para ver sus marcas abria el formulario de cambio
-                           de nombre. #}
+                           de nombre.                            {% endcomment %}
                         <a class="equipos-catalogo__enlace"
                            href="?tipo={{ tipo.pk }}">
                             <span class="equipos-catalogo__nombre">{{ tipo.nombre }}</span>
@@ -195,9 +195,9 @@
                             <span>Agregar</span>
                         </button>
                     </div>
-                    {# Sugerencias con las marcas que ya existen en el sistema:
+                    {% comment %} Sugerencias con las marcas que ya existen en el sistema:
                        si Epson esta en impresoras, al escribirla en escaneres
-                       se reutiliza la misma en vez de crear un duplicado. #}
+                       se reutiliza la misma en vez de crear un duplicado.                        {% endcomment %}
                     <datalist id="marcas_existentes_equipos">
                         {% for nombre in marcas_existentes %}
                             <option value="{{ nombre }}"></option>

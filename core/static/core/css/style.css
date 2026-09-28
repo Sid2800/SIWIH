@@ -8311,10 +8311,13 @@ button.equipos-imagenes__vista:hover img {
    min-width: 0;
 }
 
+/* 19rem es lo que mide "SELECCIONE LA CATEGORIA" sin cortarse. Por debajo de
+   eso los dos desplegables pasan uno encima del otro, que es preferible a
+   dejarlos lado a lado mostrando media palabra. */
 .equipos-catalogo__campos {
    display: grid;
    gap: .7rem;
-   grid-template-columns: repeat(auto-fit, minmax(min(14rem, 100%), 1fr));
+   grid-template-columns: repeat(auto-fit, minmax(min(19rem, 100%), 1fr));
 }
 
 .equipos-catalogo__campo {
@@ -8452,6 +8455,14 @@ button.equipos-imagenes__vista:hover img {
    padding: 1rem 0;
 }
 
+/* Cuando el aviso es lo unico que hay en el panel se centra en el hueco, en
+   vez de quedarse arriba con el resto del recuadro vacio debajo. */
+.equipos-catalogo__panel > .equipos-catalogo__vacio {
+   flex: 1;
+   justify-content: center;
+   text-align: center;
+}
+
 .equipos-catalogo__aviso {
    align-items: center;
    background-color: rgba(220, 53, 69, .12);
@@ -8466,6 +8477,12 @@ button.equipos-imagenes__vista:hover img {
    padding: .9rem 1.1rem;
 }
 
+/* Pantallas donde hay un solo panel, como procedencias: ocupa todo el ancho
+   en vez de quedarse en la columna que le tocaria de la cascada. */
+.equipos-catalogo--unico {
+   grid-template-columns: 1fr;
+}
+
 /* Tablet en horizontal: los dos primeros pasos caben lado a lado y el tercero
    pasa debajo a lo ancho, que es donde se trabaja al cargar modelos. */
 @media (min-width: 780px) {
@@ -8478,14 +8495,71 @@ button.equipos-imagenes__vista:hover img {
    }
 }
 
-/* Escritorio: los tres pasos en fila, la cadena completa a la vista. */
+/* Escritorio: los tres pasos en fila, la cadena completa a la vista.
+
+   El primer paso recibe algo mas de ancho que los otros dos: sus filas llevan
+   nombre del tipo mas categoria, marcas y equipos, mientras que marcas y
+   modelos solo llevan un nombre y un contador. Con las tres columnas iguales,
+   la primera se apretaba y las otras dos sobraban de espacio. */
 @media (min-width: 1100px) {
    .equipos-catalogo {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: 1.3fr 1fr 1fr;
+   }
+
+   .equipos-catalogo--unico {
+      grid-template-columns: 1fr;
    }
 
    .equipos-catalogo__panel:last-child {
       grid-column: auto;
+   }
+
+   /* Los tres paneles miden lo mismo aunque dos esten vacios: con altura
+      libre la fila parecia tres recuadros sin terminar. El stretch los iguala
+      al mas alto y el min-height evita que los tres queden minusculos cuando
+      todavia no hay nada elegido. */
+   .equipos-catalogo {
+      align-items: stretch;
+   }
+
+   .equipos-catalogo__panel {
+      min-height: 52rem;
+   }
+
+   /* La altura minima existe para igualar los tres pasos. En una pantalla de
+      un solo panel, como procedencias, solo dejaria hueco muerto debajo de
+      la lista. */
+   .equipos-catalogo--unico .equipos-catalogo__panel {
+      min-height: auto;
+   }
+
+   .equipos-catalogo__lista {
+      max-height: none;
+      flex: 1;
+   }
+
+   /* En una columna ancha el dato cabe en la misma linea que el nombre, que
+      es mas compacto y deja ver mas filas sin desplazarse. */
+   .equipos-catalogo__enlace {
+      align-items: baseline;
+      flex-direction: row;
+      flex-wrap: wrap;
+      gap: .2rem 1rem;
+   }
+
+   .equipos-catalogo__meta {
+      margin-left: auto;
+      text-align: right;
+      white-space: nowrap;
+   }
+}
+
+/* Monitores anchos: el contenedor deja de crecer y se centra. Mas alla de
+   unos 1700px las filas se vuelven tan largas que el ojo pierde la linea. */
+@media (min-width: 1700px) {
+   .equipos-catalogo {
+      margin: 0 auto;
+      max-width: 165rem;
    }
 }
 
@@ -8707,13 +8781,18 @@ p + .equipos-garantia__bloqueo {
    original el RTN se partia en dos lineas. Las 34rem son 340px, mas de lo que
    deja libre un telefono de 375px, asi que sin el min() la ficha se salia del
    recuadro y cortaba el encabezado de la pagina. */
-/* Procedencias llena siete campos, no un nombre: sus campos van en
-   rejilla y el boton debajo, en lugar de la fila unica de los tres pasos. */
-.equipos-catalogo__form--procedencias {
-   align-items: end;
-   display: grid;
-   gap: 1rem;
-   grid-template-columns: repeat(auto-fit, minmax(min(20rem, 100%), 1fr));
+/* Procedencias llena siete campos, no un nombre. Se reparten por el ancho
+   disponible -dos en telefono, cuatro en un monitor- en vez de quedarse en
+   dos columnas fijas que en pantalla grande dejaban media pagina vacia. */
+.equipos-catalogo__form--procedencias .equipos-registro__campos {
+   grid-template-columns: repeat(auto-fit, minmax(min(22rem, 100%), 1fr));
+}
+
+/* El boton se queda con su ancho natural y alineado a la izquierda, debajo de
+   los campos: a ancho completo parecia el boton de enviar toda la pagina. */
+.equipos-catalogo__form--procedencias .equipos-catalogo__boton {
+   align-self: start;
+   justify-self: start;
 }
 
 .equipos-catalogo__lista--fichas {

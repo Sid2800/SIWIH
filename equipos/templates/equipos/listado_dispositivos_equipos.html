@@ -56,9 +56,9 @@
     {# Filtros GET: views.py lee estos parametros y devuelve la tabla paginada. #}
     <form class="equipos-listado__controles" id="equipos-listado-filtros" method="get">
         <div class="equipos-listado__filtros">
-            {# La categoria es el filtro mas grueso: separa equipo medico de
+            {% comment %} La categoria es el filtro mas grueso: separa equipo medico de
                informatica o electrico. Incluye los hibridos, asi que un
-               ecografo con estacion de trabajo aparece en las dos. #}
+               ecografo con estacion de trabajo aparece en las dos.                {% endcomment %}
             <div class="equipos-listado__filtro">
                 <div class="equipos-listado__campo-icono">
                     <i class="bi bi-diagram-3"></i>

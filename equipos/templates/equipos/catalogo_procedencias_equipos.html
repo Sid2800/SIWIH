@@ -21,7 +21,13 @@
         <div class="tituloFormulario-subrallado"></div>
     </div>
 
-    <div class="equipos-catalogo">
+    {% comment %}
+       Un solo panel a lo ancho: esta pantalla no es una cascada de pasos como
+       el catalogo de tipos, sino una sola lista. Con la rejilla de tres
+       columnas el panel se quedaba en un tercio del ancho y los siete campos
+       del formulario acababan en 100px cada uno.
+    {% endcomment %}
+    <div class="equipos-catalogo equipos-catalogo--unico">
         <section class="equipos-catalogo__panel">
             <h3 class="equipos-registro__titulo">
                 <i class="bi bi-person-vcard"></i>
@@ -77,7 +83,7 @@
                         </div>
                     </div>
 
-                    <button class="formularioBotones-boton equipos-catalogo__boton"
+                    <button class="equipos-catalogo__boton"
                             type="submit">
                         {% if procedencia_editada %}
                             <i class="bi bi-check-lg"></i>
