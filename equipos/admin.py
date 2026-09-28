@@ -38,7 +38,7 @@ class TipoDispositivoAdmin(admin.ModelAdmin):
     list_filter = ("categoria", "activo")
     search_fields = ("nombre", "categoria__nombre")
     autocomplete_fields = ("categoria",)
-    filter_horizontal = ("categorias_secundarias",)
+    filter_horizontal = ("categorias_secundarias", "marcas")
 
 
 @admin.register(MarcaDispositivo)
@@ -50,9 +50,10 @@ class MarcaDispositivoAdmin(admin.ModelAdmin):
 
 @admin.register(ModeloDispositivo)
 class ModeloDispositivoAdmin(admin.ModelAdmin):
-    list_display = ("nombre", "activo")
-    list_filter = ("activo",)
-    search_fields = ("nombre",)
+    list_display = ("nombre", "tipo", "marca", "activo")
+    list_filter = ("tipo", "marca", "activo")
+    search_fields = ("nombre", "marca__nombre", "tipo__nombre")
+    autocomplete_fields = ("tipo", "marca")
 
 
 @admin.register(AreaGestora)
@@ -83,7 +84,6 @@ class DispositivoAdmin(admin.ModelAdmin):
     list_display = (
         "codigo",
         "tipo",
-        "tipo_tecnologia",
         "marca",
         "modelo",
         "area_gestora",
@@ -103,7 +103,7 @@ class DispositivoAdmin(admin.ModelAdmin):
         "modalidad_procedencia",
         "procedencia",
         "colores",
-        "tipo_tecnologia",
+        "tipo__tipo_tecnologia",
         "estado",
         "criticidad",
     )

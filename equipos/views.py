@@ -23,8 +23,8 @@ from .views_autocomplete import (
     buscar_modelos,
     buscar_procedencias,
     buscar_tipos,
-    categoria_tipo,
     datos_empleado,
+    datos_tipo,
 )
 from .views_bajas import (
     ficha_baja_dispositivo_pdf,
@@ -43,6 +43,7 @@ from .views_catalogos import (
     catalogo_procedencias,
     editar_procedencia_catalogo,
     editar_tipo_catalogo,
+    quitar_marca_tipo,
 )
 from .views_documentos import (
     ficha_activo_fijo_pdf,
@@ -86,8 +87,8 @@ __all__ = [
     "buscar_marcas",
     "buscar_modelos",
     "buscar_empleados",
-    "categoria_tipo",
     "datos_empleado",
+    "datos_tipo",
     # catalogos
     "catalogo_marcas_modelos",
     "agregar_marca_catalogo",
@@ -101,6 +102,7 @@ __all__ = [
     "agregar_procedencia_catalogo",
     "editar_procedencia_catalogo",
     "cambiar_estado_procedencia",
+    "quitar_marca_tipo",
     # garantias
     "panel_garantias",
     "gestionar_garantia",

@@ -21,175 +21,259 @@
         <div class="tituloFormulario-subrallado"></div>
     </div>
 
+    {% comment %}
+       El catalogo es una cadena de tres pasos y la pantalla lo dice: el tipo
+       de equipo declara que marcas lo fabrican, y cada marca los modelos que
+       existen de ese aparato. Antes las tres listas eran independientes y
+       habia que adivinar como se relacionaban.
+
+       La seleccion viaja en la URL, asi que recargar, compartir el enlace o
+       usar el boton atras no pierde el paso en el que iba el usuario. En
+       telefono los pasos se apilan; en pantalla grande van uno al lado del
+       otro para ver la cadena completa de un vistazo.
+    {% endcomment %}
+    <nav class="equipos-pasos" aria-label="Pasos del catálogo">
+        <span class="equipos-pasos__paso equipos-pasos__paso--activo">
+            <b>1</b> Tipo de equipo
+        </span>
+        <i class="bi bi-chevron-right equipos-pasos__flecha"></i>
+        <span class="equipos-pasos__paso{% if tipo_seleccionado %} equipos-pasos__paso--activo{% endif %}">
+            <b>2</b> {{ tipo_seleccionado.nombre|default:"Marcas" }}
+        </span>
+        <i class="bi bi-chevron-right equipos-pasos__flecha"></i>
+        <span class="equipos-pasos__paso{% if marca_seleccionada %} equipos-pasos__paso--activo{% endif %}">
+            <b>3</b> {{ marca_seleccionada.nombre|default:"Modelos" }}
+        </span>
+    </nav>
+
     <div class="equipos-catalogo">
 
-        {% comment %}
-           Tipos de equipo: ocupan el ancho completo porque, a diferencia de los
-           modelos, no cuelgan de la marca seleccionada. Van primero por ser el
-           unico de los tres que es obligatorio al registrar un equipo.
-        {% endcomment %}
-        <section class="equipos-registro__seccion equipos-catalogo__columna equipos-catalogo__columna--completa">
-            <h3 class="equipos-registro__titulo">
-                <i class="bi bi-clipboard2-check"></i>
-                Tipos de equipo
-            </h3>
+        {# ---------- Paso 1: tipos de equipo ---------- #}
+        <section class="equipos-catalogo__panel">
+            <header class="equipos-catalogo__encabezado">
+                <h3>
+                    <span class="equipos-catalogo__numero">1</span>
+                    Tipos de equipo
+                </h3>
+                <p>Elija uno para ver sus marcas.</p>
+            </header>
 
             <form class="equipos-catalogo__form"
                   method="post"
                   action="{% if tipo_editado %}{% url 'editar_tipo_equipos' tipo_editado.pk %}{% else %}{% url 'agregar_tipo_equipos' %}{% endif %}">
                 {% csrf_token %}
-                <div class="equipos-registro__campo">
-                    <label for="nombre_tipo_catalogo">
+
+                {# Nombre y boton en la misma linea: es el gesto mas repetido
+                   de la pantalla y no merece dos filas. #}
+                <div class="equipos-catalogo__fila">
+                    <input class="formularioCampo-text"
+                           id="nombre_tipo_catalogo"
+                           name="nombre"
+                           type="text"
+                           maxlength="100"
+                           required
+                           placeholder="{% if tipo_editado %}{{ tipo_editado.nombre }}{% else %}Ej. IMPRESORA MULTIFUNCIONAL{% endif %}"
+                           value="{{ form_tipo.nombre.value|default:'' }}"
+                           aria-label="Nombre del tipo de equipo">
+                    <button class="equipos-catalogo__boton" type="submit">
                         {% if tipo_editado %}
-                            Renombrar {{ tipo_editado.nombre }}
+                            <i class="bi bi-check-lg"></i>
+                            <span>Guardar</span>
                         {% else %}
-                            Nuevo tipo *
+                            <i class="bi bi-plus-lg"></i>
+                            <span>Agregar</span>
                         {% endif %}
-                    </label>
-                    {{ form_tipo.nombre }}
+                    </button>
                 </div>
+
+                <div class="equipos-catalogo__campos">
+                    <label class="equipos-catalogo__campo">
+                        <span>Categoría *</span>
+                        {{ form_tipo.categoria }}
+                    </label>
+                    <label class="equipos-catalogo__campo">
+                        <span>Tecnología *</span>
+                        {{ form_tipo.tipo_tecnologia }}
+                    </label>
+                </div>
+
                 {% comment %}
-                   La categoria se define aqui, una sola vez por tipo, y no en
-                   cada equipo: todos los monitores de signos vitales son
-                   equipo medico, asi que preguntarlo en cada registro solo
-                   abre la puerta a que dos iguales queden clasificados
-                   distinto.
+                   Las categorias secundarias solo aplican a equipos hibridos,
+                   asi que van plegadas: la mayoria de los tipos no las usa y
+                   verlas siempre alarga el formulario sin motivo.
                 {% endcomment %}
-                <div class="equipos-registro__campo">
-                    <label for="categoria_tipo_catalogo">Categoría principal *</label>
-                    {{ form_tipo.categoria }}
-                    <p class="equipos-registro__ayuda">
-                        {{ form_tipo.categoria.help_text }}
-                    </p>
-                </div>
-                <div class="equipos-registro__campo">
-                    <label for="categorias_secundarias_tipo_catalogo">
-                        También pertenece a
-                    </label>
-                    {{ form_tipo.categorias_secundarias }}
+                <details class="equipos-catalogo__extra"
+                         {% if tipo_editado.categorias_secundarias.exists %}open{% endif %}>
+                    <summary>¿Es un equipo híbrido?</summary>
                     <p class="equipos-registro__ayuda">
                         {{ form_tipo.categorias_secundarias.help_text }}
                     </p>
-                </div>
-                <button class="formularioBotones-boton equipos-catalogo__boton"
-                        type="submit">
-                    {% if tipo_editado %}
-                        <i class="bi bi-check-lg"></i>
-                        Guardar cambios
-                    {% else %}
-                        <i class="bi bi-plus-lg"></i>
-                        Agregar tipo
-                    {% endif %}
-                </button>
+                    {{ form_tipo.categorias_secundarias }}
+                </details>
+
                 {% if tipo_editado %}
                     <a class="equipos-catalogo__cancelar"
                        href="{% url 'catalogo_marcas_equipos' %}">
-                        Cancelar
+                        Cancelar edición
                     </a>
                 {% endif %}
             </form>
 
-            <ul class="equipos-catalogo__lista equipos-catalogo__lista--columnas">
+            <ul class="equipos-catalogo__lista">
                 {% for tipo in tipos %}
-                    <li class="equipos-catalogo__item{% if tipo_editado and tipo.pk == tipo_editado.pk %} equipos-catalogo__item--activo{% endif %}{% if not tipo.activo %} equipos-catalogo__item--inactivo{% endif %}">
+                    <li class="equipos-catalogo__item{% if tipo_seleccionado and tipo.pk == tipo_seleccionado.pk %} equipos-catalogo__item--activo{% endif %}{% if not tipo.activo %} equipos-catalogo__item--inactivo{% endif %}">
+                        {# Pulsar el nombre selecciona; renombrar es un boton
+                           aparte. Antes era la misma accion y elegir un tipo
+                           para ver sus marcas abria el formulario de cambio
+                           de nombre. #}
                         <a class="equipos-catalogo__enlace"
-                           href="{% url 'catalogo_marcas_equipos' %}?tipo={{ tipo.pk }}"
-                           title="Renombrar {{ tipo.nombre }}">
+                           href="?tipo={{ tipo.pk }}">
                             <span class="equipos-catalogo__nombre">{{ tipo.nombre }}</span>
-                            <span class="equipos-catalogo__conteo">
-                                {{ tipo.total_equipos }} equipo{{ tipo.total_equipos|pluralize }}
+                            <span class="equipos-catalogo__meta">
+                                {{ tipo.categoria.nombre }}
+                                · {{ tipo.total_marcas }} marca{{ tipo.total_marcas|pluralize }}
+                                · {{ tipo.total_equipos }} equipo{{ tipo.total_equipos|pluralize }}
                             </span>
                         </a>
-                        <form method="post"
-                              action="{% url 'cambiar_estado_tipo_equipos' tipo.pk %}">
-                            {% csrf_token %}
-                            <button class="equipos-catalogo__estado"
-                                    type="submit"
-                                    title="{% if tipo.activo %}Desactivar{% else %}Reactivar{% endif %} {{ tipo.nombre }}">
-                                {% if tipo.activo %}
-                                    <i class="bi bi-toggle-on"></i>
-                                {% else %}
-                                    <i class="bi bi-toggle-off"></i>
-                                {% endif %}
-                            </button>
-                        </form>
+                        <div class="equipos-catalogo__acciones">
+                            <a class="equipos-catalogo__icono"
+                               href="?editar={{ tipo.pk }}{% if tipo_seleccionado %}&tipo={{ tipo_seleccionado.pk }}{% endif %}"
+                               title="Renombrar {{ tipo.nombre }}">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            <form method="post"
+                                  action="{% url 'cambiar_estado_tipo_equipos' tipo.pk %}">
+                                {% csrf_token %}
+                                <button class="equipos-catalogo__icono"
+                                        type="submit"
+                                        title="{% if tipo.activo %}Desactivar{% else %}Reactivar{% endif %} {{ tipo.nombre }}">
+                                    <i class="bi bi-toggle-{% if tipo.activo %}on{% else %}off{% endif %}"></i>
+                                </button>
+                            </form>
+                        </div>
                     </li>
                 {% empty %}
                     <li class="equipos-catalogo__vacio">
-                        Todavía no hay tipos de equipo.
+                        Todavía no hay tipos de equipo. Agregue el primero arriba.
                     </li>
                 {% endfor %}
             </ul>
         </section>
 
-        {% comment %}
-           Columna izquierda: alta y listado de marcas. Se muestran activas e
-           inactivas porque desactivar no es esconder; desde aqui se reactiva.
-        {% endcomment %}
-        <section class="equipos-registro__seccion equipos-catalogo__columna">
-            <h3 class="equipos-registro__titulo">
-                <i class="bi bi-bookmark"></i>
-                Marcas
-            </h3>
+        {# ---------- Paso 2: marcas del tipo ---------- #}
+        <section class="equipos-catalogo__panel">
+            <header class="equipos-catalogo__encabezado">
+                <h3>
+                    <span class="equipos-catalogo__numero">2</span>
+                    Marcas
+                </h3>
+                <p>
+                    {% if tipo_seleccionado %}
+                        Fabricantes de {{ tipo_seleccionado.nombre }}.
+                    {% else %}
+                        Elija un tipo de equipo para empezar.
+                    {% endif %}
+                </p>
+            </header>
 
-            <form class="equipos-catalogo__form"
-                  method="post"
-                  action="{% url 'agregar_marca_equipos' %}">
-                {% csrf_token %}
-                <div class="equipos-registro__campo">
-                    <label for="nombre_marca_catalogo">Nueva marca *</label>
-                    {{ form_marca.nombre }}
-                </div>
-                <button class="formularioBotones-boton equipos-catalogo__boton"
-                        type="submit">
-                    <i class="bi bi-plus-lg"></i>
-                    Agregar marca
-                </button>
-            </form>
-
-            <ul class="equipos-catalogo__lista">
-                {% for marca in marcas %}
-                    <li class="equipos-catalogo__item{% if marca_seleccionada and marca.pk == marca_seleccionada.pk %} equipos-catalogo__item--activo{% endif %}{% if not marca.activo %} equipos-catalogo__item--inactivo{% endif %}">
-                        <a class="equipos-catalogo__enlace"
-                           href="{% url 'catalogo_marcas_equipos' %}?marca={{ marca.pk }}">
-                            <span class="equipos-catalogo__nombre">{{ marca.nombre }}</span>
-                            <span class="equipos-catalogo__conteo">
-                                {{ marca.total_modelos }} modelo{{ marca.total_modelos|pluralize }}
-                            </span>
-                        </a>
-                        <form method="post"
-                              action="{% url 'cambiar_estado_marca_equipos' marca.pk %}">
-                            {% csrf_token %}
-                            <button class="equipos-catalogo__estado"
-                                    type="submit"
-                                    title="{% if marca.activo %}Desactivar{% else %}Reactivar{% endif %} {{ marca.nombre }}">
-                                {% if marca.activo %}
-                                    <i class="bi bi-toggle-on"></i>
-                                {% else %}
-                                    <i class="bi bi-toggle-off"></i>
-                                {% endif %}
-                            </button>
-                        </form>
-                    </li>
-                {% empty %}
-                    <li class="equipos-catalogo__vacio">Todavía no hay marcas.</li>
-                {% endfor %}
-            </ul>
-        </section>
-
-        {% comment %}
-           Columna derecha: modelos de la marca elegida. Sin marca seleccionada
-           no se muestra formulario, porque un modelo no puede existir suelto.
-        {% endcomment %}
-        <section class="equipos-registro__seccion equipos-catalogo__columna">
-            <h3 class="equipos-registro__titulo">
-                <i class="bi bi-diagram-3"></i>
-                {% if marca_seleccionada %}
-                    Modelos de {{ marca_seleccionada.nombre }}
-                {% else %}
-                    Modelos
+            {% if tipo_seleccionado %}
+                {% if not tipo_seleccionado.activo %}
+                    <p class="equipos-catalogo__aviso">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        Este tipo está desactivado: no aparecerá al registrar equipos.
+                    </p>
                 {% endif %}
-            </h3>
+
+                <form class="equipos-catalogo__form"
+                      method="post"
+                      action="{% url 'agregar_marca_equipos' tipo_seleccionado.pk %}">
+                    {% csrf_token %}
+                    <div class="equipos-catalogo__fila">
+                        {{ form_marca.nombre }}
+                        <button class="equipos-catalogo__boton" type="submit">
+                            <i class="bi bi-plus-lg"></i>
+                            <span>Agregar</span>
+                        </button>
+                    </div>
+                    {# Sugerencias con las marcas que ya existen en el sistema:
+                       si Epson esta en impresoras, al escribirla en escaneres
+                       se reutiliza la misma en vez de crear un duplicado. #}
+                    <datalist id="marcas_existentes_equipos">
+                        {% for nombre in marcas_existentes %}
+                            <option value="{{ nombre }}"></option>
+                        {% endfor %}
+                    </datalist>
+                    <p class="equipos-registro__ayuda">
+                        Si la marca ya existe en otro tipo, se reutiliza.
+                    </p>
+                </form>
+
+                <ul class="equipos-catalogo__lista">
+                    {% for marca in marcas %}
+                        <li class="equipos-catalogo__item{% if marca_seleccionada and marca.pk == marca_seleccionada.pk %} equipos-catalogo__item--activo{% endif %}{% if not marca.activo %} equipos-catalogo__item--inactivo{% endif %}">
+                            <a class="equipos-catalogo__enlace"
+                               href="?tipo={{ tipo_seleccionado.pk }}&marca={{ marca.pk }}">
+                                <span class="equipos-catalogo__nombre">{{ marca.nombre }}</span>
+                                <span class="equipos-catalogo__meta">
+                                    {{ marca.total_modelos }} modelo{{ marca.total_modelos|pluralize }}
+                                </span>
+                            </a>
+                            <div class="equipos-catalogo__acciones">
+                                <form method="post"
+                                      action="{% url 'quitar_marca_tipo_equipos' tipo_seleccionado.pk marca.pk %}">
+                                    {% csrf_token %}
+                                    <button class="equipos-catalogo__icono"
+                                            type="submit"
+                                            title="Quitar {{ marca.nombre }} de {{ tipo_seleccionado.nombre }}">
+                                        <i class="bi bi-x-lg"></i>
+                                    </button>
+                                </form>
+                                <form method="post"
+                                      action="{% url 'cambiar_estado_marca_equipos' marca.pk %}">
+                                    {% csrf_token %}
+                                    <input type="hidden"
+                                           name="volver"
+                                           value="?tipo={{ tipo_seleccionado.pk }}">
+                                    <button class="equipos-catalogo__icono"
+                                            type="submit"
+                                            title="{% if marca.activo %}Desactivar{% else %}Reactivar{% endif %} {{ marca.nombre }} en todo el sistema">
+                                        <i class="bi bi-toggle-{% if marca.activo %}on{% else %}off{% endif %}"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </li>
+                    {% empty %}
+                        <li class="equipos-catalogo__vacio">
+                            {{ tipo_seleccionado.nombre }} todavía no tiene marcas.
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p class="equipos-catalogo__vacio">
+                    <i class="bi bi-arrow-left-circle"></i>
+                    Sin tipo elegido no hay marcas que mostrar.
+                </p>
+            {% endif %}
+        </section>
+
+        {# ---------- Paso 3: modelos de la marca ---------- #}
+        <section class="equipos-catalogo__panel">
+            <header class="equipos-catalogo__encabezado">
+                <h3>
+                    <span class="equipos-catalogo__numero">3</span>
+                    Modelos
+                </h3>
+                <p>
+                    {% if marca_seleccionada %}
+                        {{ marca_seleccionada.nombre }} para
+                        {{ tipo_seleccionado.nombre }}.
+                    {% elif tipo_seleccionado %}
+                        Elija una marca para ver sus modelos.
+                    {% else %}
+                        Elija un tipo y una marca.
+                    {% endif %}
+                </p>
+            </header>
 
             {% if marca_seleccionada %}
                 {% if not marca_seleccionada.activo %}
@@ -202,17 +286,15 @@
 
                 <form class="equipos-catalogo__form"
                       method="post"
-                      action="{% url 'agregar_modelo_equipos' marca_seleccionada.pk %}">
+                      action="{% url 'agregar_modelo_equipos' tipo_seleccionado.pk marca_seleccionada.pk %}">
                     {% csrf_token %}
-                    <div class="equipos-registro__campo">
-                        <label for="nombre_modelo_catalogo">Nuevo modelo *</label>
+                    <div class="equipos-catalogo__fila">
                         {{ form_modelo.nombre }}
+                        <button class="equipos-catalogo__boton" type="submit">
+                            <i class="bi bi-plus-lg"></i>
+                            <span>Agregar</span>
+                        </button>
                     </div>
-                    <button class="formularioBotones-boton equipos-catalogo__boton"
-                            type="submit">
-                        <i class="bi bi-plus-lg"></i>
-                        Agregar modelo
-                    </button>
                 </form>
 
                 <ul class="equipos-catalogo__lista">
@@ -220,37 +302,33 @@
                         <li class="equipos-catalogo__item{% if not modelo.activo %} equipos-catalogo__item--inactivo{% endif %}">
                             <span class="equipos-catalogo__enlace">
                                 <span class="equipos-catalogo__nombre">{{ modelo.nombre }}</span>
-                                <span class="equipos-catalogo__conteo">
+                                <span class="equipos-catalogo__meta">
                                     {{ modelo.total_equipos }} equipo{{ modelo.total_equipos|pluralize }}
                                 </span>
                             </span>
-                            <form method="post"
-                                  action="{% url 'cambiar_estado_modelo_equipos' modelo.pk %}">
-                                {% csrf_token %}
-                                <button class="equipos-catalogo__estado"
-                                        type="submit"
-                                        title="{% if modelo.activo %}Desactivar{% else %}Reactivar{% endif %} {{ modelo.nombre }}">
-                                    {% if modelo.activo %}
-                                        <i class="bi bi-toggle-on"></i>
-                                    {% else %}
-                                        <i class="bi bi-toggle-off"></i>
-                                    {% endif %}
-                                </button>
-                            </form>
+                            <div class="equipos-catalogo__acciones">
+                                <form method="post"
+                                      action="{% url 'cambiar_estado_modelo_equipos' modelo.pk %}">
+                                    {% csrf_token %}
+                                    <button class="equipos-catalogo__icono"
+                                            type="submit"
+                                            title="{% if modelo.activo %}Desactivar{% else %}Reactivar{% endif %} {{ modelo.nombre }}">
+                                        <i class="bi bi-toggle-{% if modelo.activo %}on{% else %}off{% endif %}"></i>
+                                    </button>
+                                </form>
+                            </div>
                         </li>
                     {% empty %}
                         <li class="equipos-catalogo__vacio">
-                            Esta marca todavía no tiene modelos.
+                            {{ marca_seleccionada.nombre }} todavía no tiene modelos
+                            de este tipo.
                         </li>
                     {% endfor %}
                 </ul>
             {% else %}
-                {% comment %}
-                   Sin referencias a la posicion: en telefono las dos columnas
-                   se apilan y "la izquierda" deja de existir.
-                {% endcomment %}
                 <p class="equipos-catalogo__vacio">
-                    Seleccione una marca para ver y agregar sus modelos.
+                    <i class="bi bi-arrow-left-circle"></i>
+                    Los modelos pertenecen a una marca dentro de un tipo.
                 </p>
             {% endif %}
         </section>

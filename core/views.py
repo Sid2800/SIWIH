@@ -6,10 +6,11 @@ from core.forms import CustomLoginForm
 from core.mixins import UnidadRolRequiredMixin
 from django.urls import reverse_lazy, reverse
 from django.shortcuts import get_object_or_404, redirect
-from django.http import Http404, HttpResponse
+from django.http import Http404, HttpResponse, HttpResponseNotModified
 from core.constants import permisos
 from core.services.usuario_service import UsuarioService
 from core.services.server_image.media_service import MediaService
+from core.services.server_image.auth_service import ImageServerAuthError
 from core.services.server_image.request_service import RequestService
 
 # Create your views here.
@@ -57,18 +58,37 @@ class CustomLoginView(LoginView):
 
 
 @login_required
-def media_equipo_proxy(request, ruta_archivo):
-   """Sirve fotos de equipos usando la sesion y el host del SIWIH principal."""
+async def media_equipo_proxy(request, ruta_archivo):
+   """Sirve fotos de equipos usando la sesion y el host del SIWIH principal.
+
+   Es asincrona porque es la vista que mas se repite del modulo y lo unico que
+   hace es esperar: una ficha con seis fotografias son seis descargas contra
+   SIWIH Images. Servida de forma sincrona, cada espera ocupa un hilo del pool
+   del servidor mientras no llega la respuesta, y tres personas abriendo
+   fichas a la vez bastaban para dejar al resto en cola. Asi las esperas no
+   ocupan hilo y el limite lo pone la red, no el servidor.
+
+   Necesita un servidor ASGI: con Daphne se ejecuta tal cual. Bajo WSGI
+   Django la envolveria en su propio bucle y seguiria funcionando, solo que
+   sin la ventaja.
+   """
    try:
-      archivo = RequestService.obtener_archivo_media_equipo(
+      archivo = await RequestService.obtener_archivo_media_equipo_async(
          f"EQUIPOS/{ruta_archivo}"
       )
    except ValueError as exc:
       raise Http404("Imagen de equipo no valida") from exc
-   except RuntimeError:
+   except (RuntimeError, ImageServerAuthError):
       # El navegador recibe un estado temporal sin revelar la direccion ni
       # detalles internos del servidor de imagenes.
       return HttpResponse(status=503)
+
+   # El nombre del archivo es un uuid: el contenido de una ruta nunca cambia,
+   # asi que si el navegador ya la tiene no hace falta volver a bajarla.
+   etag = archivo.get("etag")
+
+   if etag and request.headers.get("If-None-Match") == etag:
+      return HttpResponseNotModified()
 
    response = HttpResponse(
       archivo["contenido"],
@@ -77,7 +97,7 @@ def media_equipo_proxy(request, ruta_archivo):
    response["Cache-Control"] = "private, max-age=300"
    response["X-Content-Type-Options"] = "nosniff"
 
-   if archivo.get("etag"):
-      response["ETag"] = archivo["etag"]
+   if etag:
+      response["ETag"] = etag
 
    return response

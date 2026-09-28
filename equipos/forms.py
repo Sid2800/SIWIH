@@ -490,7 +490,6 @@ class DispositivoCreateForm(forms.ModelForm):
         model = Dispositivo
         fields = [
             "tipo",
-            "tipo_tecnologia",
             "marca",
             "modelo",
             "area_gestora",
@@ -516,12 +515,6 @@ class DispositivoCreateForm(forms.ModelForm):
                 attrs={
                     "class": "formularioCampo-select",
                     "id": "tipo_dispositivo",
-                }
-            ),
-            "tipo_tecnologia": forms.Select(
-                attrs={
-                    "class": "formularioCampo-select",
-                    "id": "tipo_tecnologia_dispositivo",
                 }
             ),
             "marca": forms.Select(
@@ -718,31 +711,44 @@ class DispositivoCreateForm(forms.ModelForm):
             "buscar_tipos_equipos"
         )
 
-        # Marca y modelo se cargan por AJAX, asi que el HTML solo necesita
-        # contener la opcion ya elegida. Cargar los catalogos completos serian
-        # cientos de <option> inutiles en cada carga de pagina.
-        self.fields["marca"].queryset = MarcaDispositivo.objects.filter(filtro_marca)
+        # Los tres selectores van en cascada: el tipo manda, la marca se limita
+        # a las que fabrican ese tipo y el modelo a los de esa marca para ese
+        # tipo. El queryset no es solo lo que se ofrece en pantalla: es lo que
+        # Django acepta al validar, asi que una combinacion imposible se
+        # rechaza aunque llegue por un POST que se salte el navegador.
+        tipo_en_juego = self._resolver_valor_en_juego("tipo")
+        marca_en_juego = self._resolver_valor_en_juego("marca")
+
+        if tipo_en_juego:
+            self.fields["marca"].queryset = MarcaDispositivo.objects.filter(
+                filtro_marca, tipos__id=tipo_en_juego
+            ).distinct()
+        else:
+            self.fields["marca"].queryset = MarcaDispositivo.objects.none()
+            # Sin tipo no hay marcas que ofrecer. El atributo deja el estado
+            # explicito en el HTML, sin depender de que el JavaScript cargue.
+            self.fields["marca"].widget.attrs["disabled"] = "disabled"
+
         self.fields["marca"].empty_label = "Sin especificar"
+        self.fields["marca"].error_messages["invalid_choice"] = (
+            "Esta marca no está registrada en el tipo de equipo elegido."
+        )
 
-        # El modelo depende de la marca: su queryset se limita a los modelos de
-        # la marca en juego. Si llega un modelo de otra marca, queda fuera del
-        # queryset y Django lo rechaza. Eso cubre a la vez las dos reglas:
-        # rechazar la combinacion invalida y no conservar un modelo que ya no
-        # corresponde tras cambiar de marca.
-        marca_en_juego = self._resolver_marca_en_juego()
-
-        if marca_en_juego:
+        if tipo_en_juego and marca_en_juego:
             self.fields["modelo"].queryset = ModeloDispositivo.objects.filter(
-                filtro_modelo, marca_id=marca_en_juego
+                filtro_modelo,
+                tipo_id=tipo_en_juego,
+                marca_id=marca_en_juego,
             ).select_related("marca")
         else:
             self.fields["modelo"].queryset = ModeloDispositivo.objects.none()
+            self.fields["modelo"].widget.attrs["disabled"] = "disabled"
 
         self.fields["modelo"].empty_label = "INDEFINIDO"
         # Sin esto el rechazo saldria como "Escoja una opcion valida", que no
-        # explica que el problema es la pareja marca-modelo.
+        # explica que el problema es la combinacion tipo-marca-modelo.
         self.fields["modelo"].error_messages["invalid_choice"] = (
-            "El modelo seleccionado no pertenece a la marca elegida."
+            "El modelo no corresponde al tipo y la marca elegidos."
         )
         self.fields["modelo"].widget.attrs["data-url-modelos"] = reverse(
             "buscar_modelos_equipos"
@@ -750,11 +756,6 @@ class DispositivoCreateForm(forms.ModelForm):
         self.fields["marca"].widget.attrs["data-url-marcas"] = reverse(
             "buscar_marcas_equipos"
         )
-
-        if not marca_en_juego:
-            # Sin marca no hay nada que elegir; el navegador tambien lo bloquea,
-            # pero el atributo deja el estado explicito en el HTML.
-            self.fields["modelo"].widget.attrs["disabled"] = "disabled"
         self.fields["area_gestora"].queryset = AreaGestora.objects.filter(
             filtro_area_gestora
         ).exclude(nombre="INDEFINIDO")
@@ -769,10 +770,6 @@ class DispositivoCreateForm(forms.ModelForm):
         self.fields["modalidad_procedencia"].choices = [
             ("", "Seleccione la modalidad"),
             *ModalidadProcedencia.choices,
-        ]
-        self.fields["tipo_tecnologia"].choices = [
-            ("", "Seleccione el tipo de tecnología"),
-            *TipoTecnologiaDispositivo.choices,
         ]
         # Sin garantia se expresa dejando los tres campos vacios. Y no se
         # limita el calendario: se registran equipos instalados hace anios,
@@ -870,20 +867,24 @@ class DispositivoCreateForm(forms.ModelForm):
 
         return []
 
-    def _resolver_marca_en_juego(self):
-        """Marca vigente para acotar los modelos disponibles.
+    def _resolver_valor_en_juego(self, campo):
+        """Identificador vigente de tipo o marca, para acotar la cascada.
 
-        En un envio manda lo que llega en el POST, porque el usuario pudo haber
-        cambiado de marca. Al abrir la edicion, la del equipo guardado.
+        En un envio manda lo que llega en el POST, porque el usuario pudo
+        haber cambiado de tipo o de marca. Al abrir la edicion, lo del equipo
+        guardado. Si no hay ninguno, no se puede acotar nada.
         """
         if self.is_bound:
-            valor = self.data.get(self.add_prefix("marca"))
+            valor = self.data.get(self.add_prefix(campo))
             return int(valor) if str(valor or "").isdigit() else None
 
-        if self.instance and self.instance.pk and self.instance.marca_id:
-            return self.instance.marca_id
+        if self.instance and self.instance.pk:
+            guardado = getattr(self.instance, f"{campo}_id", None)
 
-        valor = self.initial.get("marca")
+            if guardado:
+                return guardado
+
+        valor = self.initial.get(campo)
         return int(valor) if str(valor or "").isdigit() else None
 
     def clean_ubicacion_fisica(self):
@@ -1090,35 +1091,36 @@ class ProcedenciaCatalogoForm(forms.ModelForm):
         return rtn
 
 
-class MarcaCatalogoForm(forms.ModelForm):
-    """Alta de marcas desde la vista de catalogo.
+class MarcaEnTipoForm(forms.Form):
+    """Declara una marca dentro de un tipo de equipo.
 
-    Las marcas no se crean desde el formulario de equipos: alli solo se eligen.
-    Concentrar el alta en un solo sitio evita que un error de tecleo genere
+    Un solo campo para dos gestos que el usuario no distingue: si la marca ya
+    existe en el sistema se reutiliza, y si no, se crea. Antes eran dos pasos
+    en dos sitios distintos -crear la marca global y luego encontrarla- y era
+    justo donde la gente se perdia.
+
+    Las marcas no se crean desde el formulario de equipos: alli solo se
+    eligen. Concentrar el alta aqui evita que un error de tecleo genere
     marcas duplicadas mientras alguien registra un aparato con prisa.
     """
 
-    class Meta:
-        model = MarcaDispositivo
-        fields = ["nombre", "descripcion"]
-        widgets = {
-            "nombre": forms.TextInput(
-                attrs={
-                    "class": "formularioCampo-text",
-                    "id": "nombre_marca_catalogo",
-                    "placeholder": "Ingrese Marca",
-                    "maxlength": 100,
-                }
-            ),
-            "descripcion": forms.TextInput(
-                attrs={
-                    "class": "formularioCampo-text",
-                    "id": "descripcion_marca_catalogo",
-                    "placeholder": "Opcional",
-                    "maxlength": 250,
-                }
-            ),
-        }
+    nombre = forms.CharField(
+        max_length=100,
+        label="Marca",
+        widget=forms.TextInput(
+            attrs={
+                "class": "formularioCampo-text",
+                "id": "nombre_marca_catalogo",
+                "list": "marcas_existentes_equipos",
+                "placeholder": "Escriba o elija una marca",
+                "autocomplete": "off",
+            }
+        ),
+    )
+
+    def __init__(self, *args, tipo=None, **kwargs):
+        self.tipo = tipo
+        super().__init__(*args, **kwargs)
 
     def clean_nombre(self):
         nombre = normalizar_nombre_catalogo(self.cleaned_data.get("nombre"))
@@ -1126,13 +1128,26 @@ class MarcaCatalogoForm(forms.ModelForm):
         if not nombre:
             raise forms.ValidationError("Debe ingresar el nombre de la marca.")
 
-        duplicada = MarcaDispositivo.objects.filter(nombre=nombre).exclude(
-            pk=self.instance.pk
-        )
-        if duplicada.exists():
-            raise forms.ValidationError("Ya existe una marca con ese nombre.")
+        if self.tipo and self.tipo.marcas.filter(nombre=nombre).exists():
+            raise forms.ValidationError(
+                "Esta marca ya está registrada en este tipo de equipo."
+            )
 
         return nombre
+
+    def guardar(self):
+        """Devuelve la marca ya vinculada al tipo, creandola si hace falta."""
+        nombre = self.cleaned_data["nombre"]
+        marca, creada = MarcaDispositivo.objects.get_or_create(nombre=nombre)
+
+        if not marca.activo:
+            # Reutilizar una marca desactivada es mas sano que crear un
+            # duplicado: el nombre es unico y ya existe.
+            marca.activo = True
+            marca.save(update_fields=["activo"])
+
+        self.tipo.marcas.add(marca)
+        return marca, creada
 
 
 class TipoCatalogoForm(forms.ModelForm):
@@ -1146,13 +1161,24 @@ class TipoCatalogoForm(forms.ModelForm):
 
     class Meta:
         model = TipoDispositivo
-        fields = ["nombre", "categoria", "categorias_secundarias", "descripcion"]
+        fields = [
+            "nombre",
+            "categoria",
+            "tipo_tecnologia",
+            "categorias_secundarias",
+            "descripcion",
+        ]
         labels = {
             "categoria": "Categoría principal",
+            "tipo_tecnologia": "Tecnología",
             "categorias_secundarias": "También pertenece a",
         }
         help_texts = {
             "categoria": "Define qué área da el mantenimiento.",
+            "tipo_tecnologia": (
+                "Igual para todos los equipos de este tipo: no se pregunta "
+                "en cada registro."
+            ),
             "categorias_secundarias": (
                 "Solo para equipos híbridos, como un ecógrafo con estación "
                 "de trabajo."
@@ -1171,6 +1197,12 @@ class TipoCatalogoForm(forms.ModelForm):
                 attrs={
                     "class": "formularioCampo-select",
                     "id": "categoria_tipo_catalogo",
+                }
+            ),
+            "tipo_tecnologia": forms.Select(
+                attrs={
+                    "class": "formularioCampo-select",
+                    "id": "tecnologia_tipo_catalogo",
                 }
             ),
             "categorias_secundarias": forms.CheckboxSelectMultiple(
@@ -1244,11 +1276,11 @@ class TipoCatalogoForm(forms.ModelForm):
 
 
 class ModeloCatalogoForm(forms.ModelForm):
-    """Alta de modelos dentro de una marca concreta.
+    """Alta de modelos dentro de una pareja tipo-marca concreta.
 
-    La marca no es un campo del formulario: viene de la marca seleccionada en
-    la pantalla, para que no se pueda crear un modelo bajo otra marca
-    manipulando el POST.
+    Ni el tipo ni la marca son campos del formulario: vienen de lo que esta
+    seleccionado en la pantalla, para que no se pueda colar un modelo bajo
+    otro aparato manipulando el POST.
     """
 
     class Meta:
@@ -1273,12 +1305,15 @@ class ModeloCatalogoForm(forms.ModelForm):
             ),
         }
 
-    def __init__(self, *args, marca=None, **kwargs):
+    def __init__(self, *args, tipo=None, marca=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.tipo = tipo
         self.marca = marca
-        # Se asigna ya en la instancia porque _post_clean() valida el modelo
-        # antes de llegar a save(), y sin marca la validacion fallaria pidiendo
-        # un campo que este formulario no expone.
+        # Se asignan ya en la instancia porque _post_clean() valida el modelo
+        # antes de llegar a save(), y sin tipo ni marca la validacion fallaria
+        # pidiendo campos que este formulario no expone.
+        if tipo is not None:
+            self.instance.tipo = tipo
         if marca is not None:
             self.instance.marca = marca
 
@@ -1288,19 +1323,22 @@ class ModeloCatalogoForm(forms.ModelForm):
         if not nombre:
             raise forms.ValidationError("Debe ingresar el nombre del modelo.")
 
-        if self.marca is None:
-            raise forms.ValidationError("Seleccione primero una marca.")
+        if self.tipo is None or self.marca is None:
+            raise forms.ValidationError(
+                "Seleccione primero el tipo de equipo y la marca."
+            )
 
-        # El mismo nombre puede existir en otras marcas; solo se comprueba
-        # dentro de esta. La restriccion de base cubre la carrera entre dos
-        # envios simultaneos.
+        # El mismo nombre puede existir en otras marcas, y una marca puede
+        # llamar igual a productos de tipos distintos: solo se comprueba
+        # dentro de esta pareja. La restriccion de base cubre la carrera entre
+        # dos envios simultaneos.
         duplicado = ModeloDispositivo.objects.filter(
-            marca=self.marca, nombre=nombre
+            tipo=self.tipo, marca=self.marca, nombre=nombre
         ).exclude(pk=self.instance.pk)
 
         if duplicado.exists():
             raise forms.ValidationError(
-                "Esta marca ya tiene un modelo con ese nombre."
+                "Esta marca ya tiene un modelo con ese nombre para este tipo."
             )
 
         return nombre

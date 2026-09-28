@@ -102,10 +102,27 @@ def buscar_procedencias(request):
 @login_required
 @registrar_errores_vista("Error al buscar marcas de equipo")
 def buscar_marcas(request):
-    # Alimenta el Select2 de marca. Sin texto devuelve las primeras marcas para
-    # que el usuario pueda abrir y elegir con el raton sin escribir nada.
+    """Marcas que fabrican el tipo de equipo elegido.
+
+    El tipo es obligatorio: devolver el catalogo completo obligaria a buscar
+    entre todas las marcas del hospital las tres que fabrican el aparato que
+    se tiene delante, y permitiria asignarle una marca que no lo fabrica.
+    """
+    tipo_id = (request.GET.get("tipo_id") or "").strip()
+
+    if not tipo_id.isdigit():
+        return JsonResponse(
+            {"results": [], "pagination": {"more": False},
+             "error": "Debe indicar el tipo de equipo."},
+            status=400,
+        )
+
     consulta = request.GET.get("q", "").strip()
-    marcas = MarcaDispositivo.objects.filter(activo=True)
+    marcas = MarcaDispositivo.objects.filter(
+        activo=True,
+        tipos__id=int(tipo_id),
+        tipos__activo=True,
+    ).distinct()
 
     if consulta:
         marcas = marcas.filter(nombre__icontains=consulta)
@@ -122,20 +139,25 @@ def buscar_marcas(request):
 @login_required
 @registrar_errores_vista("Error al buscar modelos de equipo")
 def buscar_modelos(request):
-    # Solo devuelve modelos activos de la marca pedida. La marca es obligatoria:
-    # sin ella no hay lista que mostrar, y devolver el catalogo entero
-    # permitiria elegir un modelo de otro fabricante.
+    """Modelos que existen de esa marca para ese tipo.
+
+    Hacen falta los dos: un modelo es un producto concreto (la L3250 es la
+    impresora de Epson), asi que sin el tipo se podrian ofrecer modelos de
+    otro aparato de la misma marca.
+    """
+    tipo_id = (request.GET.get("tipo_id") or "").strip()
     marca_id = (request.GET.get("marca_id") or "").strip()
 
-    if not marca_id.isdigit():
+    if not tipo_id.isdigit() or not marca_id.isdigit():
         return JsonResponse(
             {"results": [], "pagination": {"more": False},
-             "error": "Debe indicar la marca."},
+             "error": "Debe indicar el tipo de equipo y la marca."},
             status=400,
         )
 
     consulta = request.GET.get("q", "").strip()
     modelos = ModeloDispositivo.objects.filter(
+        tipo_id=int(tipo_id),
         marca_id=int(marca_id),
         activo=True,
         marca__activo=True,
@@ -154,13 +176,13 @@ def buscar_modelos(request):
 
 @exige_formularios_equipos_json
 @login_required
-@registrar_errores_vista("Error al consultar la categoria del tipo de equipo")
-def categoria_tipo(request):
-    """Categorias del tipo elegido, para confirmarlas en el formulario.
+@registrar_errores_vista("Error al consultar los datos del tipo de equipo")
+def datos_tipo(request):
+    """Todo lo que el tipo ya sabe de si mismo: categoria y tecnologia.
 
-    La categoria no se captura: la trae el tipo. Se devuelve para mostrarla y
-    que quien registra note de inmediato si eligio el tipo equivocado, antes
-    de llenar el resto de la ficha.
+    Ninguno de los dos se captura por equipo, los trae el tipo. Se devuelven
+    para mostrarlos en el formulario y que quien registra note de inmediato si
+    eligio el tipo equivocado, antes de llenar el resto de la ficha.
     """
     tipo_id = (request.GET.get("tipo_id") or "").strip()
 
@@ -184,6 +206,10 @@ def categoria_tipo(request):
             categoria.nombre
             for categoria in tipo.categorias_secundarias.all()
         ],
+        "tecnologia": tipo.get_tipo_tecnologia_display(),
+        # Cuantas marcas tiene declaradas: si son cero, el formulario avisa de
+        # que hay que registrarlas en el catalogo antes de seguir.
+        "total_marcas": tipo.marcas.filter(activo=True).count(),
     })
 
 

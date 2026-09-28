@@ -340,8 +340,10 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    // Marca y modelo son dos Select2 encadenados. Los catalogos se cargan por
-    // AJAX y no aceptan valores libres: las opciones nacen en sus catalogos.
+    // Tipo, marca y modelo son tres Select2 en cascada: cada uno solo ofrece
+    // lo que existe para lo ya elegido. Los catalogos se cargan por AJAX y no
+    // aceptan valores libres; las opciones nacen en el catalogo.
+    const tipoSelect = $('#tipo_dispositivo');
     const marcaSelect = $('#marca_dispositivo');
     const modeloSelect = $('#modelo_dispositivo');
 
@@ -376,47 +378,34 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    function marcaElegida() {
-        const valor = marcaSelect.val();
+    function valorElegido(elemento) {
+        const valor = elemento.val();
         return valor ? String(valor) : '';
     }
 
-    function refrescarEstadoModelo() {
-        if (!modeloSelect.length) {
-            return;
-        }
+    function tipoElegido() {
+        return valorElegido(tipoSelect);
+    }
+
+    function marcaElegida() {
+        return valorElegido(marcaSelect);
+    }
+
+    // Cada eslabon se habilita cuando el anterior tiene valor. Deshabilitar en
+    // vez de esconder deja ver que el campo existe y por que todavia no se
+    // puede usar; el placeholder lo explica.
+    function refrescarCascada() {
+        const hayTipo = tipoElegido() !== '';
         const hayMarca = marcaElegida() !== '';
-        modeloSelect.prop('disabled', !hayMarca);
+
+        if (marcaSelect.length) {
+            marcaSelect.prop('disabled', !hayTipo);
+        }
+
+        if (modeloSelect.length) {
+            modeloSelect.prop('disabled', !(hayTipo && hayMarca));
+        }
     }
-
-    if (marcaSelect.length && marcaSelect.select2) {
-        configurarSelectRemoto(marcaSelect, {
-            url: marcaSelect.data('url-marcas'),
-            placeholder: 'Buscar o elegir marca',
-            sinResultados: 'No se encontraron marcas'
-        });
-    }
-
-    if (modeloSelect.length && modeloSelect.select2) {
-        configurarSelectRemoto(modeloSelect, {
-            url: modeloSelect.data('url-modelos'),
-            placeholder: 'Seleccione primero una marca',
-            sinResultados: 'Esta marca no tiene modelos activos',
-            extra: function () {
-                return { marca_id: marcaElegida() };
-            }
-        });
-
-        refrescarEstadoModelo();
-
-        marcaSelect.on('change', function () {
-            modeloSelect.val(null).trigger('change.select2');
-            refrescarEstadoModelo();
-        });
-    }
-
-    // Tipo de equipo usa el mismo Select2 remoto y tampoco admite valores libres.
-    const tipoSelect = $('#tipo_dispositivo');
 
     if (tipoSelect.length && tipoSelect.select2) {
         configurarSelectRemoto(tipoSelect, {
@@ -426,17 +415,53 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // La categoria no se captura: pertenece al tipo. Se muestra para que quien
-    // registra note de inmediato si eligio el tipo equivocado, antes de llenar
-    // el resto de la ficha.
-    const categoriaTipo = document.getElementById('categoria_tipo_dispositivo');
+    if (marcaSelect.length && marcaSelect.select2) {
+        configurarSelectRemoto(marcaSelect, {
+            url: marcaSelect.data('url-marcas'),
+            placeholder: 'Elija primero el tipo de equipo',
+            sinResultados: 'Este tipo no tiene marcas registradas',
+            extra: function () {
+                return { tipo_id: tipoElegido() };
+            }
+        });
+    }
 
-    async function mostrarCategoriaTipo(tipoId) {
-        const url = categoriaTipo ? categoriaTipo.dataset.urlCategoria : '';
+    if (modeloSelect.length && modeloSelect.select2) {
+        configurarSelectRemoto(modeloSelect, {
+            url: modeloSelect.data('url-modelos'),
+            placeholder: 'Elija primero la marca',
+            sinResultados: 'Esta marca no tiene modelos de este tipo',
+            extra: function () {
+                return { tipo_id: tipoElegido(), marca_id: marcaElegida() };
+            }
+        });
+    }
+
+    // Al cambiar de tipo caen marca y modelo: los que estaban elegidos
+    // pertenecian al tipo anterior y ya no son opciones validas.
+    tipoSelect.on('change', function () {
+        marcaSelect.val(null).trigger('change.select2');
+        modeloSelect.val(null).trigger('change.select2');
+        refrescarCascada();
+        mostrarDatosTipo(tipoElegido());
+    });
+
+    marcaSelect.on('change', function () {
+        modeloSelect.val(null).trigger('change.select2');
+        refrescarCascada();
+    });
+
+    // Categoria y tecnologia no se capturan: las trae el tipo. Se muestran
+    // para que quien registra note de inmediato si eligio el tipo equivocado,
+    // antes de llenar el resto de la ficha.
+    const datosTipo = document.getElementById('datos_tipo_dispositivo');
+
+    async function mostrarDatosTipo(tipoId) {
+        const url = datosTipo ? datosTipo.dataset.urlDatos : '';
 
         if (!url || !tipoId) {
-            if (categoriaTipo) {
-                categoriaTipo.hidden = true;
+            if (datosTipo) {
+                datosTipo.hidden = true;
             }
             return;
         }
@@ -448,28 +473,35 @@ document.addEventListener('DOMContentLoaded', function () {
             );
 
             if (!respuesta.ok) {
-                categoriaTipo.hidden = true;
+                datosTipo.hidden = true;
                 return;
             }
 
             const datos = await respuesta.json();
-            const etiquetas = [datos.categoria].concat(datos.secundarias || []);
+            const categorias = [datos.categoria].concat(datos.secundarias || []);
+            const partes = [categorias.join(' + '), datos.tecnologia];
 
-            categoriaTipo.textContent = `Categoría: ${etiquetas.join(' + ')}`;
-            categoriaTipo.hidden = false;
+            // Un tipo sin marcas deja la cascada sin nada que ofrecer. Vale
+            // mas avisarlo aqui que dejar al usuario abriendo un desplegable
+            // vacio sin saber por que.
+            if (!datos.total_marcas) {
+                partes.push('sin marcas registradas en el catálogo');
+                datosTipo.classList.add('equipos-registro__ayuda--aviso');
+            } else {
+                datosTipo.classList.remove('equipos-registro__ayuda--aviso');
+            }
+
+            datosTipo.textContent = partes.join(' · ');
+            datosTipo.hidden = false;
         } catch (error) {
-            categoriaTipo.hidden = true;
+            datosTipo.hidden = true;
         }
     }
 
-    if (tipoSelect.length) {
-        tipoSelect.on('change', function () {
-            mostrarCategoriaTipo(tipoSelect.val());
-        });
+    refrescarCascada();
 
-        if (tipoSelect.val()) {
-            mostrarCategoriaTipo(tipoSelect.val());
-        }
+    if (tipoElegido()) {
+        mostrarDatosTipo(tipoElegido());
     }
 
     // La procedencia se busca contra el servidor igual que las anteriores. El

@@ -56,24 +56,21 @@
             </h3>
 
             <div class="equipos-registro__campos equipos-registro__campos--dos">
-                <div class="equipos-registro__campo">
+                {% comment %}
+                   Los tres van en cascada y en este orden porque asi es la
+                   realidad del catalogo: el tipo dice que marcas lo fabrican,
+                   y la marca que modelos existen de ese aparato. Elegir el
+                   tipo tambien resuelve su categoria y su tecnologia, que no
+                   se preguntan. Lo rellena registroEquipo.js.
+                {% endcomment %}
+                <div class="equipos-registro__campo equipos-registro__campo--completo">
                     <label for="tipo_dispositivo">Tipo de equipo *</label>
                     {{ form.tipo }}
-                    {% comment %}
-                       La categoria no se pregunta: la trae el tipo elegido. Se
-                       muestra para que quien registra confirme que eligio el
-                       tipo correcto, y la rellena registroEquipo.js.
-                    {% endcomment %}
                     <p class="equipos-registro__ayuda"
-                       id="categoria_tipo_dispositivo"
-                       data-url-categoria="{% url 'categoria_tipo_equipos' %}"
+                       id="datos_tipo_dispositivo"
+                       data-url-datos="{% url 'datos_tipo_equipos' %}"
                        hidden></p>
                     {{ form.tipo.errors }}
-                </div>
-                <div class="equipos-registro__campo">
-                    <label for="tipo_tecnologia_dispositivo">Tipo de tecnología *</label>
-                    {{ form.tipo_tecnologia }}
-                    {{ form.tipo_tecnologia.errors }}
                 </div>
                 <div class="equipos-registro__campo">
                     <label for="marca_dispositivo">Marca</label>

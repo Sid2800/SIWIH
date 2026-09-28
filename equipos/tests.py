@@ -16,18 +16,24 @@ from django.test import TestCase
 from expediente.models import ExpedienteUbicacion
 from servicio.models import Unidad
 
-from .forms import ColoresOrdenadosField, TipoCatalogoForm
+from .forms import (
+    ColoresOrdenadosField,
+    MarcaEnTipoForm,
+    TipoCatalogoForm,
+)
 from .models import (
-    TipoTecnologiaDispositivo,
     AreaGestora,
     AsignacionDispositivo,
     CategoriaEquipo,
     ColorDispositivo,
     Dispositivo,
+    MarcaDispositivo,
     ModalidadProcedencia,
+    ModeloDispositivo,
     Procedencia,
     TipoDispositivo,
     TipoProcedencia,
+    TipoTecnologiaDispositivo,
     UbicacionFisica,
 )
 
@@ -42,6 +48,7 @@ class GarantiaCalculadaTests(TestCase):
         cls.tipo = TipoDispositivo.objects.create(
             nombre="MONITOR",
             categoria=cls.categoria,
+            tipo_tecnologia=TipoTecnologiaDispositivo.ELECTRONICO,
         )
         cls.area = AreaGestora.objects.get(nombre="BIOMEDICA")
         cls.procedencia = Procedencia.objects.create(
@@ -52,7 +59,6 @@ class GarantiaCalculadaTests(TestCase):
     def _crear_equipo(self, **extra):
         return Dispositivo.objects.create(
             tipo=self.tipo,
-            tipo_tecnologia=TipoTecnologiaDispositivo.ELECTRONICO,
             area_gestora=self.area,
             modalidad_procedencia=ModalidadProcedencia.COMPRA,
             procedencia=self.procedencia,
@@ -175,6 +181,7 @@ class UbicacionAsignacionTests(TestCase):
         cls.tipo = TipoDispositivo.objects.create(
             nombre="MONITOR",
             categoria=cls.categoria,
+            tipo_tecnologia=TipoTecnologiaDispositivo.ELECTRONICO,
         )
         cls.area = AreaGestora.objects.get(nombre="BIOMEDICA")
         cls.procedencia = Procedencia.objects.create(
@@ -195,7 +202,6 @@ class UbicacionAsignacionTests(TestCase):
     def test_la_ubicacion_dice_si_es_clinica(self):
         equipo = Dispositivo.objects.create(
             tipo=self.tipo,
-            tipo_tecnologia=TipoTecnologiaDispositivo.ELECTRONICO,
             area_gestora=self.area,
             modalidad_procedencia=ModalidadProcedencia.COMPRA,
             procedencia=self.procedencia,
@@ -229,6 +235,7 @@ class ColoresEquipoTests(TestCase):
         cls.tipo = TipoDispositivo.objects.create(
             nombre="CAMILLA",
             categoria=CategoriaEquipo.objects.get(nombre="MOBILIARIO CLINICO"),
+            tipo_tecnologia=TipoTecnologiaDispositivo.NO_ELECTRONICO,
         )
         cls.procedencia = Procedencia.objects.create(
             nombre="DONANTE",
@@ -238,7 +245,6 @@ class ColoresEquipoTests(TestCase):
     def _crear_equipo(self):
         return Dispositivo.objects.create(
             tipo=self.tipo,
-            tipo_tecnologia=TipoTecnologiaDispositivo.NO_ELECTRONICO,
             area_gestora=AreaGestora.objects.get(nombre="ANALOGICA"),
             modalidad_procedencia=ModalidadProcedencia.DONACION,
             procedencia=self.procedencia,
@@ -312,3 +318,170 @@ class ColoresOrdenadosFieldTests(TestCase):
 
         with self.assertRaises(ValidationError):
             campo.clean("999999")
+
+
+class CascadaTipoMarcaModeloTests(TestCase):
+    """El catalogo es una cadena: tipo -> marcas del tipo -> modelos.
+
+    Es la regla que sostiene los tres desplegables del formulario, asi que
+    tambien se comprueba desde el modelo: si se pudiera saltar por codigo, un
+    POST manipulado podria dejar un equipo con un modelo de otro aparato.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.usuario = User.objects.create_user("tecnico", password="x")
+        cls.impresora = TipoDispositivo.objects.create(
+            nombre="IMPRESORA",
+            categoria=CategoriaEquipo.objects.get(nombre="INFORMATICA"),
+        )
+        cls.camilla = TipoDispositivo.objects.create(
+            nombre="CAMILLA",
+            categoria=CategoriaEquipo.objects.get(nombre="MOBILIARIO CLINICO"),
+            tipo_tecnologia=TipoTecnologiaDispositivo.NO_ELECTRONICO,
+        )
+        cls.epson = MarcaDispositivo.objects.create(nombre="EPSON")
+        cls.impresora.marcas.add(cls.epson)
+        cls.modelo = ModeloDispositivo.objects.create(
+            tipo=cls.impresora,
+            marca=cls.epson,
+            nombre="L3250",
+        )
+        cls.area = AreaGestora.objects.get(nombre="INFORMATICA")
+        cls.procedencia = Procedencia.objects.create(
+            nombre="PROVEEDOR",
+            tipo=TipoProcedencia.EMPRESA,
+        )
+
+    def _equipo(self, **extra):
+        return Dispositivo(
+            tipo=self.impresora,
+            area_gestora=self.area,
+            modalidad_procedencia=ModalidadProcedencia.COMPRA,
+            procedencia=self.procedencia,
+            creado_por=self.usuario,
+            modificado_por=self.usuario,
+            **extra,
+        )
+
+    def test_la_tecnologia_la_trae_el_tipo(self):
+        equipo = self._equipo()
+
+        self.assertEqual(
+            equipo.tipo_tecnologia,
+            TipoTecnologiaDispositivo.ELECTRONICO,
+        )
+        self.assertEqual(equipo.get_tipo_tecnologia_display(), "Electrónico")
+
+    def test_un_modelo_exige_que_la_marca_este_en_el_tipo(self):
+        # Epson no esta declarada en camillas, asi que no puede tener modelos
+        # de camilla aunque la marca exista.
+        with self.assertRaises(ValidationError) as error:
+            ModeloDispositivo.objects.create(
+                tipo=self.camilla,
+                marca=self.epson,
+                nombre="CUALQUIERA",
+            )
+
+        self.assertIn("marca", error.exception.message_dict)
+
+    def test_el_mismo_nombre_vale_en_tipos_distintos(self):
+        self.camilla.marcas.add(self.epson)
+
+        gemelo = ModeloDispositivo.objects.create(
+            tipo=self.camilla,
+            marca=self.epson,
+            nombre="L3250",
+        )
+
+        self.assertNotEqual(gemelo.pk, self.modelo.pk)
+
+    def test_un_equipo_rechaza_marca_ajena_al_tipo(self):
+        otra = MarcaDispositivo.objects.create(nombre="MINDRAY")
+
+        with self.assertRaises(ValidationError) as error:
+            self._equipo(marca=otra).save()
+
+        self.assertIn("marca", error.exception.message_dict)
+
+    def test_un_equipo_rechaza_modelo_de_otro_tipo(self):
+        self.camilla.marcas.add(self.epson)
+        modelo_camilla = ModeloDispositivo.objects.create(
+            tipo=self.camilla,
+            marca=self.epson,
+            nombre="RODABLE",
+        )
+
+        equipo = self._equipo(marca=self.epson, modelo=modelo_camilla)
+
+        with self.assertRaises(ValidationError) as error:
+            equipo.save()
+
+        self.assertIn("modelo", error.exception.message_dict)
+
+    def test_la_combinacion_correcta_se_guarda(self):
+        equipo = self._equipo(marca=self.epson, modelo=self.modelo)
+        equipo.save()
+
+        self.assertEqual(equipo.modelo.nombre, "L3250")
+
+
+class MarcaEnTipoFormTests(TestCase):
+    """Un solo campo para crear la marca o reutilizar la que ya existe."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.impresora = TipoDispositivo.objects.create(
+            nombre="IMPRESORA",
+            categoria=CategoriaEquipo.objects.get(nombre="INFORMATICA"),
+        )
+        cls.escaner = TipoDispositivo.objects.create(
+            nombre="ESCANER",
+            categoria=CategoriaEquipo.objects.get(nombre="INFORMATICA"),
+        )
+
+    def test_crea_la_marca_si_no_existia(self):
+        formulario = MarcaEnTipoForm(
+            data={"nombre": "brother"},
+            tipo=self.impresora,
+        )
+
+        self.assertTrue(formulario.is_valid(), formulario.errors)
+        marca, creada = formulario.guardar()
+
+        self.assertTrue(creada)
+        self.assertEqual(marca.nombre, "BROTHER")
+        self.assertIn(marca, self.impresora.marcas.all())
+
+    def test_reutiliza_la_marca_de_otro_tipo(self):
+        existente = MarcaDispositivo.objects.create(nombre="EPSON")
+        self.impresora.marcas.add(existente)
+
+        formulario = MarcaEnTipoForm(
+            data={"nombre": "Epson"},
+            tipo=self.escaner,
+        )
+
+        self.assertTrue(formulario.is_valid(), formulario.errors)
+        marca, creada = formulario.guardar()
+
+        self.assertFalse(creada)
+        self.assertEqual(marca.pk, existente.pk)
+        # El catalogo trae un INDEFINIDO sembrado de antes: lo que importa
+        # es que no se haya creado una segunda Epson.
+        self.assertEqual(
+            MarcaDispositivo.objects.filter(nombre="EPSON").count(),
+            1,
+        )
+
+    def test_rechaza_repetirla_en_el_mismo_tipo(self):
+        marca = MarcaDispositivo.objects.create(nombre="EPSON")
+        self.impresora.marcas.add(marca)
+
+        formulario = MarcaEnTipoForm(
+            data={"nombre": "EPSON"},
+            tipo=self.impresora,
+        )
+
+        self.assertFalse(formulario.is_valid())
+        self.assertIn("nombre", formulario.errors)

@@ -81,16 +81,6 @@ def normalizar_telefono(valor):
     return valor
 
 
-def obtener_catalogo_indefinido(modelo_catalogo):
-    # Marca/modelo pueden venir vacios; se usa un registro comun de catalogo
-    # para no guardar textos sueltos ni dejar la FK en blanco.
-    objeto, _ = modelo_catalogo.objects.get_or_create(
-        nombre="INDEFINIDO",
-        defaults={"descripcion": "Valor usado cuando el dato no aplica."},
-    )
-    return objeto
-
-
 # Choices: Django guarda numeros en base de datos y muestra etiquetas legibles
 # en formularios/templates con get_campo_display().
 
@@ -228,6 +218,27 @@ class TipoDispositivo(models.Model):
         related_name="tipos_secundarios",
         verbose_name="Categorias secundarias",
     )
+    # Si el equipo lleva electronica o no es una propiedad del tipo, no de cada
+    # aparato: todas las camillas de traslado son mecanicas y todos los
+    # monitores son electronicos. Preguntarlo en cada registro solo permitia
+    # que dos equipos iguales quedaran clasificados distinto.
+    tipo_tecnologia = models.PositiveSmallIntegerField(
+        choices=TipoTecnologiaDispositivo.choices,
+        default=TipoTecnologiaDispositivo.ELECTRONICO,
+        db_index=True,
+        verbose_name="Tipo de tecnología",
+    )
+    # Marcas que fabrican este tipo de equipo. Es una relacion propia y no algo
+    # deducido de los modelos porque una marca se registra en el tipo antes de
+    # conocerle un solo modelo: primero se sabe que Epson hace impresoras y
+    # despues se van agregando la L3250, la L3210 y las que vengan.
+    marcas = models.ManyToManyField(
+        "MarcaDispositivo",
+        blank=True,
+        related_name="tipos",
+        db_table="equipo_tipo_marca",
+        verbose_name="Marcas",
+    )
     descripcion = models.CharField(max_length=250, blank=True)
     activo = models.BooleanField(default=True, db_index=True)
 
@@ -288,9 +299,16 @@ class MarcaDispositivo(models.Model):
 
 
 class ModeloDispositivo(models.Model):
-    # Un modelo pertenece siempre a una marca. El mismo nombre puede repetirse
-    # entre marcas distintas (dos fabricantes pueden llamar igual a su equipo),
-    # pero no dentro de una misma marca.
+    # Un modelo es un producto concreto: la L3250 es la impresora de Epson, no
+    # "un modelo de Epson" a secas. Por eso cuelga de la pareja tipo-marca y no
+    # solo de la marca: asi el formulario puede ofrecer, para el tipo elegido,
+    # unicamente los modelos que existen de esa marca para ese tipo.
+    tipo = models.ForeignKey(
+        TipoDispositivo,
+        on_delete=models.PROTECT,
+        related_name="modelos",
+        verbose_name="Tipo de equipo",
+    )
     marca = models.ForeignKey(
         MarcaDispositivo,
         on_delete=models.PROTECT,
@@ -305,12 +323,14 @@ class ModeloDispositivo(models.Model):
         db_table = "equipo_modelo_dispositivo"
         verbose_name = "Modelo de equipo"
         verbose_name_plural = "Modelos de equipo"
-        ordering = ["marca__nombre", "nombre"]
+        ordering = ["tipo__nombre", "marca__nombre", "nombre"]
         constraints = [
-            # La unicidad ya no es global: se limita a cada marca.
+            # El mismo nombre puede repetirse entre marcas, y una marca puede
+            # llamar igual a productos de tipos distintos. Lo que no se repite
+            # es el nombre dentro de la misma pareja tipo-marca.
             models.UniqueConstraint(
-                fields=["marca", "nombre"],
-                name="equipo_modelo_unico_por_marca",
+                fields=["tipo", "marca", "nombre"],
+                name="equipo_modelo_unico_por_tipo_marca",
             ),
         ]
 
@@ -328,9 +348,25 @@ class ModeloDispositivo(models.Model):
         if self.marca_id is None:
             raise ValidationError({"marca": "Debe indicar la marca del modelo."})
 
+        if self.tipo_id is None:
+            raise ValidationError({"tipo": "Debe indicar el tipo de equipo."})
+
+        # La marca tiene que estar declarada en el tipo. Sin esta regla se
+        # podria registrar "Mindray" como modelo de camilla sin que Mindray
+        # figure entre las marcas de camillas, y la lista del formulario y el
+        # catalogo dejarian de contar lo mismo.
+        if not self.tipo.marcas.filter(pk=self.marca_id).exists():
+            raise ValidationError({
+                "marca": (
+                    "Esta marca no está registrada en el tipo de equipo. "
+                    "Agréguela primero al tipo."
+                ),
+            })
+
         # La restriccion de base cubre el duplicado; esto lo detecta antes para
         # devolver un mensaje entendible en vez de un IntegrityError.
         duplicado = ModeloDispositivo.objects.filter(
+            tipo_id=self.tipo_id,
             marca_id=self.marca_id,
             nombre=self.nombre,
         ).exclude(pk=self.pk)
@@ -449,11 +485,6 @@ class Dispositivo(models.Model):
         TipoDispositivo,
         on_delete=models.PROTECT,
         related_name="dispositivos",
-    )
-    tipo_tecnologia = models.PositiveSmallIntegerField(
-        choices=TipoTecnologiaDispositivo.choices,
-        null=True,
-        db_index=True,
     )
     marca = models.ForeignKey(
         MarcaDispositivo,
@@ -651,6 +682,21 @@ class Dispositivo(models.Model):
         return "SIN TIPO"
 
     @property
+    def tipo_tecnologia(self):
+        """La lleva el tipo de equipo, no cada aparato."""
+        return self.tipo.tipo_tecnologia if self.tipo_id else None
+
+    def get_tipo_tecnologia_display(self):
+        """Conserva el nombre que Django daria al campo, ya movido al tipo.
+
+        Las pantallas y el PDF lo llaman asi desde antes del cambio, y aqui
+        cuesta una linea en vez de una revision de cada plantilla.
+        """
+        if not self.tipo_id:
+            return ""
+        return self.tipo.get_tipo_tecnologia_display()
+
+    @property
     def color_principal(self):
         """El primero de la lista: el color con el que se reconoce el equipo."""
         primero = self.colores_asignados.first()
@@ -719,10 +765,11 @@ class Dispositivo(models.Model):
             normalizar_nombre_catalogo(self.numero_referencia) or None
         )
 
-        if self.marca_id is None:
-            # Si no se conoce la marca no guardamos texto vacio: se usa el
-            # catalogo INDEFINIDO.
-            self.marca = obtener_catalogo_indefinido(MarcaDispositivo)
+        # Una marca desconocida se queda en NULL y la interfaz la presenta
+        # como INDEFINIDO. Antes se guardaba apuntando a un registro de
+        # catalogo llamado asi, pero desde que las marcas pertenecen al tipo
+        # eso dejo de tener sentido: INDEFINIDO no figura entre las marcas de
+        # ningun tipo, asi que la propia validacion de abajo lo rechazaria.
 
         # La garantia se resuelve antes de validar fechas: con inicio y
         # duracion el vencimiento se calcula y no se le pide al usuario. Si el
@@ -745,14 +792,25 @@ class Dispositivo(models.Model):
                 "Indique el inicio de la garantía para calcular su vencimiento."
             )
 
-        # El modelo es opcional porque a veces se desconoce; en ese caso queda
-        # en NULL y la interfaz lo presenta como INDEFINIDO. Pero si viene,
-        # tiene que ser de la marca elegida: no basta con el filtro del
-        # navegador, que un POST directo se salta.
-        if self.modelo_id and self.marca_id:
-            if self.modelo.marca_id != self.marca_id:
+        # Marca y modelo son opcionales porque a veces se desconocen. Pero si
+        # vienen, tienen que encajar con el tipo: el navegador ya solo ofrece
+        # las combinaciones validas, y un POST directo se salta ese filtro.
+        if self.marca_id and self.tipo_id:
+            if not self.tipo.marcas.filter(pk=self.marca_id).exists():
+                errores["marca"] = (
+                    "Esta marca no está registrada en el tipo de equipo elegido."
+                )
+
+        if self.modelo_id:
+            if self.marca_id and self.modelo.marca_id != self.marca_id:
                 errores["modelo"] = (
                     "El modelo seleccionado no pertenece a la marca indicada."
+                )
+
+            if self.tipo_id and self.modelo.tipo_id != self.tipo_id:
+                errores["modelo"] = (
+                    "El modelo seleccionado no pertenece al tipo de equipo "
+                    "indicado."
                 )
 
         try:

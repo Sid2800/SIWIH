@@ -91,10 +91,17 @@ urlpatterns = [
         views.catalogo_marcas_modelos,
         name='catalogo_marcas_equipos'
     ),
+    # La marca y el modelo viven dentro de un tipo: la ruta lo lleva para que
+    # no se pueda colar una marca en otro tipo manipulando el POST.
     path(
-        'catalogo/marcas/agregar/',
+        'catalogo/tipos/<int:tipo_id>/marcas/agregar/',
         views.agregar_marca_catalogo,
         name='agregar_marca_equipos'
+    ),
+    path(
+        'catalogo/tipos/<int:tipo_id>/marcas/<int:marca_id>/quitar/',
+        views.quitar_marca_tipo,
+        name='quitar_marca_tipo_equipos'
     ),
     path(
         'catalogo/marcas/<int:marca_id>/estado/',
@@ -102,7 +109,7 @@ urlpatterns = [
         name='cambiar_estado_marca_equipos'
     ),
     path(
-        'catalogo/marcas/<int:marca_id>/modelos/agregar/',
+        'catalogo/tipos/<int:tipo_id>/marcas/<int:marca_id>/modelos/agregar/',
         views.agregar_modelo_catalogo,
         name='agregar_modelo_equipos'
     ),
@@ -179,9 +186,9 @@ urlpatterns = [
     # La categoria del tipo y la ficha del empleado se consultan al vuelo: el
     # formulario las muestra para confirmar, no se las pide al usuario.
     path(
-        'categoria-tipo/',
-        views.categoria_tipo,
-        name='categoria_tipo_equipos'
+        'datos-tipo/',
+        views.datos_tipo,
+        name='datos_tipo_equipos'
     ),
     path(
         'datos-empleado/',

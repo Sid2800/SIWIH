@@ -22,14 +22,14 @@
     </div>
 
     <div class="equipos-catalogo">
-        <section class="equipos-registro__seccion equipos-catalogo__columna equipos-catalogo__columna--completa">
+        <section class="equipos-catalogo__panel">
             <h3 class="equipos-registro__titulo">
                 <i class="bi bi-person-vcard"></i>
                 Personas y empresas
             </h3>
 
             {% if request.user|puede_administrar_catalogo_equipos %}
-                <form class="equipos-catalogo__form"
+                <form class="equipos-catalogo__form equipos-catalogo__form--procedencias"
                       method="post"
                       action="{% if procedencia_editada %}{% url 'editar_procedencia_equipos' procedencia_editada.pk %}{% else %}{% url 'agregar_procedencia_equipos' %}{% endif %}">
                     {% csrf_token %}
@@ -112,7 +112,7 @@
                                 <span class="equipos-catalogo__nombre">
                                     {{ procedencia.nombre }} · {{ procedencia.get_tipo_display }}
                                 </span>
-                                <span class="equipos-catalogo__conteo">
+                                <span class="equipos-catalogo__meta">
                                     RTN: {{ procedencia.rtn|default:"No indicado" }} ·
                                     Tel: {{ procedencia.telefono|default:"No indicado" }} ·
                                     {{ procedencia.total_equipos }} equipo{{ procedencia.total_equipos|pluralize }}
@@ -121,7 +121,7 @@
                             <form method="post"
                                   action="{% url 'cambiar_estado_procedencia_equipos' procedencia.pk %}">
                                 {% csrf_token %}
-                                <button class="equipos-catalogo__estado"
+                                <button class="equipos-catalogo__icono"
                                         type="submit"
                                         title="{% if procedencia.activo %}Desactivar{% else %}Reactivar{% endif %} {{ procedencia.nombre }}">
                                     {% if procedencia.activo %}
@@ -136,7 +136,7 @@
                                 <span class="equipos-catalogo__nombre">
                                     {{ procedencia.nombre }} · {{ procedencia.get_tipo_display }}
                                 </span>
-                                <span class="equipos-catalogo__conteo">
+                                <span class="equipos-catalogo__meta">
                                     RTN: {{ procedencia.rtn|default:"No indicado" }} ·
                                     Tel: {{ procedencia.telefono|default:"No indicado" }} ·
                                     Contacto: {{ procedencia.contacto|default:"No indicado" }} ·

@@ -1,4 +1,8 @@
-from core.services.server_image.auth_service import traer_server_token, ImageServerAuthError
+from core.services.server_image.auth_service import (
+    ImageServerAuthError,
+    traer_server_token,
+    traer_server_token_async,
+)
 from core.constants.image_server_enpoints import (
     BUSCAR_ARCHIVOS,
     BUSCAR_FICHA_BAJA_DISPOSITIVO,
@@ -483,13 +487,18 @@ class RequestService:
         return dispositivo_id
 
     @staticmethod
-    def obtener_archivo_media_equipo(ruta_archivo):
-        """Descarga una foto de EQUIPOS para servirla desde SIWIH principal."""
+    def _url_media_equipo(ruta_archivo):
+        """Valida la ruta pedida y la convierte en la URL de SIWIH Images.
+
+        El proxy solo puede consultar archivos de equipos. Esta validacion es
+        lo que evita usar la ruta para recorrer directorios y leer, por
+        ejemplo, las imagenes clinicas del mismo servidor. La comparten las
+        versiones sincrona y asincrona: duplicarla seria arriesgarse a que una
+        de las dos se quede sin el arreglo del dia que haga falta.
+        """
         ruta = str(ruta_archivo or "").replace("\\", "/").lstrip("/")
         partes = PurePosixPath(ruta).parts
 
-        # El proxy solo puede consultar archivos de equipos. Esta validacion
-        # evita usar la ruta para recorrer directorios o leer otros modulos.
         if (
             len(partes) < 2
             or partes[0] != "EQUIPOS"
@@ -498,10 +507,16 @@ class RequestService:
             raise ValueError("Ruta de imagen de equipo no valida")
 
         ruta_codificada = quote("/".join(partes), safe="/")
-        url = (
+
+        return (
             f"{settings.IMAGE_SERVER_URL.rstrip('/')}"
             f"/media/{ruta_codificada}"
         )
+
+    @staticmethod
+    def obtener_archivo_media_equipo(ruta_archivo):
+        """Descarga una foto de EQUIPOS para servirla desde SIWIH principal."""
+        url = RequestService._url_media_equipo(ruta_archivo)
         token = traer_server_token()
 
         try:
@@ -528,6 +543,51 @@ class RequestService:
                 "application/octet-stream",
             ),
             "etag": response.headers.get("ETag"),
+        }
+
+    @staticmethod
+    async def obtener_archivo_media_equipo_async(ruta_archivo):
+        """Version asincrona del proxy de fotos, para servir bajo Daphne.
+
+        Es la peticion que mas se repite del modulo: una ficha con seis fotos
+        son seis descargas, y cada una pasa casi todo su tiempo esperando a
+        SIWIH Images. En la version sincrona cada espera ocupa un hilo del
+        pool; aqui no ocupa ninguno, asi que dos personas abriendo fichas a la
+        vez ya no compiten por los hilos del servidor.
+
+        La validacion de la ruta es la misma y esta compartida a proposito: es
+        lo que impide usar el proxy para salirse de EQUIPOS/ y leer imagenes
+        clinicas.
+        """
+        import httpx
+
+        url = RequestService._url_media_equipo(ruta_archivo)
+        token = await traer_server_token_async()
+
+        try:
+            async with httpx.AsyncClient(timeout=10) as cliente:
+                respuesta = await cliente.get(
+                    url,
+                    headers={"Authorization": f"Bearer {token}"},
+                )
+        except httpx.RequestError as exc:
+            raise RuntimeError(
+                f"Error conexion al descargar imagen de equipo: {exc}"
+            ) from exc
+
+        if respuesta.status_code >= 400:
+            raise RuntimeError(
+                "Error al descargar imagen de equipo "
+                f"status={respuesta.status_code}"
+            )
+
+        return {
+            "contenido": respuesta.content,
+            "content_type": respuesta.headers.get(
+                "Content-Type",
+                "application/octet-stream",
+            ),
+            "etag": respuesta.headers.get("ETag"),
         }
 
     @staticmethod

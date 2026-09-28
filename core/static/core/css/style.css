@@ -8184,65 +8184,190 @@ button.equipos-imagenes__vista:hover img {
 }
 
 /* ---------------------------------------------------------------------
-   Catalogo de marcas y modelos
-   Dos columnas: marcas a la izquierda, modelos de la marca elegida a la
-   derecha. Se apilan en pantallas estrechas.
+   Catalogo de equipos
+   Tres pasos encadenados: tipo -> marcas del tipo -> modelos de la marca.
+   En telefono se apilan en ese orden, que es el de la tarea; a partir de
+   1100px van uno al lado del otro para ver la cadena completa de un vistazo.
    --------------------------------------------------------------------- */
+
+/* Migas de pan de los tres pasos. Dicen donde esta el usuario sin que tenga
+   que deducirlo de que listas tienen contenido. */
+.equipos-pasos {
+   align-items: center;
+   display: flex;
+   flex-wrap: wrap;
+   gap: .4rem .6rem;
+   margin-bottom: 1.2rem;
+}
+
+.equipos-pasos__paso {
+   align-items: center;
+   background-color: var(--colorMenuHover);
+   border-radius: 2rem;
+   color: var(--colorTextoMenu);
+   display: flex;
+   font-size: 1.2rem;
+   gap: .5rem;
+   max-width: 100%;
+   overflow: hidden;
+   padding: .35rem .9rem;
+   text-overflow: ellipsis;
+   white-space: nowrap;
+}
+
+.equipos-pasos__paso b {
+   align-items: center;
+   background-color: var(--colorTextoMenu);
+   border-radius: 50%;
+   color: #fff;
+   display: flex;
+   flex: 0 0 auto;
+   font-size: 1rem;
+   height: 1.8rem;
+   justify-content: center;
+   width: 1.8rem;
+}
+
+.equipos-pasos__paso--activo {
+   color: var(--negro);
+   font-weight: 600;
+}
+
+.equipos-pasos__paso--activo b {
+   background-color: var(--negro);
+}
+
+.equipos-pasos__flecha {
+   color: var(--colorTextoMenu);
+   font-size: 1.1rem;
+}
+
 .equipos-catalogo {
    align-items: start;
    display: grid;
    gap: 1.2rem;
-   grid-template-columns: repeat(2, minmax(0, 1fr));
+   grid-template-columns: 1fr;
 }
 
-.equipos-catalogo__columna {
+.equipos-catalogo__panel {
+   background-color: var(--colorFondoContenedor, #fff);
+   border: .1rem solid var(--colorLinea);
+   border-radius: 1rem;
+   display: flex;
+   flex-direction: column;
    min-width: 0;
+   padding: 1.2rem;
 }
 
-/* Los tipos no cuelgan de la marca elegida, asi que ocupan la fila entera en
-   vez de competir por una de las dos columnas. */
-.equipos-catalogo__columna--completa {
-   grid-column: 1 / -1;
+.equipos-catalogo__encabezado {
+   margin-bottom: 1rem;
 }
 
-/* El catalogo de tipos pasa del centenar de entradas: en pantallas anchas se
-   reparte en varias columnas para no obligar a un desplazamiento larguisimo.
-   El min() es lo que evita que en un telefono la columna siga midiendo 28rem
-   y se salga por la derecha: cuando no cabe, pasa a valer lo que haya. */
-.equipos-catalogo__lista--columnas {
-   display: grid;
-   grid-template-columns: repeat(auto-fill, minmax(min(28rem, 100%), 1fr));
+.equipos-catalogo__encabezado h3 {
+   align-items: center;
+   display: flex;
+   font-size: 1.5rem;
+   gap: .6rem;
+   margin: 0;
 }
 
-.equipos-catalogo__cancelar {
-   align-self: center;
+.equipos-catalogo__encabezado p {
    color: var(--colorTextoMenu);
-   font-size: 1.3rem;
-   text-decoration: underline;
+   font-size: 1.2rem;
+   line-height: 1.4;
+   margin: .3rem 0 0;
+}
+
+.equipos-catalogo__numero {
+   align-items: center;
+   background-color: var(--negro);
+   border-radius: 50%;
+   color: #fff;
+   display: flex;
+   flex: 0 0 auto;
+   font-size: 1.2rem;
+   height: 2.4rem;
+   justify-content: center;
+   width: 2.4rem;
 }
 
 .equipos-catalogo__form {
-   align-items: end;
-   display: grid;
-   gap: 1rem;
-   grid-template-columns: minmax(0, 1fr) auto;
+   display: flex;
+   flex-direction: column;
+   gap: .7rem;
    margin-bottom: 1.2rem;
 }
 
+/* El campo y su boton en la misma linea. Es el gesto que mas se repite en la
+   pantalla -escribir un nombre y pulsar agregar- y separarlos en dos filas
+   obligaba a bajar la vista para encontrar el boton en cada alta. */
+.equipos-catalogo__fila {
+   display: flex;
+   gap: .6rem;
+}
+
+.equipos-catalogo__fila .formularioCampo-text {
+   flex: 1;
+   min-width: 0;
+}
+
+.equipos-catalogo__campos {
+   display: grid;
+   gap: .7rem;
+   grid-template-columns: repeat(auto-fit, minmax(min(14rem, 100%), 1fr));
+}
+
+.equipos-catalogo__campo {
+   display: flex;
+   flex-direction: column;
+   gap: .25rem;
+   min-width: 0;
+}
+
+.equipos-catalogo__campo > span {
+   color: var(--colorTextoMenu);
+   font-size: 1.15rem;
+}
+
+.equipos-catalogo__extra > summary {
+   color: var(--colorTextoMenu);
+   cursor: pointer;
+   font-size: 1.2rem;
+   padding: .3rem 0;
+}
+
 .equipos-catalogo__boton {
-   height: auto;
-   min-height: 3.6rem;
-   padding: .6rem 1.4rem;
-   text-transform: none;
+   align-items: center;
+   background-color: var(--negro);
+   border: none;
+   border-radius: .5rem;
+   color: #fff;
+   cursor: pointer;
+   display: flex;
+   font-size: 1.25rem;
+   gap: .4rem;
+   /* Alto minimo de blanco tocable en tablet y telefono. */
+   min-height: 4rem;
+   padding: 0 1.2rem;
    white-space: nowrap;
-   width: auto;
+}
+
+.equipos-catalogo__boton:hover {
+   filter: brightness(1.25);
+}
+
+.equipos-catalogo__cancelar {
+   align-self: flex-start;
+   color: var(--colorTextoMenu);
+   font-size: 1.25rem;
+   text-decoration: underline;
 }
 
 .equipos-catalogo__lista {
    border-top: .1rem solid var(--colorLinea);
    list-style: none;
    margin: 0;
-   max-height: 46rem;
+   max-height: 42rem;
    overflow-y: auto;
    padding: 0;
 }
@@ -8251,7 +8376,7 @@ button.equipos-imagenes__vista:hover img {
    align-items: center;
    border-bottom: .1rem solid var(--colorLinea);
    display: flex;
-   gap: .6rem;
+   gap: .4rem;
    justify-content: space-between;
 }
 
@@ -8259,8 +8384,8 @@ button.equipos-imagenes__vista:hover img {
    background-color: var(--colorMenuHover);
 }
 
-/* La marca abierta se resalta con una barra lateral, no con color de fondo,
-   para que siga leyendose igual en tema claro y oscuro. */
+/* El elegido se resalta con una barra lateral, no con color de fondo, para
+   que siga leyendose igual en tema claro y oscuro. */
 .equipos-catalogo__item--activo {
    border-left: .3rem solid var(--negro);
 }
@@ -8271,14 +8396,13 @@ button.equipos-imagenes__vista:hover img {
 }
 
 .equipos-catalogo__enlace {
-   align-items: baseline;
    color: var(--negro);
    display: flex;
    flex: 1 1 auto;
-   flex-wrap: wrap;
-   gap: .2rem 1rem;
+   flex-direction: column;
+   gap: .15rem;
    min-width: 0;
-   padding: .9rem 1rem;
+   padding: .8rem 1rem;
    text-decoration: none;
 }
 
@@ -8287,30 +8411,43 @@ button.equipos-imagenes__vista:hover img {
    overflow-wrap: anywhere;
 }
 
-.equipos-catalogo__conteo {
+.equipos-catalogo__meta {
    color: var(--colorTextoMenu);
-   font-size: 1.15rem;
-   margin-left: auto;
-   white-space: nowrap;
+   font-size: 1.1rem;
+   overflow-wrap: anywhere;
 }
 
-.equipos-catalogo__estado {
+.equipos-catalogo__acciones {
+   display: flex;
+   flex: 0 0 auto;
+}
+
+.equipos-catalogo__icono {
+   align-items: center;
    background: none;
    border: none;
    color: var(--colorTextoMenu);
    cursor: pointer;
-   font-size: 1.9rem;
+   display: flex;
+   font-size: 1.6rem;
+   justify-content: center;
    line-height: 1;
-   padding: .6rem 1rem;
+   /* 4rem de lado: lo minimo para acertar con el dedo sin apuntar. */
+   min-height: 4rem;
+   min-width: 4rem;
+   text-decoration: none;
 }
 
-.equipos-catalogo__estado:hover {
+.equipos-catalogo__icono:hover {
    color: var(--negro);
 }
 
 .equipos-catalogo__vacio {
+   align-items: center;
    color: var(--colorTextoMenu);
+   display: flex;
    font-size: 1.25rem;
+   gap: .6rem;
    line-height: 1.5;
    padding: 1rem 0;
 }
@@ -8329,11 +8466,43 @@ button.equipos-imagenes__vista:hover img {
    padding: .9rem 1.1rem;
 }
 
-@media (max-width: 900px) {
+/* Tablet en horizontal: los dos primeros pasos caben lado a lado y el tercero
+   pasa debajo a lo ancho, que es donde se trabaja al cargar modelos. */
+@media (min-width: 780px) {
    .equipos-catalogo {
-      grid-template-columns: 1fr;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
    }
 
+   .equipos-catalogo__panel:last-child {
+      grid-column: 1 / -1;
+   }
+}
+
+/* Escritorio: los tres pasos en fila, la cadena completa a la vista. */
+@media (min-width: 1100px) {
+   .equipos-catalogo {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+   }
+
+   .equipos-catalogo__panel:last-child {
+      grid-column: auto;
+   }
+}
+
+/* En telefono el boton baja debajo del campo: uno al lado del otro deja el
+   campo de escritura en unos 80px, imposible de leer mientras se teclea. */
+@media (max-width: 420px) {
+   .equipos-catalogo__fila {
+      flex-direction: column;
+   }
+
+   .equipos-catalogo__boton {
+      justify-content: center;
+      width: 100%;
+   }
+}
+
+@media (max-width: 900px) {
    .equipos-imagenes__carga {
       grid-template-columns: 1fr;
    }
@@ -8349,24 +8518,10 @@ button.equipos-imagenes__vista:hover img {
    }
 }
 
-/* El formulario del catalogo pone los campos y el boton uno al lado del otro,
-   que es lo que le conviene a marcas y modelos: un solo campo y el boton a su
-   derecha. Procedencias lleva siete campos, y en un telefono esa segunda
-   columna dejaba los campos en 80px con el boton ocupando el resto. Se corta a
-   650px, el mismo punto en el que los campos dejan de ir en dos columnas. */
+/* El catalogo de procedencias conserva su propia rejilla con el boton al
+   lado: lleva siete campos y en un telefono esa segunda columna dejaba los
+   campos en 80px con el boton ocupando el resto. */
 @media (max-width: 650px) {
-   .equipos-catalogo__form {
-      grid-template-columns: 1fr;
-   }
-
-   /* .formularioBotones-boton reparte su contenido con space-between, pensado
-      para un ancho fijo. A ancho completo eso mandaria el icono y el texto a
-      los extremos opuestos del boton. */
-   .equipos-catalogo__boton {
-      justify-content: center;
-      width: 100%;
-   }
-
    .equipos-catalogo__cancelar {
       text-align: center;
    }
@@ -8552,8 +8707,18 @@ p + .equipos-garantia__bloqueo {
    original el RTN se partia en dos lineas. Las 34rem son 340px, mas de lo que
    deja libre un telefono de 375px, asi que sin el min() la ficha se salia del
    recuadro y cortaba el encabezado de la pagina. */
+/* Procedencias llena siete campos, no un nombre: sus campos van en
+   rejilla y el boton debajo, en lugar de la fila unica de los tres pasos. */
+.equipos-catalogo__form--procedencias {
+   align-items: end;
+   display: grid;
+   gap: 1rem;
+   grid-template-columns: repeat(auto-fit, minmax(min(20rem, 100%), 1fr));
+}
+
 .equipos-catalogo__lista--fichas {
    border-top: 0;
+   display: grid;
    gap: 1rem;
    grid-template-columns: repeat(auto-fill, minmax(min(34rem, 100%), 1fr));
    padding: .2rem;
@@ -8596,7 +8761,7 @@ p + .equipos-garantia__bloqueo {
 /* La lista de marcas fuerza nowrap y empuja el dato a la derecha, porque alli
    es una fila. Dentro de una ficha eso hace que el RTN se salga del recuadro
    en lugar de pasar a la linea siguiente. */
-.equipos-catalogo__lista--fichas .equipos-catalogo__conteo {
+.equipos-catalogo__lista--fichas .equipos-catalogo__meta {
    line-height: 1.6;
    margin-left: 0;
    white-space: normal;

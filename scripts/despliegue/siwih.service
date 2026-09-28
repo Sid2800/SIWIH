@@ -1,0 +1,37 @@
+# Servicio de SIWIH con Daphne, en sustitucion de Gunicorn.
+#
+# Daphne habla ASGI: admite websockets y vistas asincronas, que es lo que
+# Gunicorn no podia dar. Las vistas sincronas de siempre siguen funcionando
+# sin cambios, porque Django las ejecuta en un hilo del pool.
+#
+# Instalacion:
+#   sudo cp scripts/despliegue/siwih.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now siwih
+#   sudo systemctl status siwih --no-pager
+#
+# Ajustar User, Group y las rutas al servidor donde se instale.
+
+[Unit]
+Description=Daphne SIWIH
+After=network.target mysql.service
+
+[Service]
+User=siwih
+Group=www-data
+WorkingDirectory=/home/siwih/SIWIH
+EnvironmentFile=/home/siwih/SIWIH/.env
+
+# --proxy-headers hace que Django lea la IP real del cliente y el esquema
+# desde las cabeceras que pone Nginx, en vez de ver siempre 127.0.0.1 y http.
+ExecStart=/home/siwih/entornoV/bin/daphne \
+    --bind 127.0.0.1 \
+    --port 8000 \
+    --proxy-headers \
+    SIWI.asgi:application
+
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
