@@ -16,9 +16,11 @@ from .models import (
     CriticidadDispositivo,
     Dispositivo,
     EstadoDispositivo,
+    GarantiaDispositivo,
     MarcaDispositivo,
     ModalidadProcedencia,
     ModeloDispositivo,
+    MotivoCierreGarantia,
     Procedencia,
     TipoDispositivo,
     TipoProcedencia,
@@ -364,16 +366,6 @@ class DispositivoCreateForm(forms.ModelForm):
         (6, "Semestral"),
         (12, "Anual"),
     ]
-    # Duraciones que aparecen en los contratos reales. "Otra" deja escribir el
-    # vencimiento a mano para los casos que no encajan en meses redondos.
-    GARANTIA_CHOICES = [
-        ("", "Sin garantía"),
-        (6, "6 meses"),
-        (12, "1 año"),
-        (24, "2 años"),
-        (36, "3 años"),
-        (60, "5 años"),
-    ]
 
     ubicacion = UbicacionChoiceField(
         queryset=ExpedienteUbicacion.objects.none(),
@@ -436,22 +428,6 @@ class DispositivoCreateForm(forms.ModelForm):
             }
         ),
     )
-    # La duracion se elige de una lista y el vencimiento lo calcula el modelo.
-    # Antes se pedia la fecha final y quien registraba tenia que contar anios
-    # de cabeza desde la factura, que es justo donde se equivocaba.
-    garantia_meses = forms.TypedChoiceField(
-        choices=GARANTIA_CHOICES,
-        coerce=int,
-        empty_value=None,
-        required=False,
-        label="Duración de la garantía",
-        widget=forms.Select(
-            attrs={
-                "class": "formularioCampo-select",
-                "id": "garantia_meses_dispositivo",
-            }
-        ),
-    )
     # Se declara aparte para aceptar el importe escrito a la hondureña. Va como
     # texto y no como <input type="number">: ese control depende del idioma del
     # navegador y, con la configuracion en español, llega a rechazar el punto
@@ -504,9 +480,6 @@ class DispositivoCreateForm(forms.ModelForm):
             "frecuencia_mantenimiento_meses",
             "vida_util_anios",
             "fecha_instalacion",
-            "fecha_inicio_garantia",
-            "garantia_meses",
-            "fecha_fin_garantia",
             "costo_adquisicion",
             "observaciones",
         ]
@@ -598,25 +571,6 @@ class DispositivoCreateForm(forms.ModelForm):
                 attrs={
                     "class": "formularioCampo-date",
                     "id": "instalacion_dispositivo",
-                    "type": "date",
-                },
-                format="%Y-%m-%d",
-            ),
-            "fecha_inicio_garantia": forms.DateInput(
-                attrs={
-                    "class": "formularioCampo-date",
-                    "id": "inicio_garantia_dispositivo",
-                    "type": "date",
-                },
-                format="%Y-%m-%d",
-            ),
-            # Solo se escribe cuando el contrato da una fecha suelta que no
-            # cuadra con meses redondos. Con inicio y duracion lo calcula el
-            # modelo y el campo se muestra de solo lectura.
-            "fecha_fin_garantia": forms.DateInput(
-                attrs={
-                    "class": "formularioCampo-date",
-                    "id": "garantia_dispositivo",
                     "type": "date",
                 },
                 format="%Y-%m-%d",
@@ -771,11 +725,6 @@ class DispositivoCreateForm(forms.ModelForm):
             ("", "Seleccione la modalidad"),
             *ModalidadProcedencia.choices,
         ]
-        # Sin garantia se expresa dejando los tres campos vacios. Y no se
-        # limita el calendario: se registran equipos instalados hace anios,
-        # con garantia ya vencida, y saber cuando vencio sigue siendo util.
-        self.fields["fecha_fin_garantia"].required = False
-
         # Opciones del selector de colores y lista ya elegida. INDEFINIDO
         # queda fuera: con una lista, "no se sabe" se expresa no agregando
         # ninguno.
@@ -946,38 +895,6 @@ class DispositivoCreateForm(forms.ModelForm):
             self.cleaned_data.get("inventario_numero_ficha")
         )
 
-    def clean(self):
-        """Revisa la garantia como conjunto, no campo por campo.
-
-        Los tres campos solo tienen sentido juntos: la duracion necesita un
-        inicio para poder contarse, y el vencimiento se escribe a mano unica-
-        mente cuando no hay duracion que lo calcule. El modelo hace la cuenta
-        al guardar; aqui se avisa antes para que el usuario lo corrija.
-        """
-        cleaned_data = super().clean()
-        inicio = cleaned_data.get("fecha_inicio_garantia")
-        meses = cleaned_data.get("garantia_meses")
-        fin = cleaned_data.get("fecha_fin_garantia")
-
-        if meses and not inicio:
-            self.add_error(
-                "fecha_inicio_garantia",
-                "Indique desde cuándo corre la garantía para calcular su "
-                "vencimiento.",
-            )
-        elif inicio and not meses and not fin:
-            self.add_error(
-                "fecha_fin_garantia",
-                "Elija una duración o escriba la fecha de vencimiento.",
-            )
-
-        if inicio and fin and fin < inicio:
-            self.add_error(
-                "fecha_fin_garantia",
-                "El vencimiento no puede ser anterior al inicio de la garantía.",
-            )
-
-        return cleaned_data
 
 
 class ProcedenciaCatalogoForm(forms.ModelForm):
@@ -1342,6 +1259,167 @@ class ModeloCatalogoForm(forms.ModelForm):
             )
 
         return nombre
+
+
+class GarantiaForm(forms.ModelForm):
+    """Alta de una garantia: la primera del equipo o una renovacion.
+
+    La duracion se elige de una lista y el vencimiento lo calcula el modelo.
+    Antes se pedia la fecha final y quien registraba tenia que contar anios de
+    cabeza desde la factura, que es justo donde se equivocaba. "Otra" deja
+    escribir el vencimiento a mano para los contratos que no caen en meses
+    redondos.
+    """
+
+    DURACIONES = [
+        ("", "Otra (escribir la fecha)"),
+        (6, "6 meses"),
+        (12, "1 año"),
+        (24, "2 años"),
+        (36, "3 años"),
+        (60, "5 años"),
+    ]
+
+    meses = forms.TypedChoiceField(
+        choices=DURACIONES,
+        coerce=int,
+        empty_value=None,
+        required=False,
+        label="Duración",
+        widget=forms.Select(
+            attrs={
+                "class": "formularioCampo-select",
+                "id": "meses_garantia",
+            }
+        ),
+    )
+
+    class Meta:
+        model = GarantiaDispositivo
+        fields = ["fecha_inicio", "meses", "fecha_fin", "referencia", "observaciones"]
+        labels = {
+            "referencia": "Contrato o factura",
+            "fecha_fin": "Vence el",
+        }
+        widgets = {
+            "fecha_inicio": forms.DateInput(
+                attrs={
+                    "class": "formularioCampo-date",
+                    "id": "inicio_garantia",
+                    "type": "date",
+                },
+                format="%Y-%m-%d",
+            ),
+            # Solo se escribe cuando el contrato da una fecha suelta. Con
+            # inicio y duracion lo calcula el modelo.
+            "fecha_fin": forms.DateInput(
+                attrs={
+                    "class": "formularioCampo-date",
+                    "id": "fin_garantia",
+                    "type": "date",
+                },
+                format="%Y-%m-%d",
+            ),
+            "referencia": forms.TextInput(
+                attrs={
+                    "class": "formularioCampo-text",
+                    "id": "referencia_garantia",
+                    "placeholder": "Opcional",
+                    "maxlength": 100,
+                }
+            ),
+            "observaciones": forms.Textarea(
+                attrs={
+                    "class": "formularioCampo-text no-resize",
+                    "id": "observaciones_garantia",
+                    "rows": 3,
+                    "placeholder": "Opcional",
+                }
+            ),
+        }
+
+    def __init__(self, *args, dispositivo=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.dispositivo = dispositivo
+        # El vencimiento solo es obligatorio si no hay duracion que lo
+        # calcule; la comprobacion real esta en clean().
+        self.fields["fecha_fin"].required = False
+
+        if dispositivo is not None:
+            self.instance.dispositivo = dispositivo
+            # Renovar es legitimo: la vista cierra la anterior y guarda esta
+            # en la misma transaccion. Sin esto, la validacion veria las dos
+            # abiertas a la vez y rechazaria la renovacion.
+            self.instance.omitir_control_de_vigente = True
+
+    def clean(self):
+        cleaned_data = super().clean()
+        inicio = cleaned_data.get("fecha_inicio")
+        meses = cleaned_data.get("meses")
+        fin = cleaned_data.get("fecha_fin")
+
+        if inicio and not meses and not fin:
+            self.add_error(
+                "fecha_fin",
+                "Elija una duración o escriba la fecha de vencimiento.",
+            )
+
+        return cleaned_data
+
+
+class CerrarGarantiaForm(forms.Form):
+    """Termina a mano la garantia vigente, sin poner otra en su lugar.
+
+    Pide el motivo porque cerrar una garantia antes de que venza es una
+    decision administrativa: dentro de un ano nadie recordara si fue un
+    incumplimiento del proveedor o una correccion de un dato mal registrado,
+    y en el primer caso hay un reclamo detras.
+    """
+
+    motivo = forms.ChoiceField(
+        choices=[
+            (valor, etiqueta)
+            for valor, etiqueta in MotivoCierreGarantia.choices
+            # La renovacion no se elige aqui: se produce al registrar la
+            # garantia nueva, y ese camino cierra la anterior por su cuenta.
+            if valor != MotivoCierreGarantia.RENOVACION
+        ],
+        label="Motivo",
+        widget=forms.Select(
+            attrs={
+                "class": "formularioCampo-select",
+                "id": "motivo_cierre_garantia",
+            }
+        ),
+    )
+    detalle = forms.CharField(
+        required=False,
+        label="Detalle",
+        widget=forms.Textarea(
+            attrs={
+                "class": "formularioCampo-text no-resize",
+                "id": "detalle_cierre_garantia",
+                "rows": 3,
+                "placeholder": "Número de reclamo, acuerdo con el proveedor...",
+            }
+        ),
+    )
+
+    def clean_detalle(self):
+        return (self.cleaned_data.get("detalle") or "").strip()
+
+    def clean(self):
+        cleaned_data = super().clean()
+
+        # "Otro motivo" sin explicacion no informa de nada: dentro de un ano
+        # la fila diria solo "otro" y habria que preguntar a quien la cerro.
+        if (
+            cleaned_data.get("motivo") == MotivoCierreGarantia.OTRO
+            and not cleaned_data.get("detalle")
+        ):
+            self.add_error("detalle", "Explique el motivo del cierre.")
+
+        return cleaned_data
 
 
 class SalidaGarantiaForm(forms.Form):

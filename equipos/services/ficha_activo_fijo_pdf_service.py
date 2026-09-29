@@ -80,11 +80,11 @@ class FichaActivoFijoPdfService:
 
         vencimiento = estado.fin_real.strftime("%d/%m/%Y")
 
-        if dispositivo.garantia_meses:
-            meses = dispositivo.garantia_meses
+        if estado.garantia.meses:
+            meses = estado.garantia.meses
             return f"{meses} mes{'es' if meses != 1 else ''}", vencimiento
 
-        desde = dispositivo.fecha_inicio_garantia
+        desde = estado.garantia.fecha_inicio
 
         if desde is None:
             registro = dispositivo.fecha_creado

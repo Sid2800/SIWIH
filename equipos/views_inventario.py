@@ -495,10 +495,9 @@ def detalle_dispositivo(request, dispositivo_id):
             ficha_baja_firmada,
             ficha_baja_server_offline,
         ) = MediaService.obtener_ficha_baja_dispositivo(dispositivo.id)
-    # La ficha solo informa de la garantia. Pausar y reanudar se maneja desde
-    # Garantias, asi que aqui no viaja nada para operar.
-    pausas = list(dispositivo.pausas_garantia.all())
-    garantia = calcular_estado_garantia(dispositivo, pausas=pausas)
+    # La ficha solo informa de la garantia vigente. Pausar, renovar y terminar
+    # se manejan desde Garantias, asi que aqui no viaja nada para operar.
+    garantia = calcular_estado_garantia(dispositivo)
 
     return render(
         request,

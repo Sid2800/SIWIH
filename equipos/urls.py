@@ -74,6 +74,16 @@ urlpatterns = [
         name='gestionar_garantia_equipos'
     ),
     path(
+        'dispositivos/<int:dispositivo_id>/garantia/registrar/',
+        views.registrar_garantia,
+        name='registrar_garantia_equipos'
+    ),
+    path(
+        'dispositivos/<int:dispositivo_id>/garantia/terminar/',
+        views.terminar_garantia,
+        name='terminar_garantia_equipos'
+    ),
+    path(
         'dispositivos/<int:dispositivo_id>/garantia/salida/',
         views.registrar_salida_garantia,
         name='registrar_salida_garantia_equipos'

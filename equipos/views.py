@@ -52,8 +52,10 @@ from .views_documentos import (
 from .views_garantias import (
     gestionar_garantia,
     panel_garantias,
+    registrar_garantia,
     registrar_retorno_garantia,
     registrar_salida_garantia,
+    terminar_garantia,
 )
 from .views_inventario import (
     agregar_imagen_dispositivo,
@@ -106,6 +108,8 @@ __all__ = [
     # garantias
     "panel_garantias",
     "gestionar_garantia",
+    "registrar_garantia",
+    "terminar_garantia",
     "registrar_salida_garantia",
     "registrar_retorno_garantia",
 ]

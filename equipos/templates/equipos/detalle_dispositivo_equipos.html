@@ -320,16 +320,22 @@
                             </span>
                         </dd>
                     </div>
-                    {% if dispositivo.fecha_inicio_garantia %}
+                    {% if garantia.garantia.fecha_inicio %}
                         <div>
                             <dt>Inicio</dt>
-                            <dd>{{ dispositivo.fecha_inicio_garantia|date:"d/m/Y" }}</dd>
+                            <dd>{{ garantia.garantia.fecha_inicio|date:"d/m/Y" }}</dd>
                         </div>
                     {% endif %}
-                    {% if dispositivo.garantia_meses %}
+                    {% if garantia.garantia.meses %}
                         <div>
                             <dt>Duración</dt>
-                            <dd>{{ dispositivo.garantia_meses }} mes{{ dispositivo.garantia_meses|pluralize:"es" }}</dd>
+                            <dd>{{ garantia.garantia.meses }} mes{{ garantia.garantia.meses|pluralize:"es" }}</dd>
+                        </div>
+                    {% endif %}
+                    {% if garantia.garantia.referencia %}
+                        <div>
+                            <dt>Contrato o factura</dt>
+                            <dd>{{ garantia.garantia.referencia }}</dd>
                         </div>
                     {% endif %}
                     <div>
@@ -439,8 +445,8 @@
                 <div>
                     <dt>Garantía</dt>
                     <dd>
-                        {% if dispositivo.fecha_fin_garantia %}
-                            Hasta el {{ dispositivo.fecha_fin_garantia|date:"d/m/Y" }}
+                        {% if garantia.fin_real %}
+                            Hasta el {{ garantia.fin_real|date:"d/m/Y" }}
                         {% else %}
                             Sin garantía
                         {% endif %}

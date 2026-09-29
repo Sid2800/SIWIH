@@ -336,15 +336,15 @@
         {% endcomment %}
         <details class="equipos-registro__opcionales"
                  id="procedencia_equipo"
-                 {% if form.modalidad_procedencia.errors or form.procedencia.errors or form.numero_referencia.errors or form.costo_adquisicion.errors or form.fecha_instalacion.errors or form.fecha_inicio_garantia.errors or form.garantia_meses.errors or form.fecha_fin_garantia.errors %}open{% endif %}>
+                 {% if form.modalidad_procedencia.errors or form.procedencia.errors or form.numero_referencia.errors or form.costo_adquisicion.errors or form.fecha_instalacion.errors %}open{% endif %}>
             <summary class="equipos-registro__opcionales-resumen">
                 <h3 class="equipos-registro__opcionales-titulo">
                     <span class="equipos-registro__paso">5</span>
                     <i class="bi bi-box-arrow-in-down"></i>
-                    Procedencia y garantía
+                    Procedencia y compra
                 </h3>
                 <span class="equipos-registro__opcionales-conteo">
-                    Origen, costo, instalación y cobertura
+                    Origen, costo e instalación
                 </span>
                 <i class="bi bi-chevron-down equipos-registro__opcionales-flecha"></i>
             </summary>
@@ -381,30 +381,23 @@
                     </div>
 
                     {% comment %}
-                       Tres campos encadenados: con inicio y duracion el
-                       vencimiento se calcula y el ultimo queda de solo
-                       lectura. Se escribe a mano solo si el contrato trae una
-                       fecha que no cuadra con meses redondos, y se admiten
-                       fechas pasadas: se registran equipos viejos cuya
-                       garantia ya vencio y eso tambien hay que saberlo.
+                       La garantia ya no se captura aqui: un equipo puede
+                       tener varias a lo largo de su vida y hace falta el
+                       historial, asi que tiene su propia pantalla. Desde el
+                       alta no se puede enlazar porque el equipo todavia no
+                       existe; en la edicion si.
                     {% endcomment %}
-                    <div class="equipos-registro__campo">
-                        <label for="inicio_garantia_dispositivo">Inicio de garantía</label>
-                        {{ form.fecha_inicio_garantia }}
-                        {{ form.fecha_inicio_garantia.errors }}
-                    </div>
-                    <div class="equipos-registro__campo">
-                        <label for="garantia_meses_dispositivo">Duración de la garantía</label>
-                        {{ form.garantia_meses }}
-                        {{ form.garantia_meses.errors }}
-                    </div>
-                    <div class="equipos-registro__campo">
-                        <label for="garantia_dispositivo">Vence el</label>
-                        {{ form.fecha_fin_garantia }}
-                        <p class="equipos-registro__ayuda"
-                           id="ayuda_garantia_dispositivo"
-                           hidden></p>
-                        {{ form.fecha_fin_garantia.errors }}
+                    <div class="equipos-registro__campo equipos-registro__campo--completo">
+                        <p class="equipos-registro__ayuda">
+                            {% if dispositivo %}
+                                La garantía se registra y renueva en
+                                <a href="{% url 'gestionar_garantia_equipos' dispositivo.id %}">su propia pantalla</a>,
+                                donde queda el historial de las anteriores.
+                            {% else %}
+                                La garantía se registra después de guardar el
+                                equipo, en su pantalla de garantía.
+                            {% endif %}
+                        </p>
                     </div>
                 </div>
             </div>

@@ -189,7 +189,7 @@
 
     {% if pausas %}
         <section class="equipos-detalle__tarjeta">
-            <h3><i class="bi bi-clock-history"></i> Historial de pausas</h3>
+            <h3><i class="bi bi-clock-history"></i> Pausas de esta garantía</h3>
             <ul class="equipos-detalle__historial">
                 {% for pausa in pausas %}
                     <li>
@@ -205,6 +205,153 @@
                         {% endif %}
                         {% if pausa.observaciones_retorno %}
                             <br><span><strong>Retorno:</strong> {{ pausa.observaciones_retorno }}</span>
+                        {% endif %}
+                    </li>
+                {% endfor %}
+            </ul>
+        </section>
+    {% endif %}
+
+    {% comment %}
+       Renovar y terminar son dos cosas distintas y por eso son dos formularios:
+       renovar deja al equipo con cobertura nueva, terminar lo deja sin
+       ninguna. Confundirlos en un solo boton llevaria a que alguien creyera
+       haber renovado cuando en realidad cerro la garantia.
+    {% endcomment %}
+    {% if form_garantia %}
+        <section class="equipos-detalle__tarjeta">
+            <h3>
+                <i class="bi bi-arrow-repeat"></i>
+                {% if garantia.tiene_garantia %}
+                    Renovar la garantía
+                {% else %}
+                    Registrar una garantía
+                {% endif %}
+            </h3>
+
+            {% if garantia.tiene_garantia %}
+                <p class="equipos-detalle__nota">
+                    La garantía actual se cerrará y quedará en el historial.
+                    El equipo pasa a cubrirse con la nueva.
+                </p>
+            {% endif %}
+
+            <form class="equipos-detalle__form"
+                  method="post"
+                  action="{% url 'registrar_garantia_equipos' dispositivo.id %}">
+                {% csrf_token %}
+
+                {% if form_garantia.non_field_errors %}
+                    <p class="formularioCampo-error">{{ form_garantia.non_field_errors }}</p>
+                {% endif %}
+
+                <div class="equipos-registro__campos equipos-registro__campos--dos">
+                    {% for campo in form_garantia %}
+                        <div class="equipos-registro__campo{% if campo.name == 'observaciones' %} equipos-registro__campo--completo{% endif %}">
+                            <label for="{{ campo.id_for_label }}">
+                                {{ campo.label }}{% if campo.field.required %} *{% endif %}
+                            </label>
+                            {{ campo }}
+                            {% if campo.help_text %}
+                                <p class="equipos-registro__ayuda">{{ campo.help_text }}</p>
+                            {% endif %}
+                            {% if campo.errors %}
+                                <p class="formularioCampo-error">{{ campo.errors }}</p>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
+
+                <button class="equipos-registro__boton" type="submit">
+                    <i class="bi bi-check-lg"></i>
+                    {% if garantia.tiene_garantia %}
+                        Renovar garantía
+                    {% else %}
+                        Registrar garantía
+                    {% endif %}
+                </button>
+            </form>
+        </section>
+    {% endif %}
+
+    {% if form_cierre %}
+        <section class="equipos-detalle__tarjeta">
+            <h3><i class="bi bi-slash-circle"></i> Terminar la garantía</h3>
+            <p class="equipos-detalle__nota">
+                Úselo cuando la cobertura deja de valer antes de vencer: el
+                proveedor incumplió, el equipo se sustituyó o la fecha estaba
+                mal registrada. El equipo queda sin garantía y ésta pasa al
+                historial con su motivo.
+            </p>
+
+            <form class="equipos-detalle__form"
+                  method="post"
+                  action="{% url 'terminar_garantia_equipos' dispositivo.id %}">
+                {% csrf_token %}
+
+                <div class="equipos-registro__campos equipos-registro__campos--dos">
+                    {% for campo in form_cierre %}
+                        <div class="equipos-registro__campo{% if campo.name == 'detalle' %} equipos-registro__campo--completo{% endif %}">
+                            <label for="{{ campo.id_for_label }}">
+                                {{ campo.label }}{% if campo.field.required %} *{% endif %}
+                            </label>
+                            {{ campo }}
+                            {% if campo.errors %}
+                                <p class="formularioCampo-error">{{ campo.errors }}</p>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
+
+                <button class="equipos-registro__boton equipos-registro__boton--secundario"
+                        type="submit">
+                    <i class="bi bi-slash-circle"></i>
+                    Terminar garantía
+                </button>
+            </form>
+        </section>
+    {% endif %}
+
+    {% comment %}
+       El historial de garantias anteriores. Una garantia cerrada no se edita
+       ni se borra: es el respaldo de lo que se reclamo en su momento, y es
+       lo que permite responder que cobertura tenia el equipo en una fecha.
+    {% endcomment %}
+    {% if historial %}
+        <section class="equipos-detalle__tarjeta">
+            <h3>
+                <i class="bi bi-archive"></i>
+                Garantías anteriores
+                <span class="equipos-procedencias__conteo">{{ historial|length }}</span>
+            </h3>
+            <ul class="equipos-detalle__historial">
+                {% for cerrada, estado in historial %}
+                    <li>
+                        <strong>
+                            {{ cerrada.fecha_inicio|date:"d/m/Y" }}
+                            al {{ cerrada.fecha_fin|date:"d/m/Y" }}
+                        </strong>
+                        {% if cerrada.meses %}
+                            ({{ cerrada.meses }} mes{{ cerrada.meses|pluralize:"es" }})
+                        {% endif %}
+                        <br>
+                        <span>
+                            <strong>Cerrada:</strong>
+                            {{ cerrada.fecha_cierre|date:"d/m/Y" }}
+                            — {{ cerrada.etiqueta_cierre }}
+                        </span>
+                        {% if cerrada.detalle_cierre %}
+                            <br><span>{{ cerrada.detalle_cierre }}</span>
+                        {% endif %}
+                        {% if cerrada.referencia %}
+                            <br><span><strong>Contrato:</strong> {{ cerrada.referencia }}</span>
+                        {% endif %}
+                        {% if estado.dias_pausados %}
+                            <br><span>
+                                {{ estado.dias_pausados }} día{{ estado.dias_pausados|pluralize }}
+                                pausado{{ estado.dias_pausados|pluralize }};
+                                vencía realmente el {{ estado.fin_real|date:"d/m/Y" }}
+                            </span>
                         {% endif %}
                     </li>
                 {% endfor %}

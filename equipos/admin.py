@@ -7,6 +7,7 @@ from .models import (
     BajaDispositivo,
     ColorDispositivo,
     Dispositivo,
+    GarantiaDispositivo,
     MarcaDispositivo,
     ModeloDispositivo,
     OrdenTrabajoBajaDispositivo,
@@ -196,6 +197,33 @@ class OrdenTrabajoBajaDispositivoAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(GarantiaDispositivo)
+class GarantiaDispositivoAdmin(admin.ModelAdmin):
+    """Consulta del historial de coberturas. Se opera desde el modulo."""
+
+    list_display = (
+        "dispositivo",
+        "fecha_inicio",
+        "fecha_fin",
+        "meses",
+        "fecha_cierre",
+        "motivo_cierre",
+    )
+    list_filter = ("motivo_cierre", "fecha_fin", "fecha_cierre")
+    search_fields = (
+        "dispositivo__numero_serie",
+        "dispositivo__inventario_numero_ficha",
+        "referencia",
+    )
+    autocomplete_fields = ("dispositivo", "registrado_por")
+    readonly_fields = ("fecha_creado",)
+
+    def save_model(self, request, obj, form, change):
+        if not obj.pk:
+            obj.registrado_por = request.user
+        super().save_model(request, obj, form, change)
 
 
 @admin.register(AsignacionDispositivo)

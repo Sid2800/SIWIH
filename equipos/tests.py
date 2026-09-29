@@ -12,10 +12,12 @@ import datetime
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.test import TestCase
+from django.utils import timezone
 
 from expediente.models import ExpedienteUbicacion
 from servicio.models import Unidad
 
+from .services.garantia_service import calcular_estado_garantia
 from .forms import (
     ColoresOrdenadosField,
     MarcaEnTipoForm,
@@ -27,9 +29,13 @@ from .models import (
     CategoriaEquipo,
     ColorDispositivo,
     Dispositivo,
+    EstadoGarantiaDispositivo,
+    GarantiaDispositivo,
     MarcaDispositivo,
     ModalidadProcedencia,
     ModeloDispositivo,
+    MotivoCierreGarantia,
+    PausaGarantia,
     Procedencia,
     TipoDispositivo,
     TipoProcedencia,
@@ -56,7 +62,7 @@ class GarantiaCalculadaTests(TestCase):
             tipo=TipoProcedencia.EMPRESA,
         )
 
-    def _crear_equipo(self, **extra):
+    def _crear_equipo(self):
         return Dispositivo.objects.create(
             tipo=self.tipo,
             area_gestora=self.area,
@@ -64,72 +70,241 @@ class GarantiaCalculadaTests(TestCase):
             procedencia=self.procedencia,
             creado_por=self.usuario,
             modificado_por=self.usuario,
-            **extra,
         )
+
+    def _crear_garantia(self, **extra):
+        datos = {
+            "dispositivo": self._crear_equipo(),
+            "registrado_por": self.usuario,
+        }
+        datos.update(extra)
+        return GarantiaDispositivo.objects.create(**datos)
 
     def test_duracion_en_meses_define_el_vencimiento(self):
         # Un anio desde el 1 de marzo cubre hasta la vispera: el 1 de marzo
         # siguiente ya esta fuera de garantia.
-        equipo = self._crear_equipo(
-            fecha_inicio_garantia=datetime.date(2024, 3, 1),
-            garantia_meses=12,
+        garantia = self._crear_garantia(
+            fecha_inicio=datetime.date(2024, 3, 1),
+            meses=12,
         )
 
-        self.assertEqual(
-            equipo.fecha_fin_garantia,
-            datetime.date(2025, 2, 28),
-        )
+        self.assertEqual(garantia.fecha_fin, datetime.date(2025, 2, 28))
 
     def test_vencimiento_respeta_el_ultimo_dia_del_mes(self):
         # 31 de enero mas un mes no puede caer en un 31 de febrero.
-        equipo = self._crear_equipo(
-            fecha_inicio_garantia=datetime.date(2024, 1, 31),
-            garantia_meses=1,
+        garantia = self._crear_garantia(
+            fecha_inicio=datetime.date(2024, 1, 31),
+            meses=1,
         )
 
-        self.assertEqual(
-            equipo.fecha_fin_garantia,
-            datetime.date(2024, 2, 28),
-        )
+        self.assertEqual(garantia.fecha_fin, datetime.date(2024, 2, 28))
 
     def test_se_acepta_una_garantia_ya_vencida(self):
         # Se registran equipos viejos: que la garantia haya vencido es un dato
         # del expediente, no un error de captura.
-        equipo = self._crear_equipo(
-            fecha_inicio_garantia=datetime.date(2019, 6, 1),
-            garantia_meses=24,
+        garantia = self._crear_garantia(
+            fecha_inicio=datetime.date(2019, 6, 1),
+            meses=24,
         )
 
-        self.assertEqual(
-            equipo.fecha_fin_garantia,
-            datetime.date(2021, 5, 31),
-        )
+        self.assertEqual(garantia.fecha_fin, datetime.date(2021, 5, 31))
 
     def test_fecha_suelta_del_contrato_se_conserva(self):
         # Sin duracion pactada manda la fecha que escribio el usuario.
-        equipo = self._crear_equipo(
-            fecha_fin_garantia=datetime.date(2030, 7, 15),
+        garantia = self._crear_garantia(
+            fecha_inicio=datetime.date(2030, 1, 1),
+            fecha_fin=datetime.date(2030, 7, 15),
         )
 
-        self.assertEqual(
-            equipo.fecha_fin_garantia,
-            datetime.date(2030, 7, 15),
-        )
-
-    def test_duracion_sin_inicio_se_rechaza(self):
-        with self.assertRaises(ValidationError) as error:
-            self._crear_equipo(garantia_meses=12)
-
-        self.assertIn("fecha_inicio_garantia", error.exception.message_dict)
+        self.assertEqual(garantia.fecha_fin, datetime.date(2030, 7, 15))
 
     def test_vencimiento_anterior_al_inicio_se_rechaza(self):
         with self.assertRaises(ValidationError) as error:
-            self._crear_equipo(
-                fecha_inicio_garantia=datetime.date(2025, 1, 1),
-                fecha_fin_garantia=datetime.date(2024, 1, 1),
+            self._crear_garantia(
+                fecha_inicio=datetime.date(2025, 1, 1),
+                fecha_fin=datetime.date(2024, 1, 1),
             )
 
-        self.assertIn("fecha_fin_garantia", error.exception.message_dict)
+        self.assertIn("fecha_fin", error.exception.message_dict)
+
+    def test_el_equipo_expone_su_garantia_vigente(self):
+        equipo = self._crear_equipo()
+        garantia = GarantiaDispositivo.objects.create(
+            dispositivo=equipo,
+            fecha_inicio=datetime.date(2026, 1, 1),
+            meses=12,
+            registrado_por=self.usuario,
+        )
+
+        self.assertEqual(equipo.garantia_vigente, garantia)
+
+    def test_sin_garantia_el_estado_lo_dice(self):
+        estado = calcular_estado_garantia(self._crear_equipo())
+
+        self.assertFalse(estado.tiene_garantia)
+        self.assertEqual(
+            estado.estado,
+            EstadoGarantiaDispositivo.SIN_GARANTIA,
+        )
+
+
+class HistorialGarantiasTests(TestCase):
+    """Un equipo puede tener varias garantias: una vigente y las anteriores."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.usuario = User.objects.create_user("tecnico", password="x")
+        cls.tipo = TipoDispositivo.objects.create(
+            nombre="MONITOR",
+            categoria=CategoriaEquipo.objects.get(nombre="MEDICO"),
+        )
+        cls.procedencia = Procedencia.objects.create(
+            nombre="PROVEEDOR",
+            tipo=TipoProcedencia.EMPRESA,
+        )
+
+    def setUp(self):
+        self.equipo = Dispositivo.objects.create(
+            tipo=self.tipo,
+            area_gestora=AreaGestora.objects.get(nombre="BIOMEDICA"),
+            modalidad_procedencia=ModalidadProcedencia.COMPRA,
+            procedencia=self.procedencia,
+            creado_por=self.usuario,
+            modificado_por=self.usuario,
+        )
+
+    def _garantia(self, anio, **extra):
+        datos = {
+            "dispositivo": self.equipo,
+            "fecha_inicio": datetime.date(anio, 1, 1),
+            "meses": 12,
+            "registrado_por": self.usuario,
+        }
+        datos.update(extra)
+        return GarantiaDispositivo.objects.create(**datos)
+
+    def test_no_se_admiten_dos_vigentes_a_la_vez(self):
+        self._garantia(2024)
+
+        with self.assertRaises(ValidationError) as error:
+            self._garantia(2025)
+
+        self.assertIn("dispositivo", error.exception.message_dict)
+
+    def test_al_cerrar_una_cabe_la_siguiente(self):
+        primera = self._garantia(2024)
+        primera.cerrar(MotivoCierreGarantia.RENOVACION)
+
+        segunda = self._garantia(2025)
+
+        self.assertEqual(self.equipo.garantias.count(), 2)
+        self.assertEqual(self.equipo.garantia_vigente, segunda)
+        self.assertFalse(primera.esta_vigente)
+
+    def test_una_garantia_cerrada_queda_en_el_historial(self):
+        garantia = self._garantia(2024)
+        garantia.cerrar(
+            MotivoCierreGarantia.INCUMPLIMIENTO,
+            "El proveedor no atendio el reclamo 123.",
+        )
+
+        garantia.refresh_from_db()
+
+        self.assertEqual(garantia.fecha_cierre, timezone.localdate())
+        self.assertEqual(
+            garantia.etiqueta_cierre,
+            "Incumplimiento del proveedor",
+        )
+        self.assertIsNone(self.equipo.garantia_vigente)
+
+    def test_cerrar_sin_motivo_se_rechaza(self):
+        garantia = self._garantia(2024)
+        garantia.fecha_cierre = timezone.localdate()
+
+        with self.assertRaises(ValidationError) as error:
+            garantia.save()
+
+        self.assertIn("motivo_cierre", error.exception.message_dict)
+
+    def test_las_pausas_pertenecen_a_su_garantia(self):
+        primera = self._garantia(2024)
+        PausaGarantia.objects.create(
+            garantia=primera,
+            fecha_salida=datetime.date(2024, 3, 1),
+            fecha_retorno=datetime.date(2024, 3, 11),
+            motivo="Enviado al proveedor.",
+            observaciones_retorno="Cambio de fuente.",
+            registrado_por=self.usuario,
+        )
+        primera.cerrar(MotivoCierreGarantia.RENOVACION)
+
+        segunda = self._garantia(2025)
+
+        # Los diez dias de la primera no alargan la segunda: cada cobertura
+        # lleva la cuenta de sus propias paradas.
+        self.assertEqual(primera.dias_pausados, 10)
+        self.assertEqual(segunda.dias_pausados, 0)
+        self.assertEqual(
+            primera.fin_real,
+            datetime.date(2025, 1, 10),
+        )
+
+    def test_una_pausa_alarga_el_vencimiento_de_su_garantia(self):
+        garantia = self._garantia(2026)
+        PausaGarantia.objects.create(
+            garantia=garantia,
+            fecha_salida=datetime.date(2026, 2, 1),
+            fecha_retorno=datetime.date(2026, 2, 16),
+            motivo="Reparacion en garantia.",
+            observaciones_retorno="Devuelto funcionando.",
+            registrado_por=self.usuario,
+        )
+
+        estado = calcular_estado_garantia(
+            self.equipo,
+            hoy=datetime.date(2026, 6, 1),
+        )
+
+        self.assertEqual(estado.dias_pausados, 15)
+        self.assertEqual(estado.fin_contrato, datetime.date(2026, 12, 31))
+        self.assertEqual(estado.fin_real, datetime.date(2027, 1, 15))
+
+    def test_una_pausa_abierta_no_suma_todavia(self):
+        garantia = self._garantia(2026)
+        PausaGarantia.objects.create(
+            garantia=garantia,
+            fecha_salida=datetime.date(2026, 2, 1),
+            motivo="Sigue con el proveedor.",
+            registrado_por=self.usuario,
+        )
+
+        estado = calcular_estado_garantia(
+            self.equipo,
+            hoy=datetime.date(2026, 6, 1),
+        )
+
+        self.assertEqual(estado.dias_pausados, 0)
+        self.assertTrue(estado.esta_pausada)
+        self.assertEqual(estado.estado, EstadoGarantiaDispositivo.PAUSADA)
+
+    def test_solo_una_pausa_abierta_por_garantia(self):
+        garantia = self._garantia(2026)
+        PausaGarantia.objects.create(
+            garantia=garantia,
+            fecha_salida=datetime.date(2026, 2, 1),
+            motivo="Primera salida.",
+            registrado_por=self.usuario,
+        )
+
+        with self.assertRaises(ValidationError) as error:
+            PausaGarantia.objects.create(
+                garantia=garantia,
+                fecha_salida=datetime.date(2026, 3, 1),
+                motivo="Segunda salida.",
+                registrado_por=self.usuario,
+            )
+
+        self.assertIn("garantia", error.exception.message_dict)
 
 
 class CategoriaEquipoTests(TestCase):
