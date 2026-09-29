@@ -191,7 +191,7 @@ def datos_tipo(request):
 
     tipo = (
         TipoDispositivo.objects
-        .select_related("categoria")
+        .select_related("categoria", "tecnologia")
         .prefetch_related("categorias_secundarias")
         .filter(pk=int(tipo_id))
         .first()
@@ -206,7 +206,7 @@ def datos_tipo(request):
             categoria.nombre
             for categoria in tipo.categorias_secundarias.all()
         ],
-        "tecnologia": tipo.get_tipo_tecnologia_display(),
+        "tecnologia": tipo.tecnologia.nombre,
         # Cuantas marcas tiene declaradas: si son cero, el formulario avisa de
         # que hay que registrarlas en el catalogo antes de seguir.
         "total_marcas": tipo.marcas.filter(activo=True).count(),

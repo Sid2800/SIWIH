@@ -12,6 +12,7 @@ from .models import (
     ModeloDispositivo,
     OrdenTrabajoBajaDispositivo,
     Procedencia,
+    TecnologiaEquipo,
     TipoDispositivo,
     UbicacionFisica,
 )
@@ -26,6 +27,13 @@ class CategoriaEquipoAdmin(admin.ModelAdmin):
     search_fields = ("nombre",)
 
 
+@admin.register(TecnologiaEquipo)
+class TecnologiaEquipoAdmin(admin.ModelAdmin):
+    list_display = ("nombre", "descripcion", "activo")
+    list_filter = ("activo",)
+    search_fields = ("nombre",)
+
+
 @admin.register(UbicacionFisica)
 class UbicacionFisicaAdmin(admin.ModelAdmin):
     list_display = ("nombre", "descripcion", "activo")
@@ -35,10 +43,10 @@ class UbicacionFisicaAdmin(admin.ModelAdmin):
 
 @admin.register(TipoDispositivo)
 class TipoDispositivoAdmin(admin.ModelAdmin):
-    list_display = ("nombre", "categoria", "activo")
-    list_filter = ("categoria", "activo")
+    list_display = ("nombre", "categoria", "tecnologia", "activo")
+    list_filter = ("categoria", "tecnologia", "activo")
     search_fields = ("nombre", "categoria__nombre")
-    autocomplete_fields = ("categoria",)
+    autocomplete_fields = ("categoria", "tecnologia")
     filter_horizontal = ("categorias_secundarias", "marcas")
 
 
@@ -104,7 +112,7 @@ class DispositivoAdmin(admin.ModelAdmin):
         "modalidad_procedencia",
         "procedencia",
         "colores",
-        "tipo__tipo_tecnologia",
+        "tipo__tecnologia",
         "estado",
         "criticidad",
     )

@@ -148,6 +148,19 @@ urlpatterns = [
         name='cambiar_estado_tipo_equipos'
     ),
 
+    # Categorias y tecnologias se dan de alta desde el modal del formulario
+    # del tipo, sin salir de la pantalla.
+    path(
+        'catalogo/categorias/agregar/',
+        views.agregar_categoria_catalogo,
+        name='agregar_categoria_equipos'
+    ),
+    path(
+        'catalogo/tecnologias/agregar/',
+        views.agregar_tecnologia_catalogo,
+        name='agregar_tecnologia_equipos'
+    ),
+
     # La procedencia tiene catálogo propio porque incluye datos de contacto,
     # no solo un nombre como los catálogos técnicos del equipo.
     path(

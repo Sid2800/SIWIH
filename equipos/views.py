@@ -31,9 +31,11 @@ from .views_bajas import (
     tramite_baja_dispositivo,
 )
 from .views_catalogos import (
+    agregar_categoria_catalogo,
     agregar_marca_catalogo,
     agregar_modelo_catalogo,
     agregar_procedencia_catalogo,
+    agregar_tecnologia_catalogo,
     agregar_tipo_catalogo,
     cambiar_estado_marca,
     cambiar_estado_modelo,
@@ -93,6 +95,8 @@ __all__ = [
     "datos_tipo",
     # catalogos
     "catalogo_marcas_modelos",
+    "agregar_categoria_catalogo",
+    "agregar_tecnologia_catalogo",
     "agregar_marca_catalogo",
     "agregar_modelo_catalogo",
     "cambiar_estado_marca",

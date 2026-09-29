@@ -41,6 +41,69 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
+    // ---------- Los filtros se envian al cambiar ----------
+    // Un desplegable que hay que confirmar con un boton aparte se queda a
+    // medias: se elige la categoria, no pasa nada, y el usuario cree que el
+    // filtro no funciona.
+    document.querySelectorAll('[data-envia-al-cambiar]').forEach(function (campo) {
+        campo.addEventListener('change', function () {
+            const formulario = campo.closest('form');
+
+            if (formulario) {
+                formulario.submit();
+            }
+        });
+    });
+
+    // ---------- Cuadros para dar de alta categoria y tecnologia ----------
+    // El "+" de cada desplegable abre el suyo. Se hace con <dialog>, que ya
+    // trae el cierre con Escape, el fondo bloqueado y el foco atrapado.
+    document.querySelectorAll('[data-abre]').forEach(function (boton) {
+        boton.addEventListener('click', function () {
+            const dialogo = document.getElementById(boton.dataset.abre);
+
+            if (!dialogo) {
+                return;
+            }
+
+            dialogo.showModal();
+
+            // El foco al primer campo: quien pulsa el "+" quiere escribir.
+            const primero = dialogo.querySelector('input[type="text"]');
+
+            if (primero) {
+                primero.focus();
+            }
+        });
+    });
+
+    document.querySelectorAll('[data-cierra]').forEach(function (boton) {
+        boton.addEventListener('click', function () {
+            const dialogo = boton.closest('dialog');
+
+            if (dialogo) {
+                dialogo.close();
+            }
+        });
+    });
+
+    // Pulsar el fondo cierra, que es lo que espera cualquiera.
+    document.querySelectorAll('.equipos-catalogo__dialogo').forEach(function (dialogo) {
+        dialogo.addEventListener('click', function (evento) {
+            const caja = dialogo.getBoundingClientRect();
+            const dentro = (
+                evento.clientX >= caja.left
+                && evento.clientX <= caja.right
+                && evento.clientY >= caja.top
+                && evento.clientY <= caja.bottom
+            );
+
+            if (!dentro) {
+                dialogo.close();
+            }
+        });
+    });
+
     // ---------- Filtrado local de las listas cortas ----------
     document.querySelectorAll('[data-filtra]').forEach(function (campo) {
         const lista = document.getElementById(campo.dataset.filtra);

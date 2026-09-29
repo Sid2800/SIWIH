@@ -98,9 +98,10 @@ class CriticidadDispositivo(models.IntegerChoices):
     ALTA = 3, "Alta"
 
 
-class TipoTecnologiaDispositivo(models.IntegerChoices):
-    ELECTRONICO = 1, "Electrónico"
-    NO_ELECTRONICO = 2, "No electrónico"
+# La tecnologia era un par fijo en el codigo -electronico o no- y por tanto no
+# habia donde agregar una tercera. Pasa a ser catalogo como la categoria: en
+# equipo hospitalario aparecen tambien electromecanicos, neumaticos e
+# hidraulicos, y anadirlos no deberia requerir una migracion.
 
 
 class TipoProcedencia(models.IntegerChoices):
@@ -208,6 +209,37 @@ class CategoriaEquipo(models.Model):
         return self.nombre
 
 
+class TecnologiaEquipo(models.Model):
+    """De que naturaleza es el equipo: electronico, mecanico, neumatico...
+
+    Como la categoria, pertenece al tipo y no a cada aparato: todas las
+    camillas de traslado son mecanicas. Es un catalogo para que agregar una
+    tecnologia nueva no obligue a tocar el codigo.
+    """
+
+    nombre = models.CharField(max_length=100, unique=True)
+    descripcion = models.CharField(max_length=250, blank=True)
+    activo = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        db_table = "equipo_tecnologia"
+        verbose_name = "Tecnologia de equipo"
+        verbose_name_plural = "Tecnologias de equipo"
+        ordering = ["nombre"]
+
+    def clean(self):
+        self.nombre = normalizar_nombre_catalogo(self.nombre)
+        if not self.nombre:
+            raise ValidationError({"nombre": "Debe ingresar la tecnología."})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.nombre
+
+
 class UbicacionFisica(models.Model):
     """Zona concreta donde esta el aparato: "SALA 3 - CAMA 12", "BODEGA B".
 
@@ -259,15 +291,15 @@ class TipoDispositivo(models.Model):
         related_name="tipos_secundarios",
         verbose_name="Categorias secundarias",
     )
-    # Si el equipo lleva electronica o no es una propiedad del tipo, no de cada
+    # De que naturaleza es el equipo. Es una propiedad del tipo y no de cada
     # aparato: todas las camillas de traslado son mecanicas y todos los
-    # monitores son electronicos. Preguntarlo en cada registro solo permitia
-    # que dos equipos iguales quedaran clasificados distinto.
-    tipo_tecnologia = models.PositiveSmallIntegerField(
-        choices=TipoTecnologiaDispositivo.choices,
-        default=TipoTecnologiaDispositivo.ELECTRONICO,
-        db_index=True,
-        verbose_name="Tipo de tecnología",
+    # monitores electronicos. Preguntarlo en cada registro solo permitia que
+    # dos equipos iguales quedaran clasificados distinto.
+    tecnologia = models.ForeignKey(
+        "TecnologiaEquipo",
+        on_delete=models.PROTECT,
+        related_name="tipos",
+        verbose_name="Tecnología",
     )
     # Marcas que fabrican este tipo de equipo. Es una relacion propia y no algo
     # deducido de los modelos porque una marca se registra en el tipo antes de
@@ -297,6 +329,9 @@ class TipoDispositivo(models.Model):
 
         if self.categoria_id is None:
             raise ValidationError({"categoria": "Debe indicar la categoria."})
+
+        if self.tecnologia_id is None:
+            raise ValidationError({"tecnologia": "Debe indicar la tecnología."})
 
     def save(self, *args, **kwargs):
         # full_clean() hace que estas reglas apliquen tambien desde admin, shell
@@ -690,19 +725,9 @@ class Dispositivo(models.Model):
         return self.garantias.filter(fecha_cierre__isnull=True).first()
 
     @property
-    def tipo_tecnologia(self):
+    def tecnologia(self):
         """La lleva el tipo de equipo, no cada aparato."""
-        return self.tipo.tipo_tecnologia if self.tipo_id else None
-
-    def get_tipo_tecnologia_display(self):
-        """Conserva el nombre que Django daria al campo, ya movido al tipo.
-
-        Las pantallas y el PDF lo llaman asi desde antes del cambio, y aqui
-        cuesta una linea en vez de una revision de cada plantilla.
-        """
-        if not self.tipo_id:
-            return ""
-        return self.tipo.get_tipo_tecnologia_display()
+        return self.tipo.tecnologia if self.tipo_id else None
 
     @property
     def color_principal(self):

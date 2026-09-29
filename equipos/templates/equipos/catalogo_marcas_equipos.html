@@ -96,15 +96,37 @@
                         </button>
                     </div>
 
+                    {% comment %}
+                       El "+" abre un cuadro para crear la categoria o la
+                       tecnologia sin salir de aqui: quien esta registrando un
+                       tipo y descubre que falta su categoria perderia lo
+                       escrito si tuviera que irse a otra pantalla.
+                    {% endcomment %}
                     <div class="equipos-catalogo__campos">
-                        <label class="equipos-catalogo__campo">
+                        <div class="equipos-catalogo__campo">
                             <span>Categoría *</span>
-                            {{ form_tipo.categoria }}
-                        </label>
-                        <label class="equipos-catalogo__campo">
+                            <div class="equipos-catalogo__campo-mas">
+                                {{ form_tipo.categoria }}
+                                <button type="button"
+                                        class="equipos-catalogo__mas"
+                                        data-abre="dialogo_categoria"
+                                        title="Agregar una categoría nueva">
+                                    <i class="bi bi-plus-lg"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="equipos-catalogo__campo">
                             <span>Tecnología *</span>
-                            {{ form_tipo.tipo_tecnologia }}
-                        </label>
+                            <div class="equipos-catalogo__campo-mas">
+                                {{ form_tipo.tecnologia }}
+                                <button type="button"
+                                        class="equipos-catalogo__mas"
+                                        data-abre="dialogo_tecnologia"
+                                        title="Agregar una tecnología nueva">
+                                    <i class="bi bi-plus-lg"></i>
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
                     {% comment %}
@@ -178,46 +200,52 @@
                         {% if marca_seleccionada %}
                             <input type="hidden" name="marca" value="{{ marca_seleccionada.pk }}">
                         {% endif %}
-                        {% if filtro_categoria %}
-                            <input type="hidden" name="categoria" value="{{ filtro_categoria }}">
-                        {% endif %}
-                        {% if filtro_tecnologia %}
-                            <input type="hidden" name="tecnologia" value="{{ filtro_tecnologia }}">
-                        {% endif %}
+                        <div class="equipos-catalogo__buscar-fila">
+                            <i class="bi bi-search"></i>
+                            <input type="search"
+                                   class="formularioCampo-text"
+                                   name="q"
+                                   value="{{ busqueda_tipos }}"
+                                   placeholder="Buscar tipo o categoría"
+                                   aria-label="Buscar entre los tipos registrados"
+                                   autocomplete="off">
+                        </div>
 
-                        <i class="bi bi-search"></i>
-                        <input type="search"
-                               class="formularioCampo-text"
-                               name="q"
-                               value="{{ busqueda_tipos }}"
-                               placeholder="Buscar tipo o categoría"
-                               aria-label="Buscar entre los tipos registrados"
-                               autocomplete="off">
+                        {% comment %}
+                           Los filtros son desplegables y no botones: son los
+                           mismos campos que el formulario de arriba, asi que
+                           el usuario ya sabe donde mirar, y "Todas" es una
+                           opcion visible en lugar de un gesto que hay que
+                           adivinar. Se envian al cambiar.
+                        {% endcomment %}
+                        <div class="equipos-catalogo__filtros">
+                            <select class="formularioCampo-select"
+                                    name="categoria"
+                                    aria-label="Filtrar por categoría"
+                                    data-envia-al-cambiar>
+                                <option value="">Todas las categorías</option>
+                                {% for categoria in categorias_filtro %}
+                                    <option value="{{ categoria.pk }}"
+                                            {% if filtro_categoria == categoria.pk|stringformat:"s" %}selected{% endif %}>
+                                        {{ categoria.nombre }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+
+                            <select class="formularioCampo-select"
+                                    name="tecnologia"
+                                    aria-label="Filtrar por tecnología"
+                                    data-envia-al-cambiar>
+                                <option value="">Toda tecnología</option>
+                                {% for tecnologia in tecnologias_filtro %}
+                                    <option value="{{ tecnologia.pk }}"
+                                            {% if filtro_tecnologia == tecnologia.pk|stringformat:"s" %}selected{% endif %}>
+                                        {{ tecnologia.nombre }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
                     </form>
-
-                    {% comment %}
-                       Filtros conmutables: pulsar activa, volver a pulsar
-                       quita. Cada boton lleva ya calculada la URL que le
-                       corresponde, asi que funcionan sin JavaScript.
-                    {% endcomment %}
-                    <div class="equipos-catalogo__filtros">
-                        {% for boton in categorias_filtro %}
-                            <a class="equipos-catalogo__chip{% if boton.activo %} equipos-catalogo__chip--activo{% endif %}"
-                               href="{{ boton.url }}"
-                               title="{% if boton.activo %}Quitar el filtro{% else %}Filtrar por {{ boton.etiqueta }}{% endif %}">
-                                {{ boton.etiqueta }}
-                                {% if boton.activo %}<i class="bi bi-x"></i>{% endif %}
-                            </a>
-                        {% endfor %}
-                        {% for boton in tecnologias_filtro %}
-                            <a class="equipos-catalogo__chip equipos-catalogo__chip--tecnologia{% if boton.activo %} equipos-catalogo__chip--activo{% endif %}"
-                               href="{{ boton.url }}"
-                               title="{% if boton.activo %}Quitar el filtro{% else %}Filtrar por {{ boton.etiqueta }}{% endif %}">
-                                {{ boton.etiqueta }}
-                                {% if boton.activo %}<i class="bi bi-x"></i>{% endif %}
-                            </a>
-                        {% endfor %}
-                    </div>
 
                     <p class="equipos-catalogo__ayuda-lista">
                         Un clic lo elige. Doble clic para renombrarlo.
@@ -551,6 +579,85 @@
         </div>
     </div>
 </div>
+
+{% comment %}
+   Los dos cuadros para dar de alta una categoria o una tecnologia. Son
+   <dialog> del navegador: traen el cierre con Escape, el fondo bloqueado y el
+   foco atrapado sin depender de ninguna libreria. Van fuera del formulario
+   del tipo porque HTML no permite anidar formularios.
+{% endcomment %}
+<dialog class="equipos-procedencias__dialogo equipos-catalogo__dialogo"
+        id="dialogo_categoria">
+    <header>
+        <h3>Nueva categoría</h3>
+        <button type="button" class="equipos-procedencias__cerrar" data-cierra aria-label="Cerrar">
+            <i class="bi bi-x-lg"></i>
+        </button>
+    </header>
+
+    <form method="post" action="{% url 'agregar_categoria_equipos' %}?{{ querystring_tipos }}">
+        {% csrf_token %}
+        <div class="equipos-catalogo__dialogo-cuerpo">
+            <p class="equipos-registro__ayuda">
+                La gran familia del equipo: define qué área da el mantenimiento.
+            </p>
+            {% for campo in form_categoria %}
+                <div class="equipos-registro__campo">
+                    <label for="{{ campo.id_for_label }}">
+                        {{ campo.label }}{% if campo.field.required %} *{% endif %}
+                    </label>
+                    {{ campo }}
+                </div>
+            {% endfor %}
+        </div>
+        <footer>
+            <button type="button" class="equipos-catalogo__cancelar" data-cierra>
+                Cancelar
+            </button>
+            <button class="equipos-catalogo__boton" type="submit">
+                <i class="bi bi-plus-lg"></i>
+                Agregar categoría
+            </button>
+        </footer>
+    </form>
+</dialog>
+
+<dialog class="equipos-procedencias__dialogo equipos-catalogo__dialogo"
+        id="dialogo_tecnologia">
+    <header>
+        <h3>Nueva tecnología</h3>
+        <button type="button" class="equipos-procedencias__cerrar" data-cierra aria-label="Cerrar">
+            <i class="bi bi-x-lg"></i>
+        </button>
+    </header>
+
+    <form method="post" action="{% url 'agregar_tecnologia_equipos' %}?{{ querystring_tipos }}">
+        {% csrf_token %}
+        <div class="equipos-catalogo__dialogo-cuerpo">
+            <p class="equipos-registro__ayuda">
+                De qué naturaleza es el equipo: electrónico, mecánico,
+                neumático, hidráulico...
+            </p>
+            {% for campo in form_tecnologia %}
+                <div class="equipos-registro__campo">
+                    <label for="{{ campo.id_for_label }}">
+                        {{ campo.label }}{% if campo.field.required %} *{% endif %}
+                    </label>
+                    {{ campo }}
+                </div>
+            {% endfor %}
+        </div>
+        <footer>
+            <button type="button" class="equipos-catalogo__cancelar" data-cierra>
+                Cancelar
+            </button>
+            <button class="equipos-catalogo__boton" type="submit">
+                <i class="bi bi-plus-lg"></i>
+                Agregar tecnología
+            </button>
+        </footer>
+    </form>
+</dialog>
 {% endblock content %}
 
 {% block extra_js %}

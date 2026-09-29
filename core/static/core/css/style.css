@@ -9441,47 +9441,80 @@ p + .equipos-garantia__bloqueo {
    y el enlace resultante se puede compartir.
    --------------------------------------------------------------------- */
 .equipos-catalogo__filtros {
-   display: flex;
-   flex-wrap: wrap;
-   gap: .4rem;
+   display: grid;
+   gap: .6rem;
+   grid-template-columns: repeat(auto-fit, minmax(min(16rem, 100%), 1fr));
    padding: 0 1.2rem .8rem;
 }
 
-/* Pulsar activa y volver a pulsar quita: cada chip lleva ya calculada la URL
-   que le toca segun este activo o no. */
-.equipos-catalogo__chip {
+.equipos-catalogo__filtros .formularioCampo-select {
+   font-size: 1.35rem;
+   min-height: 4rem;
+   min-width: 0;
+}
+
+.equipos-catalogo__buscar-fila {
+   align-items: center;
+   display: flex;
+   gap: .6rem;
+}
+
+.equipos-catalogo__buscar-fila .formularioCampo-text {
+   flex: 1;
+   min-width: 0;
+}
+
+/* El "+" que abre el cuadro de alta, pegado a su desplegable. */
+.equipos-catalogo__campo-mas {
+   display: flex;
+   gap: .5rem;
+}
+
+.equipos-catalogo__campo-mas .formularioCampo-select {
+   flex: 1;
+   min-width: 0;
+}
+
+.equipos-catalogo__mas {
    align-items: center;
    background-color: var(--colorMenuHover);
-   border: .1rem solid transparent;
-   border-radius: 2rem;
-   color: var(--colorTextoMenu);
-   display: flex;
-   font-size: 1.2rem;
-   gap: .3rem;
-   padding: .45rem .9rem;
-   text-decoration: none;
-   white-space: nowrap;
-}
-
-.equipos-catalogo__chip:hover {
-   border-color: var(--colorBoton);
+   border: .1rem solid var(--colorLinea);
+   border-radius: .5rem;
    color: var(--negro);
+   cursor: pointer;
+   display: flex;
+   flex: 0 0 auto;
+   font-size: 1.5rem;
+   justify-content: center;
+   /* Cuadrado y del alto del campo, para que se lea como parte de el. */
+   min-height: 4rem;
+   min-width: 4rem;
 }
 
-.equipos-catalogo__chip--activo {
-   background-color: var(--negro);
-   color: #fff;
+.equipos-catalogo__mas:hover {
+   border-color: var(--colorBoton);
 }
 
-.equipos-catalogo__chip--activo:hover {
-   color: #fff;
+.equipos-catalogo__dialogo-cuerpo {
+   display: flex;
+   flex-direction: column;
+   gap: 1rem;
+   padding: 1.4rem 1.6rem;
 }
 
-/* La tecnologia se distingue de la categoria con el borde: son dos filtros
-   distintos en la misma fila y conviene no leerlos como una sola lista. */
-.equipos-catalogo__chip--tecnologia {
-   background-color: transparent;
-   border-color: var(--colorLinea);
+.equipos-catalogo__dialogo > form > footer {
+   border-top: .1rem solid var(--colorLinea);
+   display: flex;
+   flex-wrap: wrap;
+   gap: 1rem;
+   justify-content: flex-end;
+   padding: 1.2rem 1.6rem;
+}
+
+.equipos-catalogo__dialogo .equipos-catalogo__cancelar {
+   background: none;
+   border: none;
+   cursor: pointer;
 }
 
 .equipos-catalogo__paginacion {

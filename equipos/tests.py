@@ -38,8 +38,8 @@ from .models import (
     PausaGarantia,
     Procedencia,
     TipoDispositivo,
+    TecnologiaEquipo,
     TipoProcedencia,
-    TipoTecnologiaDispositivo,
     UbicacionFisica,
 )
 
@@ -54,7 +54,7 @@ class GarantiaCalculadaTests(TestCase):
         cls.tipo = TipoDispositivo.objects.create(
             nombre="MONITOR",
             categoria=cls.categoria,
-            tipo_tecnologia=TipoTecnologiaDispositivo.ELECTRONICO,
+            tecnologia=TecnologiaEquipo.objects.get(nombre="ELECTRONICO"),
         )
         cls.area = AreaGestora.objects.get(nombre="BIOMEDICA")
         cls.procedencia = Procedencia.objects.create(
@@ -157,6 +157,7 @@ class HistorialGarantiasTests(TestCase):
         cls.tipo = TipoDispositivo.objects.create(
             nombre="MONITOR",
             categoria=CategoriaEquipo.objects.get(nombre="MEDICO"),
+            tecnologia=TecnologiaEquipo.objects.get(nombre="ELECTRONICO"),
         )
         cls.procedencia = Procedencia.objects.create(
             nombre="PROVEEDOR",
@@ -319,6 +320,7 @@ class CategoriaEquipoTests(TestCase):
         tipo = TipoDispositivo.objects.create(
             nombre="ECOGRAFO CON ESTACION",
             categoria=self.medico,
+            tecnologia=TecnologiaEquipo.objects.get(nombre="ELECTRONICO"),
         )
         tipo.categorias_secundarias.add(self.informatica)
 
@@ -341,6 +343,7 @@ class CategoriaEquipoTests(TestCase):
         tipo = TipoDispositivo.objects.create(
             nombre="  camilla de traslado ",
             categoria=self.medico,
+            tecnologia=TecnologiaEquipo.objects.get(nombre="ELECTRONICO"),
         )
 
         self.assertEqual(tipo.nombre, "CAMILLA DE TRASLADO")
@@ -356,7 +359,7 @@ class UbicacionAsignacionTests(TestCase):
         cls.tipo = TipoDispositivo.objects.create(
             nombre="MONITOR",
             categoria=cls.categoria,
-            tipo_tecnologia=TipoTecnologiaDispositivo.ELECTRONICO,
+            tecnologia=TecnologiaEquipo.objects.get(nombre="ELECTRONICO"),
         )
         cls.area = AreaGestora.objects.get(nombre="BIOMEDICA")
         cls.procedencia = Procedencia.objects.create(
@@ -410,7 +413,7 @@ class ColoresEquipoTests(TestCase):
         cls.tipo = TipoDispositivo.objects.create(
             nombre="CAMILLA",
             categoria=CategoriaEquipo.objects.get(nombre="MOBILIARIO CLINICO"),
-            tipo_tecnologia=TipoTecnologiaDispositivo.NO_ELECTRONICO,
+            tecnologia=TecnologiaEquipo.objects.get(nombre="NO ELECTRONICO"),
         )
         cls.procedencia = Procedencia.objects.create(
             nombre="DONANTE",
@@ -509,11 +512,12 @@ class CascadaTipoMarcaModeloTests(TestCase):
         cls.impresora = TipoDispositivo.objects.create(
             nombre="IMPRESORA",
             categoria=CategoriaEquipo.objects.get(nombre="INFORMATICA"),
+            tecnologia=TecnologiaEquipo.objects.get(nombre="ELECTRONICO"),
         )
         cls.camilla = TipoDispositivo.objects.create(
             nombre="CAMILLA",
             categoria=CategoriaEquipo.objects.get(nombre="MOBILIARIO CLINICO"),
-            tipo_tecnologia=TipoTecnologiaDispositivo.NO_ELECTRONICO,
+            tecnologia=TecnologiaEquipo.objects.get(nombre="NO ELECTRONICO"),
         )
         cls.epson = MarcaDispositivo.objects.create(nombre="EPSON")
         cls.impresora.marcas.add(cls.epson)
@@ -542,11 +546,8 @@ class CascadaTipoMarcaModeloTests(TestCase):
     def test_la_tecnologia_la_trae_el_tipo(self):
         equipo = self._equipo()
 
-        self.assertEqual(
-            equipo.tipo_tecnologia,
-            TipoTecnologiaDispositivo.ELECTRONICO,
-        )
-        self.assertEqual(equipo.get_tipo_tecnologia_display(), "Electrónico")
+        self.assertEqual(equipo.tecnologia, self.impresora.tecnologia)
+        self.assertEqual(equipo.tecnologia.nombre, "ELECTRONICO")
 
     def test_un_modelo_exige_que_la_marca_este_en_el_tipo(self):
         # Epson no esta declarada en camillas, asi que no puede tener modelos
@@ -609,10 +610,12 @@ class MarcaEnTipoFormTests(TestCase):
         cls.impresora = TipoDispositivo.objects.create(
             nombre="IMPRESORA",
             categoria=CategoriaEquipo.objects.get(nombre="INFORMATICA"),
+            tecnologia=TecnologiaEquipo.objects.get(nombre="ELECTRONICO"),
         )
         cls.escaner = TipoDispositivo.objects.create(
             nombre="ESCANER",
             categoria=CategoriaEquipo.objects.get(nombre="INFORMATICA"),
+            tecnologia=TecnologiaEquipo.objects.get(nombre="ELECTRONICO"),
         )
 
     def test_crea_la_marca_si_no_existia(self):

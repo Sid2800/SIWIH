@@ -12,6 +12,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 from .forms import (
+    CatalogoSimpleForm,
     MarcaEnTipoForm,
     ModeloCatalogoForm,
     ProcedenciaCatalogoForm,
@@ -23,8 +24,8 @@ from .models import (
     MarcaDispositivo,
     ModeloDispositivo,
     Procedencia,
+    TecnologiaEquipo,
     TipoDispositivo,
-    TipoTecnologiaDispositivo,
 )
 from .decorators import exige_catalogo_equipos, exige_ver_equipos
 from .view_helpers import registrar_errores_vista
@@ -107,7 +108,7 @@ def _filtrar_tipos(request):
 
     tipos = (
         TipoDispositivo.objects
-        .select_related("categoria")
+        .select_related("categoria", "tecnologia")
         .annotate(
             total_equipos=Count("dispositivos", distinct=True),
             total_marcas=Count("marcas", distinct=True),
@@ -127,7 +128,7 @@ def _filtrar_tipos(request):
         tipos = tipos.filter(categoria_id=int(categoria))
 
     if tecnologia.isdigit():
-        tipos = tipos.filter(tipo_tecnologia=int(tecnologia))
+        tipos = tipos.filter(tecnologia_id=int(tecnologia))
 
     paginador = Paginator(tipos, TIPOS_POR_PAGINA)
     pagina = paginador.get_page(request.GET.get("pagina"))
@@ -146,54 +147,34 @@ def _filtrar_tipos(request):
         "filtro_tecnologia": tecnologia,
         "hay_filtros": bool(busqueda or categoria or tecnologia),
         "querystring_tipos": parametros.urlencode(),
-        # Los botones de filtro: cada uno lleva la URL que lo activa y, si ya
-        # esta activo, la que lo quita. Volver a pulsarlo muestra todo otra
-        # vez, que es lo que espera cualquiera de un boton de filtro.
-        "categorias_filtro": _botones_filtro(
-            request,
-            "categoria",
-            [
-                (str(c.pk), c.nombre)
-                for c in CategoriaEquipo.objects.filter(activo=True)
-            ],
-        ),
-        "tecnologias_filtro": _botones_filtro(
-            request,
-            "tecnologia",
-            [
-                (str(valor), etiqueta)
-                for valor, etiqueta in TipoTecnologiaDispositivo.choices
-            ],
-        ),
+        # Los dos filtros son desplegables y no botones: son los mismos
+        # campos que el formulario de arriba, asi que el usuario ya sabe
+        # donde mirar, y "Todas" es una opcion visible en lugar de un gesto
+        # que hay que adivinar.
+        "categorias_filtro": CategoriaEquipo.objects.filter(activo=True),
+        "tecnologias_filtro": TecnologiaEquipo.objects.filter(activo=True),
     }
 
 
-def _botones_filtro(request, parametro, opciones):
-    """Construye los botones de un filtro, con su URL de activar y quitar."""
-    actual = (request.GET.get(parametro) or "").strip()
-    botones = []
+def _preseleccion_catalogo(request):
+    """Valores que el modal acaba de crear, para dejarlos ya elegidos.
 
-    for valor, etiqueta in opciones:
-        activo = actual == valor
-        parametros = request.GET.copy()
-        # Al cambiar un filtro se vuelve a la primera pagina: la 7 del listado
-        # sin filtrar no tiene nada que ver con la 7 del filtrado.
-        parametros.pop("pagina", None)
+    Quien agrega una categoria desde el modal la esta agregando porque la
+    necesita para el tipo que esta escribiendo: lo natural es encontrarla ya
+    seleccionada al volver, no tener que buscarla en el desplegable.
+    """
+    inicial = {}
 
-        if activo:
-            parametros.pop(parametro, None)
-        else:
-            parametros[parametro] = valor
+    for parametro, campo in (
+        ("nueva_categoria", "categoria"),
+        ("nueva_tecnologia", "tecnologia"),
+    ):
+        valor = (request.GET.get(parametro) or "").strip()
 
-        consulta = parametros.urlencode()
-        botones.append({
-            "valor": valor,
-            "etiqueta": etiqueta,
-            "activo": activo,
-            "url": f"?{consulta}" if consulta else "?",
-        })
+        if valor.isdigit():
+            inicial[campo] = int(valor)
 
-    return botones
+    return inicial
 
 
 @exige_catalogo_equipos
@@ -246,7 +227,18 @@ def catalogo_marcas_modelos(request):
         "modelos": modelos,
         # El mismo formulario sirve para alta y edicion; lo unico que
         # cambia es si se le pasa la instancia que se esta editando.
-        "form_tipo": TipoCatalogoForm(instance=tipo_editado),
+        "form_tipo": TipoCatalogoForm(
+            instance=tipo_editado,
+            initial=_preseleccion_catalogo(request),
+        ),
+        "form_categoria": CatalogoSimpleForm(
+            modelo=CategoriaEquipo,
+            etiqueta="categoría",
+        ),
+        "form_tecnologia": CatalogoSimpleForm(
+            modelo=TecnologiaEquipo,
+            etiqueta="tecnología",
+        ),
         "form_marca": MarcaEnTipoForm(tipo=tipo) if tipo else None,
         "form_modelo": (
             ModeloCatalogoForm(tipo=tipo, marca=marca)
@@ -403,7 +395,10 @@ def agregar_tipo_catalogo(request):
 
     tipo = form.save()
     messages.success(request, f"Tipo {tipo.nombre} agregado correctamente.")
-    return redirect(_url_catalogo())
+    # Se vuelve con el tipo nuevo elegido y buscado por su nombre: la lista va
+    # paginada y ordenada por categoria, asi que un tipo recien creado podia
+    # caer en otra pagina y parecer que no se habia guardado.
+    return redirect(f"{_url_catalogo(tipo)}&q={quote(tipo.nombre)}")
 
 
 @exige_catalogo_equipos
@@ -466,6 +461,77 @@ def cambiar_estado_modelo(request, modelo_id):
         f"Modelo {modelo.nombre} {'reactivado' if modelo.activo else 'desactivado'}.",
     )
     return redirect(_url_catalogo(modelo.tipo, modelo.marca, request=request))
+
+
+# =====================================================================
+# Categorias y tecnologias
+# ---------------------------------------------------------------------
+# Son los dos catalogos de los que cuelga un tipo de equipo. Se dan de
+# alta desde el propio formulario del tipo, en un cuadro de dialogo: si
+# alguien esta registrando "NEBULIZADOR" y descubre que falta su
+# categoria, mandarlo a otra pantalla le haria perder lo que llevaba
+# escrito.
+# =====================================================================
+
+
+def _alta_catalogo_simple(request, modelo, etiqueta, parametro):
+    """Alta comun de categoria y tecnologia: nombre y descripcion.
+
+    Al terminar se vuelve a la pantalla del catalogo con el valor nuevo ya
+    elegido en el desplegable, para que quien lo acaba de crear no tenga
+    que buscarlo en la lista.
+    """
+    formulario = CatalogoSimpleForm(
+        request.POST,
+        modelo=modelo,
+        etiqueta=etiqueta,
+    )
+
+    if not formulario.is_valid():
+        primer_error = next(
+            (str(e) for errores in formulario.errors.values() for e in errores),
+            f"Revise los datos de la {etiqueta}.",
+        )
+        messages.error(request, primer_error)
+        return redirect(_url_catalogo(request=request))
+
+    creado = formulario.guardar()
+    messages.success(
+        request,
+        f"{etiqueta.capitalize()} {creado.nombre} agregada correctamente.",
+    )
+
+    # Se vuelve con el valor nuevo preseleccionado en el formulario del tipo.
+    destino = _url_catalogo(request=request)
+    separador = "&" if "?" in destino else "?"
+
+    return redirect(f"{destino}{separador}{parametro}={creado.pk}")
+
+
+@exige_catalogo_equipos
+@login_required
+@registrar_errores_vista("Error al agregar categoria de equipo")
+@require_POST
+def agregar_categoria_catalogo(request):
+    return _alta_catalogo_simple(
+        request,
+        CategoriaEquipo,
+        "categoría",
+        "nueva_categoria",
+    )
+
+
+@exige_catalogo_equipos
+@login_required
+@registrar_errores_vista("Error al agregar tecnologia de equipo")
+@require_POST
+def agregar_tecnologia_catalogo(request):
+    return _alta_catalogo_simple(
+        request,
+        TecnologiaEquipo,
+        "tecnología",
+        "nueva_tecnologia",
+    )
 
 
 def _url_catalogo_procedencias(procedencia=None):

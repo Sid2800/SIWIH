@@ -24,7 +24,7 @@ from .models import (
     Procedencia,
     TipoDispositivo,
     TipoProcedencia,
-    TipoTecnologiaDispositivo,
+    TecnologiaEquipo,
     UbicacionFisica,
     normalizar_inventario_bienes_nacionales,
     normalizar_inventario_numero_ficha,
@@ -1067,6 +1067,65 @@ class MarcaEnTipoForm(forms.Form):
         return marca, creada
 
 
+class CatalogoSimpleForm(forms.Form):
+    """Alta de una categoria o una tecnologia desde el modal del formulario.
+
+    Las dos son lo mismo -un nombre y una descripcion opcional- asi que
+    comparten formulario. El modelo concreto se pasa al construirlo, y de el
+    sale tambien el mensaje del duplicado.
+    """
+
+    nombre = forms.CharField(
+        max_length=100,
+        label="Nombre",
+        widget=forms.TextInput(
+            attrs={
+                "class": "formularioCampo-text",
+                "placeholder": "Ej. NEUMATICO",
+                "maxlength": 100,
+            }
+        ),
+    )
+    descripcion = forms.CharField(
+        required=False,
+        max_length=250,
+        label="Descripción",
+        widget=forms.TextInput(
+            attrs={
+                "class": "formularioCampo-text",
+                "placeholder": "Opcional",
+                "maxlength": 250,
+            }
+        ),
+    )
+
+    def __init__(self, *args, modelo=None, etiqueta="valor", **kwargs):
+        self.modelo = modelo
+        self.etiqueta = etiqueta
+        super().__init__(*args, **kwargs)
+
+    def clean_nombre(self):
+        nombre = normalizar_nombre_catalogo(self.cleaned_data.get("nombre"))
+
+        if not nombre:
+            raise forms.ValidationError(
+                f"Debe ingresar el nombre de la {self.etiqueta}."
+            )
+
+        if self.modelo.objects.filter(nombre=nombre).exists():
+            raise forms.ValidationError(
+                f"Ya existe una {self.etiqueta} con ese nombre."
+            )
+
+        return nombre
+
+    def guardar(self):
+        return self.modelo.objects.create(
+            nombre=self.cleaned_data["nombre"],
+            descripcion=self.cleaned_data.get("descripcion", ""),
+        )
+
+
 class TipoCatalogoForm(forms.ModelForm):
     """Alta y edicion de tipos de equipo desde la vista de catalogo.
 
@@ -1081,18 +1140,18 @@ class TipoCatalogoForm(forms.ModelForm):
         fields = [
             "nombre",
             "categoria",
-            "tipo_tecnologia",
+            "tecnologia",
             "categorias_secundarias",
             "descripcion",
         ]
         labels = {
             "categoria": "Categoría principal",
-            "tipo_tecnologia": "Tecnología",
+            "tecnologia": "Tecnología",
             "categorias_secundarias": "También pertenece a",
         }
         help_texts = {
             "categoria": "Define qué área da el mantenimiento.",
-            "tipo_tecnologia": (
+            "tecnologia": (
                 "Igual para todos los equipos de este tipo: no se pregunta "
                 "en cada registro."
             ),
@@ -1116,7 +1175,7 @@ class TipoCatalogoForm(forms.ModelForm):
                     "id": "categoria_tipo_catalogo",
                 }
             ),
-            "tipo_tecnologia": forms.Select(
+            "tecnologia": forms.Select(
                 attrs={
                     "class": "formularioCampo-select",
                     "id": "tecnologia_tipo_catalogo",
@@ -1153,6 +1212,18 @@ class TipoCatalogoForm(forms.ModelForm):
         self.fields["categoria"].empty_label = "Seleccione la categoría"
         self.fields["categorias_secundarias"].queryset = activas
         self.fields["categorias_secundarias"].required = False
+
+        # Misma regla para la tecnologia: una desactivada no se ofrece para
+        # tipos nuevos, pero se conserva en la edicion del que ya la usa.
+        filtro_tecnologia = Q(activo=True)
+
+        if self.instance.pk and self.instance.tecnologia_id:
+            filtro_tecnologia |= Q(pk=self.instance.tecnologia_id)
+
+        self.fields["tecnologia"].queryset = TecnologiaEquipo.objects.filter(
+            filtro_tecnologia
+        )
+        self.fields["tecnologia"].empty_label = "Seleccione la tecnología"
 
     def clean(self):
         """Una categoria secundaria repetida no aporta nada.
