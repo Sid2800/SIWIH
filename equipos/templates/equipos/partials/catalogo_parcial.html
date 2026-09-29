@@ -1,0 +1,17 @@
+{% comment %}
+   Respuesta para el navegador cuando solo cambia parte de la pantalla.
+
+   Son los mismos trozos que la pagina completa, uno detras de otro y cada uno
+   con su identificador. El navegador toma cada uno y lo pone en el sitio del
+   que ya tenia, en vez de cambiar la pagina entera: asi lo que el usuario
+   llevaba escrito en el formulario de arriba no se pierde al filtrar la
+   lista ni al elegir un tipo.
+
+   No lleva ni la plantilla base ni el formulario de alta a proposito: la base
+   volveria a mandar el menu y la hoja de estilos en cada peticion, y el
+   formulario es precisamente lo que hay que dejar intacto.
+{% endcomment %}
+{% include 'equipos/partials/catalogo_migas.html' %}
+{% include 'equipos/partials/catalogo_tipos_cuerpo.html' %}
+{% include 'equipos/partials/catalogo_paso_marcas.html' %}
+{% include 'equipos/partials/catalogo_paso_modelos.html' %}

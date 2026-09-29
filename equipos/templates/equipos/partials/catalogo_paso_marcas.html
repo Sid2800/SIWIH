@@ -1,0 +1,138 @@
+{% comment %}
+   Paso 2: las marcas del tipo elegido.
+
+   Vive en su propio archivo porque se dibuja de dos maneras: dentro de la
+   pagina completa la primera vez, y sola cuando el navegador pide solo
+   este trozo para cambiarlo sin recargar. El marcado esta escrito una vez
+   y los dos caminos usan el mismo.
+{% endcomment %}
+        {# ---------- Paso 2: marcas del tipo ---------- #}
+        <div class="equipos-catalogo__paso" id="equipos_paso_marcas">
+            <section class="equipos-catalogo__panel">
+                <header class="equipos-catalogo__encabezado">
+                    <h3>
+                        <span class="equipos-catalogo__numero">2</span>
+                        Marcas
+                    </h3>
+                    <p>
+                        {% if tipo_seleccionado %}
+                            Fabricantes de {{ tipo_seleccionado.nombre }}.
+                        {% else %}
+                            Elija un tipo de equipo para empezar.
+                        {% endif %}
+                    </p>
+                </header>
+
+                {% if tipo_seleccionado %}
+                    {% if not tipo_seleccionado.activo %}
+                        <p class="equipos-catalogo__aviso">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            Este tipo está desactivado: no aparecerá al registrar equipos.
+                        </p>
+                    {% endif %}
+
+                    <form class="equipos-catalogo__form"
+                          method="post"
+                          action="{% url 'agregar_marca_equipos' tipo_seleccionado.pk %}">
+                        {% csrf_token %}
+                        <div class="equipos-catalogo__fila">
+                            {{ form_marca.nombre }}
+                            <button class="equipos-catalogo__boton" type="submit">
+                                <i class="bi bi-plus-lg"></i>
+                                <span>Agregar</span>
+                            </button>
+                        </div>
+                        {% comment %}
+                           Sugerencias con las marcas que ya existen en el
+                           sistema: si Epson esta en impresoras, al escribirla
+                           en escaneres se reutiliza la misma en vez de crear
+                           un duplicado.
+                        {% endcomment %}
+                        <datalist id="marcas_existentes_equipos">
+                            {% for nombre in marcas_existentes %}
+                                <option value="{{ nombre }}"></option>
+                            {% endfor %}
+                        </datalist>
+                        <p class="equipos-registro__ayuda">
+                            Si la marca ya existe en otro tipo, se reutiliza.
+                        </p>
+                    </form>
+                {% else %}
+                    <p class="equipos-catalogo__vacio">
+                        <i class="bi bi-arrow-left-circle"></i>
+                        Sin tipo elegido no hay marcas que registrar.
+                    </p>
+                {% endif %}
+            </section>
+
+            {% if tipo_seleccionado %}
+                <section class="equipos-catalogo__panel equipos-catalogo__panel--lista">
+                    <details class="equipos-catalogo__desplegable" open>
+                        <summary>
+                            <span class="equipos-catalogo__desplegable-titulo">
+                                <i class="bi bi-list-ul"></i>
+                                Marcas registradas
+                                <span class="equipos-catalogo__contador">{{ marcas|length }}</span>
+                            </span>
+                            <i class="bi bi-chevron-down equipos-catalogo__desplegable-flecha"></i>
+                        </summary>
+
+                        <div class="equipos-catalogo__buscador">
+                            <i class="bi bi-search"></i>
+                            <input type="search"
+                                   class="formularioCampo-text"
+                                   data-filtra="lista_marcas"
+                                   placeholder="Buscar marca"
+                                   aria-label="Buscar entre las marcas registradas"
+                                   autocomplete="off">
+                        </div>
+
+                        <ul class="equipos-catalogo__lista" id="lista_marcas">
+                            {% for marca in marcas %}
+                                <li class="equipos-catalogo__item{% if marca_seleccionada and marca.pk == marca_seleccionada.pk %} equipos-catalogo__item--activo{% endif %}{% if not marca.activo %} equipos-catalogo__item--inactivo{% endif %}">
+                                    <a class="equipos-catalogo__enlace"
+                                       data-navega
+                                       href="?tipo={{ tipo_seleccionado.pk }}&marca={{ marca.pk }}">
+                                        <span class="equipos-catalogo__nombre">{{ marca.nombre }}</span>
+                                        <span class="equipos-catalogo__meta">
+                                            {{ marca.total_modelos }} modelo{{ marca.total_modelos|pluralize }}
+                                        </span>
+                                    </a>
+                                    <div class="equipos-catalogo__acciones">
+                                        <form method="post"
+                                              action="{% url 'quitar_marca_tipo_equipos' tipo_seleccionado.pk marca.pk %}">
+                                            {% csrf_token %}
+                                            <button class="equipos-catalogo__icono"
+                                                    type="submit"
+                                                    title="Quitar {{ marca.nombre }} de {{ tipo_seleccionado.nombre }}">
+                                                <i class="bi bi-x-lg"></i>
+                                            </button>
+                                        </form>
+                                        <form method="post"
+                                              action="{% url 'cambiar_estado_marca_equipos' marca.pk %}">
+                                            {% csrf_token %}
+                                            <input type="hidden"
+                                                   name="volver"
+                                                   value="?tipo={{ tipo_seleccionado.pk }}">
+                                            <button class="equipos-catalogo__icono"
+                                                    type="submit"
+                                                    title="{% if marca.activo %}Desactivar{% else %}Reactivar{% endif %} {{ marca.nombre }} en todo el sistema">
+                                                <i class="bi bi-toggle-{% if marca.activo %}on{% else %}off{% endif %}"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </li>
+                            {% empty %}
+                                <li class="equipos-catalogo__vacio">
+                                    {{ tipo_seleccionado.nombre }} todavía no tiene marcas.
+                                </li>
+                            {% endfor %}
+                        </ul>
+
+                        <p class="equipos-catalogo__sin-coincidencias" hidden>
+                            Ninguna marca coincide con la búsqueda.
+                        </p>
+                    </details>
+                </section>
+            {% endif %}
+        </div>

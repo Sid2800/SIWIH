@@ -1,0 +1,103 @@
+{% comment %}
+   Filas de tipos registrados y su paginacion.
+
+   Vive en su propio archivo porque se dibuja de dos maneras: dentro de la
+   pagina completa la primera vez, y sola cuando el navegador pide solo
+   este trozo para cambiarlo sin recargar. El marcado esta escrito una vez
+   y los dos caminos usan el mismo.
+{% endcomment %}
+                    <div id="equipos_tipos_cuerpo"
+                         data-total="{{ total_tipos }}">
+                    <p class="equipos-catalogo__ayuda-lista">
+                        Un clic lo elige. Doble clic para renombrarlo.
+                    </p>
+
+                    <ul class="equipos-catalogo__lista" id="lista_tipos">
+                        {% for tipo in tipos %}
+                            <li class="equipos-catalogo__item{% if tipo_seleccionado and tipo.pk == tipo_seleccionado.pk %} equipos-catalogo__item--activo{% endif %}{% if not tipo.activo %} equipos-catalogo__item--inactivo{% endif %}">
+                                {% comment %}
+                                   Un clic elige el tipo y el doble clic lo
+                                   abre para renombrar. Lo resuelve
+                                   catalogoEquipos.js, que espera un momento
+                                   antes de seguir el enlace para distinguir
+                                   un gesto del otro.
+                                {% endcomment %}
+                                <a class="equipos-catalogo__enlace"
+                                   data-navega
+                                   href="?tipo={{ tipo.pk }}"
+                                   data-url-editar="?editar={{ tipo.pk }}{% if tipo_seleccionado %}&tipo={{ tipo_seleccionado.pk }}{% endif %}">
+                                    <span class="equipos-catalogo__nombre">{{ tipo.nombre }}</span>
+                                    <span class="equipos-catalogo__meta">
+                                        {{ tipo.categoria.nombre }}
+                                        · {{ tipo.total_marcas }} marca{{ tipo.total_marcas|pluralize }}
+                                        · {{ tipo.total_equipos }} equipo{{ tipo.total_equipos|pluralize }}
+                                    </span>
+                                </a>
+                                <div class="equipos-catalogo__acciones">
+                                    <a class="equipos-catalogo__icono"
+                                       href="?editar={{ tipo.pk }}{% if tipo_seleccionado %}&tipo={{ tipo_seleccionado.pk }}{% endif %}"
+                                       title="Renombrar {{ tipo.nombre }}">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <form method="post"
+                                          action="{% url 'cambiar_estado_tipo_equipos' tipo.pk %}">
+                                        {% csrf_token %}
+                                        <button class="equipos-catalogo__icono"
+                                                type="submit"
+                                                title="{% if tipo.activo %}Desactivar{% else %}Reactivar{% endif %} {{ tipo.nombre }}">
+                                            <i class="bi bi-toggle-{% if tipo.activo %}on{% else %}off{% endif %}"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </li>
+                        {% empty %}
+                            <li class="equipos-catalogo__vacio">
+                                {% if hay_filtros %}
+                                    Ningún tipo coincide con la búsqueda.
+                                {% else %}
+                                    Todavía no hay tipos de equipo. Agregue el primero arriba.
+                                {% endif %}
+                            </li>
+                        {% endfor %}
+                    </ul>
+
+                    {% comment %}
+                       Paginacion de diez en diez. Los enlaces conservan la
+                       busqueda y los filtros: sin eso, pasar a la pagina 2
+                       perdia lo que el usuario acababa de filtrar.
+                    {% endcomment %}
+                    {% if pagina_tipos.paginator.num_pages > 1 %}
+                        <nav class="equipos-catalogo__paginacion"
+                             aria-label="Páginas de tipos de equipo">
+                            {% if pagina_tipos.has_previous %}
+                                <a data-navega
+                                   href="?pagina={{ pagina_tipos.previous_page_number }}{% if querystring_tipos %}&{{ querystring_tipos }}{% endif %}"
+                                   aria-label="Página anterior">
+                                    <i class="bi bi-chevron-left"></i>
+                                </a>
+                            {% else %}
+                                <span class="equipos-catalogo__paginacion--inactivo">
+                                    <i class="bi bi-chevron-left"></i>
+                                </span>
+                            {% endif %}
+
+                            <span class="equipos-catalogo__paginacion-texto">
+                                {{ pagina_tipos.number }} de
+                                {{ pagina_tipos.paginator.num_pages }}
+                                · {{ total_tipos }} tipo{{ total_tipos|pluralize }}
+                            </span>
+
+                            {% if pagina_tipos.has_next %}
+                                <a data-navega
+                                   href="?pagina={{ pagina_tipos.next_page_number }}{% if querystring_tipos %}&{{ querystring_tipos }}{% endif %}"
+                                   aria-label="Página siguiente">
+                                    <i class="bi bi-chevron-right"></i>
+                                </a>
+                            {% else %}
+                                <span class="equipos-catalogo__paginacion--inactivo">
+                                    <i class="bi bi-chevron-right"></i>
+                                </span>
+                            {% endif %}
+                        </nav>
+                    {% endif %}
+                    </div>

@@ -663,3 +663,156 @@ class MarcaEnTipoFormTests(TestCase):
 
         self.assertFalse(formulario.is_valid())
         self.assertIn("nombre", formulario.errors)
+
+
+class CategoriasSecundariasUnaAUnaTests(TestCase):
+    """Las categorias secundarias llegan como lista, no como casillas.
+
+    El navegador las va agregando de una en una -igual que los colores del
+    equipo- y las manda en un solo campo oculto: "3,7".
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.medico = CategoriaEquipo.objects.get(nombre="MEDICO")
+        cls.informatica = CategoriaEquipo.objects.get(nombre="INFORMATICA")
+        cls.electronico = TecnologiaEquipo.objects.get(nombre="ELECTRONICO")
+
+    def test_acepta_los_identificadores_separados_por_coma(self):
+        formulario = TipoCatalogoForm(data={
+            "nombre": "ECOGRAFO CON ESTACION",
+            "categoria": self.medico.pk,
+            "tecnologia": self.electronico.pk,
+            "categorias_secundarias": str(self.informatica.pk),
+        })
+
+        self.assertTrue(formulario.is_valid(), formulario.errors)
+        tipo = formulario.save()
+
+        self.assertEqual(
+            list(tipo.categorias_secundarias.values_list("nombre", flat=True)),
+            ["INFORMATICA"],
+        )
+
+    def test_sin_ninguna_es_valido(self):
+        # La mayoria de los tipos no son hibridos: el campo es opcional.
+        formulario = TipoCatalogoForm(data={
+            "nombre": "CAMILLA",
+            "categoria": self.medico.pk,
+            "tecnologia": self.electronico.pk,
+            "categorias_secundarias": "",
+        })
+
+        self.assertTrue(formulario.is_valid(), formulario.errors)
+        self.assertEqual(formulario.save().categorias_secundarias.count(), 0)
+
+    def test_el_campo_oculto_se_dibuja_con_las_ya_guardadas(self):
+        """Al editar, el valor tiene que volver en el mismo formato.
+
+        Si el widget pintara la lista de Python tal cual -"[3]"- al guardar
+        de nuevo esos corchetes no serian identificadores y el tipo perderia
+        sus categorias secundarias.
+        """
+        tipo = TipoDispositivo.objects.create(
+            nombre="ECOGRAFO CON ESTACION",
+            categoria=self.medico,
+            tecnologia=self.electronico,
+        )
+        tipo.categorias_secundarias.add(self.informatica)
+
+        dibujado = str(TipoCatalogoForm(instance=tipo)["categorias_secundarias"])
+
+        self.assertIn('type="hidden"', dibujado)
+        self.assertIn('value="%s"' % self.informatica.pk, dibujado)
+
+    def test_una_repetida_no_se_guarda_dos_veces(self):
+        formulario = TipoCatalogoForm(data={
+            "nombre": "ECOGRAFO CON ESTACION",
+            "categoria": self.medico.pk,
+            "tecnologia": self.electronico.pk,
+            "categorias_secundarias": "{0},{0}".format(self.informatica.pk),
+        })
+
+        self.assertTrue(formulario.is_valid(), formulario.errors)
+        self.assertEqual(formulario.save().categorias_secundarias.count(), 1)
+
+
+class CatalogoParcialTests(TestCase):
+    """La pantalla pide solo los trozos que cambian.
+
+    Filtrar la lista o elegir un tipo no toca el formulario de alta de
+    arriba, y recargar la pagina entera por eso borraba lo que el usuario
+    llevaba escrito ahi.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.usuario = User.objects.create_superuser(
+            username="catalogo_parcial",
+            password="clave-de-prueba",
+        )
+        cls.medico = CategoriaEquipo.objects.get(nombre="MEDICO")
+        cls.informatica = CategoriaEquipo.objects.get(nombre="INFORMATICA")
+        cls.electronico = TecnologiaEquipo.objects.get(nombre="ELECTRONICO")
+
+        cls.monitor = TipoDispositivo.objects.create(
+            nombre="MONITOR DE SIGNOS",
+            categoria=cls.medico,
+            tecnologia=cls.electronico,
+        )
+        cls.laptop = TipoDispositivo.objects.create(
+            nombre="COMPUTADORA PORTATIL",
+            categoria=cls.informatica,
+            tecnologia=cls.electronico,
+        )
+        cls.hp = MarcaDispositivo.objects.create(nombre="HP")
+        cls.laptop.marcas.add(cls.hp)
+
+    def setUp(self):
+        self.client.force_login(self.usuario)
+
+    def _parcial(self, **parametros):
+        parametros["parcial"] = "1"
+        respuesta = self.client.get("/equipos/catalogo/marcas/", parametros)
+        self.assertEqual(respuesta.status_code, 200)
+        return respuesta.content.decode()
+
+    def test_devuelve_los_trozos_y_no_la_pagina_entera(self):
+        html = self._parcial()
+
+        for identificador in (
+            "equipos_migas",
+            "equipos_tipos_cuerpo",
+            "equipos_paso_marcas",
+            "equipos_paso_modelos",
+        ):
+            self.assertIn('id="%s"' % identificador, html)
+
+        # Ni la plantilla base ni el formulario de alta: la base volveria a
+        # mandar el menu en cada peticion, y el formulario es justo lo que
+        # hay que dejar intacto.
+        self.assertNotIn("<html", html)
+        self.assertNotIn('id="nombre_tipo_catalogo"', html)
+
+    def test_el_filtro_de_categoria_recorta_la_lista(self):
+        html = self._parcial(categoria=self.informatica.pk)
+
+        self.assertIn("COMPUTADORA PORTATIL", html)
+        self.assertNotIn("MONITOR DE SIGNOS", html)
+
+    def test_elegir_un_tipo_trae_sus_marcas(self):
+        html = self._parcial(tipo=self.laptop.pk)
+
+        self.assertIn("Fabricantes de COMPUTADORA PORTATIL", html)
+        self.assertIn("HP", html)
+
+    def test_los_enlaces_no_arrastran_el_parametro_parcial(self):
+        """Un enlace del trozo tiene que llevar a la pantalla completa.
+
+        Si conservara parcial=1, pulsarlo sin JavaScript abriria un pedazo de
+        HTML suelto, sin menu ni estilos.
+        """
+        html = self._parcial(q="COMPUTADORA")
+
+        self.assertNotIn("parcial=1", html)
+        self.assertNotIn("parcial%3D1", html)

@@ -214,6 +214,62 @@ class ColoresOrdenadosField(forms.CharField):
         return [catalogo[numero] for numero in identificadores]
 
 
+class ListaOcultaWidget(forms.HiddenInput):
+    """Campo oculto que lleva varios identificadores en un solo valor.
+
+    Los pinta separados por coma -"3,7"-, que es como los arma el navegador
+    conforme el usuario va agregando. Sin esto el widget escribiria la lista
+    de Python tal cual, "[3, 7]", y al reenviar el formulario esos corchetes
+    no serian identificadores de nada.
+    """
+
+    def format_value(self, valor):
+        if isinstance(valor, (list, tuple)):
+            return ",".join(
+                str(elemento) for elemento in valor if elemento not in (None, "")
+            )
+
+        return super().format_value(valor)
+
+
+def _identificadores_de_lista(valor):
+    """Separa "3,7" en ["3", "7"], y deja en paz lo que ya es una lista."""
+    if not isinstance(valor, str):
+        return valor
+
+    return [
+        parte
+        for parte in (trozo.strip() for trozo in valor.split(","))
+        if parte
+    ]
+
+
+class CategoriasAgregadasField(forms.ModelMultipleChoiceField):
+    """Categorias secundarias que se van agregando de una en una.
+
+    Llegan como una lista de identificadores separados por coma ("3,7"), la
+    misma forma en que viajan los colores del equipo. Antes eran casillas: una
+    por cada categoria del sistema, todas a la vista y todas por marcar. Un
+    tipo hibrido suele tener una o dos categorias mas, asi que casi todas las
+    casillas sobraban, y a medida que el hospital agrega categorias la lista
+    se alarga sin que el formulario mejore.
+    """
+
+    widget = ListaOcultaWidget
+
+    def clean(self, valor):
+        # El campo es oculto, asi que llega un texto y no una lista.
+        return super().clean(_identificadores_de_lista(valor))
+
+    def has_changed(self, inicial, datos):
+        # La clase padre compara conjuntos contando con que los datos son una
+        # lista; con un texto acabaria comparando letras sueltas.
+        def conjunto(valor):
+            return {str(elemento) for elemento in (_identificadores_de_lista(valor) or [])}
+
+        return conjunto(inicial) != conjunto(datos)
+
+
 class UbicacionChoiceField(forms.ModelChoiceField):
     iterator = IteradorUbicaciones
 
@@ -1135,6 +1191,18 @@ class TipoCatalogoForm(forms.ModelForm):
     diferencia esta en si llega o no una instancia.
     """
 
+    # Se agregan de una en una, como los colores del equipo: se elige en el
+    # desplegable, se pulsa agregar y queda en la lista. El campo que viaja al
+    # servidor es oculto y lleva los identificadores separados por coma.
+    categorias_secundarias = CategoriasAgregadasField(
+        queryset=CategoriaEquipo.objects.none(),
+        required=False,
+        label="También pertenece a",
+        widget=ListaOcultaWidget(
+            attrs={"id": "categorias_secundarias_tipo_catalogo"}
+        ),
+    )
+
     class Meta:
         model = TipoDispositivo
         fields = [
@@ -1181,12 +1249,6 @@ class TipoCatalogoForm(forms.ModelForm):
                     "id": "tecnologia_tipo_catalogo",
                 }
             ),
-            "categorias_secundarias": forms.CheckboxSelectMultiple(
-                attrs={
-                    "class": "equipos-registro__casillas",
-                    "id": "categorias_secundarias_tipo_catalogo",
-                }
-            ),
             "descripcion": forms.TextInput(
                 attrs={
                     "class": "formularioCampo-text",
@@ -1211,7 +1273,11 @@ class TipoCatalogoForm(forms.ModelForm):
         self.fields["categoria"].queryset = activas
         self.fields["categoria"].empty_label = "Seleccione la categoría"
         self.fields["categorias_secundarias"].queryset = activas
-        self.fields["categorias_secundarias"].required = False
+
+        # Lo que el navegador tiene que pintar: el desplegable con las
+        # categorias disponibles y la lista de las ya agregadas.
+        self.categorias_disponibles = activas
+        self.categorias_secundarias_elegidas = self._resolver_secundarias()
 
         # Misma regla para la tecnologia: una desactivada no se ofrece para
         # tipos nuevos, pero se conserva en la edicion del que ya la usa.
@@ -1224,6 +1290,30 @@ class TipoCatalogoForm(forms.ModelForm):
             filtro_tecnologia
         )
         self.fields["tecnologia"].empty_label = "Seleccione la tecnología"
+
+    def _resolver_secundarias(self):
+        """Categorias secundarias que deben aparecer ya en la lista.
+
+        En un envio con errores se devuelven las que venian en el POST, para
+        no perder lo que el usuario habia agregado. Al abrir la edicion, las
+        que tiene guardadas el tipo.
+        """
+        if self.is_bound:
+            campo = self.fields["categorias_secundarias"]
+
+            try:
+                return list(
+                    campo.clean(
+                        self.data.get(self.add_prefix("categorias_secundarias"))
+                    )
+                )
+            except forms.ValidationError:
+                return []
+
+        if self.instance and self.instance.pk:
+            return list(self.instance.categorias_secundarias.all())
+
+        return []
 
     def clean(self):
         """Una categoria secundaria repetida no aporta nada.

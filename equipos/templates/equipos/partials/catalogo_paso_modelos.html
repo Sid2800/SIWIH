@@ -1,0 +1,115 @@
+{% comment %}
+   Paso 3: los modelos de la marca elegida.
+
+   Vive en su propio archivo porque se dibuja de dos maneras: dentro de la
+   pagina completa la primera vez, y sola cuando el navegador pide solo
+   este trozo para cambiarlo sin recargar. El marcado esta escrito una vez
+   y los dos caminos usan el mismo.
+{% endcomment %}
+        {# ---------- Paso 3: modelos de la marca ---------- #}
+        <div class="equipos-catalogo__paso" id="equipos_paso_modelos">
+            <section class="equipos-catalogo__panel">
+                <header class="equipos-catalogo__encabezado">
+                    <h3>
+                        <span class="equipos-catalogo__numero">3</span>
+                        Modelos
+                    </h3>
+                    <p>
+                        {% if marca_seleccionada %}
+                            {{ marca_seleccionada.nombre }} para
+                            {{ tipo_seleccionado.nombre }}.
+                        {% elif tipo_seleccionado %}
+                            Elija una marca para ver sus modelos.
+                        {% else %}
+                            Elija un tipo y una marca.
+                        {% endif %}
+                    </p>
+                </header>
+
+                {% if marca_seleccionada %}
+                    {% if not marca_seleccionada.activo %}
+                        <p class="equipos-catalogo__aviso">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            Esta marca está desactivada: sus modelos no aparecerán al
+                            registrar equipos aunque estén activos.
+                        </p>
+                    {% endif %}
+
+                    <form class="equipos-catalogo__form"
+                          method="post"
+                          action="{% url 'agregar_modelo_equipos' tipo_seleccionado.pk marca_seleccionada.pk %}">
+                        {% csrf_token %}
+                        <div class="equipos-catalogo__fila">
+                            {{ form_modelo.nombre }}
+                            <button class="equipos-catalogo__boton" type="submit">
+                                <i class="bi bi-plus-lg"></i>
+                                <span>Agregar</span>
+                            </button>
+                        </div>
+                    </form>
+                {% else %}
+                    <p class="equipos-catalogo__vacio">
+                        <i class="bi bi-arrow-left-circle"></i>
+                        Los modelos pertenecen a una marca dentro de un tipo.
+                    </p>
+                {% endif %}
+            </section>
+
+            {% if marca_seleccionada %}
+                <section class="equipos-catalogo__panel equipos-catalogo__panel--lista">
+                    <details class="equipos-catalogo__desplegable" open>
+                        <summary>
+                            <span class="equipos-catalogo__desplegable-titulo">
+                                <i class="bi bi-list-ul"></i>
+                                Modelos registrados
+                                <span class="equipos-catalogo__contador">{{ modelos|length }}</span>
+                            </span>
+                            <i class="bi bi-chevron-down equipos-catalogo__desplegable-flecha"></i>
+                        </summary>
+
+                        <div class="equipos-catalogo__buscador">
+                            <i class="bi bi-search"></i>
+                            <input type="search"
+                                   class="formularioCampo-text"
+                                   data-filtra="lista_modelos"
+                                   placeholder="Buscar modelo"
+                                   aria-label="Buscar entre los modelos registrados"
+                                   autocomplete="off">
+                        </div>
+
+                        <ul class="equipos-catalogo__lista" id="lista_modelos">
+                            {% for modelo in modelos %}
+                                <li class="equipos-catalogo__item{% if not modelo.activo %} equipos-catalogo__item--inactivo{% endif %}">
+                                    <span class="equipos-catalogo__enlace">
+                                        <span class="equipos-catalogo__nombre">{{ modelo.nombre }}</span>
+                                        <span class="equipos-catalogo__meta">
+                                            {{ modelo.total_equipos }} equipo{{ modelo.total_equipos|pluralize }}
+                                        </span>
+                                    </span>
+                                    <div class="equipos-catalogo__acciones">
+                                        <form method="post"
+                                              action="{% url 'cambiar_estado_modelo_equipos' modelo.pk %}">
+                                            {% csrf_token %}
+                                            <button class="equipos-catalogo__icono"
+                                                    type="submit"
+                                                    title="{% if modelo.activo %}Desactivar{% else %}Reactivar{% endif %} {{ modelo.nombre }}">
+                                                <i class="bi bi-toggle-{% if modelo.activo %}on{% else %}off{% endif %}"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </li>
+                            {% empty %}
+                                <li class="equipos-catalogo__vacio">
+                                    {{ marca_seleccionada.nombre }} todavía no tiene modelos
+                                    de este tipo.
+                                </li>
+                            {% endfor %}
+                        </ul>
+
+                        <p class="equipos-catalogo__sin-coincidencias" hidden>
+                            Ningún modelo coincide con la búsqueda.
+                        </p>
+                    </details>
+                </section>
+            {% endif %}
+        </div>

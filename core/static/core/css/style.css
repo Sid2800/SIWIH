@@ -5727,6 +5727,48 @@ tbody tr:last-child .botonTablaBajar{
  * Incluye menu, formularios, listado, detalle, imagenes, catalogos y garantias.
  */
 
+/* ---------------------------------------------------------------------
+   Colores del modulo
+   El modulo nacio escribiendo los colores dentro de cada regla, con formas
+   como var(--gris-claro) sobre variables que nunca se definieron:
+   siempre caia el valor de reserva, asi que el modo oscuro no cambiaba nada y
+   quedaban paneles blancos con texto blanco encima.
+
+   Aqui se declaran una sola vez, y al final del archivo estan sus valores
+   para el modo oscuro. Los tonos de marca -el teal y el rojo de baja- son los
+   mismos en los dos temas: son color de identidad, no de fondo, y llevan
+   texto blanco que se lee igual sobre uno y otro.
+   --------------------------------------------------------------------- */
+:root {
+   /* Superficies y bordes. */
+   --eq-panel: var(--blanco);
+   --gris-claro: #f3f4f6;
+   --colorFondo: #f3f4f6;
+   --eq-borde-campo: #ccc;
+
+   /* Texto que va encima de los circulos y pastillas en color --negro. En
+      modo oscuro --negro es blanco, asi que este texto tiene que voltearse
+      con el tema o queda blanco sobre blanco. */
+   --eq-sobre-acento: #fff;
+
+   --gris-texto: #6b7280;
+   --verde-oscuro: #0f766e;
+   --rojo: #b91c1c;
+
+   /* Avisos en rojo dentro de los paneles del catalogo. */
+   --eq-aviso-fondo: rgba(220, 53, 69, .12);
+   --eq-aviso-borde: rgba(220, 53, 69, .45);
+   --eq-aviso-texto: #7f1d1d;
+
+   /* Texto de las pastillas de estado. El fondo es translucido en los dos
+      temas; lo que hay que cambiar es el texto. */
+   --eq-estado-operativo: #146c43;
+   --eq-estado-alta: #a71d2a;
+   --eq-estado-media: #8a5a00;
+   --eq-estado-repuesto: #7a3d00;
+   --eq-estado-inactivo: #495057;
+}
+
 .equipos-pagina {
    display: flex;
    position: relative;
@@ -6202,7 +6244,7 @@ a.equipos-submenu__opcion:hover {
    del empleado o de donde sale el vencimiento calculado. Es un dato derivado,
    no algo que el usuario deba llenar, y por eso se ve mas apagado. */
 .equipos-registro__ayuda {
-   color: var(--gris-texto, #6b7280);
+   color: var(--gris-texto);
    font-size: 1.15rem;
    margin: .3rem 0 0;
 }
@@ -6229,7 +6271,7 @@ a.equipos-submenu__opcion:hover {
 
 .equipos-colores__boton {
    align-items: center;
-   background-color: var(--verde-oscuro, #0f766e);
+   background-color: var(--verde-oscuro);
    border: none;
    border-radius: .4rem;
    color: #fff;
@@ -6256,7 +6298,7 @@ a.equipos-submenu__opcion:hover {
 
 .equipos-colores__item {
    align-items: center;
-   background-color: var(--gris-claro, #f3f4f6);
+   background-color: var(--gris-claro);
    border-radius: .4rem;
    display: flex;
    gap: .6rem;
@@ -6265,7 +6307,7 @@ a.equipos-submenu__opcion:hover {
 
 .equipos-colores__orden {
    align-items: center;
-   background-color: var(--verde-oscuro, #0f766e);
+   background-color: var(--verde-oscuro);
    border-radius: 50%;
    color: #fff;
    display: flex;
@@ -6282,7 +6324,7 @@ a.equipos-submenu__opcion:hover {
 }
 
 .equipos-colores__etiqueta {
-   background-color: var(--verde-oscuro, #0f766e);
+   background-color: var(--verde-oscuro);
    border-radius: .3rem;
    color: #fff;
    font-size: 1rem;
@@ -6293,28 +6335,17 @@ a.equipos-submenu__opcion:hover {
 .equipos-colores__quitar {
    background: none;
    border: none;
-   color: var(--rojo, #b91c1c);
+   color: var(--rojo);
    cursor: pointer;
    font-size: 1.2rem;
    line-height: 1;
    padding: .25rem;
 }
 
-/* Grupos de casillas (categorias secundarias del tipo de equipo). Se usan en
-   lugar de un select multiple porque en tablet no hay tecla Ctrl con la que
-   marcar varias opciones, y aqui cada opcion es un blanco tocable.
-
-   El alineado y la rejilla viven en .equipos-catalogo__casillas, que envuelve
-   al widget: Django reparte la clase del widget entre el contenedor y cada
-   casilla, asi que declararlo aqui afectaria tambien a los <input>. */
-.equipos-registro__casillas {
-   margin: .2rem 0 0;
-}
-
 /* Un vencimiento calculado se muestra, no se teclea: el gris avisa de que el
    campo esta en modo lectura sin llegar a parecer deshabilitado. */
 .equipos-registro__campo .formularioCampo-date[readonly] {
-   background-color: var(--gris-claro, #f3f4f6);
+   background-color: var(--gris-claro);
    cursor: default;
 }
 
@@ -6393,7 +6424,7 @@ a.equipos-submenu__opcion:hover {
 .equipos-registro__costo span {
    align-items: center;
    background-color: var(--colorMenuHover);
-   border: .1rem solid #ccc;
+   border: .1rem solid var(--eq-borde-campo);
    border-radius: .5rem 0 0 .5rem;
    color: var(--negro);
    display: flex;
@@ -7121,31 +7152,31 @@ table.dataTable tbody td.equipos-listado__vacio {
 .equipos-estado--operativo {
    background-color: rgba(39, 205, 64, .12);
    border-color: rgb(39, 205, 64);
-   color: #146c43;
+   color: var(--eq-estado-operativo);
 }
 
 .equipos-estado--alta {
    background-color: rgba(220, 53, 69, .12);
    border-color: rgba(220, 53, 69, .9);
-   color: #a71d2a;
+   color: var(--eq-estado-alta);
 }
 
 .equipos-estado--media {
    background-color: rgba(255, 193, 7, .18);
    border-color: rgba(255, 193, 7, .95);
-   color: #8a5a00;
+   color: var(--eq-estado-media);
 }
 
 .equipos-estado--repuesto {
    background-color: rgba(253, 126, 20, .16);
    border-color: rgba(253, 126, 20, .95);
-   color: #7a3d00;
+   color: var(--eq-estado-repuesto);
 }
 
 .equipos-estado--inactivo {
    background-color: rgba(108, 117, 125, .14);
    border-color: rgba(108, 117, 125, .85);
-   color: #495057;
+   color: var(--eq-estado-inactivo);
 }
 
 .equipos-detalle__contenido {
@@ -8204,7 +8235,7 @@ button.equipos-imagenes__vista:hover img {
    align-items: center;
    background-color: var(--colorTextoMenu);
    border-radius: 50%;
-   color: #fff;
+   color: var(--eq-sobre-acento);
    display: flex;
    flex: 0 0 auto;
    font-size: 1rem;
@@ -8235,7 +8266,7 @@ button.equipos-imagenes__vista:hover img {
 }
 
 .equipos-catalogo__panel {
-   background-color: var(--colorFondoContenedor, #fff);
+   background-color: var(--eq-panel);
    border: .1rem solid var(--colorLinea);
    border-radius: 1rem;
    display: flex;
@@ -8267,7 +8298,7 @@ button.equipos-imagenes__vista:hover img {
    align-items: center;
    background-color: var(--negro);
    border-radius: 50%;
-   color: #fff;
+   color: var(--eq-sobre-acento);
    display: flex;
    flex: 0 0 auto;
    font-size: 1.2rem;
@@ -8329,7 +8360,7 @@ button.equipos-imagenes__vista:hover img {
    background-color: var(--negro);
    border: none;
    border-radius: .5rem;
-   color: #fff;
+   color: var(--eq-sobre-acento);
    cursor: pointer;
    display: flex;
    font-size: 1.25rem;
@@ -8450,10 +8481,10 @@ button.equipos-imagenes__vista:hover img {
 
 .equipos-catalogo__aviso {
    align-items: center;
-   background-color: rgba(220, 53, 69, .12);
-   border: .1rem solid rgba(220, 53, 69, .45);
+   background-color: var(--eq-aviso-fondo);
+   border: .1rem solid var(--eq-aviso-borde);
    border-radius: .8rem;
-   color: #7f1d1d;
+   color: var(--eq-aviso-texto);
    display: flex;
    font-size: 1.2rem;
    gap: .8rem;
@@ -8883,7 +8914,7 @@ p + .equipos-garantia__bloqueo {
 .equipos-procedencias__conteo {
    background-color: var(--negro);
    border-radius: 2rem;
-   color: #fff;
+   color: var(--eq-sobre-acento);
    font-size: 1.3rem;
    padding: .1rem .8rem;
 }
@@ -9148,7 +9179,7 @@ p + .equipos-garantia__bloqueo {
    align-items: center;
    background-color: var(--negro);
    border-radius: 50%;
-   color: #fff;
+   color: var(--eq-sobre-acento);
    display: flex;
    flex: 0 0 auto;
    font-size: 1.3rem;
@@ -9332,7 +9363,7 @@ p + .equipos-garantia__bloqueo {
 .equipos-catalogo__contador {
    background-color: var(--negro);
    border-radius: 2rem;
-   color: #fff;
+   color: var(--eq-sobre-acento);
    font-size: 1.2rem;
    padding: .1rem .8rem;
 }
@@ -9384,47 +9415,6 @@ p + .equipos-garantia__bloqueo {
 
 .equipos-catalogo__panel--lista .equipos-catalogo__lista {
    border-bottom: .1rem solid transparent;
-}
-
-/* ---------------------------------------------------------------------
-   Casillas de categoria secundaria
-   Django pone los attrs del widget en cada <input>, no en la lista que las
-   agrupa, asi que la clase se declara en un contenedor y desde aqui se
-   alcanza la lista. Sin esto la casilla salia encima de su texto en lugar de
-   al lado.
-   --------------------------------------------------------------------- */
-/* Django dibuja un <div> contenedor y dentro un <div> por casilla, no una
-   lista: las reglas apuntan a esa estructura y no a <ul>/<li>. */
-.equipos-catalogo__casillas > div {
-   display: grid;
-   gap: .4rem 1.4rem;
-   grid-template-columns: repeat(auto-fit, minmax(min(16rem, 100%), 1fr));
-   margin: .4rem 0 0;
-}
-
-.equipos-catalogo__casillas > div > div {
-   min-width: 0;
-}
-
-/* La casilla y su texto en una sola linea y centrados entre si. */
-.equipos-catalogo__casillas label {
-   align-items: center;
-   cursor: pointer;
-   display: flex;
-   font-size: 1.35rem;
-   font-weight: 500;
-   gap: .6rem;
-   line-height: 1.3;
-   margin: 0;
-   /* Comodo de pulsar con el dedo sin apuntar a la casilla. */
-   min-height: 3.4rem;
-}
-
-.equipos-catalogo__casillas input[type="checkbox"] {
-   flex: 0 0 auto;
-   height: 1.8rem;
-   margin: 0;
-   width: 1.8rem;
 }
 
 .equipos-catalogo__extra > summary {
@@ -9556,7 +9546,107 @@ p + .equipos-garantia__bloqueo {
    text-align: center;
 }
 
-/* El buscador es un formulario, asi que no debe heredar margenes de form. */
+/* El buscador es un formulario, asi que no debe heredar margenes de form.
+   Y va en columna: .equipos-catalogo__buscador es flex en fila -lo necesitan
+   los buscadores de marcas y modelos, que son un icono y un campo- y aqui
+   eso ponia los dos filtros al lado del campo de texto, estrujandolo. Los
+   filtros van debajo de lo que filtran. */
 form.equipos-catalogo__buscador {
+   display: grid;
+   gap: .6rem;
    margin: 0;
+}
+
+.equipos-catalogo__filtros {
+   /* El padding lateral ya lo pone el formulario. */
+   padding: 0;
+}
+
+.equipos-catalogo__buscar-fila > i {
+   color: var(--colorTextoMenu);
+   font-size: 1.4rem;
+}
+
+/* ---------------------------------------------------------------------
+   Categorias secundarias del tipo
+   Reutilizan la lista de colores del equipo: mismo gesto -elegir, agregar,
+   quitar- y misma forma, asi que quien ya cargo un equipo reconoce esto sin
+   que haya que explicarselo.
+   --------------------------------------------------------------------- */
+.equipos-catalogo__secundarias {
+   margin-top: .6rem;
+}
+
+.equipos-catalogo__secundarias .equipos-colores__lista {
+   /* Sin numeros: aqui el orden no significa nada, a diferencia de los
+      colores, donde el primero es el principal. */
+   list-style: none;
+   margin: .6rem 0 0;
+   padding: 0;
+}
+
+/* ---------------------------------------------------------------------
+   Mientras llega el trozo pedido
+   La espera es de decimas, pero sin ninguna senal un clic que no cambia nada
+   al instante se siente como un clic perdido y el usuario vuelve a pulsar.
+   --------------------------------------------------------------------- */
+.equipos-catalogo[aria-busy="true"] {
+   opacity: .6;
+   transition: opacity .15s ease;
+}
+
+.equipos-catalogo[aria-busy="true"] .equipos-catalogo__lista {
+   /* Lo que se esta redibujando no se puede pulsar: un clic ahi iria a la
+      fila que esta a punto de ser sustituida por otra. */
+   pointer-events: none;
+}
+
+/* ---------------------------------------------------------------------
+   Modo oscuro del modulo equipos
+   Los valores de arriba son los del tema claro; aqui estan los del oscuro.
+   Se cambian las variables y no las reglas, asi que una regla nueva del
+   modulo queda bien en los dos temas sin escribirla dos veces.
+
+   Lo que se voltea es poco y concreto: la superficie de los paneles, los
+   grises de relleno y el texto que va encima de las pastillas en color
+   --negro, que en oscuro pasa a ser blanco. Los tonos de identidad -el teal
+   de los colores y el rojo de baja- no se tocan.
+   --------------------------------------------------------------------- */
+.darkmode {
+   --eq-panel: var(--blanco);
+   --gris-claro: #2f343a;
+   --colorFondo: #262626;
+   --eq-borde-campo: var(--colorTablaceldaBorde);
+
+   /* En oscuro la pastilla es clara, asi que su texto tiene que ser oscuro. */
+   --eq-sobre-acento: #1f2429;
+
+   --gris-texto: #9aa1ab;
+
+   /* El rojo de #b91c1c no se distingue sobre fondo oscuro: se aclara solo lo
+      necesario para que siga leyendose como rojo. */
+   --rojo: #f87171;
+
+   --eq-aviso-fondo: rgba(220, 53, 69, .18);
+   --eq-aviso-borde: rgba(248, 113, 113, .55);
+   --eq-aviso-texto: #fca5a5;
+
+   --eq-estado-operativo: #4ade80;
+   --eq-estado-alta: #fca5a5;
+   --eq-estado-media: #fcd34d;
+   --eq-estado-repuesto: #fdba74;
+   --eq-estado-inactivo: #c3c8ce;
+}
+
+/* El texto de un <select> nativo lo pinta el sistema, no la hoja de estilos,
+   y en modo oscuro salia negro sobre el fondo oscuro del campo. Con esto el
+   navegador dibuja los controles con la paleta del tema. */
+.darkmode .equipos-pagina {
+   color-scheme: dark;
+}
+
+/* El fondo del dialogo lo tapa todo menos el cuadro, y sobre un tema oscuro
+   el velo claro de por defecto deslumbra. */
+.darkmode .equipos-procedencias__dialogo::backdrop {
+   background-color: rgba(0, 0, 0, .65);
 }

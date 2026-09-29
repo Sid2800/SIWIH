@@ -137,6 +137,10 @@ def _filtrar_tipos(request):
     # esto, pasar a la pagina 2 perdia lo que el usuario acababa de filtrar.
     parametros = request.GET.copy()
     parametros.pop("pagina", None)
+    # "parcial" es como pide el navegador solo los trozos que cambian; no debe
+    # acabar dentro de los enlaces que esos trozos dibujan, o al pulsarlos se
+    # abriria una pagina sin menu ni estilos.
+    parametros.pop("parcial", None)
 
     return {
         "tipos": pagina.object_list,
@@ -254,6 +258,16 @@ def catalogo_marcas_modelos(request):
         "url_regresar": reverse("inicio_equipos"),
     }
     contexto.update(_filtrar_tipos(request))
+
+    # El navegador puede pedir solo los trozos que cambian. Filtrar la lista o
+    # elegir un tipo no toca el formulario de alta de arriba, y recargar la
+    # pagina entera por eso borraba lo que el usuario llevaba escrito ahi.
+    if request.GET.get("parcial"):
+        return render(
+            request,
+            "equipos/partials/catalogo_parcial.html",
+            contexto,
+        )
 
     return render(
         request,
