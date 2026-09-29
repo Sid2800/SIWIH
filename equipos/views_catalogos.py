@@ -2,8 +2,11 @@
 # procedencias. Altas, ediciones y cambios de estado.
 
 
+from urllib.parse import quote
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
 from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -15,11 +18,13 @@ from .forms import (
     TipoCatalogoForm,
 )
 from .models import (
+    CategoriaEquipo,
     Dispositivo,
     MarcaDispositivo,
     ModeloDispositivo,
     Procedencia,
     TipoDispositivo,
+    TipoTecnologiaDispositivo,
 )
 from .decorators import exige_catalogo_equipos, exige_ver_equipos
 from .view_helpers import registrar_errores_vista
@@ -49,12 +54,19 @@ def _parametro_modelo(request, nombre, modelo):
     return modelo.objects.filter(pk=int(valor)).first()
 
 
-def _url_catalogo(tipo=None, marca=None, editar_tipo=None):
+TIPOS_POR_PAGINA = 10
+
+
+def _url_catalogo(tipo=None, marca=None, editar_tipo=None, request=None):
     """Arma la URL del catalogo conservando el paso en que esta el usuario.
 
     Tras cualquier operacion se vuelve al mismo sitio: si acababa de agregar
     un modelo a Epson dentro de impresoras, sigue ahi y puede agregar el
     siguiente sin volver a bajar por los tres pasos.
+
+    Con `request` se conservan ademas la busqueda y los filtros de la lista de
+    tipos, para no devolver al usuario a la primera pagina sin filtrar cada
+    vez que da de alta algo.
     """
     url = reverse("catalogo_marcas_equipos")
     partes = []
@@ -63,13 +75,125 @@ def _url_catalogo(tipo=None, marca=None, editar_tipo=None):
         partes.append(f"tipo={tipo.pk}")
     if marca is not None:
         partes.append(f"marca={marca.pk}")
-    # Renombrar un tipo es una accion aparte de seleccionarlo: antes compartian
-    # parametro y al pulsar un tipo para ver sus marcas se abria el formulario
-    # de renombrado, que no era lo que el usuario pedia.
+    # Renombrar un tipo es una accion aparte de seleccionarlo: antes
+    # compartian parametro y al pulsar un tipo para ver sus marcas se abria el
+    # formulario de renombrado, que no era lo que el usuario pedia.
     if editar_tipo is not None:
         partes.append(f"editar={editar_tipo.pk}")
 
+    if request is not None:
+        for nombre in ("q", "categoria", "tecnologia", "pagina"):
+            valor = (request.GET.get(nombre) or "").strip()
+
+            if valor:
+                partes.append(f"{nombre}={quote(valor)}")
+
     return f"{url}?{'&'.join(partes)}" if partes else url
+
+
+def _filtrar_tipos(request):
+    """Lista de tipos segun la busqueda y los filtros, ya paginada.
+
+    Se filtra y se pagina contra la base y no en el navegador. El catalogo de
+    tipos puede llegar a varios miles, y mandarlos todos al navegador para
+    filtrarlos alli haria una pagina de megas que tarda en dibujarse. Una
+    consulta con LIKE sobre unos miles de filas es trabajo despreciable para
+    MySQL, y el campo de busqueda espera a que se deje de teclear antes de
+    pedir, asi que escribir "computadora" son una consulta y no once.
+    """
+    busqueda = (request.GET.get("q") or "").strip()
+    categoria = (request.GET.get("categoria") or "").strip()
+    tecnologia = (request.GET.get("tecnologia") or "").strip()
+
+    tipos = (
+        TipoDispositivo.objects
+        .select_related("categoria")
+        .annotate(
+            total_equipos=Count("dispositivos", distinct=True),
+            total_marcas=Count("marcas", distinct=True),
+        )
+        .order_by("-activo", "categoria__nombre", "nombre")
+    )
+
+    if busqueda:
+        # Se busca tambien por categoria: quien escribe "electrico" espera
+        # ver los de esa familia aunque el nombre no lleve la palabra.
+        tipos = tipos.filter(
+            Q(nombre__icontains=busqueda)
+            | Q(categoria__nombre__icontains=busqueda)
+        )
+
+    if categoria.isdigit():
+        tipos = tipos.filter(categoria_id=int(categoria))
+
+    if tecnologia.isdigit():
+        tipos = tipos.filter(tipo_tecnologia=int(tecnologia))
+
+    paginador = Paginator(tipos, TIPOS_POR_PAGINA)
+    pagina = paginador.get_page(request.GET.get("pagina"))
+
+    # Los enlaces de paginacion tienen que conservar busqueda y filtros: sin
+    # esto, pasar a la pagina 2 perdia lo que el usuario acababa de filtrar.
+    parametros = request.GET.copy()
+    parametros.pop("pagina", None)
+
+    return {
+        "tipos": pagina.object_list,
+        "pagina_tipos": pagina,
+        "total_tipos": paginador.count,
+        "busqueda_tipos": busqueda,
+        "filtro_categoria": categoria,
+        "filtro_tecnologia": tecnologia,
+        "hay_filtros": bool(busqueda or categoria or tecnologia),
+        "querystring_tipos": parametros.urlencode(),
+        # Los botones de filtro: cada uno lleva la URL que lo activa y, si ya
+        # esta activo, la que lo quita. Volver a pulsarlo muestra todo otra
+        # vez, que es lo que espera cualquiera de un boton de filtro.
+        "categorias_filtro": _botones_filtro(
+            request,
+            "categoria",
+            [
+                (str(c.pk), c.nombre)
+                for c in CategoriaEquipo.objects.filter(activo=True)
+            ],
+        ),
+        "tecnologias_filtro": _botones_filtro(
+            request,
+            "tecnologia",
+            [
+                (str(valor), etiqueta)
+                for valor, etiqueta in TipoTecnologiaDispositivo.choices
+            ],
+        ),
+    }
+
+
+def _botones_filtro(request, parametro, opciones):
+    """Construye los botones de un filtro, con su URL de activar y quitar."""
+    actual = (request.GET.get(parametro) or "").strip()
+    botones = []
+
+    for valor, etiqueta in opciones:
+        activo = actual == valor
+        parametros = request.GET.copy()
+        # Al cambiar un filtro se vuelve a la primera pagina: la 7 del listado
+        # sin filtrar no tiene nada que ver con la 7 del filtrado.
+        parametros.pop("pagina", None)
+
+        if activo:
+            parametros.pop(parametro, None)
+        else:
+            parametros[parametro] = valor
+
+        consulta = parametros.urlencode()
+        botones.append({
+            "valor": valor,
+            "etiqueta": etiqueta,
+            "activo": activo,
+            "url": f"?{consulta}" if consulta else "?",
+        })
+
+    return botones
 
 
 @exige_catalogo_equipos
@@ -90,16 +214,6 @@ def catalogo_marcas_modelos(request):
     # se descarta en lugar de mostrar los modelos de otra combinacion.
     if marca and (not tipo or not tipo.marcas.filter(pk=marca.pk).exists()):
         marca = None
-
-    tipos = (
-        TipoDispositivo.objects
-        .select_related("categoria")
-        .annotate(
-            total_equipos=Count("dispositivos", distinct=True),
-            total_marcas=Count("marcas", distinct=True),
-        )
-        .order_by("-activo", "categoria__nombre", "nombre")
-    )
 
     marcas = []
     if tipo:
@@ -124,33 +238,35 @@ def catalogo_marcas_modelos(request):
             .order_by("-activo", "nombre")
         )
 
+    contexto = {
+        "tipo_seleccionado": tipo,
+        "tipo_editado": tipo_editado,
+        "marcas": marcas,
+        "marca_seleccionada": marca,
+        "modelos": modelos,
+        # El mismo formulario sirve para alta y edicion; lo unico que
+        # cambia es si se le pasa la instancia que se esta editando.
+        "form_tipo": TipoCatalogoForm(instance=tipo_editado),
+        "form_marca": MarcaEnTipoForm(tipo=tipo) if tipo else None,
+        "form_modelo": (
+            ModeloCatalogoForm(tipo=tipo, marca=marca)
+            if tipo and marca
+            else None
+        ),
+        # Sugerencias del campo de marca: el catalogo global, para
+        # reutilizar una marca que ya existe en otro tipo en vez de
+        # escribirla de nuevo y arriesgarse a un duplicado.
+        "marcas_existentes": MarcaDispositivo.objects.filter(
+            activo=True
+        ).values_list("nombre", flat=True),
+        "url_regresar": reverse("inicio_equipos"),
+    }
+    contexto.update(_filtrar_tipos(request))
+
     return render(
         request,
         "equipos/catalogo_marcas_equipos.html",
-        {
-            "tipos": tipos,
-            "tipo_seleccionado": tipo,
-            "tipo_editado": tipo_editado,
-            "marcas": marcas,
-            "marca_seleccionada": marca,
-            "modelos": modelos,
-            # El mismo formulario sirve para alta y edicion; lo unico que
-            # cambia es si se le pasa la instancia que se esta editando.
-            "form_tipo": TipoCatalogoForm(instance=tipo_editado),
-            "form_marca": MarcaEnTipoForm(tipo=tipo) if tipo else None,
-            "form_modelo": (
-                ModeloCatalogoForm(tipo=tipo, marca=marca)
-                if tipo and marca
-                else None
-            ),
-            # Sugerencias del campo de marca: el catalogo global, para
-            # reutilizar una marca que ya existe en otro tipo en vez de
-            # escribirla de nuevo y arriesgarse a un duplicado.
-            "marcas_existentes": MarcaDispositivo.objects.filter(
-                activo=True
-            ).values_list("nombre", flat=True),
-            "url_regresar": reverse("inicio_equipos"),
-        },
+        contexto,
     )
 
 
@@ -174,7 +290,7 @@ def agregar_marca_catalogo(request, tipo_id):
             "Revise los datos de la marca.",
         )
         messages.error(request, primer_error)
-        return redirect(_url_catalogo(tipo))
+        return redirect(_url_catalogo(tipo, request=request))
 
     marca, creada = form.guardar()
     messages.success(
@@ -183,7 +299,7 @@ def agregar_marca_catalogo(request, tipo_id):
         f"a {tipo.nombre}.",
     )
     # Se deja seleccionada para poder cargarle modelos de inmediato.
-    return redirect(_url_catalogo(tipo, marca))
+    return redirect(_url_catalogo(tipo, marca, request=request))
 
 
 @exige_catalogo_equipos
@@ -201,14 +317,14 @@ def agregar_modelo_catalogo(request, tipo_id, marca_id):
             "Revise los datos del modelo.",
         )
         messages.error(request, primer_error)
-        return redirect(_url_catalogo(tipo, marca))
+        return redirect(_url_catalogo(tipo, marca, request=request))
 
     modelo = form.save()
     messages.success(
         request,
         f"Modelo {modelo.nombre} agregado a {marca.nombre} en {tipo.nombre}.",
     )
-    return redirect(_url_catalogo(tipo, marca))
+    return redirect(_url_catalogo(tipo, marca, request=request))
 
 
 @exige_catalogo_equipos
@@ -234,7 +350,7 @@ def quitar_marca_tipo(request, tipo_id, marca_id):
             f"{'s' if modelos != 1 else ''} en {tipo.nombre}. "
             f"Quitelos antes de desvincular la marca.",
         )
-        return redirect(_url_catalogo(tipo, marca))
+        return redirect(_url_catalogo(tipo, marca, request=request))
 
     if Dispositivo.objects.filter(tipo=tipo, marca=marca).exists():
         messages.error(
@@ -242,11 +358,11 @@ def quitar_marca_tipo(request, tipo_id, marca_id):
             f"Hay equipos registrados como {tipo.nombre} de {marca.nombre}. "
             f"La marca no se puede quitar del tipo.",
         )
-        return redirect(_url_catalogo(tipo, marca))
+        return redirect(_url_catalogo(tipo, marca, request=request))
 
     tipo.marcas.remove(marca)
     messages.success(request, f"{marca.nombre} quitada de {tipo.nombre}.")
-    return redirect(_url_catalogo(tipo))
+    return redirect(_url_catalogo(tipo, request=request))
 
 
 @exige_catalogo_equipos
@@ -308,7 +424,7 @@ def editar_tipo_catalogo(request, tipo_id):
         messages.error(request, primer_error)
         # Se vuelve al modo edicion para que el usuario corrija sin repetir
         # el camino desde la lista.
-        return redirect(_url_catalogo(editar_tipo=tipo))
+        return redirect(_url_catalogo(editar_tipo=tipo, request=request))
 
     tipo = form.save()
     messages.success(request, f"Tipo {tipo.nombre} actualizado correctamente.")
@@ -349,7 +465,7 @@ def cambiar_estado_modelo(request, modelo_id):
         request,
         f"Modelo {modelo.nombre} {'reactivado' if modelo.activo else 'desactivado'}.",
     )
-    return redirect(_url_catalogo(modelo.tipo, modelo.marca))
+    return redirect(_url_catalogo(modelo.tipo, modelo.marca, request=request))
 
 
 def _url_catalogo_procedencias(procedencia=None):

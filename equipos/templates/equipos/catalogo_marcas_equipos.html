@@ -142,11 +142,16 @@
             </section>
 
             {% comment %}
-               La lista va aparte y se puede plegar. El catalogo de tipos es el
-               que mas crece de los tres, asi que lleva buscador: filtra las
-               filas ya dibujadas en el navegador, sin volver a consultar al
-               servidor, que para unas decenas de entradas es instantaneo y
-               para el servidor es trabajo que no tiene que hacer.
+               El catalogo de tipos es el que mas crece de los tres y puede
+               llegar a varios miles, asi que su busqueda, sus filtros y su
+               paginacion se resuelven contra la base y no en el navegador:
+               mandar miles de filas para filtrarlas alli haria una pagina de
+               megas que tarda en dibujarse.
+
+               El formulario se envia solo cuando se deja de teclear -lo hace
+               catalogoEquipos.js-, de modo que escribir "computadora" son una
+               consulta y no once. Sin JavaScript sigue funcionando con la
+               tecla Enter.
             {% endcomment %}
             <section class="equipos-catalogo__panel equipos-catalogo__panel--lista">
                 <details class="equipos-catalogo__desplegable" open>
@@ -154,19 +159,64 @@
                         <span class="equipos-catalogo__desplegable-titulo">
                             <i class="bi bi-list-ul"></i>
                             Tipos registrados
-                            <span class="equipos-catalogo__contador">{{ tipos|length }}</span>
+                            <span class="equipos-catalogo__contador">{{ total_tipos }}</span>
                         </span>
                         <i class="bi bi-chevron-down equipos-catalogo__desplegable-flecha"></i>
                     </summary>
 
-                    <div class="equipos-catalogo__buscador">
+                    <form class="equipos-catalogo__buscador"
+                          method="get"
+                          data-busqueda-diferida>
+                        {% comment %}
+                           La seleccion viaja en la URL, asi que hay que
+                           reenviarla o buscar perderia el paso en el que iba
+                           el usuario.
+                        {% endcomment %}
+                        {% if tipo_seleccionado %}
+                            <input type="hidden" name="tipo" value="{{ tipo_seleccionado.pk }}">
+                        {% endif %}
+                        {% if marca_seleccionada %}
+                            <input type="hidden" name="marca" value="{{ marca_seleccionada.pk }}">
+                        {% endif %}
+                        {% if filtro_categoria %}
+                            <input type="hidden" name="categoria" value="{{ filtro_categoria }}">
+                        {% endif %}
+                        {% if filtro_tecnologia %}
+                            <input type="hidden" name="tecnologia" value="{{ filtro_tecnologia }}">
+                        {% endif %}
+
                         <i class="bi bi-search"></i>
                         <input type="search"
                                class="formularioCampo-text"
-                               data-filtra="lista_tipos"
+                               name="q"
+                               value="{{ busqueda_tipos }}"
                                placeholder="Buscar tipo o categoría"
                                aria-label="Buscar entre los tipos registrados"
                                autocomplete="off">
+                    </form>
+
+                    {% comment %}
+                       Filtros conmutables: pulsar activa, volver a pulsar
+                       quita. Cada boton lleva ya calculada la URL que le
+                       corresponde, asi que funcionan sin JavaScript.
+                    {% endcomment %}
+                    <div class="equipos-catalogo__filtros">
+                        {% for boton in categorias_filtro %}
+                            <a class="equipos-catalogo__chip{% if boton.activo %} equipos-catalogo__chip--activo{% endif %}"
+                               href="{{ boton.url }}"
+                               title="{% if boton.activo %}Quitar el filtro{% else %}Filtrar por {{ boton.etiqueta }}{% endif %}">
+                                {{ boton.etiqueta }}
+                                {% if boton.activo %}<i class="bi bi-x"></i>{% endif %}
+                            </a>
+                        {% endfor %}
+                        {% for boton in tecnologias_filtro %}
+                            <a class="equipos-catalogo__chip equipos-catalogo__chip--tecnologia{% if boton.activo %} equipos-catalogo__chip--activo{% endif %}"
+                               href="{{ boton.url }}"
+                               title="{% if boton.activo %}Quitar el filtro{% else %}Filtrar por {{ boton.etiqueta }}{% endif %}">
+                                {{ boton.etiqueta }}
+                                {% if boton.activo %}<i class="bi bi-x"></i>{% endif %}
+                            </a>
+                        {% endfor %}
                     </div>
 
                     <p class="equipos-catalogo__ayuda-lista">
@@ -212,14 +262,52 @@
                             </li>
                         {% empty %}
                             <li class="equipos-catalogo__vacio">
-                                Todavía no hay tipos de equipo. Agregue el primero arriba.
+                                {% if hay_filtros %}
+                                    Ningún tipo coincide con la búsqueda.
+                                {% else %}
+                                    Todavía no hay tipos de equipo. Agregue el primero arriba.
+                                {% endif %}
                             </li>
                         {% endfor %}
                     </ul>
 
-                    <p class="equipos-catalogo__sin-coincidencias" hidden>
-                        Ningún tipo coincide con la búsqueda.
-                    </p>
+                    {% comment %}
+                       Paginacion de diez en diez. Los enlaces conservan la
+                       busqueda y los filtros: sin eso, pasar a la pagina 2
+                       perdia lo que el usuario acababa de filtrar.
+                    {% endcomment %}
+                    {% if pagina_tipos.paginator.num_pages > 1 %}
+                        <nav class="equipos-catalogo__paginacion"
+                             aria-label="Páginas de tipos de equipo">
+                            {% if pagina_tipos.has_previous %}
+                                <a href="?pagina={{ pagina_tipos.previous_page_number }}{% if querystring_tipos %}&{{ querystring_tipos }}{% endif %}"
+                                   aria-label="Página anterior">
+                                    <i class="bi bi-chevron-left"></i>
+                                </a>
+                            {% else %}
+                                <span class="equipos-catalogo__paginacion--inactivo">
+                                    <i class="bi bi-chevron-left"></i>
+                                </span>
+                            {% endif %}
+
+                            <span class="equipos-catalogo__paginacion-texto">
+                                {{ pagina_tipos.number }} de
+                                {{ pagina_tipos.paginator.num_pages }}
+                                · {{ total_tipos }} tipo{{ total_tipos|pluralize }}
+                            </span>
+
+                            {% if pagina_tipos.has_next %}
+                                <a href="?pagina={{ pagina_tipos.next_page_number }}{% if querystring_tipos %}&{{ querystring_tipos }}{% endif %}"
+                                   aria-label="Página siguiente">
+                                    <i class="bi bi-chevron-right"></i>
+                                </a>
+                            {% else %}
+                                <span class="equipos-catalogo__paginacion--inactivo">
+                                    <i class="bi bi-chevron-right"></i>
+                                </span>
+                            {% endif %}
+                        </nav>
+                    {% endif %}
                 </details>
             </section>
         </div>

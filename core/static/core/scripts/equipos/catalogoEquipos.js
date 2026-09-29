@@ -1,13 +1,47 @@
-// Catalogo de equipos: buscador de cada lista y doble clic para renombrar.
+// Catalogo de equipos: buscadores de las listas y doble clic para renombrar.
 //
-// El filtrado se hace sobre las filas que ya estan en la pagina, sin volver a
-// consultar al servidor. Para unas decenas de entradas es instantaneo, y al
-// servidor le ahorra una consulta por cada letra que se teclea. El dia que un
-// catalogo crezca a miles de filas habra que paginarlo y buscar contra la
-// base; hasta entonces esto es lo barato y lo rapido.
+// Hay dos clases de buscador, y la diferencia es cuanto puede crecer la lista:
+//
+//   - Tipos de equipo puede llegar a varios miles, asi que su busqueda va
+//     contra la base y la lista viene paginada. El formulario se envia cuando
+//     el usuario deja de teclear, no en cada letra: escribir "computadora" es
+//     una consulta y no once. Sin JavaScript sigue funcionando con Enter.
+//
+//   - Marcas de un tipo y modelos de una marca son listas cortas por
+//     naturaleza -pocas decenas- y ya vienen enteras en la pagina, asi que se
+//     filtran aqui mismo, al instante y sin molestar al servidor.
 document.addEventListener('DOMContentLoaded', function () {
 
-    // ---------- Buscadores ----------
+    // ---------- Busqueda contra la base, diferida ----------
+    // 400ms: lo bastante para no disparar a media palabra y lo bastante poco
+    // para que la lista llegue antes de que el usuario mire la pantalla.
+    const ESPERA_BUSQUEDA = 400;
+
+    document.querySelectorAll('[data-busqueda-diferida]').forEach(function (formulario) {
+        const campo = formulario.querySelector('input[type="search"]');
+
+        if (!campo) {
+            return;
+        }
+
+        let temporizador = null;
+
+        campo.addEventListener('input', function () {
+            window.clearTimeout(temporizador);
+            temporizador = window.setTimeout(function () {
+                formulario.submit();
+            }, ESPERA_BUSQUEDA);
+        });
+
+        // Enter envia de inmediato, sin esperar el retardo.
+        campo.addEventListener('keydown', function (evento) {
+            if (evento.key === 'Enter') {
+                window.clearTimeout(temporizador);
+            }
+        });
+    });
+
+    // ---------- Filtrado local de las listas cortas ----------
     document.querySelectorAll('[data-filtra]').forEach(function (campo) {
         const lista = document.getElementById(campo.dataset.filtra);
 

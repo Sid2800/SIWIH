@@ -9433,3 +9433,97 @@ p + .equipos-garantia__bloqueo {
    gap: .5rem;
    min-height: 3.6rem;
 }
+
+/* ---------------------------------------------------------------------
+   Filtros y paginacion de la lista de tipos
+   El catalogo puede llegar a varios miles de tipos, asi que la lista viene
+   paginada del servidor y los filtros son enlaces: funcionan sin JavaScript
+   y el enlace resultante se puede compartir.
+   --------------------------------------------------------------------- */
+.equipos-catalogo__filtros {
+   display: flex;
+   flex-wrap: wrap;
+   gap: .4rem;
+   padding: 0 1.2rem .8rem;
+}
+
+/* Pulsar activa y volver a pulsar quita: cada chip lleva ya calculada la URL
+   que le toca segun este activo o no. */
+.equipos-catalogo__chip {
+   align-items: center;
+   background-color: var(--colorMenuHover);
+   border: .1rem solid transparent;
+   border-radius: 2rem;
+   color: var(--colorTextoMenu);
+   display: flex;
+   font-size: 1.2rem;
+   gap: .3rem;
+   padding: .45rem .9rem;
+   text-decoration: none;
+   white-space: nowrap;
+}
+
+.equipos-catalogo__chip:hover {
+   border-color: var(--colorBoton);
+   color: var(--negro);
+}
+
+.equipos-catalogo__chip--activo {
+   background-color: var(--negro);
+   color: #fff;
+}
+
+.equipos-catalogo__chip--activo:hover {
+   color: #fff;
+}
+
+/* La tecnologia se distingue de la categoria con el borde: son dos filtros
+   distintos en la misma fila y conviene no leerlos como una sola lista. */
+.equipos-catalogo__chip--tecnologia {
+   background-color: transparent;
+   border-color: var(--colorLinea);
+}
+
+.equipos-catalogo__paginacion {
+   align-items: center;
+   border-top: .1rem solid var(--colorLinea);
+   display: flex;
+   gap: .6rem;
+   justify-content: center;
+   padding: .8rem 1.2rem;
+}
+
+.equipos-catalogo__paginacion a,
+.equipos-catalogo__paginacion--inactivo {
+   align-items: center;
+   border: .1rem solid var(--colorLinea);
+   border-radius: .5rem;
+   color: var(--negro);
+   display: flex;
+   font-size: 1.5rem;
+   justify-content: center;
+   /* Blanco tocable en tablet: es un boton que se usa de pie. */
+   min-height: 4rem;
+   min-width: 4rem;
+   text-decoration: none;
+}
+
+.equipos-catalogo__paginacion a:hover {
+   border-color: var(--colorBoton);
+}
+
+.equipos-catalogo__paginacion--inactivo {
+   color: var(--colorTextoMenu);
+   opacity: .45;
+}
+
+.equipos-catalogo__paginacion-texto {
+   color: var(--colorTextoMenu);
+   font-size: 1.25rem;
+   text-align: center;
+}
+
+/* El buscador es un formulario, asi que no debe heredar margenes de form. */
+form.equipos-catalogo__buscador {
+   margin: 0;
+}
