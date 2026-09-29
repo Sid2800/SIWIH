@@ -77,6 +77,10 @@
                             <i class="bi bi-chevron-down equipos-catalogo__desplegable-flecha"></i>
                         </summary>
 
+                        <p class="equipos-catalogo__ayuda-lista">
+                            Un clic la elige. Doble clic para renombrarla.
+                        </p>
+
                         <div class="equipos-catalogo__buscador">
                             <i class="bi bi-search"></i>
                             <input type="search"
@@ -90,8 +94,16 @@
                         <ul class="equipos-catalogo__lista" id="lista_marcas">
                             {% for marca in marcas %}
                                 <li class="equipos-catalogo__item{% if marca_seleccionada and marca.pk == marca_seleccionada.pk %} equipos-catalogo__item--activo{% endif %}{% if not marca.activo %} equipos-catalogo__item--inactivo{% endif %}">
+                                    {% comment %}
+                                       Un clic elige la marca y el doble clic
+                                       la renombra ahi mismo: no tiene mas
+                                       dato que el nombre, asi que corregir
+                                       una errata no merece un formulario.
+                                    {% endcomment %}
                                     <a class="equipos-catalogo__enlace"
                                        data-navega
+                                       data-url-renombrar="{% url 'renombrar_marca_equipos' marca.pk %}"
+                                       title="Doble clic para renombrar {{ marca.nombre }}"
                                        href="?tipo={{ tipo_seleccionado.pk }}&marca={{ marca.pk }}">
                                         <span class="equipos-catalogo__nombre">{{ marca.nombre }}</span>
                                         <span class="equipos-catalogo__meta">

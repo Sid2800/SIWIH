@@ -1339,10 +1339,14 @@ class TipoCatalogoForm(forms.ModelForm):
         usos = {}
 
         for campo in ("categoria_id", "categorias_secundarias__id"):
+            # distinct() es lo que hace esto barato: sin el, la consulta
+            # devuelve una fila por tipo registrado -miles- para acabar
+            # quedandose con el punado de parejas distintas que existen.
             pares = (
                 TipoDispositivo.objects
                 .exclude(**{campo: None})
                 .values_list(campo, "tecnologia_id")
+                .distinct()
             )
 
             for categoria_id, tecnologia_id in pares:

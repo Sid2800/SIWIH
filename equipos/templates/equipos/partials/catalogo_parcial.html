@@ -11,6 +11,14 @@
    volveria a mandar el menu y la hoja de estilos en cada peticion, y el
    formulario es precisamente lo que hay que dejar intacto.
 {% endcomment %}
+{% if incluir_formulario %}
+    {% comment %}
+       Solo cuando el usuario pidio abrir un tipo para editarlo, o volver al
+       modo alta. En los demas casos el formulario no viaja: es justo lo que
+       hay que dejar intacto.
+    {% endcomment %}
+    {% include 'equipos/partials/catalogo_form_tipo.html' %}
+{% endif %}
 {% include 'equipos/partials/catalogo_migas.html' %}
 {% include 'equipos/partials/catalogo_tipos_cuerpo.html' %}
 {% include 'equipos/partials/catalogo_paso_marcas.html' %}

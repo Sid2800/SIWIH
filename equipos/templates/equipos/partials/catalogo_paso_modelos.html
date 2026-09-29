@@ -67,6 +67,10 @@
                             <i class="bi bi-chevron-down equipos-catalogo__desplegable-flecha"></i>
                         </summary>
 
+                        <p class="equipos-catalogo__ayuda-lista">
+                            Doble clic para renombrar un modelo.
+                        </p>
+
                         <div class="equipos-catalogo__buscador">
                             <i class="bi bi-search"></i>
                             <input type="search"
@@ -80,7 +84,15 @@
                         <ul class="equipos-catalogo__lista" id="lista_modelos">
                             {% for modelo in modelos %}
                                 <li class="equipos-catalogo__item{% if not modelo.activo %} equipos-catalogo__item--inactivo{% endif %}">
-                                    <span class="equipos-catalogo__enlace">
+                                    {% comment %}
+                                       La fila no lleva a ninguna parte -el
+                                       modelo es el ultimo paso de la cadena-
+                                       asi que el doble clic queda libre para
+                                       renombrarlo.
+                                    {% endcomment %}
+                                    <span class="equipos-catalogo__enlace"
+                                          data-url-renombrar="{% url 'renombrar_modelo_equipos' modelo.pk %}"
+                                          title="Doble clic para renombrar {{ modelo.nombre }}">
                                         <span class="equipos-catalogo__nombre">{{ modelo.nombre }}</span>
                                         <span class="equipos-catalogo__meta">
                                             {{ modelo.total_equipos }} equipo{{ modelo.total_equipos|pluralize }}

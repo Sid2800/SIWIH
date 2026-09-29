@@ -25,7 +25,7 @@
                                 <a class="equipos-catalogo__enlace"
                                    data-navega
                                    href="?tipo={{ tipo.pk }}"
-                                   data-url-editar="?editar={{ tipo.pk }}{% if tipo_seleccionado %}&tipo={{ tipo_seleccionado.pk }}{% endif %}">
+                                   data-url-editar="?editar={{ tipo.pk }}&form=1{% if tipo_seleccionado %}&tipo={{ tipo_seleccionado.pk }}{% endif %}">
                                     <span class="equipos-catalogo__nombre">{{ tipo.nombre }}</span>
                                     <span class="equipos-catalogo__meta">
                                         {{ tipo.categoria.nombre }}
@@ -35,7 +35,8 @@
                                 </a>
                                 <div class="equipos-catalogo__acciones">
                                     <a class="equipos-catalogo__icono"
-                                       href="?editar={{ tipo.pk }}{% if tipo_seleccionado %}&tipo={{ tipo_seleccionado.pk }}{% endif %}"
+                                       data-navega
+                                       href="?editar={{ tipo.pk }}&form=1{% if tipo_seleccionado %}&tipo={{ tipo_seleccionado.pk }}{% endif %}"
                                        title="Renombrar {{ tipo.nombre }}">
                                         <i class="bi bi-pencil"></i>
                                     </a>

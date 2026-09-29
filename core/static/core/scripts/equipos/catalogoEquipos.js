@@ -20,6 +20,9 @@ document.addEventListener('DOMContentLoaded', function () {
     // -el paso 3 no existe hasta que hay una marca elegida- se deja como
     // estaba en vez de dar error.
     const TROZOS = [
+        // El formulario solo llega cuando el usuario pidio abrir un tipo
+        // para editarlo; en los demas casos no viene y se queda como esta.
+        'equipos_form_tipo',
         'equipos_migas',
         'equipos_tipos_cuerpo',
         'equipos_paso_marcas',
@@ -28,7 +31,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Parametros que describen donde esta el usuario. Son los mismos que
     // viajan en la URL, de modo que el enlace se puede copiar y recargar.
-    const PARAMETROS = ['tipo', 'marca', 'q', 'categoria', 'tecnologia', 'pagina'];
+    const PARAMETROS = [
+        'tipo', 'marca', 'q', 'categoria', 'tecnologia', 'pagina', 'editar',
+    ];
+
+    // "form" no describe donde esta el usuario, es un aviso de una sola vez:
+    // "mandame tambien el formulario". Viaja en la peticion y no en la URL.
+    const SENAL_FORMULARIO = 'form';
 
     const contenedor = document.querySelector('.equipos-catalogo');
 
@@ -50,13 +59,17 @@ document.addEventListener('DOMContentLoaded', function () {
 
     let estado = estadoDesdeUrl(window.location.search);
 
-    function urlDe(estado, parcial) {
+    function urlDe(estado, parcial, senales) {
         const parametros = new URLSearchParams();
 
         PARAMETROS.forEach(function (nombre) {
             if (estado[nombre]) {
                 parametros.set(nombre, estado[nombre]);
             }
+        });
+
+        Object.keys(senales || {}).forEach(function (nombre) {
+            parametros.set(nombre, senales[nombre]);
         });
 
         if (parcial) {
@@ -70,7 +83,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // ---------- Pedir y colocar los trozos ----------
     let peticionEnCurso = null;
 
-    function cargar(nuevoEstado, empujarHistorial) {
+    function cargar(nuevoEstado, empujarHistorial, senales) {
         estado = nuevoEstado;
 
         if (contenedor) {
@@ -83,7 +96,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const miPeticion = {};
         peticionEnCurso = miPeticion;
 
-        return window.fetch(urlDe(estado, true), {
+        return window.fetch(urlDe(estado, true, senales), {
             headers: { 'X-Requested-With': 'XMLHttpRequest' },
             credentials: 'same-origin',
         })
@@ -132,6 +145,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         actualizarContador();
         prepararFiltrosLocales();
+        prepararCategorias();
     }
 
     // El contador vive en la cabecera plegable, que no se cambia para no
@@ -159,6 +173,14 @@ document.addEventListener('DOMContentLoaded', function () {
     const ESPERA_DOBLE_CLIC = 250;
     let temporizadorClic = null;
 
+    function senalesDesdeEnlace(enlace) {
+        const destino = new URL(enlace.getAttribute('href'), window.location.href);
+
+        return destino.searchParams.get(SENAL_FORMULARIO)
+            ? { form: '1' }
+            : null;
+    }
+
     function estadoDesdeEnlace(enlace) {
         const destino = new URL(enlace.getAttribute('href'), window.location.href);
         const pedido = estadoDesdeUrl(destino.search);
@@ -174,6 +196,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (!pedido.pagina) {
             delete nuevo.pagina;
+        }
+
+        // Volver al modo alta -Cancelar edicion- es pedir el formulario sin
+        // ningun tipo abierto.
+        if (!pedido.editar && destino.searchParams.get(SENAL_FORMULARIO)) {
+            delete nuevo.editar;
         }
 
         return nuevo;
@@ -193,8 +221,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
         evento.preventDefault();
 
-        if (!enlace.dataset.urlEditar) {
-            cargar(estadoDesdeEnlace(enlace), true);
+        // Sin segundo gesto posible, el clic va de inmediato.
+        if (!enlace.dataset.urlEditar && !enlace.dataset.urlRenombrar) {
+            cargar(estadoDesdeEnlace(enlace), true, senalesDesdeEnlace(enlace));
             return;
         }
 
@@ -204,23 +233,208 @@ document.addEventListener('DOMContentLoaded', function () {
 
         temporizadorClic = window.setTimeout(function () {
             temporizadorClic = null;
-            cargar(estadoDesdeEnlace(enlace), true);
+            cargar(estadoDesdeEnlace(enlace), true, senalesDesdeEnlace(enlace));
         }, ESPERA_DOBLE_CLIC);
     });
 
     document.addEventListener('dblclick', function (evento) {
-        const enlace = evento.target.closest('[data-url-editar]');
+        const fila = evento.target.closest('[data-url-editar], [data-url-renombrar]');
 
-        if (!enlace) {
+        if (!fila) {
             return;
         }
 
         evento.preventDefault();
         window.clearTimeout(temporizadorClic);
         temporizadorClic = null;
-        // Renombrar si recarga: hay que llenar el formulario de arriba con el
-        // tipo elegido, y eso lo dibuja el servidor.
-        window.location.href = enlace.dataset.urlEditar;
+
+        if (fila.dataset.urlEditar) {
+            // Un tipo tiene mas que un nombre -tecnologia y categorias- asi
+            // que se abre en el formulario de arriba. Llega solo ese trozo,
+            // no la pagina entera.
+            const destino = new URL(fila.dataset.urlEditar, window.location.href);
+            const nuevo = Object.assign(
+                {}, estado, estadoDesdeUrl(destino.search)
+            );
+            cargar(nuevo, true, { form: '1' });
+            return;
+        }
+
+        // Una marca y un modelo no tienen mas dato que su nombre: se escribe
+        // encima de la fila y se guarda ahi mismo.
+        renombrarEnLaFila(fila);
+    });
+
+    // ---------- Renombrar escribiendo encima de la fila ----------
+    // Corregir una errata en una marca no merece abrir un formulario ni
+    // recargar la pantalla. El nombre se cambia por un campo de texto, se
+    // guarda con Enter y se deja como estaba con Escape.
+    function tokenCsrf() {
+        const campo = document.querySelector('[name="csrfmiddlewaretoken"]');
+        return campo ? campo.value : '';
+    }
+
+    function renombrarEnLaFila(fila) {
+        const etiqueta = fila.querySelector('.equipos-catalogo__nombre');
+
+        // Si ya se esta editando, el segundo doble clic no debe empezar otra
+        // vez y perder lo escrito.
+        if (!etiqueta || fila.dataset.renombrando) {
+            return;
+        }
+
+        fila.dataset.renombrando = '1';
+
+        const original = etiqueta.textContent.trim();
+        const campo = document.createElement('input');
+        campo.type = 'text';
+        campo.className = 'formularioCampo-text equipos-catalogo__renombrar';
+        campo.value = original;
+        campo.maxLength = 100;
+        campo.setAttribute('aria-label', 'Nuevo nombre de ' + original);
+
+        etiqueta.hidden = true;
+        etiqueta.after(campo);
+        campo.focus();
+        campo.select();
+
+        let cerrado = false;
+
+        function cerrar(nombre) {
+            if (cerrado) {
+                return;
+            }
+
+            cerrado = true;
+            etiqueta.textContent = nombre;
+            etiqueta.hidden = false;
+            campo.remove();
+            delete fila.dataset.renombrando;
+        }
+
+        function guardar() {
+            const nombre = campo.value.trim();
+
+            if (!nombre || nombre.toUpperCase() === original.toUpperCase()) {
+                cerrar(original);
+                return;
+            }
+
+            const datos = new FormData();
+            datos.append('nombre', nombre);
+            datos.append('csrfmiddlewaretoken', tokenCsrf());
+
+            campo.disabled = true;
+
+            window.fetch(fila.dataset.urlRenombrar, {
+                method: 'POST',
+                body: datos,
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+            })
+                .then(function (respuesta) {
+                    return respuesta.json().then(function (cuerpo) {
+                        return { ok: respuesta.ok, cuerpo: cuerpo };
+                    });
+                })
+                .then(function (resultado) {
+                    if (!resultado.ok) {
+                        // El motivo se dice donde ocurrio, no en una alerta
+                        // que tape la pantalla, y el campo sigue abierto para
+                        // corregir sin volver a empezar.
+                        campo.disabled = false;
+                        campo.focus();
+                        campo.select();
+                        avisarEnLaFila(fila, resultado.cuerpo.error);
+                        return;
+                    }
+
+                    cerrar(resultado.cuerpo.nombre);
+                })
+                .catch(function () {
+                    campo.disabled = false;
+                    avisarEnLaFila(
+                        fila,
+                        'No se pudo guardar el nombre. Intente de nuevo.'
+                    );
+                });
+        }
+
+        campo.addEventListener('keydown', function (evento) {
+            if (evento.key === 'Enter') {
+                evento.preventDefault();
+                guardar();
+            } else if (evento.key === 'Escape') {
+                evento.preventDefault();
+                cerrar(original);
+            }
+        });
+
+        // Salir del campo guarda, que es lo que espera quien pulsa en otro
+        // sitio dando por hecho que ya quedo.
+        campo.addEventListener('blur', guardar);
+
+        // Un clic dentro del campo no debe seguir el enlace de la fila.
+        campo.addEventListener('click', function (evento) {
+            evento.preventDefault();
+            evento.stopPropagation();
+        });
+    }
+
+    function avisarEnLaFila(fila, mensaje) {
+        let aviso = fila.parentNode.querySelector('.equipos-catalogo__error-fila');
+
+        if (!aviso) {
+            aviso = document.createElement('p');
+            aviso.className = 'equipos-catalogo__error-fila';
+            aviso.setAttribute('role', 'alert');
+            fila.parentNode.append(aviso);
+        }
+
+        aviso.textContent = mensaje || 'No se pudo guardar el nombre.';
+    }
+
+    // ---------- Limpiar el formulario del tipo ----------
+    // Cuando se cargan tipos en rafaga y uno se escribe mal, vaciar los
+    // campos a mano es mas trabajo que el alta. No va al servidor: no hay
+    // nada que preguntarle.
+    document.addEventListener('click', function (evento) {
+        if (!evento.target.closest('[data-limpia-formulario]')) {
+            return;
+        }
+
+        const formulario = evento.target.closest('form');
+
+        if (!formulario) {
+            return;
+        }
+
+        formulario.querySelectorAll('input[type="text"], input[type="hidden"]')
+            .forEach(function (campo) {
+                if (campo.name !== 'csrfmiddlewaretoken') {
+                    campo.value = '';
+                }
+            });
+
+        formulario.querySelectorAll('select').forEach(function (campo) {
+            campo.value = '';
+        });
+
+        // La lista de categorias es la cara del campo oculto, asi que se
+        // vacia tambien.
+        const lista = formulario.querySelector('#lista_categorias_tipo');
+
+        if (lista) {
+            lista.replaceChildren();
+        }
+
+        prepararCategorias();
+
+        const primero = formulario.querySelector('#nombre_tipo_catalogo');
+
+        if (primero) {
+            primero.focus();
+        }
     });
 
     // ---------- Busqueda y filtros de la lista de tipos ----------
@@ -407,10 +621,21 @@ document.addEventListener('DOMContentLoaded', function () {
     // que ya se usan con ella suben arriba y el resto queda debajo. No se
     // esconde ninguna, porque la primera vez que una categoria se usa con una
     // tecnologia tiene que poder elegirse.
-    (function categoriasDelTipo() {
+    //
+    // Es una funcion y no un bloque que corre una vez porque el formulario
+    // se cambia en caliente -al abrir un tipo para editarlo- y hay que
+    // preparar el bloque que llega. Si el que hay ya esta preparado, solo se
+    // vuelve a poner al dia: repetir los escuchadores sobre los mismos
+    // elementos haria que un clic en agregar valiera por dos.
+    function prepararCategorias() {
         const bloque = document.getElementById('categorias_equipo');
 
         if (!bloque) {
+            return;
+        }
+
+        if (bloque.sincronizarCategorias) {
+            bloque.sincronizarCategorias();
             return;
         }
 
@@ -585,7 +810,11 @@ document.addEventListener('DOMContentLoaded', function () {
             tecnologia.addEventListener('change', ordenarPorTecnologia);
         }
 
+        bloque.sincronizarCategorias = sincronizar;
+
         ordenarPorTecnologia();
         sincronizar();
-    }());
+    }
+
+    prepararCategorias();
 });

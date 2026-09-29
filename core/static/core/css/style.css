@@ -9648,6 +9648,43 @@ form.equipos-catalogo__buscador {
    color-scheme: dark;
 }
 
+/* ---------------------------------------------------------------------
+   Renombrar escribiendo encima de la fila
+   Una marca y un modelo no tienen mas dato que su nombre, asi que corregir
+   una errata no merece abrir un formulario. El campo ocupa el sitio del
+   nombre para que no salte nada al aparecer.
+   --------------------------------------------------------------------- */
+.equipos-catalogo__renombrar {
+   font-size: 1.35rem;
+   min-height: 3.2rem;
+   width: 100%;
+}
+
+.equipos-catalogo__error-fila {
+   color: var(--eq-aviso-texto);
+   font-size: 1.2rem;
+   line-height: 1.4;
+   margin: 0;
+   padding: .6rem 1.2rem;
+}
+
+/* Los botones de debajo del formulario del tipo: limpiar y, si se esta
+   editando, cancelar. */
+.equipos-catalogo__acciones-form {
+   display: flex;
+   flex-wrap: wrap;
+   gap: 1.2rem;
+}
+
+.equipos-catalogo__acciones-form .equipos-catalogo__cancelar {
+   align-items: center;
+   background: none;
+   border: none;
+   cursor: pointer;
+   display: flex;
+   gap: .4rem;
+}
+
 /* La lista desplegada de un <select>
    Hay una regla global -.formularioCampo-select option- que fija el fondo de
    las opciones en un gris con !important y les pone "color: var(0, 0, 0)",

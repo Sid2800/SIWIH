@@ -54,3 +54,10 @@ exige_baja_equipos = _exigir(puede_dar_baja_equipos)
 
 # Los buscadores de los formularios responden a fetch, no a una navegacion.
 exige_formularios_equipos_json = _exigir(puede_usar_formularios_equipos, como_json=True)
+
+# Renombrar en el sitio tambien responde a fetch: un redirect a
+# acceso_denegado llegaria como un trozo de HTML que el JavaScript no sabria
+# leer, y la fila se quedaria en blanco sin decir que falta el permiso.
+exige_catalogo_equipos_json = _exigir(
+    puede_administrar_catalogos_equipos, como_json=True
+)

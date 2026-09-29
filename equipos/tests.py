@@ -12,6 +12,7 @@ import datetime
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.test import TestCase
+from django.urls import reverse
 from django.utils import timezone
 
 from expediente.models import ExpedienteUbicacion
@@ -803,6 +804,178 @@ class CategoriasDelTipoTests(TestCase):
         }
 
         self.assertEqual(disponibles["MEDICO"], str(self.electronico.pk))
+
+
+class RenombrarEnElSitioTests(TestCase):
+    """Marcas y modelos se renombran sin recargar la pantalla.
+
+    Responden JSON porque el navegador cambia solo la fila. El nombre se
+    normaliza igual que en los formularios, asi que "  epson " y "EPSON" son
+    el mismo nombre y los duplicados se detectan.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.usuario = User.objects.create_superuser(
+            username="zz_renombrar",
+            password="clave-de-prueba",
+        )
+        cls.impresora = TipoDispositivo.objects.create(
+            nombre="IMPRESORA",
+            categoria=CategoriaEquipo.objects.get(nombre="INFORMATICA"),
+            tecnologia=TecnologiaEquipo.objects.get(nombre="ELECTRONICO"),
+        )
+        cls.epson = MarcaDispositivo.objects.create(nombre="EPSOM")
+        cls.hp = MarcaDispositivo.objects.create(nombre="HP")
+        cls.impresora.marcas.add(cls.epson, cls.hp)
+        cls.modelo = ModeloDispositivo.objects.create(
+            nombre="L3250",
+            tipo=cls.impresora,
+            marca=cls.epson,
+        )
+
+    def setUp(self):
+        self.client.force_login(self.usuario)
+
+    def _renombrar_marca(self, marca, nombre):
+        return self.client.post(
+            reverse("renombrar_marca_equipos", args=[marca.pk]),
+            {"nombre": nombre},
+        )
+
+    def _renombrar_modelo(self, modelo, nombre):
+        return self.client.post(
+            reverse("renombrar_modelo_equipos", args=[modelo.pk]),
+            {"nombre": nombre},
+        )
+
+    def test_corrige_el_nombre_de_la_marca(self):
+        respuesta = self._renombrar_marca(self.epson, "  epson ")
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(respuesta.json()["nombre"], "EPSON")
+        self.epson.refresh_from_db()
+        self.assertEqual(self.epson.nombre, "EPSON")
+
+    def test_los_modelos_de_la_marca_no_se_tocan(self):
+        """Apuntan por identificador, no por texto."""
+        self._renombrar_marca(self.epson, "EPSON")
+
+        self.modelo.refresh_from_db()
+        self.assertEqual(self.modelo.marca_id, self.epson.pk)
+        self.assertEqual(self.modelo.nombre, "L3250")
+
+    def test_rechaza_el_nombre_de_otra_marca(self):
+        respuesta = self._renombrar_marca(self.epson, "hp")
+
+        self.assertEqual(respuesta.status_code, 400)
+        self.assertIn("HP", respuesta.json()["error"])
+        self.epson.refresh_from_db()
+        self.assertEqual(self.epson.nombre, "EPSOM")
+
+    def test_rechaza_dejarlo_vacio(self):
+        respuesta = self._renombrar_marca(self.epson, "   ")
+
+        self.assertEqual(respuesta.status_code, 400)
+        self.epson.refresh_from_db()
+        self.assertEqual(self.epson.nombre, "EPSOM")
+
+    def test_corrige_el_nombre_del_modelo(self):
+        respuesta = self._renombrar_modelo(self.modelo, "l3251")
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(respuesta.json()["nombre"], "L3251")
+
+    def test_el_modelo_solo_choca_dentro_de_su_tipo_y_marca(self):
+        """La L3250 de otra marca no estorba: el nombre es unico ahi dentro."""
+        ModeloDispositivo.objects.create(
+            nombre="L3250",
+            tipo=self.impresora,
+            marca=self.hp,
+        )
+        otro = ModeloDispositivo.objects.create(
+            nombre="L5290",
+            tipo=self.impresora,
+            marca=self.epson,
+        )
+
+        # Contra el de otra marca no hay conflicto...
+        self.assertEqual(self._renombrar_modelo(otro, "L3251").status_code, 200)
+
+        # ...pero contra el de la misma marca y tipo, si.
+        respuesta = self._renombrar_modelo(otro, "L3250")
+        self.assertEqual(respuesta.status_code, 400)
+        self.assertIn("L3250", respuesta.json()["error"])
+
+    def test_sin_permiso_responde_403_y_no_una_pagina(self):
+        """El navegador espera JSON: un redirect llegaria como HTML."""
+        self.client.logout()
+        sin_permiso = User.objects.create_user(
+            username="zz_sin_permiso",
+            password="clave-de-prueba",
+        )
+        self.client.force_login(sin_permiso)
+
+        respuesta = self._renombrar_marca(self.epson, "EPSON")
+
+        self.assertEqual(respuesta.status_code, 403)
+        self.assertEqual(respuesta["Content-Type"], "application/json")
+        self.epson.refresh_from_db()
+        self.assertEqual(self.epson.nombre, "EPSOM")
+
+
+class FormularioDelTipoEnLaRespuestaParcialTests(TestCase):
+    """El formulario de arriba solo viaja cuando se pidio editar un tipo.
+
+    Es lo que permite filtrar y elegir sin borrarle al usuario lo que lleva
+    escrito, y a la vez abrir un tipo para editarlo sin recargar la pantalla.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.usuario = User.objects.create_superuser(
+            username="zz_form_parcial",
+            password="clave-de-prueba",
+        )
+        cls.tipo = TipoDispositivo.objects.create(
+            nombre="CAMILLA DE TRASLADO",
+            categoria=CategoriaEquipo.objects.get(nombre="MEDICO"),
+            tecnologia=TecnologiaEquipo.objects.get(nombre="ELECTRONICO"),
+        )
+
+    def setUp(self):
+        self.client.force_login(self.usuario)
+
+    def _parcial(self, **parametros):
+        parametros["parcial"] = "1"
+        respuesta = self.client.get("/equipos/catalogo/marcas/", parametros)
+        self.assertEqual(respuesta.status_code, 200)
+        return respuesta.content.decode()
+
+    def test_al_filtrar_no_viaja(self):
+        html = self._parcial(q="CAMILLA")
+
+        self.assertNotIn('id="equipos_form_tipo"', html)
+        self.assertNotIn('id="nombre_tipo_catalogo"', html)
+
+    def test_al_pedir_editar_si_viaja_y_con_el_tipo_puesto(self):
+        html = self._parcial(editar=self.tipo.pk, form="1")
+
+        self.assertIn('id="equipos_form_tipo"', html)
+        self.assertIn("Editar tipo", html)
+        self.assertIn("CAMILLA DE TRASLADO", html)
+
+    def test_cancelar_la_edicion_devuelve_el_formulario_en_blanco(self):
+        html = self._parcial(form="1")
+
+        self.assertIn('id="equipos_form_tipo"', html)
+        self.assertIn("Nuevo tipo de equipo", html)
+
+    def test_la_senal_del_formulario_no_se_cuela_en_los_enlaces(self):
+        html = self._parcial(editar=self.tipo.pk, form="1", q="CAMILLA")
+
+        self.assertNotIn("form=1&", html.replace("&form=1", ""))
+        self.assertNotIn("parcial=1", html)
 
 
 class CatalogoParcialTests(TestCase):

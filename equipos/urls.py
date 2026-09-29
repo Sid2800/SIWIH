@@ -123,6 +123,19 @@ urlpatterns = [
         views.agregar_modelo_catalogo,
         name='agregar_modelo_equipos'
     ),
+    # Renombrar en el sitio: responden a fetch y devuelven JSON, para que la
+    # fila se actualice sin recargar la pantalla entera.
+    path(
+        'catalogo/marcas/<int:marca_id>/renombrar/',
+        views.renombrar_marca_catalogo,
+        name='renombrar_marca_equipos'
+    ),
+    path(
+        'catalogo/modelos/<int:modelo_id>/renombrar/',
+        views.renombrar_modelo_catalogo,
+        name='renombrar_modelo_equipos'
+    ),
+
     path(
         'catalogo/modelos/<int:modelo_id>/estado/',
         views.cambiar_estado_modelo,

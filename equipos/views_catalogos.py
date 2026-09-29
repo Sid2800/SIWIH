@@ -8,6 +8,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Count, Q
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
@@ -26,8 +27,13 @@ from .models import (
     Procedencia,
     TecnologiaEquipo,
     TipoDispositivo,
+    normalizar_nombre_catalogo,
 )
-from .decorators import exige_catalogo_equipos, exige_ver_equipos
+from .decorators import (
+    exige_catalogo_equipos,
+    exige_catalogo_equipos_json,
+    exige_ver_equipos,
+)
 from .view_helpers import registrar_errores_vista
 
 
@@ -106,15 +112,9 @@ def _filtrar_tipos(request):
     categoria = (request.GET.get("categoria") or "").strip()
     tecnologia = (request.GET.get("tecnologia") or "").strip()
 
-    tipos = (
-        TipoDispositivo.objects
-        .select_related("categoria", "tecnologia")
-        .annotate(
-            total_equipos=Count("dispositivos", distinct=True),
-            total_marcas=Count("marcas", distinct=True),
-        )
-        .order_by("-activo", "categoria__nombre", "nombre")
-    )
+    ORDEN = ("-activo", "categoria__nombre", "nombre")
+
+    tipos = TipoDispositivo.objects.order_by(*ORDEN)
 
     if busqueda:
         # Se busca tambien por categoria: quien escribe "electrico" espera
@@ -130,8 +130,26 @@ def _filtrar_tipos(request):
     if tecnologia.isdigit():
         tipos = tipos.filter(tecnologia_id=int(tecnologia))
 
-    paginador = Paginator(tipos, TIPOS_POR_PAGINA)
+    # Se pagina sobre los identificadores y los contadores se calculan solo
+    # para las diez filas que se van a dibujar. Contando en la misma consulta,
+    # los dos contadores obligan a unir la tabla de equipos y la de marcas y a
+    # contar distinto sobre el producto de ambas, y eso lo paga tambien el
+    # COUNT del paginador: sobre el catalogo entero, para saber cuantas
+    # paginas hay, se acababa recorriendo un cruce de tres tablas cuando basta
+    # contar filas de una.
+    paginador = Paginator(tipos.values_list("pk", flat=True), TIPOS_POR_PAGINA)
     pagina = paginador.get_page(request.GET.get("pagina"))
+
+    filas = (
+        TipoDispositivo.objects
+        .filter(pk__in=list(pagina.object_list))
+        .select_related("categoria", "tecnologia")
+        .annotate(
+            total_equipos=Count("dispositivos", distinct=True),
+            total_marcas=Count("marcas", distinct=True),
+        )
+        .order_by(*ORDEN)
+    )
 
     # Los enlaces de paginacion tienen que conservar busqueda y filtros: sin
     # esto, pasar a la pagina 2 perdia lo que el usuario acababa de filtrar.
@@ -141,9 +159,10 @@ def _filtrar_tipos(request):
     # acabar dentro de los enlaces que esos trozos dibujan, o al pulsarlos se
     # abriria una pagina sin menu ni estilos.
     parametros.pop("parcial", None)
+    parametros.pop("form", None)
 
     return {
-        "tipos": pagina.object_list,
+        "tipos": filas,
         "pagina_tipos": pagina,
         "total_tipos": paginador.count,
         "busqueda_tipos": busqueda,
@@ -256,6 +275,13 @@ def catalogo_marcas_modelos(request):
             activo=True
         ).values_list("nombre", flat=True),
         "url_regresar": reverse("inicio_equipos"),
+        # El formulario de arriba solo se manda en la respuesta parcial
+        # cuando el usuario pidio abrir un tipo para editarlo -o volver al
+        # modo alta-, que es el unico caso en que quiere que se rellene. En
+        # los demas no viaja, para no borrarle lo que lleve escrito.
+        "incluir_formulario": bool(
+            request.GET.get("editar") or request.GET.get("form")
+        ),
     }
     contexto.update(_filtrar_tipos(request))
 
@@ -546,6 +572,108 @@ def agregar_tecnologia_catalogo(request):
         "tecnología",
         "nueva_tecnologia",
     )
+
+
+# =====================================================================
+# Renombrar en el sitio
+# ---------------------------------------------------------------------
+# Una marca y un modelo no tienen mas dato que su nombre, asi que
+# corregir una errata no merece abrir un formulario ni recargar la
+# pantalla: se escribe encima de la fila y se guarda. El tipo no entra
+# aqui porque tiene ademas tecnologia y categorias, y eso si es un
+# formulario.
+# =====================================================================
+
+
+def _nombre_pedido(request):
+    """Nombre que llega para renombrar, ya normalizado.
+
+    normalizar_nombre_catalogo recorta espacios y pasa a mayusculas, de modo
+    que "  epson " y "EPSON" acaban siendo el mismo nombre y las
+    comprobaciones de duplicado los detectan.
+    """
+    nombre = normalizar_nombre_catalogo(request.POST.get("nombre"))
+
+    if not nombre:
+        raise ValueError("Debe ingresar el nombre.")
+
+    if len(nombre) > 100:
+        raise ValueError("El nombre no puede pasar de 100 caracteres.")
+
+    return nombre
+
+
+@exige_catalogo_equipos_json
+@login_required
+@registrar_errores_vista("Error al renombrar marca")
+@require_POST
+def renombrar_marca_catalogo(request, marca_id):
+    """Cambia el nombre de la marca en todo el sistema.
+
+    Los equipos y los modelos que la usan apuntan por identificador, no por
+    texto, asi que corregir la errata no toca nada de lo registrado.
+    """
+    marca = get_object_or_404(MarcaDispositivo, pk=marca_id)
+
+    try:
+        nombre = _nombre_pedido(request)
+    except ValueError as error:
+        return JsonResponse({"error": str(error)}, status=400)
+
+    if nombre != marca.nombre and MarcaDispositivo.objects.filter(
+        nombre=nombre
+    ).exists():
+        return JsonResponse(
+            {"error": f"Ya existe una marca llamada {nombre}."},
+            status=400,
+        )
+
+    marca.nombre = nombre
+    marca.save(update_fields=["nombre"])
+
+    return JsonResponse({"nombre": marca.nombre})
+
+
+@exige_catalogo_equipos_json
+@login_required
+@registrar_errores_vista("Error al renombrar modelo")
+@require_POST
+def renombrar_modelo_catalogo(request, modelo_id):
+    """Cambia el nombre del modelo dentro de su pareja tipo-marca.
+
+    El nombre solo tiene que ser unico ahi: la L3250 de Epson en impresoras no
+    estorba a una L3250 de otra marca o de otro aparato.
+    """
+    modelo = get_object_or_404(
+        ModeloDispositivo.objects.select_related("tipo", "marca"), pk=modelo_id
+    )
+
+    try:
+        nombre = _nombre_pedido(request)
+    except ValueError as error:
+        return JsonResponse({"error": str(error)}, status=400)
+
+    hermano = (
+        ModeloDispositivo.objects
+        .filter(tipo=modelo.tipo, marca=modelo.marca, nombre=nombre)
+        .exclude(pk=modelo.pk)
+    )
+
+    if hermano.exists():
+        return JsonResponse(
+            {
+                "error": (
+                    f"{modelo.marca.nombre} ya tiene un modelo {nombre} "
+                    f"en {modelo.tipo.nombre}."
+                )
+            },
+            status=400,
+        )
+
+    modelo.nombre = nombre
+    modelo.save(update_fields=["nombre"])
+
+    return JsonResponse({"nombre": modelo.nombre})
 
 
 def _url_catalogo_procedencias(procedencia=None):
