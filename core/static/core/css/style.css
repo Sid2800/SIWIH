@@ -9648,6 +9648,40 @@ form.equipos-catalogo__buscador {
    color-scheme: dark;
 }
 
+/* La lista desplegada de un <select>
+   Hay una regla global -.formularioCampo-select option- que fija el fondo de
+   las opciones en un gris con !important y les pone "color: var(0, 0, 0)",
+   que no es una variable valida y por tanto no aplica ningun color. En tema
+   claro se nota poco; en oscuro la lista salia con las opciones sobre gris
+   claro y las cabeceras de grupo como barras blancas vacias, porque su texto
+   quedaba blanco sobre blanco.
+
+   Se corrige solo aqui y solo para el tema oscuro: tocar la regla global
+   cambiaria el aspecto de todos los formularios del sistema, que no es lo que
+   se esta arreglando. El !important es para ganarle al !important de alla.
+   Los colores son los del tema, asi que la lista se ve como el campo del que
+   sale. */
+.darkmode .equipos-pagina .formularioCampo-select option,
+.darkmode .equipos-pagina .formularioCampo-select optgroup,
+.darkmode .equipos-procedencias__dialogo .formularioCampo-select option,
+.darkmode .equipos-procedencias__dialogo .formularioCampo-select optgroup {
+   background-color: var(--blanco) !important;
+   color: var(--negro) !important;
+}
+
+/* La cabecera del grupo tiene que leerse como cabecera y no como una opcion
+   mas: el navegador la pone en cursiva, que con estos nombres en mayusculas
+   se lee peor que un simple contraste de peso. */
+.darkmode .equipos-pagina .formularioCampo-select optgroup,
+.darkmode .equipos-procedencias__dialogo .formularioCampo-select optgroup {
+   font-style: normal;
+   font-weight: 700;
+}
+
+.darkmode .equipos-pagina .formularioCampo-select option:hover {
+   color: var(--negro) !important;
+}
+
 /* El fondo del dialogo lo tapa todo menos el cuadro, y sobre un tema oscuro
    el velo claro de por defecto deslumbra. */
 .darkmode .equipos-procedencias__dialogo::backdrop {
