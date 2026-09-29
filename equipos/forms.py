@@ -244,30 +244,79 @@ def _identificadores_de_lista(valor):
     ]
 
 
-class CategoriasAgregadasField(forms.ModelMultipleChoiceField):
-    """Categorias secundarias que se van agregando de una en una.
+class CategoriasOrdenadasField(forms.CharField):
+    """Categorias del tipo en el orden en que se agregaron.
 
-    Llegan como una lista de identificadores separados por coma ("3,7"), la
-    misma forma en que viajan los colores del equipo. Antes eran casillas: una
-    por cada categoria del sistema, todas a la vista y todas por marcar. Un
-    tipo hibrido suele tener una o dos categorias mas, asi que casi todas las
-    casillas sobraban, y a medida que el hospital agrega categorias la lista
-    se alarga sin que el formulario mejore.
+    Llegan como una lista de identificadores separados por coma ("3,7") que
+    arma el navegador conforme el usuario las va agregando de una en una. El
+    orden es el dato: la primera es la principal -la que decide que area da el
+    mantenimiento- y las demas son secundarias.
+
+    Antes eran dos controles, un desplegable para la principal y unas casillas
+    para las otras. Pero es una sola pregunta -a que familias pertenece este
+    aparato- y partirla obligaba a contestarla en dos sitios distintos con
+    reglas distintas. Con una lista, la respuesta se lee de arriba abajo.
+
+    No se usa un multiple de Django porque esos devuelven el orden del
+    catalogo, y aqui hace falta el del usuario.
     """
 
-    widget = ListaOcultaWidget
+    def to_python(self, valor):
+        texto = (valor or "").strip()
 
-    def clean(self, valor):
-        # El campo es oculto, asi que llega un texto y no una lista.
-        return super().clean(_identificadores_de_lista(valor))
+        if not texto:
+            return []
 
-    def has_changed(self, inicial, datos):
-        # La clase padre compara conjuntos contando con que los datos son una
-        # lista; con un texto acabaria comparando letras sueltas.
-        def conjunto(valor):
-            return {str(elemento) for elemento in (_identificadores_de_lista(valor) or [])}
+        identificadores = []
 
-        return conjunto(inicial) != conjunto(datos)
+        for parte in texto.split(","):
+            parte = parte.strip()
+
+            if not parte:
+                continue
+
+            if not parte.isdigit():
+                raise forms.ValidationError("La lista de categorías no es válida.")
+
+            numero = int(parte)
+
+            # Repetir una categoria no aporta nada: la principal ya clasifica
+            # el tipo y volver a ponerla produciria una etiqueta duplicada en
+            # las pantallas y en los reportes. Se descarta la repeticion, no
+            # la seleccion.
+            if numero not in identificadores:
+                identificadores.append(numero)
+
+        catalogo = CategoriaEquipo.objects.in_bulk(identificadores)
+
+        if len(catalogo) != len(identificadores):
+            raise forms.ValidationError(
+                "Alguna de las categorías elegidas ya no existe."
+            )
+
+        # in_bulk devuelve un diccionario sin orden util: se recorre la lista
+        # original para conservar el que eligio el usuario.
+        return [catalogo[numero] for numero in identificadores]
+
+
+class ListaOcultaWidget(forms.HiddenInput):
+    """Campo oculto que lleva varios identificadores en un solo valor.
+
+    Los pinta separados por coma -"3,7"-, que es como los arma el navegador
+    conforme el usuario va agregando. Sin esto el widget escribiria la lista
+    de Python tal cual, "[3, 7]", y al reenviar el formulario esos corchetes
+    no serian identificadores de nada.
+    """
+
+    def format_value(self, valor):
+        if isinstance(valor, (list, tuple)):
+            return ",".join(
+                str(getattr(elemento, "pk", elemento))
+                for elemento in valor
+                if elemento not in (None, "")
+            )
+
+        return super().format_value(valor)
 
 
 class UbicacionChoiceField(forms.ModelChoiceField):
@@ -1191,41 +1240,31 @@ class TipoCatalogoForm(forms.ModelForm):
     diferencia esta en si llega o no una instancia.
     """
 
-    # Se agregan de una en una, como los colores del equipo: se elige en el
-    # desplegable, se pulsa agregar y queda en la lista. El campo que viaja al
-    # servidor es oculto y lleva los identificadores separados por coma.
-    categorias_secundarias = CategoriasAgregadasField(
-        queryset=CategoriaEquipo.objects.none(),
+    # Una sola lista para todas las categorias del tipo: la primera es la
+    # principal y las demas secundarias. En la base siguen siendo dos cosas
+    # distintas -la principal es una clave propia, porque es la que ordena
+    # listados y reportes- pero eso es asunto del sistema, no algo que quien
+    # llena el catalogo tenga que contestar dos veces.
+    categorias = CategoriasOrdenadasField(
         required=False,
-        label="También pertenece a",
-        widget=ListaOcultaWidget(
-            attrs={"id": "categorias_secundarias_tipo_catalogo"}
-        ),
+        label="Categorías",
+        widget=ListaOcultaWidget(attrs={"id": "categorias_tipo_catalogo"}),
     )
 
     class Meta:
         model = TipoDispositivo
         fields = [
             "nombre",
-            "categoria",
             "tecnologia",
-            "categorias_secundarias",
             "descripcion",
         ]
         labels = {
-            "categoria": "Categoría principal",
             "tecnologia": "Tecnología",
-            "categorias_secundarias": "También pertenece a",
         }
         help_texts = {
-            "categoria": "Define qué área da el mantenimiento.",
             "tecnologia": (
                 "Igual para todos los equipos de este tipo: no se pregunta "
                 "en cada registro."
-            ),
-            "categorias_secundarias": (
-                "Solo para equipos híbridos, como un ecógrafo con estación "
-                "de trabajo."
             ),
         }
         widgets = {
@@ -1235,12 +1274,6 @@ class TipoCatalogoForm(forms.ModelForm):
                     "id": "nombre_tipo_catalogo",
                     "placeholder": "Ej. MONITOR DE SIGNOS VITALES",
                     "maxlength": 100,
-                }
-            ),
-            "categoria": forms.Select(
-                attrs={
-                    "class": "formularioCampo-select",
-                    "id": "categoria_tipo_catalogo",
                 }
             ),
             "tecnologia": forms.Select(
@@ -1269,18 +1302,7 @@ class TipoCatalogoForm(forms.ModelForm):
         if self.instance.pk and self.instance.categoria_id:
             filtro |= Q(pk=self.instance.categoria_id)
 
-        activas = CategoriaEquipo.objects.filter(filtro)
-        self.fields["categoria"].queryset = activas
-        self.fields["categoria"].empty_label = "Seleccione la categoría"
-        self.fields["categorias_secundarias"].queryset = activas
-
-        # Lo que el navegador tiene que pintar: el desplegable con las
-        # categorias disponibles y la lista de las ya agregadas.
-        self.categorias_disponibles = activas
-        self.categorias_secundarias_elegidas = self._resolver_secundarias()
-
-        # Misma regla para la tecnologia: una desactivada no se ofrece para
-        # tipos nuevos, pero se conserva en la edicion del que ya la usa.
+        # Misma regla para la tecnologia.
         filtro_tecnologia = Q(activo=True)
 
         if self.instance.pk and self.instance.tecnologia_id:
@@ -1291,49 +1313,124 @@ class TipoCatalogoForm(forms.ModelForm):
         )
         self.fields["tecnologia"].empty_label = "Seleccione la tecnología"
 
-    def _resolver_secundarias(self):
-        """Categorias secundarias que deben aparecer ya en la lista.
+        # Lo que el navegador tiene que pintar: el desplegable de categorias y
+        # la lista de las ya agregadas, en su orden.
+        self.categorias_disponibles = self._catalogo_de_categorias(filtro)
+        self.categorias_elegidas = self._resolver_categorias()
 
-        En un envio con errores se devuelven las que venian en el POST, para
-        no perder lo que el usuario habia agregado. Al abrir la edicion, las
-        que tiene guardadas el tipo.
+        # "categorias" no es un campo del modelo, asi que su valor inicial no
+        # lo pone Django: sin esto, al abrir la edicion el campo oculto saldria
+        # vacio y guardar dejaria al tipo sin ninguna.
+        self.initial.setdefault("categorias", self.categorias_elegidas)
+
+    def _catalogo_de_categorias(self, filtro):
+        """Categorias para el desplegable, con la tecnologia en que se usan.
+
+        Cada una viaja con la lista de tecnologias de los tipos que ya la
+        tienen, para que el navegador pueda acercar las que corresponden a la
+        tecnologia elegida y dejar el resto mas abajo. Es una relacion que ya
+        existe -la que dibujan los tipos registrados- y no un dato nuevo que
+        alguien tenga que mantener al dia aparte.
+
+        Se acerca, no se esconde: una categoria que todavia no se ha usado con
+        esa tecnologia sigue estando a mano, porque la primera vez que se usa
+        tiene que poder elegirse.
+        """
+        usos = {}
+
+        for campo in ("categoria_id", "categorias_secundarias__id"):
+            pares = (
+                TipoDispositivo.objects
+                .exclude(**{campo: None})
+                .values_list(campo, "tecnologia_id")
+            )
+
+            for categoria_id, tecnologia_id in pares:
+                usos.setdefault(categoria_id, set()).add(tecnologia_id)
+
+        return [
+            {
+                "pk": categoria.pk,
+                "nombre": categoria.nombre,
+                "tecnologias": ",".join(
+                    str(identificador)
+                    for identificador in sorted(usos.get(categoria.pk, ()))
+                ),
+            }
+            for categoria in CategoriaEquipo.objects.filter(filtro)
+        ]
+
+    def _resolver_categorias(self):
+        """Categorias que el navegador debe pintar ya en la lista, en su orden.
+
+        En un envio con errores manda lo que venia en el POST, para no perder
+        lo que el usuario habia agregado. Al abrir la edicion, las del tipo
+        guardado, con la principal primero.
         """
         if self.is_bound:
-            campo = self.fields["categorias_secundarias"]
+            campo = self.fields["categorias"]
 
             try:
-                return list(
-                    campo.clean(
-                        self.data.get(self.add_prefix("categorias_secundarias"))
-                    )
-                )
+                return campo.clean(self.data.get(self.add_prefix("categorias")))
             except forms.ValidationError:
                 return []
 
         if self.instance and self.instance.pk:
-            return list(self.instance.categorias_secundarias.all())
+            return list(self.instance.categorias)
 
         return []
 
-    def clean(self):
-        """Una categoria secundaria repetida no aporta nada.
+    def clean_categorias(self):
+        """Al menos una: la primera es la principal y el tipo la necesita."""
+        categorias = self.cleaned_data.get("categorias") or []
 
-        La principal ya clasifica el tipo; volver a marcarla como secundaria
-        solo produce una etiqueta duplicada en las pantallas y en los
-        reportes.
-        """
-        cleaned_data = super().clean()
-        principal = cleaned_data.get("categoria")
-        secundarias = cleaned_data.get("categorias_secundarias")
-
-        if principal and secundarias and principal in secundarias:
-            self.add_error(
-                "categorias_secundarias",
-                "La categoría principal ya está incluida; no hace falta "
-                "repetirla aquí.",
+        if not categorias:
+            raise forms.ValidationError(
+                "Agregue al menos una categoría. La primera es la principal."
             )
 
-        return cleaned_data
+        return categorias
+
+    def _post_clean(self):
+        # La principal se pone en la instancia antes de validarla: es una
+        # columna obligatoria del modelo, y el formulario ya no tiene un campo
+        # que se llame asi.
+        categorias = self.cleaned_data.get("categorias")
+
+        if not categorias:
+            # Sin principal, el modelo informaria el fallo en "categoria",
+            # que aqui no existe como campo. clean_categorias ya lo dijo en
+            # "categorias", que es el control que el usuario tiene delante,
+            # asi que no hace falta validar ademas la instancia.
+            return
+
+        self.instance.categoria = categorias[0]
+        super()._post_clean()
+
+    def save(self, commit=True):
+        """Guarda el tipo y reparte la lista entre principal y secundarias."""
+        tipo = super().save(commit=False)
+        secundarias = (self.cleaned_data.get("categorias") or [])[1:]
+
+        def guardar_secundarias():
+            tipo.categorias_secundarias.set(secundarias)
+
+        if commit:
+            tipo.save()
+            self.save_m2m()
+            guardar_secundarias()
+            return tipo
+
+        # Con commit=False, Django deja el guardado de las relaciones para
+        # cuando quien llama pueda: se encadena al suyo en vez de sustituirlo.
+        guardar_m2m_original = self.save_m2m
+
+        def save_m2m():
+            guardar_m2m_original()
+            guardar_secundarias()
+
+        self.save_m2m = save_m2m
+        return tipo
 
     def clean_nombre(self):
         # normalizar_nombre_catalogo recorta espacios y pasa a mayusculas, asi

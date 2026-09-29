@@ -329,15 +329,16 @@ class CategoriaEquipoTests(TestCase):
             ["MEDICO", "INFORMATICA"],
         )
 
-    def test_el_formulario_rechaza_repetir_la_principal(self):
+    def test_el_formulario_exige_al_menos_una_categoria(self):
+        # La primera de la lista es la principal, y es columna obligatoria.
         formulario = TipoCatalogoForm(data={
             "nombre": "COMPUTADORA",
-            "categoria": self.informatica.pk,
-            "categorias_secundarias": [self.informatica.pk],
+            "tecnologia": TecnologiaEquipo.objects.get(nombre="ELECTRONICO").pk,
+            "categorias": "",
         })
 
         self.assertFalse(formulario.is_valid())
-        self.assertIn("categorias_secundarias", formulario.errors)
+        self.assertIn("categorias", formulario.errors)
 
     def test_el_nombre_se_normaliza_a_mayusculas(self):
         tipo = TipoDispositivo.objects.create(
@@ -665,11 +666,12 @@ class MarcaEnTipoFormTests(TestCase):
         self.assertIn("nombre", formulario.errors)
 
 
-class CategoriasSecundariasUnaAUnaTests(TestCase):
-    """Las categorias secundarias llegan como lista, no como casillas.
+class CategoriasDelTipoTests(TestCase):
+    """Todas las categorias del tipo llegan en una sola lista ordenada.
 
-    El navegador las va agregando de una en una -igual que los colores del
-    equipo- y las manda en un solo campo oculto: "3,7".
+    El navegador las va agregando de una en una y las manda en un campo
+    oculto -"3,7"-. La primera es la principal, que en la base es una clave
+    propia porque ordena listados y reportes; las demas son secundarias.
     """
 
     @classmethod
@@ -678,40 +680,70 @@ class CategoriasSecundariasUnaAUnaTests(TestCase):
         cls.informatica = CategoriaEquipo.objects.get(nombre="INFORMATICA")
         cls.electronico = TecnologiaEquipo.objects.get(nombre="ELECTRONICO")
 
-    def test_acepta_los_identificadores_separados_por_coma(self):
-        formulario = TipoCatalogoForm(data={
-            "nombre": "ECOGRAFO CON ESTACION",
-            "categoria": self.medico.pk,
+    def _datos(self, categorias, nombre="ECOGRAFO CON ESTACION"):
+        return {
+            "nombre": nombre,
             "tecnologia": self.electronico.pk,
-            "categorias_secundarias": str(self.informatica.pk),
-        })
+            "categorias": categorias,
+        }
+
+    def test_la_primera_es_la_principal_y_el_resto_secundarias(self):
+        formulario = TipoCatalogoForm(data=self._datos(
+            "{0},{1}".format(self.medico.pk, self.informatica.pk)
+        ))
 
         self.assertTrue(formulario.is_valid(), formulario.errors)
         tipo = formulario.save()
 
+        self.assertEqual(tipo.categoria, self.medico)
         self.assertEqual(
             list(tipo.categorias_secundarias.values_list("nombre", flat=True)),
             ["INFORMATICA"],
         )
 
-    def test_sin_ninguna_es_valido(self):
-        # La mayoria de los tipos no son hibridos: el campo es opcional.
-        formulario = TipoCatalogoForm(data={
-            "nombre": "CAMILLA",
-            "categoria": self.medico.pk,
-            "tecnologia": self.electronico.pk,
-            "categorias_secundarias": "",
-        })
+    def test_el_orden_de_la_lista_decide_cual_es_la_principal(self):
+        # La misma pareja al reves da la otra principal: el orden es el dato.
+        formulario = TipoCatalogoForm(data=self._datos(
+            "{0},{1}".format(self.informatica.pk, self.medico.pk)
+        ))
 
         self.assertTrue(formulario.is_valid(), formulario.errors)
-        self.assertEqual(formulario.save().categorias_secundarias.count(), 0)
+        self.assertEqual(formulario.save().categoria, self.informatica)
+
+    def test_una_sola_categoria_deja_el_tipo_sin_secundarias(self):
+        formulario = TipoCatalogoForm(data=self._datos(
+            str(self.medico.pk), nombre="CAMILLA"
+        ))
+
+        self.assertTrue(formulario.is_valid(), formulario.errors)
+        tipo = formulario.save()
+
+        self.assertEqual(tipo.categoria, self.medico)
+        self.assertEqual(tipo.categorias_secundarias.count(), 0)
+
+    def test_una_repetida_no_se_guarda_dos_veces(self):
+        formulario = TipoCatalogoForm(data=self._datos(
+            "{0},{0}".format(self.medico.pk)
+        ))
+
+        self.assertTrue(formulario.is_valid(), formulario.errors)
+        tipo = formulario.save()
+
+        self.assertEqual(tipo.categoria, self.medico)
+        self.assertEqual(tipo.categorias_secundarias.count(), 0)
+
+    def test_sin_ninguna_no_es_valido(self):
+        formulario = TipoCatalogoForm(data=self._datos(""))
+
+        self.assertFalse(formulario.is_valid())
+        self.assertIn("categorias", formulario.errors)
 
     def test_el_campo_oculto_se_dibuja_con_las_ya_guardadas(self):
-        """Al editar, el valor tiene que volver en el mismo formato.
+        """Al editar, el valor tiene que volver en el mismo formato y orden.
 
-        Si el widget pintara la lista de Python tal cual -"[3]"- al guardar
-        de nuevo esos corchetes no serian identificadores y el tipo perderia
-        sus categorias secundarias.
+        Si el widget pintara la lista de Python tal cual -"[3, 7]"- al
+        guardar de nuevo esos corchetes no serian identificadores y el tipo
+        perderia sus categorias.
         """
         tipo = TipoDispositivo.objects.create(
             nombre="ECOGRAFO CON ESTACION",
@@ -720,21 +752,57 @@ class CategoriasSecundariasUnaAUnaTests(TestCase):
         )
         tipo.categorias_secundarias.add(self.informatica)
 
-        dibujado = str(TipoCatalogoForm(instance=tipo)["categorias_secundarias"])
+        formulario = TipoCatalogoForm(instance=tipo)
 
-        self.assertIn('type="hidden"', dibujado)
-        self.assertIn('value="%s"' % self.informatica.pk, dibujado)
+        self.assertEqual(
+            [categoria.pk for categoria in formulario.categorias_elegidas],
+            [self.medico.pk, self.informatica.pk],
+        )
+        self.assertIn(
+            'value="%s,%s"' % (self.medico.pk, self.informatica.pk),
+            str(formulario["categorias"]),
+        )
 
-    def test_una_repetida_no_se_guarda_dos_veces(self):
-        formulario = TipoCatalogoForm(data={
-            "nombre": "ECOGRAFO CON ESTACION",
-            "categoria": self.medico.pk,
-            "tecnologia": self.electronico.pk,
-            "categorias_secundarias": "{0},{0}".format(self.informatica.pk),
-        })
+    def test_editar_puede_cambiar_cual_es_la_principal(self):
+        tipo = TipoDispositivo.objects.create(
+            nombre="ECOGRAFO CON ESTACION",
+            categoria=self.medico,
+            tecnologia=self.electronico,
+        )
+        tipo.categorias_secundarias.add(self.informatica)
+
+        formulario = TipoCatalogoForm(
+            data=self._datos("{0},{1}".format(self.informatica.pk, self.medico.pk)),
+            instance=tipo,
+        )
 
         self.assertTrue(formulario.is_valid(), formulario.errors)
-        self.assertEqual(formulario.save().categorias_secundarias.count(), 1)
+        tipo = formulario.save()
+
+        self.assertEqual(tipo.categoria, self.informatica)
+        self.assertEqual(
+            list(tipo.categorias_secundarias.values_list("nombre", flat=True)),
+            ["MEDICO"],
+        )
+
+    def test_cada_categoria_viaja_con_las_tecnologias_en_que_se_usa(self):
+        """Es lo que permite acercar las que corresponden a la tecnologia.
+
+        La relacion no es un dato aparte que alguien deba mantener: sale de
+        los tipos ya registrados.
+        """
+        TipoDispositivo.objects.create(
+            nombre="TOMOGRAFO",
+            categoria=self.medico,
+            tecnologia=self.electronico,
+        )
+
+        disponibles = {
+            categoria["nombre"]: categoria["tecnologias"]
+            for categoria in TipoCatalogoForm().categorias_disponibles
+        }
+
+        self.assertEqual(disponibles["MEDICO"], str(self.electronico.pk))
 
 
 class CatalogoParcialTests(TestCase):

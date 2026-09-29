@@ -348,7 +348,7 @@ document.addEventListener('DOMContentLoaded', function () {
         return texto
             .toLowerCase()
             .normalize('NFD')
-            .replace(/[̀-ͯ]/g, '');
+            .replace(/[\u0300-\u036f]/g, '');
     }
 
     function prepararFiltrosLocales() {
@@ -397,26 +397,29 @@ document.addEventListener('DOMContentLoaded', function () {
 
     prepararFiltrosLocales();
 
-    // ---------- Categorias secundarias, de una en una ----------
-    // Igual que los colores del equipo: se elige en el desplegable, se pulsa
-    // agregar y queda en la lista. Antes eran casillas, una por cada
-    // categoria del sistema: un tipo hibrido suele tener una o dos mas, asi
-    // que casi todas sobraban y habia que marcarlas igual de una en una.
-    (function categoriasSecundarias() {
-        const bloque = document.getElementById('categorias_secundarias_equipo');
+    // ---------- Categorias del tipo, de una en una ----------
+    // Una sola lista para todas: la primera es la principal -la que decide
+    // que area da el mantenimiento- y las demas son secundarias. Antes eran
+    // dos controles, un desplegable y una seccion aparte, para una sola
+    // pregunta: a que familias pertenece este aparato.
+    //
+    // El desplegable se ordena segun la tecnologia elegida: las categorias
+    // que ya se usan con ella suben arriba y el resto queda debajo. No se
+    // esconde ninguna, porque la primera vez que una categoria se usa con una
+    // tecnologia tiene que poder elegirse.
+    (function categoriasDelTipo() {
+        const bloque = document.getElementById('categorias_equipo');
 
         if (!bloque) {
             return;
         }
 
-        const campoOculto = document.getElementById(
-            'categorias_secundarias_tipo_catalogo'
-        );
-        const selector = document.getElementById('selector_categoria_secundaria');
-        const boton = document.getElementById('agregar_categoria_secundaria');
-        const lista = document.getElementById('lista_categorias_secundarias');
-        const avisoVacio = document.getElementById('sin_categorias_secundarias');
-        const principal = document.getElementById('categoria_tipo_catalogo');
+        const campoOculto = document.getElementById('categorias_tipo_catalogo');
+        const selector = document.getElementById('selector_categoria_tipo');
+        const boton = document.getElementById('agregar_categoria_tipo');
+        const lista = document.getElementById('lista_categorias_tipo');
+        const avisoVacio = document.getElementById('sin_categorias_tipo');
+        const tecnologia = document.getElementById('tecnologia_tipo_catalogo');
 
         if (!campoOculto || !selector || !boton || !lista) {
             return;
@@ -437,13 +440,26 @@ document.addEventListener('DOMContentLoaded', function () {
                 avisoVacio.hidden = ids.length > 0;
             }
 
-            // Una categoria ya agregada no debe poder elegirse otra vez, y la
-            // principal tampoco: repetirla solo produce una etiqueta doble en
-            // las pantallas y el servidor la rechaza.
-            const vetadas = ids.concat(principal ? [principal.value] : []);
+            // La numeracion y la etiqueta de principal se recalculan enteras:
+            // al quitar la primera, la segunda pasa a serlo.
+            Array.from(lista.children).forEach(function (item, indice) {
+                item.querySelector('.equipos-colores__orden').textContent = indice + 1;
 
+                const etiqueta = item.querySelector('.equipos-colores__etiqueta');
+
+                if (indice === 0 && !etiqueta) {
+                    const nueva = document.createElement('span');
+                    nueva.className = 'equipos-colores__etiqueta';
+                    nueva.textContent = 'Principal';
+                    item.querySelector('.equipos-colores__nombre').after(nueva);
+                } else if (indice !== 0 && etiqueta) {
+                    etiqueta.remove();
+                }
+            });
+
+            // Una categoria ya agregada no debe poder elegirse otra vez.
             Array.from(selector.options).forEach(function (opcion) {
-                const usada = opcion.value !== '' && vetadas.includes(opcion.value);
+                const usada = opcion.value !== '' && ids.includes(opcion.value);
                 opcion.hidden = usada;
                 opcion.disabled = usada;
             });
@@ -453,6 +469,9 @@ document.addEventListener('DOMContentLoaded', function () {
             const item = document.createElement('li');
             item.className = 'equipos-colores__item';
             item.dataset.categoriaId = id;
+
+            const orden = document.createElement('span');
+            orden.className = 'equipos-colores__orden';
 
             const texto = document.createElement('span');
             texto.className = 'equipos-colores__nombre';
@@ -464,8 +483,66 @@ document.addEventListener('DOMContentLoaded', function () {
             quitar.setAttribute('aria-label', 'Quitar ' + nombre);
             quitar.innerHTML = '<i class="bi bi-x-lg"></i>';
 
-            item.append(texto, quitar);
+            item.append(orden, texto, quitar);
             return item;
+        }
+
+        // ----- El desplegable se ordena por la tecnologia elegida -----
+        const opciones = Array.from(selector.options).filter(function (opcion) {
+            return opcion.value !== '';
+        });
+        const vacia = selector.querySelector('option[value=""]');
+
+        function grupo(etiqueta) {
+            const nuevo = document.createElement('optgroup');
+            nuevo.label = etiqueta;
+            return nuevo;
+        }
+
+        function ordenarPorTecnologia() {
+            const elegida = tecnologia ? tecnologia.value : '';
+
+            // Se vacia el desplegable y se vuelve a montar: mover las
+            // opciones conserva cual estaba seleccionada y evita reconstruir
+            // los <option>, que llevan sus datos.
+            Array.from(selector.querySelectorAll('optgroup')).forEach(function (viejo) {
+                viejo.remove();
+            });
+
+            if (!elegida) {
+                // Sin tecnologia no hay nada por lo que ordenar: la lista
+                // plana y completa, como estaba.
+                opciones.forEach(function (opcion) {
+                    selector.append(opcion);
+                });
+                return;
+            }
+
+            const nombre = tecnologia.options[tecnologia.selectedIndex].textContent.trim();
+            const usadas = grupo('Usadas con ' + nombre);
+            const otras = grupo('Otras categorías');
+
+            opciones.forEach(function (opcion) {
+                const suyas = (opcion.dataset.tecnologias || '')
+                    .split(',')
+                    .filter(Boolean);
+
+                (suyas.includes(elegida) ? usadas : otras).append(opcion);
+            });
+
+            // Un grupo vacio solo anade ruido: al principio, cuando ninguna
+            // categoria se ha usado todavia con esa tecnologia, no aparece.
+            if (usadas.children.length) {
+                selector.append(usadas);
+            }
+
+            if (otras.children.length) {
+                selector.append(otras);
+            }
+
+            if (vacia) {
+                selector.prepend(vacia);
+            }
         }
 
         boton.addEventListener('click', function () {
@@ -504,10 +581,11 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
 
-        if (principal) {
-            principal.addEventListener('change', sincronizar);
+        if (tecnologia) {
+            tecnologia.addEventListener('change', ordenarPorTecnologia);
         }
 
+        ordenarPorTecnologia();
         sincronizar();
     }());
 });

@@ -85,24 +85,17 @@
                     </div>
 
                     {% comment %}
+                       La tecnologia va antes que las categorias porque las
+                       ordena: al elegirla, el desplegable de categorias
+                       acerca las que ya se usan con ella y deja el resto mas
+                       abajo. Preguntarla despues obligaria a volver atras.
+
                        El "+" abre un cuadro para crear la categoria o la
                        tecnologia sin salir de aqui: quien esta registrando un
                        tipo y descubre que falta su categoria perderia lo
                        escrito si tuviera que irse a otra pantalla.
                     {% endcomment %}
                     <div class="equipos-catalogo__campos">
-                        <div class="equipos-catalogo__campo">
-                            <span>Categoría *</span>
-                            <div class="equipos-catalogo__campo-mas">
-                                {{ form_tipo.categoria }}
-                                <button type="button"
-                                        class="equipos-catalogo__mas"
-                                        data-abre="dialogo_categoria"
-                                        title="Agregar una categoría nueva">
-                                    <i class="bi bi-plus-lg"></i>
-                                </button>
-                            </div>
-                        </div>
                         <div class="equipos-catalogo__campo">
                             <span>Tecnología *</span>
                             <div class="equipos-catalogo__campo-mas">
@@ -118,54 +111,56 @@
                     </div>
 
                     {% comment %}
-                       Las categorias secundarias solo aplican a equipos
-                       hibridos, asi que van plegadas: la mayoria de los tipos
-                       no las usa y verlas siempre alarga el formulario.
+                       Una sola lista para todas las categorias del tipo. Es
+                       una sola pregunta -a que familias pertenece este
+                       aparato- y antes estaba partida en dos controles con
+                       reglas distintas: un desplegable para la principal y
+                       otra seccion aparte para las demas.
 
-                       Se agregan de una en una, como los colores del equipo.
-                       Antes eran casillas, una por cada categoria del
-                       sistema: un tipo hibrido suele tener una o dos mas, asi
-                       que casi todas sobraban, y hay que marcarlas de una en
-                       una igual. Con el desplegable se escribe el nombre y se
-                       agrega, y la lista deja ver de un golpe las que lleva.
+                       Se agregan de una en una, como los colores del equipo,
+                       y el orden es el dato: la primera es la principal, la
+                       que decide que area da el mantenimiento.
                     {% endcomment %}
-                    <details class="equipos-catalogo__extra"
-                             {% if form_tipo.categorias_secundarias_elegidas %}open{% endif %}>
-                        <summary>
-                            <i class="bi bi-diagram-2"></i>
-                            Agregar otra categoría (equipos híbridos)
-                        </summary>
-                        <p class="equipos-registro__ayuda">
-                            Un ecógrafo con estación de trabajo es médico y
-                            también de informática: agregue las categorías que
-                            le falten, las que haga falta.
-                        </p>
-
-                        <div class="equipos-colores equipos-catalogo__secundarias"
-                             id="categorias_secundarias_equipo">
+                    <div class="equipos-catalogo__campo">
+                        <span>Categorías *</span>
+                        <div class="equipos-colores equipos-catalogo__categorias"
+                             id="categorias_equipo">
                             <div class="equipos-colores__agregar">
                                 <select class="formularioCampo-select"
-                                        id="selector_categoria_secundaria"
+                                        id="selector_categoria_tipo"
                                         aria-label="Categoría a agregar">
                                     <option value="">Seleccione una categoría</option>
                                     {% for categoria in form_tipo.categorias_disponibles %}
-                                        <option value="{{ categoria.pk }}">{{ categoria.nombre }}</option>
+                                        <option value="{{ categoria.pk }}"
+                                                data-tecnologias="{{ categoria.tecnologias }}">
+                                            {{ categoria.nombre }}
+                                        </option>
                                     {% endfor %}
                                 </select>
+                                <button type="button"
+                                        class="equipos-catalogo__mas"
+                                        data-abre="dialogo_categoria"
+                                        title="Agregar una categoría nueva">
+                                    <i class="bi bi-plus-lg"></i>
+                                </button>
                                 <button class="equipos-colores__boton"
-                                        id="agregar_categoria_secundaria"
+                                        id="agregar_categoria_tipo"
                                         type="button">
                                     <i class="bi bi-plus-lg"></i>
                                     Agregar
                                 </button>
                             </div>
 
-                            <ul class="equipos-colores__lista"
-                                id="lista_categorias_secundarias">
-                                {% for categoria in form_tipo.categorias_secundarias_elegidas %}
+                            <ol class="equipos-colores__lista"
+                                id="lista_categorias_tipo">
+                                {% for categoria in form_tipo.categorias_elegidas %}
                                     <li class="equipos-colores__item"
                                         data-categoria-id="{{ categoria.pk }}">
+                                        <span class="equipos-colores__orden">{{ forloop.counter }}</span>
                                         <span class="equipos-colores__nombre">{{ categoria.nombre }}</span>
+                                        {% if forloop.first %}
+                                            <span class="equipos-colores__etiqueta">Principal</span>
+                                        {% endif %}
                                         <button class="equipos-colores__quitar"
                                                 type="button"
                                                 aria-label="Quitar {{ categoria.nombre }}">
@@ -173,18 +168,21 @@
                                         </button>
                                     </li>
                                 {% endfor %}
-                            </ul>
+                            </ol>
 
                             <p class="equipos-registro__ayuda equipos-colores__vacio"
-                               id="sin_categorias_secundarias"
-                               {% if form_tipo.categorias_secundarias_elegidas %}hidden{% endif %}>
-                                Sin categorías adicionales. La mayoría de los
-                                tipos no necesita ninguna.
+                               id="sin_categorias_tipo"
+                               {% if form_tipo.categorias_elegidas %}hidden{% endif %}>
+                                La primera que agregue es la principal: la que
+                                decide qué área da el mantenimiento. Agregue
+                                más solo si el equipo es híbrido, como un
+                                ecógrafo con estación de trabajo.
                             </p>
 
-                            {{ form_tipo.categorias_secundarias }}
+                            {{ form_tipo.categorias }}
+                            {{ form_tipo.categorias.errors }}
                         </div>
-                    </details>
+                    </div>
 
                     {% if tipo_editado %}
                         <a class="equipos-catalogo__cancelar"

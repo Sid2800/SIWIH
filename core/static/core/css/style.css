@@ -8348,13 +8348,6 @@ button.equipos-imagenes__vista:hover img {
    font-size: 1.15rem;
 }
 
-.equipos-catalogo__extra > summary {
-   color: var(--colorTextoMenu);
-   cursor: pointer;
-   font-size: 1.2rem;
-   padding: .3rem 0;
-}
-
 .equipos-catalogo__boton {
    align-items: center;
    background-color: var(--negro);
@@ -9417,13 +9410,6 @@ p + .equipos-garantia__bloqueo {
    border-bottom: .1rem solid transparent;
 }
 
-.equipos-catalogo__extra > summary {
-   align-items: center;
-   display: flex;
-   gap: .5rem;
-   min-height: 3.6rem;
-}
-
 /* ---------------------------------------------------------------------
    Filtros y paginacion de la lista de tipos
    El catalogo puede llegar a varios miles de tipos, asi que la lista viene
@@ -9568,21 +9554,38 @@ form.equipos-catalogo__buscador {
 }
 
 /* ---------------------------------------------------------------------
-   Categorias secundarias del tipo
+   Categorias del tipo
    Reutilizan la lista de colores del equipo: mismo gesto -elegir, agregar,
    quitar- y misma forma, asi que quien ya cargo un equipo reconoce esto sin
-   que haya que explicarselo.
+   que haya que explicarselo. Y el orden significa lo mismo en los dos
+   sitios: la primera es la principal.
    --------------------------------------------------------------------- */
-.equipos-catalogo__secundarias {
-   margin-top: .6rem;
+.equipos-catalogo__categorias {
+   margin-top: .25rem;
 }
 
-.equipos-catalogo__secundarias .equipos-colores__lista {
-   /* Sin numeros: aqui el orden no significa nada, a diferencia de los
-      colores, donde el primero es el principal. */
+.equipos-catalogo__categorias .equipos-colores__lista {
    list-style: none;
    margin: .6rem 0 0;
    padding: 0;
+}
+
+/* La fila de alta lleva tres cosas: el desplegable, el "+" que crea una
+   categoria nueva y el boton de agregar a la lista. En pantalla estrecha el
+   desplegable se queda con la fila entera y los dos botones bajan, en vez de
+   apretarse los tres hasta no poder leer ninguno. */
+.equipos-catalogo__categorias .equipos-colores__agregar {
+   flex-wrap: wrap;
+}
+
+.equipos-catalogo__categorias .equipos-colores__agregar select {
+   flex: 1 1 18rem;
+}
+
+.equipos-catalogo__categorias .equipos-catalogo__mas {
+   /* Mismo alto que el boton de agregar, para que la fila no se escalone. */
+   min-height: auto;
+   align-self: stretch;
 }
 
 /* ---------------------------------------------------------------------
