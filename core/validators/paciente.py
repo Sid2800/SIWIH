@@ -6,22 +6,26 @@ from datetime import datetime
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 
+@staticmethod
 def validar_paciente(id_paciente):
-        """
-        Verifica que el paciente exista, esté activo y no fallecido.
-        """
-        if not id_paciente:
-            raise ValidationError("Debe especificarse un paciente válido.")
+    """
+    Verifica que el paciente exista, esté activo y no haya fallecido.
+    """
+    if not id_paciente:
+        raise ValidationError("Debe especificarse un paciente válido.")
 
-        paciente = get_object_or_404(Paciente, id=id_paciente)
+    paciente = Paciente.objects.filter(id=id_paciente).first()
 
-        if PacienteService.comprobar_inactivo(paciente.id):
-            raise ValidationError("El paciente seleccionado no está activo.")
+    if paciente is None:
+        raise ValidationError("El paciente seleccionado no existe.")
 
-        if PacienteService.comprobar_defuncion(paciente):
-            raise ValidationError("El paciente seleccionado ha fallecido.")
+    if PacienteService.comprobar_inactivo(paciente.id):
+        raise ValidationError("El paciente seleccionado no está activo.")
 
-        return paciente
+    if PacienteService.comprobar_defuncion(paciente):
+        raise ValidationError("El paciente seleccionado ha fallecido.")
+
+    return paciente
 
 
 def buscar_duplicidad_paciente(paciente):

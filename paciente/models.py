@@ -5,7 +5,7 @@ from ubicacion.models import Sector
 from django.contrib.auth.models import User
 from servicio.models import Zona, Unidad_clinica
 from core.utils.utilidades_textos import construir_nombre_dinamico
-from core.constants.choices_constants import TipoDefuncion
+from core.constants.choices_constants import TipoDefuncion, Sexo
 from django.db import connections
 
 
@@ -210,7 +210,7 @@ class Paciente(models.Model):
     sexo = models.CharField(
         verbose_name="Sexo",
         max_length=1,
-        choices=[("H", "Hombre"), ("M", "Mujer"), ("N", "No identificado")],
+        choices=Sexo.choices,
         default="M"
     )
     estado_civil = models.ForeignKey(

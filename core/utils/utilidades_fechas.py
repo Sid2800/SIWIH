@@ -58,7 +58,7 @@ def convertir_fecha(fecha):
     return fecha
 
 
-def calcular_edad_texto(fecha_nacimiento):
+def calcular_edad_texto(fecha_nacimiento, solo_anios=False):
     hoy = datetime.now()
     # Si viene como date, convertir a datetime
     if isinstance(fecha_nacimiento, date):
@@ -82,15 +82,30 @@ def calcular_edad_texto(fecha_nacimiento):
         anios -= 1
         meses += 12
 
+    if solo_anios:
+        return f"{anios} {'año' if anios == 1 else 'años'}"
+
     partes = []
+
     if anios > 0:
-        partes.append(f"{anios} {'año' if anios == 1 else 'años'}")
+        partes.append(
+            f"{anios} {'año' if anios == 1 else 'años'}"
+        )
+
     if meses > 0:
-        partes.append(f"{meses} {'mes' if meses == 1 else 'meses'}")
+        partes.append(
+            f"{meses} {'mes' if meses == 1 else 'meses'}"
+        )
+
     if dias > 0:
-        partes.append(f"{dias} {'día' if dias == 1 else 'días'}")
+        partes.append(
+            f"{dias} {'día' if dias == 1 else 'días'}"
+        )
 
     return ", ".join(partes) if partes else "0 días"
+
+
+
 
 
 def obtener_edad_con_indicador(fecha_nacimiento):

@@ -1,0 +1,1654 @@
+
+
+.labor-parto__paciente-icono .material-symbols-outlined{
+   font-weight: 200;
+   font-size: 4.5rem;
+}
+
+
+
+.labor-parto {
+   display: grid;
+   grid-template-columns: 48% 1fr;
+   gap: 1rem;
+   align-items: start;
+   height: calc(99vh - 12rem);
+}
+
+
+.labor-parto__listado,
+.labor-parto__detalle {
+   min-width: 0;
+   min-height: 0;
+   box-sizing: border-box;
+   
+   display: flex;
+   flex-direction: column;
+   background: var(--blanco-apagado);
+   padding: 1.5rem 1rem;
+   border: 1px solid var(--colorLinea);
+   border-radius: 0.75rem;
+   box-shadow: var(--sombra-card);
+   row-gap: .5rem;
+   height: 100%;
+}
+
+
+/* botones */
+.labor-parto__boton-accion {
+   display: inline-flex;
+   align-items: center;
+   justify-content: center;
+   gap: 0.45rem;
+
+   margin-top: 0.3rem;
+   padding: 0.65rem 1.1rem;
+
+   border: 0.18rem solid rgb(70, 115, 175);
+   border-radius: 0.5rem;
+
+   background: rgb(70, 115, 175);
+   color: white;
+
+   font-size: 1.4rem;
+   font-weight: 600;
+
+   cursor: pointer;
+
+   transition:
+      background-color 0.2s ease,
+      border-color 0.2s ease,
+      color 0.2s ease,
+      transform 0.15s ease;
+}
+
+.labor-parto__boton-accion:hover {
+   background: rgb(55, 95, 150);
+   border-color: rgb(55, 95, 150);
+   color: white;
+}
+
+
+
+.labor-parto__boton-accion:disabled {
+   background: var(--colorTablaceldaBorde);
+   border-color: var(--colorLinea);
+   color: var(--colorTextoSololectura);
+
+   cursor: not-allowed;
+   opacity: 0.6;
+}
+
+.labor-parto__boton-accion:not(:disabled):active {
+   transform: scale(0.98);
+}
+
+
+
+
+.labor-parto__boton-accion
+.material-symbols-outlined {
+   font-size: 2.4rem;
+}
+
+
+
+.labor-parto__encabezado,
+.labor-parto__detalle-encabezado {
+   display: flex;
+   align-items: center;
+   justify-content: flex-start;
+   column-gap: 2rem;
+   margin-bottom: .1rem;
+   border-bottom: 1px solid var(--colorLinea);
+   padding: 0 1rem;
+}
+
+
+.labor-parto__encabezado button,
+.labor-parto__detalle-encabezado button{
+   margin-left: auto;
+   font-size: 1.25rem;
+   column-gap: 1rem;
+   margin-top: 0;
+}
+
+
+.labor-parto__encabezado button i,
+.labor-parto__detalle-encabezado button i{
+   font-size: 2rem;
+}
+
+.labor-parto_encabezado__titulo{
+   display: flex;
+   align-items: center;
+   justify-content: space-between;
+   column-gap: 2rem;
+   font-size: 2.1rem;
+   font-weight: 600;
+
+}
+
+.labor-parto_encabezado__titulo .material-symbols-outlined{
+   font-size: 4rem;
+   line-height: 1;
+}
+
+.labor-parto__contador {
+   padding: 0.35rem 0.7rem;
+   border-radius: 1.5rem;
+   background: var(--negro-suave);
+   color: var(--blanco-apagado);
+   font-size: 1.6rem;
+   font-weight: 600;
+}
+
+.labor-parto__buscador {
+   display: flex;
+
+   align-items: center;
+   gap: 0.8rem;
+   padding: 0.8rem 1rem;
+   margin-bottom: 1.5rem;
+   border: 1px solid var(--colorLinea);
+   border-radius: 0.6rem;
+   margin: 0 2rem;
+   background: var(--blanco-apagado);
+}
+
+.labor-parto__buscador i {
+   font-size: 1.8rem;
+   color: #6c757d;
+}
+
+.labor-parto__buscador input {
+   width: 100%;
+   border: none;
+   outline: none;
+   background: transparent;
+   font-size: 1.4rem;
+   text-transform: uppercase;
+   color: var(--negro);
+
+}
+
+.labor-parto__buscador input::placeholder {
+   color: var(--color-Scroll)
+}
+
+
+/* TABLA LISTADO */
+
+.labor-parto__tabla-contenedor {
+   width: 100%;
+   overflow-x: auto;
+   flex: 1;
+   overflow-y: auto;
+   background-color: rgba(0, 0, 0, 0.025);
+   border-radius: .5rem;
+   margin-top: 1rem;
+}
+
+
+.labor-parto__tabla {
+   
+   width: 100%;
+   border-collapse: collapse;
+   font-size: 1.6rem;
+   text-transform: uppercase;
+}
+
+
+.labor-parto__tabla thead {
+   background-color: var(--colorLinea);
+   color: var(--negro-suave);
+   position: sticky;
+   top: 0;
+   z-index: 2;
+   
+}
+
+
+.labor-parto__tabla thead tr > :first-child {
+   padding-left: 2rem;
+}
+
+
+.labor-parto__tabla th {
+   padding: 1.2rem 1rem;
+   text-align: left;
+   font-size: 1.5rem;
+   font-weight: 600;
+   color: var(--negro-suave);
+   border-bottom: .1rem solid var(--colorLinea)
+}
+
+.labor-parto__tabla td {
+   padding: 1rem .5rem ;
+   border-bottom: .2rem solid var(--colorLinea);
+   vertical-align: middle;
+}
+
+
+.labor-parto__tabla td {
+   padding: 1rem .5rem ;
+   border-bottom: .2rem solid var(--colorLinea);
+   vertical-align: middle;
+}
+
+.labor-parto__tabla td:first-child {
+    padding: 0.2rem 0.5rem;
+}
+
+
+
+.labor-parto__fila {
+   cursor: pointer;
+   transition: background-color 0.15s ease;
+}
+
+
+.labor-parto__fila:hover {
+   background-color: var(--colorTablaHover);
+}
+
+.labor-parto__fila--seleccionada {
+    background-color: rgba(59, 130, 246, 0.20);
+}
+
+.labor-parto__fila--seleccionada:hover {
+    background-color: rgba(59, 130, 246, 0.30);
+}
+
+
+.labor-parto__paciente {
+   display: flex;
+   align-items: center;
+   gap: 1rem;
+}
+
+/* .labor-parto__paciente-icono {
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   width: 4rem;
+   height: 4rem;
+   flex-shrink: 0;
+   border-radius: 50%;
+   background: var(--colorTablaHover)
+}
+
+
+.labor-parto__paciente-icono .material-symbols-outlined {
+   font-size: 4rem;
+   color: var(--negro-suave)
+}
+ */
+
+.labor-parto__paciente strong,
+.labor-parto__paciente small {
+   display: block;
+}
+
+.labor-parto__paciente strong {
+   font-size: 1.5rem;
+}
+
+.labor-parto__paciente small {
+   margin-top: 0.3rem;
+   font-size: 1.2rem;
+   color: var(--colorTextoSololectura);
+}
+
+
+.labor-parto__columna-estado{
+   max-width: 2rem;
+}
+
+.labor-parto__estado-contenedor {
+   display: inline-flex;
+   flex-direction: column;
+   align-items: center;
+   padding: 0.5rem 0.8rem;
+   border-radius: .5rem;
+   color: var(--negro-suave);
+   font-size: 1.2rem;
+   font-weight: 600;
+   white-space: nowrap;
+   height: 4.5rem;
+   width: auto;
+
+   position: relative;
+}
+
+.labor-parto__estado {
+   position: absolute;
+   top: 0.5rem;
+   right: 0.8rem;
+   font-weight: 700;
+   font-size: 1rem;
+   text-align: right;
+}
+
+.labor-parto__estado-icono {
+   width: 100%;
+   height: 100%;
+   display: flex;
+   align-items: center;
+   justify-content: flex-start;
+}
+
+.labor-parto__estado-icono svg {
+   width: auto;
+   height: 5rem;
+   display: block;
+}
+
+.labor-parto__fecha strong,
+.labor-parto__fecha small {
+   display: block;
+}
+
+
+.labor-parto__fecha strong {
+   font-size: 1.5rem;
+}
+
+
+.labor-parto__fecha small {
+   margin-top: 0.2rem;
+   font-size: 1.2rem;
+   color: var(--colorTextoSololectura);
+}
+
+.labor-parto__fecha .material-symbols-outlined {
+   font-size: 1.5rem;
+   vertical-align: middle;
+}
+
+
+.labor-parto__vacio {
+   padding: 3rem 1rem !important;
+   text-align: center !important;
+   color: var(--colorTextoSololectura);
+}
+
+
+
+/* FILTROS */
+
+.labor-parto__filtro-check {
+   display: none;
+}
+
+.labor-parto__filtros {
+   display: flex;
+   align-items: center;
+   width: 100%;
+   padding: 0.3rem 2rem;
+}
+
+.labor-parto__filtros-lista {
+   display: flex;
+   flex-wrap: wrap;
+   align-items: center;
+   justify-content: center;
+   gap: 0.8rem;
+   width: 100%;
+}
+
+.labor-parto__filtro {
+   position: relative;
+
+   display: inline-flex;
+   align-items: center;
+   justify-content: center;
+   flex-direction: column;
+
+   width: 8.5rem;
+   height: 7.3rem;
+
+   padding: 0.6rem 1rem;
+
+   border: .18rem solid var(--colorLinea);
+   border-radius: 0.7rem;
+
+   background-color: var(--colorTablaceldaBorde);
+   color: var(--colorTextoSololectura);
+
+   cursor: pointer;
+
+   transition:
+      background-color 0.15s ease,
+      border-color 0.15s ease,
+      color 0.15s ease;
+}
+
+.labor-parto__filtro-texto {
+   position: absolute;
+
+   top: 0.6rem;
+   left: 50%;
+   transform: translateX(-50%);
+
+   padding: 0;
+   margin: 0;
+
+   font-size: 1.2rem;
+   text-transform: uppercase;
+   text-align: center;
+   font-weight: 600;
+
+   white-space: nowrap;
+}
+
+.labor-parto__filtro--activo {
+   color: var(--color-estado);
+   background-color: transparent;
+   border-color: var(--fondo-estado);
+}
+
+.labor-parto__filtro--activo:hover {
+   background-color: var(--fondo-estado);
+   border-color: var(--color-estado);
+}
+
+.labor-parto__filtro:not(.labor-parto__filtro--activo):hover {
+   background-color: var(--colorTablaHover);
+   color: var(--negro-suave);
+}
+
+
+/* ICONOS */
+
+.labor-parto__filtro-icono {
+   top: 1.6rem;
+   position: absolute;
+
+   display: flex;
+   align-items: center;
+   justify-content: center;
+
+   margin: 0 auto;
+   padding: 1.5rem 1rem 0;
+}
+
+.labor-parto__filtro-icono[data-icono="trabajo_parto"] {
+   width: 8.3rem;
+   height: 4.1rem;
+
+}
+
+.labor-parto__filtro-icono[data-icono="expulsivo"] {
+   width: 9.6rem;
+   height: 3.5rem;
+
+}
+
+.labor-parto__filtro-icono[data-icono="puerperio_inmediato"] {
+   width: 8.7rem;
+   height: 3.8rem;
+}
+
+.labor-parto__filtro-icono[data-icono="cuidados_intermedios"] {
+   width: 8.7rem;
+   height: 4.1rem;
+}
+
+.labor-parto__filtro-icono[data-icono="quirofano"] {
+   width: 8.7rem;
+   height: 4.1rem;
+}
+
+
+.labor-parto__filtro-icono svg {
+   display: block;
+}
+
+
+.labor-parto__paginacion {
+   display: flex;
+   align-items: center;
+   justify-content: space-between;
+   padding: 1rem 2rem 0;
+}
+
+
+.labor-parto__paginacion-info {
+   font-size: 1.3rem;
+   color: var(--colorTextoSololectura);
+}
+
+.labor-parto__paginacion-info strong {
+   color: var(--negro-suave);
+   font-weight: 600;
+}
+
+.labor-parto__paginacion-controles {
+   display: flex;
+   align-items: center;
+   gap: 0.5rem;
+}
+
+.labor-parto__paginacion-boton {
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   width: 3.2rem;
+   height: 3.2rem;
+   padding: 0;
+   border: 1px solid var(--colorLinea);
+   border-radius: 0.5rem;
+   background: var(--blanco-apagado);
+   color: var(--negro-suave);
+   cursor: pointer;
+   transition: background-color 0.15s ease;
+}
+
+.labor-parto__paginacion-boton:hover:not(:disabled) {
+   background-color: var(--colorTablaHover);
+}
+
+.labor-parto__paginacion-boton:disabled {
+   opacity: 0.4;
+   cursor: default;
+}
+
+.labor-parto__paginacion-pagina {
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   min-width: 3.2rem;
+   height: 3.2rem;
+   padding: 0 0.8rem;
+   border-radius: 0.5rem;
+   background: var(--colorTablaHover);
+   font-size: 1.3rem;
+   font-weight: 600;
+   color: var(--negro-suave);
+}
+
+/* Detall episodio */
+
+
+.labor-parto__pill-alta {
+   display: inline-flex;
+   align-items: center;
+   justify-content: center;
+   gap: 0.4rem;
+
+   padding: 0.35rem 0.75rem;
+   margin-left: auto;
+   border: 0.15rem solid;
+   border-radius: 2rem;
+
+   font-size: 1.3rem;
+   font-weight: 600;
+   line-height: 1;
+
+   white-space: nowrap;
+
+   color: var(--color-alta);
+   background-color: var(--fondo-alta);
+   border-color: var(--border-color-alta);
+}
+
+
+.labor-parto__pill-alta
+.material-symbols-outlined {
+   font-size: 2.25rem;
+}
+
+
+.labor-parto__detalle-vacio {
+
+   display: flex;
+   flex-direction: column;
+   align-items: center;
+   justify-content: center;
+   gap: 0.75rem;
+   height: 100%;
+   padding: 2rem;
+   text-align: center;
+   color: var(--colorTextoSololectura);
+}
+
+
+.labor-parto__detalle-vacio
+.material-symbols-outlined {
+
+   font-size: 8rem;
+   line-height: 1;
+   color: var(--colorLinea);
+   font-variation-settings:
+      'FILL' 0,
+      'wght' 300,
+      'GRAD' 0,
+      'opsz' 95;
+
+}
+
+
+
+.labor-parto__detalle-vacio p {
+
+   max-width: 22rem;
+   margin: 0;
+   font-size: 1.3rem;
+   line-height: 1.5;
+   color: var(--colorTextoSololectura);
+
+}
+
+
+
+.labor-parto__detalle{
+   padding: 1.5rem;
+}
+
+
+.labor-parto__paciente-detalle{
+   display: flex;
+   justify-content: flex-start;
+   align-items: center;
+   column-gap: 2rem;
+}
+
+
+
+.labor-parto__paciente-icono.grande{
+   color: #D45A91;
+   background: rgba(212, 90, 145, 0.10);
+   border-radius: 50%;
+   margin: .5rem;
+   font-weight: 300;
+}
+
+
+.labor-parto__paciente-icono.grande span{
+   font-size: 4.5rem;
+ 
+}
+
+.labor-parto__dato{
+   font-size: 1.35rem;
+}
+
+
+.labor-parto__paciente-datos{
+   display: grid;
+   grid-template-columns: 1fr 1fr 1fr;
+   column-gap: 2rem;
+   row-gap: .5rem;
+   color: var(--colorTextoMenu);
+}
+
+.modalLaborPartoPacienteNombre,
+#detalleNombrePaciente{
+   grid-column: 1/-1;
+   color: var(--negro-suave);
+   font-weight: 650;
+   font-size: 2rem;
+}
+
+.labor-parto__estados{
+   padding: 1rem;
+   display:grid ;
+   grid-template-columns: 40% auto;
+   column-gap: 1rem;
+}
+
+
+.labor-parto__seccion {
+   border-radius: 1rem;
+   padding: 1rem;
+   border: .18rem solid var(--colorLinea);
+   display: flex;
+   flex-direction: column;
+   row-gap: .5rem;
+
+}
+
+
+
+.labor-parto__seccion .labor-parto__seccion-titulo{
+   color: var(--negro-suave);
+   font-weight: 600;
+   font-size: 1.1rem;
+}
+
+
+.labor-parto__selector-estados {
+   display: grid;
+   grid-template-columns: repeat(2, 1fr);
+   gap: 0.6rem;
+
+}
+
+
+
+
+
+.labor-parto__opcion-estado {
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   min-height: 3rem;
+   padding: 0.75rem 1rem;
+   border: .18rem solid var(--colorLinea);
+   border-radius: 0.5rem;
+   background: var(--colorTablaceldaBorde);
+   color: var(--colorTextoSololectura);
+   cursor: pointer;
+   transition:
+      background-color 0.2s ease,
+      border-color 0.2s ease,
+      color 0.2s ease;
+
+}
+
+.labor-parto__opcion-estado input {
+   display: none;
+} 
+
+.labor-parto__opcion-estado:has(input:checked) {
+   color: var(--estado-color);
+   background: var(--estado-fondo);
+   border-color: var(--estado-border);
+}
+
+.labor-parto__opcion-estado:not(:has(input:checked)):not(:has(input:disabled)):hover {
+   background: var(--colorLinea);
+   border-color: var(--estado-border);
+   color: var(--colorTexto);
+
+}
+
+.labor-parto__opcion-estado:has(input:disabled) {
+   cursor: not-allowed;
+   opacity: 0.6;
+}
+
+
+.labor-parto__opcion-estado > span {
+   font-size: 1.3rem;
+   font-weight: 600;
+   text-transform: uppercase;
+} 
+
+
+
+
+
+/* ESTADO  */
+.labor-parto__seccion.actual {
+   position: relative;
+}
+
+.labor-parto__indicador-bebe {
+   position: absolute;
+   top: 0.75rem;
+   right: 0.75rem;
+}
+
+.labor-parto__estado-actual {
+   display: flex;
+   align-items: center;
+   flex-direction: column;
+   gap: .5rem;
+}
+
+.labor-parto__estado-actual-icono{
+   height: 10rem;
+   background: var(--colorTablaceldaBorde);
+   border-radius: 25%;
+   padding: .5rem;
+}
+
+.labor-parto__estado-actual-icono svg{
+   height: 100%;
+}
+
+.labor-parto__estado-actual-texto{
+   display: flex;
+   flex-direction: column;
+   align-items: center;
+   gap: .3rem;
+}
+
+.labor-parto__estado-actual-texto strong{
+   letter-spacing: 0.07rem;
+
+}
+
+#detalleEstadoDesde{
+   font-size: 1.25rem;
+   color: var(--colorTextoMenu);
+}
+
+
+/* Detalle del episodio */
+
+
+.labor-parto__detalle-contenido{
+   display: flex;
+   flex-direction: column;
+   height: 100%;
+   min-width: 0;
+   min-height: 0;
+   box-sizing: border-box;
+}
+
+.labor-parto__informacion {
+   display: grid;
+   grid-template-columns: 1fr 1fr;
+   column-gap: 0;
+   row-gap: 0;
+   padding: 1rem;
+}
+
+
+.labor-parto__informacion-item {
+   display: flex;
+   align-items: center;
+   min-height: 5rem;
+   padding: .75rem 1.25rem;
+   column-gap: 1.5rem;
+   border-bottom: 0.2rem solid var(--colorLinea);
+}
+
+
+/* Separador vertical entre columnas */
+
+.labor-parto__informacion-item:nth-child(odd) {
+   border-right: 0.2rem solid var(--colorLinea);
+
+}
+
+
+/* Evitar borde inferior en la última fila */
+
+.labor-parto__informacion-item:nth-child(3),
+.labor-parto__informacion-item:nth-child(4) {
+   border-bottom: none;
+
+}
+
+
+.labor-parto__informacion-item i {
+   flex-shrink: 0;
+   font-size: 2.5rem;
+   color: rgb(47, 79, 121);
+}
+
+
+.labor-parto__informacion-texto {
+   display: flex;
+   flex-direction: column;
+   gap: .2rem;
+}
+
+
+.labor-parto__informacion-texto > span:first-child {
+   font-size: 1.2rem;
+   color: var(--colorTextoMenu);
+
+}
+
+
+.labor-parto__informacion-texto > strong {
+   font-size: 1.45rem;
+   text-transform: uppercase;
+   color: rgb(47, 79, 121);
+
+}
+
+
+
+/* TABS */
+
+.labor-parto__tab-contenido {
+   display: flex;
+   flex-direction: column;
+
+   flex: 1;
+   min-height: 0;
+   min-width: 0;
+
+   padding: 1rem;
+   /* overflow: hidden; */
+}
+
+
+
+/* Subencabezado de cada pestaña */
+
+
+
+/* botones tabs */
+
+.labor-parto__tabs {
+   display: flex;
+   align-items: center;
+   gap: 0.25rem;
+   border-bottom: 0.15rem solid var(--colorLinea);
+   width: 100%;
+
+}
+
+
+
+.labor-parto__tabs button {
+   display: inline-flex;
+   align-items: center;
+   justify-content: center;
+   gap: 0.45rem;
+   column-gap: 1rem;
+   padding: 0.3rem 1.2rem;
+   border: none;
+   border-bottom: 0.18rem solid transparent;
+   margin-bottom: -0.15rem;
+   background: transparent;
+   color: var(--colorTextoSololectura);
+   font-size: 1.25rem;
+   font-weight: 600;
+   cursor: pointer;
+   min-width: 15rem;
+   transition:
+      color 0.2s ease,
+      border-color 0.2s ease,
+      background-color 0.2s ease;
+
+}
+
+.labor-parto__tabs button:hover {
+   color: var(--colorTexto);
+   background: var(--colorLinea);
+
+}
+
+.labor-parto__tabs button.activo {
+   color: rgb(47, 79, 121);
+   border-bottom-color: rgb(70, 115, 175);
+
+}
+
+.labor-parto__tabs button .material-symbols-outlined {
+   font-size: 3.0rem;
+}
+
+
+
+.labor-parto__subencabezado {
+   display: flex;
+   align-items: center;
+   justify-content: space-between;
+   margin-bottom: 1rem;
+
+}
+
+
+.labor-parto__subencabezado-titulo {
+   font-size: 1.35rem;
+   font-weight: 600;
+   color: var(--colorTexto);
+
+}
+
+.labor-parto__subencabezado button{
+   font-size: 1.2rem;
+   column-gap: 1rem;
+}
+
+.labor-parto__subencabezado button i {
+
+   font-size: 1.8rem;
+
+}
+
+
+/* TABLA DE MOVIMEINTOS  */
+
+
+.labor-parto__movimientos .labor-parto__tabla,
+.labor-parto__tabla-bebes .labor-parto__tabla {
+   height: 100%;
+}
+
+
+.labor-parto__tabla-movimientos thead tr th ,
+.labor-parto__tabla-bebes thead tr th {
+   font-size: 1.4rem;
+}
+
+
+.labor-parto__tabla-movimientos tbody tr,
+.labor-parto__tabla-bebes tbody tr {
+   cursor: pointer;
+   font-size: 1.3rem;
+   transition:
+      background-color 0.15s ease;
+}
+
+.labor-parto__tabla-bebes tbody tr {
+   font-size: 1.4rem;
+
+}
+
+.labor-parto__tabla-movimientos tbody tr:hover,
+.labor-parto__tabla-bebes tbody tr:hover{
+   background: rgba(70, 115, 175, 0.08);
+}
+
+
+.labor-parto__movimiento-icono{
+   font-size: 2.5rem;
+
+}
+
+.labor-parto__bebes {
+   display: flex;
+   flex-direction: column;
+
+   flex: 1;
+   min-height: 0;
+   min-width: 0;
+}
+
+
+.labor-parto__tabla-bebes-contenedor {
+   flex: 1;
+   min-height: 0;
+   min-width: 0;
+
+   overflow-y: auto;
+   overflow-x: auto;
+}
+
+
+.labor-parto__celda-icono {
+   display: flex;
+   align-items: center;
+   gap: .5rem;
+}
+
+
+
+/* modal AREGAR EPIDOSIO*/
+.contener-modal-titulo .icono-titulo-modal {
+   color: #4A80B8;
+   background: rgba(74, 128, 184, 0.10);
+   border-radius: 50%;
+   margin: .5rem;
+   font-weight: 300;
+   display: flex;
+   height: 4rem;
+   width: 4rem;
+   justify-content: center;
+   align-items: center;
+   margin-right: 1rem;
+}
+
+.contener-modal-titulo .icono-titulo-modal .material-symbols-outlined {
+   line-height: 2;
+   max-height: none;
+   padding: 0;
+   margin: 0;
+   font-size: 3.5rem;
+}
+
+.contenedor-modal-episodio-labor-parto .tituloFormulario-subrallado{
+   margin-bottom: .3rem;
+}
+
+.modalLaborPartoCampos .formularioCampoModal{
+   display: grid;
+   grid-template-columns: 1fr;
+}
+
+
+#modal-labor-parto-paciente-info{
+   font-size: 1.55rem;
+}
+.modalLaborPartoCampos  .labor-parto__selector-unidades  input[type="radio"]{
+   display: none;
+}
+
+.modalLaborPartoCampos .labor-parto__selector-unidades {
+   display: grid;
+   grid-template-columns: repeat(2, 1fr);
+   gap: .75rem;
+   width: 100%;
+}
+
+
+.modalLaborPartoCampos .labor-parto__opcion-unidad {
+   position: relative;
+   display: flex;
+   flex-direction: row;
+   justify-content: center;
+   align-items: center;
+   gap: .45rem;
+   min-height: 5.5rem;
+   padding: .5rem 1rem;
+   border: 1px solid #D9DDE3;
+   border-radius: .6rem;
+   background: var(--blanco-apagado);
+   color: #555;
+   cursor: pointer;
+   transition:
+      background-color .2s ease,
+      border-color .2s ease,
+      color .2s ease,
+      box-shadow .2s ease;
+}
+
+
+.modalLaborPartoCampos .labor-parto__selector-unidades input[type="radio"] {
+   display: none;
+}
+
+
+.modalLaborPartoCampos .labor-parto__opcion-unidad .material-symbols-outlined {
+   font-size: 2.9rem;
+   line-height: 1;
+}
+
+
+.modalLaborPartoCampos .labor-parto__opcion-unidad > span:last-child {
+   font-size: 1.28rem;
+   font-weight: 600;
+   text-transform: uppercase;
+   text-align: center;
+}
+
+.modalLaborPartoCampos .labor-parto__opcion-unidad:has(input[type="radio"]:checked) {
+   color: #438A8C;
+   background: rgba(67, 138, 140, 0.07);
+   border-color: rgba(67, 138, 140, 0.55);
+   box-shadow: 0 0 0 1px rgba(67, 138, 140, 0.10);
+}
+
+.modalLaborPartoCampos .labor-parto__opcion-unidad:hover {
+   border-color: rgba(67, 138, 140, 0.45);
+   background: rgba(67, 138, 140, 0.04);
+}
+
+/* ESTADO INICIAL */
+
+.labor-parto-estado-inicial {
+   display: flex;
+   align-items: center;
+   gap: 1rem;
+   column-gap: 2rem;
+
+   width: 100%;
+   padding: .5rem 1.7rem;
+
+   background: var(--fondo-estado);
+   border-radius: .6rem;
+
+   color: var(--color-estado);
+}
+
+
+.labor-parto-estado-icono {
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   flex-shrink: 0;
+
+   width: 8rem;
+   height: 6.5rem;
+   padding: .3rem;
+
+   color: var(--color-estado);
+
+   border-radius: 1rem;
+   border: .19rem solid var(--border-color-estado);
+   
+
+}
+
+
+.labor-parto-estado-icono .material-symbols-outlined {
+   font-size: 4rem;
+   line-height: 1;
+}
+
+
+.labor-parto-estado-contenido {
+   display: flex;
+   flex-direction: column;
+   gap: .25rem;
+   min-width: 0;
+}
+
+
+.labor-parto-estado-contenido strong {
+   color: var(--color-estado);
+   text-transform: uppercase;
+   font-size: 1.8rem;
+   font-weight: 700;
+   line-height: 1.4;
+}
+
+
+.labor-parto-estado-contenido span {
+   color: #666;
+
+   font-size: 1.35rem;
+   line-height: 1.4;
+}
+
+
+
+@media (min-width: 36rem) {
+   .modalLaborPartoCampos .formularioCampoModal{
+      grid-template-columns: 1fr 3fr;
+      align-items: center;
+   }
+}
+
+.oculto {
+   display: none !important;
+   
+}
+
+
+/* modal agregar movimiento*/
+
+
+.modalLaborPartoCampos .labor-parto__paciente-datos{
+   row-gap: .86rem;
+   column-gap: 2.5;
+
+}
+
+
+.modalLaborPartoCampos .labor-parto__paciente-icono.grande span {
+   font-size: 5.5rem;
+}
+
+
+.modalLaborPartoCampos .labor-parto__dato{
+   display: flex;
+   flex-direction: column;
+   row-gap: .3rem;
+
+
+}
+
+
+.modalLaborPartoCampos .labor-parto__dato strong{
+   color: var(--colorTextoSololectura);
+}
+
+.labor-parto__filtro-radio {
+   display: none;
+}
+
+.labor-parto__filtro:has(.labor-parto__filtro-radio:checked) {
+   color: var(--color-estado);
+   background-color: transparent;
+   border-color: var(--border-color-estado);
+   border-width: .18rem;
+}
+
+
+.labor-parto__filtro:has(.labor-parto__filtro-radio:disabled) {
+   cursor: not-allowed;
+   filter: grayscale(1) opacity(0.45);
+}
+
+.labor-parto__filtro:hover:not(:has(.labor-parto__filtro-radio:checked)):not(:has(.labor-parto__filtro-radio:disabled)) {
+   background-color: var(--fondo-estado);
+   border-color: var(--border-color-estado);
+   color: var(--colorTexto);
+}
+
+#modal-movimiento-observacion{
+   grid-column: 1/-1;
+}
+
+
+/* MODAL DETALLE MOVIMIENTO */
+
+.contextoEpisodioLaborParto {
+   display: grid;
+   column-gap: 1rem;
+   grid-template-columns: 1fr 1.2fr ;
+   align-items: center;
+}
+
+.contextoEpisodioItem {
+   background: var(--blanco-apagado);
+   padding: .5rem 1rem .5rem .8rem;
+   border-radius: .5rem;
+   border: .18rem solid var(--colorLinea);
+
+   display: grid;
+   grid-template-columns: 3rem 1fr;
+   grid-template-areas:
+      "icono etiqueta"
+      "icono valor";
+
+   column-gap: 1rem;
+   align-items: center;
+   row-gap: .3rem;
+}
+
+
+
+
+.contextoEpisodioItem:nth-child(2) {
+   grid-template-columns: 6rem 1fr;
+}
+
+.contextoEpisodioItem > i {
+   grid-area: icono;
+   justify-self: center;
+   align-self: center;
+   font-size: 2.6rem;
+   color: var(--colorTextoSololectura);
+}
+
+.contextoEpisodioIcono{
+   grid-area: icono;
+   display: flex;
+   align-items: center;
+   justify-content: center;
+}
+
+.contextoEpisodioItem > label {
+   grid-area: etiqueta;
+   font-size: 1.2rem;
+   color: var(--colorTextoSololectura);
+   font-weight: 600;
+}
+
+.contextoEpisodioItem > .contextoEpisodioValor {
+   grid-area: valor;
+   font-weight: 700;
+   min-width: 0;
+}
+
+.contextoEpisodioDetalle {
+   color: var(--colorTextoSololectura);
+   font-size: 1.1rem;
+   font-weight: 400;
+}
+
+#modal-detalle-episodio-estado-actual-contenedor{
+   background: var(--fondo-estado);
+   border: .18rem solid var(--border-color-estado);
+}
+
+#modal-detalle-episodio-estado-actual-contenedor .contextoEpisodioIcono,
+#modal-detalle-episodio-estado-actual-contenedor #modal-detalle-episodio-estado-actual{
+   color: var(--color-estado) !important;
+}
+
+
+
+/* detalle movimiento */
+.detalleCambioEstadoLaborParto{
+   display: flex;
+   flex-direction: row;
+   gap: .5rem;
+   border: .18rem solid var(--colorLinea);
+   /* background: var(--blanco-apagado); */
+   border-bottom: 0.1rem solid var(--colorControlDeshabilitadoFondo);
+   padding-bottom: 1rem;
+}
+
+.detalleCambioEstadoIcono{
+   align-self: center;
+   font-size: 2rem;
+}
+
+
+#modal-detalle-movimiento-estado-anterior-contenedor,
+#modal-detalle-movimiento-estado-nuevo-contenedor{
+   border: var(--borde-depuracion);
+   position: relative;
+   display: flex;
+   padding: 1.5rem .5rem .2rem .8rem;
+   border-radius: .5rem;
+   border: .18rem solid var(--colorLinea);
+   height: 6rem;
+   width: 100%;
+
+   background: var(--fondo-estado);
+   border-color: var(--border-color-estado);
+}
+
+.detalleEstadoMovimientoTitulo{
+   position: absolute;
+   top: .7rem;
+   right: 1.3rem;
+
+   font-size: 1.2rem;
+   color: var(--colorTextoSololectura);
+   font-weight: 600;
+}
+
+.detalleEstadoMovimientoContenido{
+   display: flex;
+   align-items: center;
+
+   column-gap: .5rem;
+   width: 100%;
+   min-width: 0;
+}
+
+.detalleEstadoMovimientoTexto{
+   min-width: 0;
+   overflow-wrap: anywhere;
+   font-weight: 600;
+   font-size: 1.45rem;
+   color: var(--color-estado);
+}
+
+.detalleEstadoMovimientoIcono{
+   flex-shrink: 0;
+   width: 4.5rem;
+   height: auto;
+   color: var(--color-estado);
+}
+
+
+/* detalles movimiento */
+
+.informacionMovimientoLaborParto{
+   display: grid;
+   grid-template-columns: 1.3fr 1.3fr .9fr ;
+   column-gap: .3rem;
+}
+
+.informacionMovimientoItem,
+.informacionAltaItem{
+   background: var(--blanco-transparente);
+   padding: .9rem .4rem .9rem .9rem;
+   border-radius: .5rem;
+   border: .18rem solid var(--colorLinea);
+   display: grid;
+   grid-template-columns: 2rem 1fr;
+   width: 100%;
+   min-width: 0;
+   column-gap: 1rem;
+   align-items: center;
+   justify-content: center;
+   row-gap: .3rem;
+   grid-template-areas:
+      "icono etiqueta"        
+      "icono valor";
+
+}
+
+
+.informacionMovimientoItem i,
+.informacionAltaItem i {
+   grid-area: icono;
+   justify-self: center;
+   align-self: center;
+   font-size: 2rem;
+   color: var(--colorTextoSololectura);
+}
+
+
+.informacionMovimientoItem label,
+.informacionAltaItem label{
+   grid-area: etiqueta;
+   font-size: 1.2rem;
+   color: var(--colorTextoSololectura);
+   font-weight: 600;
+}
+
+.informacionMovimientoItem div,
+.informacionAltaItem div{
+   text-transform: uppercase;
+   grid-area: valor;
+   min-width: 0;
+   overflow-wrap: anywhere;
+   font-weight: 700;
+   font-size: 1.4rem;
+}
+
+#modal-detalle-movimiento-observacion{
+   grid-column: 1/-1;
+}
+
+
+/* MODAL ALTA */
+
+.unidadesSalidaLaborParto {
+   display: grid;
+   grid-template-columns: repeat(3, 1fr);
+   gap: .65rem;
+   width: 100%;
+   min-height: 2.5rem;
+}
+
+
+.modalLaborPartoCampos .labor-parto__opcion-unidad {
+   min-height: 3rem;
+}
+
+
+
+.modalLaborPartoCampos .labor-parto__opcion-unidad input[type="radio"] {
+   display: none;
+}
+
+
+.informacionAltaLaborParto{
+   display: grid;
+   grid-template-columns: 1.3fr 1fr;
+   column-gap: .3rem;
+}
+
+#modal-alta-observacion{
+   grid-column: 1/-1;
+}
+
+
+/* modal bebe */
+.labor-parto__selector-sexo{
+   display: grid;
+   grid-template-columns: repeat(2, .8fr) 1fr;
+   column-gap: .65rem;
+   row-gap: .3rem;
+   width: 100%;
+   min-height: 2.5rem;
+}
+
+.modalLaborPartoCampos .labor-parto__etiqueta{
+   grid-column: 1/-1;
+
+}
+
+
+.modalLaborPartoCampos .labor-parto__opcion-sexo input[type="radio"]{
+   display: none;
+}
+
+
+.modalLaborPartoCampos .labor-parto__opcion-sexo {
+   position: relative;
+   display: flex;
+   flex-direction: column;
+   justify-content: center;
+   align-items: center;
+   gap: .45rem;
+   min-height: 5.5rem;
+   min-height: 3rem;
+   padding: .5rem 1rem;
+   border: 1px solid #D9DDE3;
+   border-radius: .6rem;
+   background: var(--blanco-apagado);
+   color: #555;
+   font-weight: 600;
+   cursor: pointer;
+   transition: background-color .2s ease,
+   border-color .2s ease,
+   color .2s ease,
+   box-shadow .2s ease;
+}
+
+
+
+/* HOMBRE: AZUL */
+.modalLaborPartoCampos
+.labor-parto__opcion-sexo[data-sexo="H"]:has(input[type="radio"]:checked) {
+   color: #3976B8;
+   background: rgba(57, 118, 184, 0.08);
+   border-color: rgba(57, 118, 184, 0.55);
+   box-shadow: 0 0 0 1px rgba(57, 118, 184, 0.10);
+}
+
+/* MUJER: ROSA */
+.modalLaborPartoCampos
+.labor-parto__opcion-sexo[data-sexo="M"]:has(input[type="radio"]:checked) {
+   color: #C45F8A;
+   background: rgba(196, 95, 138, 0.08);
+   border-color: rgba(196, 95, 138, 0.55);
+   box-shadow: 0 0 0 1px rgba(196, 95, 138, 0.10);
+}
+
+/* NO IDENTIFICADO: GRIS */
+.modalLaborPartoCampos
+.labor-parto__opcion-sexo[data-sexo="N"]:has(input[type="radio"]:checked) {
+   color: #6B7280;
+   background: rgba(107, 114, 128, 0.08);
+   border-color: rgba(107, 114, 128, 0.50);
+   box-shadow: 0 0 0 1px rgba(107, 114, 128, 0.10);
+}
+
+
+
+.labor-parto__bebe-grid {
+   display: grid;
+   grid-template-columns: .4fr  .6fr;
+   column-gap: 1.5rem;
+   row-gap: 1rem;
+
+   padding-top: 1.5rem;
+
+}
+
+
+
+.labor-parto__bebe-grid .formularioCampoModal{
+   grid-template-columns: 1fr;
+}
+
+
+.labor-parto__bebe-grid .formularioCampoModal label{
+   width: auto;
+}
+
+
+.labor-parto__bebe-grid .observaciones {
+   grid-column: 1/-1;
+}

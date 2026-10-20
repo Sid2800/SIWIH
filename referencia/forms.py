@@ -604,7 +604,9 @@ class RespuestaCreateForm(forms.ModelForm):
         unidades_clinicas = ServicioService.obtener_unidades_clinicas(incluir_externo=False)
         qs_areas_atencion_activas = Area_atencion.objects.filter(estado=True)
         qs_instituciones_activa_1erNivel = Institucion_salud.objects.filter(Q(estado=True, nivel_atencion=1) | Q(id=65) # INCLUIMOS AL CERRATO
-                                                        )
+        )
+
+        qs_instituciones_activa_2doNivel = Institucion_salud.objects.filter(Q(estado=True, nivel_atencion__in=[1, 2]))
 
 
 
@@ -717,7 +719,15 @@ class RespuestaCreateForm(forms.ModelForm):
             'placeholder': 'Area de seguimiento'
         })
 
-        self.fields['institucion_destino'].queryset = qs_instituciones_activa_1erNivel
+
+        if principal_instance.tipo == 0: # recibida
+            self.fields['institucion_destino'].queryset = qs_instituciones_activa_1erNivel
+        elif principal_instance.tipo == 1:
+            self.fields['institucion_destino'].queryset = qs_instituciones_activa_2doNivel
+
+
+
+
         self.fields['institucion_destino'].widget.attrs.update({
             'class': 'formularioCampo-select',
             'placeholder': 'Institucion Destino'

@@ -393,3 +393,34 @@ MAPEO_CAMAS_HISTORIALES_UNIDADES = ["ADMI"]
 # [2026-05-28] Acceso al dashboard operativo de KPIs/gráficas en tiempo real.
 MAPEO_CAMAS_DASHBOARD_ROLES = []
 MAPEO_CAMAS_DASHBOARD_UNIDADES = ["ADMI"]
+
+
+
+
+
+# -----------------------------
+# COMUNICACION HOSPITALARIA
+# -----------------------------
+
+COMUNICACION_HOSPITALARIA_VISUALIZACION_ROLES = [
+   "admin",
+   "digitador",
+   "directivo",
+]
+
+COMUNICACION_HOSPITALARIA_VISUALIZACION_UNIDADES = [
+   "ADMI",
+]
+
+
+COMUNICACION_HOSPITALARIA_EDICION_ROLES = [
+   "admin",
+   "digitador",
+]
+
+COMUNICACION_HOSPITALARIA_EDICION_UNIDADES = [
+   "ADMI",
+]
+
+
+# -----------------------------

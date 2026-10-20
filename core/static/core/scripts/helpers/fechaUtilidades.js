@@ -141,6 +141,19 @@ function formatearFechaLocal(isoString) {
     });
 }
 
+function formatearHoraLocal(isoString) {
+    const fecha = new Date(isoString);
+
+    if (isNaN(fecha)) return '';
+
+    return fecha.toLocaleTimeString('es-HN', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+    });
+
+}
+
 
 function formatearFechaISO(fechaISO) {
     if (!fechaISO) return "";

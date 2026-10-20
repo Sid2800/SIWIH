@@ -93,6 +93,13 @@
                </a>
             </li>
 
+            <li>
+               <a href="{% url 'monitor_labor_parto' %}" class="bn-navegacion__enlace" title="Monitor de Labor y Parto">
+                  <i class="bi bi-heart-pulse bn-navegacion-enlace__logo"></i>
+                  <span class="bn-navegacion-enlace__texto">Labor y Parto</span>
+               </a>
+            </li>
+
 
             
 
@@ -335,7 +342,12 @@
          listadoPacientes: "{% url 'listar_pacientes_API' %}",
          agregarPaciente: "{% url 'paciente_agregar' %}",
          editarPaciente: "{% url 'paciente_editar' pk=0 slug='slug' %}",
-         busquedaPaciente: "{% url 'busqueda-paciente' %}",
+         busquedaPacientes: "{% url 'busqueda_pacientes' %}",
+         busquedaPaciente: "{% url 'busqueda_paciente' %}",
+
+
+
+         
          obtenerPacienteIngresoExpediente: "{% url 'obtener_paciente_ingreso_expediente' %}",
          obtenerPacienteIngresoDNI: "{% url 'obtener_paciente_ingreso_dni' %}",
          verificarPacienteSimilar: "{% url 'verificar_paciente_similar'%}",
@@ -481,6 +493,27 @@
          guardarDiaPeriodoLaboral: "{% url 'guardar_dia_periodo_laboral' %}",
          obtenerDiaLaboral: "{% url 'obtener_dia_laboral' %}",
 
+
+         /* ---------------- COMUNICACION ---------------- */
+         listarEpisodiosAPI: "{% url 'listar_episodios_API' %}",
+         obtenerEpisodioLaborParto: "{% url 'obtener_episodio_labor_parto' %}",
+         obtenerMovimientoLaborParto: "{% url 'obtener_movimiento_labor_parto' %}",
+         guardarEpisodioLaborParto: "{% url 'guardar_episodio_labor_parto' %}",
+         procesarMovimientoLaborParto: "{% url 'procesar_movimiento_labor_parto' %}",
+
+         gestionarMovimientoLaborParto: "{% url 'gestionar_movimiento_labor_parto' %}",
+         registrarAltaLaborParto: "{% url 'registrar_alta_labor_parto' %}",
+         procesarBebeLaborParto: "{% url 'procesar_bebe_labor_parto' %}",
+
+         obtenerBebeLaborParto: "{% url 'obtener_bebe_labor_parto' %}",
+
+
+         
+
+         
+
+         
+
          /* ---------------- S_EXP (Préstamos de Expedientes) ---------------- */
          s_exp_dashboard: "{% url 's_exp_dashboard' %}",
          s_exp_buscador: "{% url 's_exp_buscador' %}",
@@ -548,8 +581,9 @@
 
    <script src="{% static 'core/virtual-select/js/virtual-select.min.js' %}"></script>
 
-   <script src="{% static 'core/flatpickr/js/es.js' %}"></script>
    <script src="{% static 'core/flatpickr/js/flatpickr.js' %}"></script>
+   <script src="{% static 'core/flatpickr/js/es.js' %}"></script>
+   
 
    <!-- ALERTAS -->
 

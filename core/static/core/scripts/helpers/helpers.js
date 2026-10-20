@@ -35,6 +35,7 @@ function slugify(text) {
 async function fetchData(url, params = {}) {
    const queryString = new URLSearchParams(params).toString();
    const response = await fetch(`${url}?${queryString}`);
+
    if (!response.ok)
       throw new Error(`Error en la red: ${response.statusText}`);
    return response.json();
@@ -155,6 +156,7 @@ const API_URLS = {
    procesarImagenUsuario: urls["procesarImagenUsuario"],
    obtenerPacienteCenso: urls["obtenerPacienteCenso"],
    busquedaCenso: urls["busquedaCenso"],
+   busquedaPacientes: urls["busquedaPacientes"],
    busquedaPaciente: urls["busquedaPaciente"],
    busquedaAvanzada: urls["busquedaAvanzada"],
    obtenerDefuncion: urls["obtenerDefuncion"],
@@ -189,6 +191,19 @@ const API_URLS = {
    guardarDiaPeriodoLaboral: urls["guardarDiaPeriodoLaboral"],
    obtenerDiaLaboral: urls["obtenerDiaLaboral"],
    editarPeriodoLaboral: urls["editarPeriodoLaboral"],
+   listarEpisodiosAPI: urls["listarEpisodiosAPI"],
+   obtenerEpisodioLaborParto: urls['obtenerEpisodioLaborParto'],
+   obtenerMovimientoLaborParto: urls['obtenerMovimientoLaborParto'],
+   guardarEpisodioLaborParto: urls['guardarEpisodioLaborParto'],
+   procesarMovimientoLaborParto: urls['procesarMovimientoLaborParto'],
+   gestionarMovimientoLaborParto: urls['gestionarMovimientoLaborParto'],
+   registrarAltaLaborParto: urls['registrarAltaLaborParto'],
+   procesarBebeLaborParto: urls['procesarBebeLaborParto'],
+   obtenerBebeLaborParto: urls['obtenerBebeLaborParto'],
+
+
+
+   
 
 };
 
@@ -255,7 +270,7 @@ async function mostrasBusquedaPaciente() {
             style: 'single'  // Permitir solo la selección de una fila a la vez
             },
          ajax: {
-         url: API_URLS.busquedaPaciente, //API_URLS.busquedaCenso,
+         url: API_URLS.busquedaPacientes, //API_URLS.busquedaCenso,
          type: "GET",
          data: function(d) {      // parametros de busqueda 
             d.search_value = $('#search-input').val();

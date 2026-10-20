@@ -1,0 +1,731 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Pacientes en Labor y Parto{% endblock title %}
+
+{% block content %}
+
+<div class="contenedor2">
+
+   <!-- ENCABEZADO -->
+   <div class="tituloFormulario" style="margin-bottom: 1rem;">
+      <div class="tituloFormulario-texto">
+         <span class="material-symbols-outlined">breastfeeding</span>
+         <h2 class="sin-margen">Pacientes en Labor y Parto</h2>
+      </div>
+
+      <div class="tituloFormulario-subrallado"></div>
+   </div>
+
+
+   <!-- CONTENEDOR PRINCIPAL -->
+   <div class="labor-parto">
+
+      <!-- ========================= -->
+      <!-- LISTADO DE PACIENTES -->
+      <!-- ========================= -->
+      <div class="labor-parto__listado">
+
+         <div class="labor-parto__encabezado">
+               <div class="labor-parto_encabezado__titulo">
+                  <span class="material-symbols-outlined">diversity_3</span>
+                  <span>Listado de episodio</span>
+               </div>
+
+               <span id="contadorEpisodios" class="labor-parto__contador">
+                  0
+               </span>
+
+               <button
+                  type="button"
+                  id="botonAgregarEpisodio"
+                  class="labor-parto__boton-accion"
+               >
+                  <i class="bi bi-plus-square"></i>
+                  Agregar episodio
+               </button>
+
+         </div>
+
+
+         <!-- Buscador -->
+         <div class="labor-parto__buscador">
+               <i class="bi bi-search"></i>
+
+               <input
+                  type="text"
+                  id="buscarPaciente"
+                  placeholder="Buscar paciente..."
+                  autocomplete="off"
+               >
+         </div>
+
+
+         <!-- Tabla -->
+         <div class="labor-parto__tabla-contenedor">
+
+               <table class="labor-parto__tabla">
+
+                  <thead>
+                     <tr>
+                           <th>Estado</th>
+                           <th>Paciente</th>
+                           <th>Ingreso</th>
+                     </tr>
+                  </thead>
+
+                  <tbody id="tablaEpisodios">
+
+
+                  </tbody>
+
+               </table>
+
+         </div>
+
+         <!-- FILTROS / LEYENDA DE ESTADOS -->
+         <div class="labor-parto__filtros">
+
+            <div class="labor-parto__filtros-lista">
+
+               <!-- TRABAJO DE PARTO -->
+               <label
+                  class="labor-parto__filtro labor-parto__filtro--activo"
+                  data-estado="1"
+               >
+                  <input
+                     type="checkbox"
+                     class="labor-parto__filtro-check"
+                     checked
+                  >
+
+                  <span
+                     class="labor-parto__filtro-icono"
+                     data-icono="trabajo_parto"
+                  ></span>
+
+                  <span class="labor-parto__filtro-texto">
+                     Labor
+                  </span>
+               </label>
+
+
+               <!-- EXPULSIVO -->
+               <label
+                  class="labor-parto__filtro labor-parto__filtro--activo"
+                  data-estado="2"
+               >
+                  <input
+                     type="checkbox"
+                     class="labor-parto__filtro-check"
+                     checked
+                  >
+
+                  <span
+                     class="labor-parto__filtro-icono"
+                     data-icono="expulsivo"
+                  ></span>
+
+                  <span class="labor-parto__filtro-texto">
+                     Expulsivo
+                  </span>
+               </label>
+
+
+               <!-- PUERPERIO INMEDIATO -->
+               <label
+                  class="labor-parto__filtro labor-parto__filtro--activo"
+                  data-estado="3"
+               >
+                  <input
+                     type="checkbox"
+                     class="labor-parto__filtro-check"
+                     checked
+                  >
+
+                  <span
+                     class="labor-parto__filtro-icono"
+                     data-icono="puerperio_inmediato"
+                  ></span>
+
+                  <span class="labor-parto__filtro-texto">
+                     Puerperio
+                  </span>
+               </label>
+
+
+               <!-- CUIDADOS INTERMEDIOS -->
+               <label
+                  class="labor-parto__filtro labor-parto__filtro--activo"
+                  data-estado="4"
+               >
+                  <input
+                     type="checkbox"
+                     class="labor-parto__filtro-check"
+                     checked
+                  >
+
+                  <span
+                     class="labor-parto__filtro-icono"
+                     data-icono="cuidados_intermedios"
+                  ></span>
+
+                  <span class="labor-parto__filtro-texto">
+                  Intermedios
+                  </span>
+               </label>
+
+               <!-- ALTAS -->
+               <label
+                  class="labor-parto__filtro labor-parto__filtro--activo"
+                  data-estado="5"
+               >
+                  <input
+                     type="checkbox"
+                     class="labor-parto__filtro-check"
+                     checked
+                  >
+
+                  <span
+                     class="labor-parto__filtro-icono"
+                     data-icono="quirofano"
+                  ></span>
+
+                  <span class="labor-parto__filtro-texto">
+                     Altas
+                  </span>
+               </label>
+
+            </div>
+
+         </div>
+
+         <!-- PAGINACIÓN -->
+         <div class="labor-parto__paginacion">
+
+            <span class="labor-parto__paginacion-info">
+               Mostrando
+               <strong id="rangoPaginacion">0</strong>
+               de
+               <strong id="totalPaginacion">0</strong>
+               episodios
+            </span>
+
+            <div class="labor-parto__paginacion-controles">
+
+               <button
+                     type="button"
+                     id="paginaAnterior"
+                     class="labor-parto__paginacion-boton"
+                     title="Página anterior"
+                     disabled
+               >
+                     <span class="material-symbols-outlined">
+                        chevron_left
+                     </span>
+               </button>
+
+               <span
+                     id="paginaActual"
+                     class="labor-parto__paginacion-pagina"
+               >
+                     Página 1 de 1
+               </span>
+
+               <button
+                     type="button"
+                     id="paginaSiguiente"
+                     class="labor-parto__paginacion-boton"
+                     title="Página siguiente"
+                     disabled
+               >
+                     <span class="material-symbols-outlined">
+                        chevron_right
+                     </span>
+               </button>
+
+            </div>
+
+         </div>
+
+      </div>
+
+
+      <!-- ========================= -->
+      <!-- DETALLE DEL PACIENTE -->
+      <!-- ========================= -->
+      <div class="labor-parto__detalle">
+
+         <div class="labor-parto__detalle-encabezado">
+               <div class="labor-parto_encabezado__titulo">
+                  <span class="material-symbols-outlined">inbox_text_person</span>
+                  <span>Detalle del episodio</span>
+               </div>
+
+               <!-- Acción: dar de alta -->
+               <button
+                  type="button"
+                  id="botonDarAlta"
+                  class="labor-parto__boton-accion oculto"
+               >
+                  <i class="bi bi-box-arrow-right"></i>
+                  Dar de alta
+               </button>
+
+
+               <!-- Indicador: episodio dado de alta -->
+               <span
+                  id="indicadorAlta"
+                  class="labor-parto__pill-alta oculto"
+               >
+                  <span class="material-symbols-outlined">
+                     check_circle
+                  </span>
+
+                  Alta
+               </span>
+         </div>
+
+
+         <!-- Estado inicial: ninguna paciente seleccionada -->
+         <div
+               id="detallePacienteVacio"
+               class="labor-parto__detalle-vacio"
+         >
+
+               <span class="material-symbols-outlined">
+                  person_search
+               </span>
+
+
+               <p>
+                  Seleccione una paciente del listado
+                  para consultar su información.
+               </p>
+
+         </div>
+
+
+         <!-- ================================= -->
+         <!-- DETALLE REAL DEL PACIENTE -->
+         <!-- ================================= -->
+         <div
+               id="detalleEpisodio"
+               class="labor-parto__detalle-contenido"
+         >
+
+               <!-- Cabecera paciente -->
+               <div class="labor-parto__paciente-detalle">
+
+                  <div class="labor-parto__paciente-icono grande">
+                     <span class="material-symbols-outlined">
+                        pregnant_woman
+                     </span>
+                  </div>
+
+                  <div class="labor-parto__paciente-datos">
+                     <span id="detalleNombrePaciente">
+                        ----
+                     </span>
+
+
+                     <div class="labor-parto__dato">
+                        <span class="labor-parto__dato-etiqueta">
+                           DNI:
+                        </span>
+
+                        <strong id="detalleDni">
+                           ----
+                        </strong>
+                     </div>
+
+                     <div class="labor-parto__dato">
+                        <span class="labor-parto__dato-etiqueta">
+                           Expediente:
+                        </span>
+
+                        <strong id="detalleExpediente">
+                           ----
+                        </strong>
+                     </div>
+
+                     <div class="labor-parto__dato">
+                        <span class="labor-parto__dato-etiqueta">
+                           Edad:
+                        </span>
+                           
+                        <strong id="detalleEdad">
+                           ----
+                        </strong>
+                     </div>
+                  </div>
+
+               </div>
+
+
+               <!-- ========================= -->
+               <!-- ESTADOS DEL EPISODIO -->
+               <!-- ========================= -->
+               <div class="labor-parto__estados">
+
+                  <!-- Estado actual -->
+                  <div class="labor-parto__seccion actual">
+
+                     <!-- Indicador de bebé -->
+                     <span
+                        id="indicadorBebe"
+                        class="material-symbols-outlined labor-parto__indicador-bebe"
+                        aria-label="Bebé registrado"
+                     >
+                        child_care
+                     </span>
+
+                     {% comment %} <span class="labor-parto__seccion-titulo">Estado actual</span> {% endcomment %}
+
+                     <div class="labor-parto__estado-actual">
+
+                        <div class="labor-parto__estado-actual-icono">
+                           <!-- Aquí irá el SVG del estado -->
+                        </div>
+
+                        <div class="labor-parto__estado-actual-texto">
+                           <strong id="detalleEstadoActual">
+                              Trabajo de parto
+                           </strong>
+
+                           <span id="detalleEstadoDesde">
+                              --
+                           </span>
+                        </div>
+                        
+
+                     </div>
+
+                  </div>
+
+
+                  <!-- Cambio de estado -->
+                  <div class="labor-parto__seccion selector">
+
+                     <span class="labor-parto__seccion-titulo">Cambiar estado</span>
+
+                     <div id="selectorEstados" class="labor-parto__selector-estados">
+
+                           <label
+                              class="labor-parto__opcion-estado"
+                              data-estado="1"
+                           >
+                              <input
+                                 type="radio"
+                                 name="nuevoEstado"
+                                 value="1"
+                              
+                              >
+
+                              <span>
+                                 Labor
+                              </span>
+                           </label>
+
+
+                           <label
+                              class="labor-parto__opcion-estado"
+                              data-estado="2"
+                           >
+                              <input
+                                 type="radio"
+                                 name="nuevoEstado"
+                                 value="2"
+                              >
+
+                              <span>
+                                 Expulsivo
+                              </span>
+                           </label>
+
+
+                           <label
+                              class="labor-parto__opcion-estado"
+                              data-estado="3"
+                           >
+                              <input
+                                 type="radio"
+                                 name="nuevoEstado"
+                                 value="3"
+                              >
+
+                              <span>
+                                 Puerperio
+                              </span>
+                           </label>
+
+
+                           <label
+                              class="labor-parto__opcion-estado"
+                              data-estado="4"
+                           >
+                              <input
+                                 type="radio"
+                                 name="nuevoEstado"
+                                 value="4"
+                              >
+
+                              <span>
+                                 Intermedios
+                              </span>
+                           </label>
+
+                     </div>
+
+
+                     <button
+                        type="button"
+                        id="btnActualizarEstado"
+                        class="labor-parto__boton-accion"
+                     >
+                        <span class="material-symbols-outlined">
+                           save
+                        </span>
+
+                        Actualizar estado
+                     </button>
+
+                  </div>
+
+               </div>
+
+
+               <!-- Información -->
+               <div class="labor-parto__informacion">
+
+                  <div class="labor-parto__informacion-item">
+                     <i class="bi bi-box-arrow-in-right"></i>
+
+                     <div class="labor-parto__informacion-texto">
+                        <span id="detalleFechaIngresoEtiqueta">
+                           Fecha y hora de ingreso
+                        </span>
+
+                        <strong id="detalleFechaIngreso">
+                           -
+                        </strong>
+                     </div>
+                  </div>
+
+                  <div class="labor-parto__informacion-item">
+                     <i
+                        id="detalleTiempoIcono"
+                        class="bi bi-clock"
+                     ></i>
+
+                     <div class="labor-parto__informacion-texto">
+                        <span id="detalleTiempoEtiqueta">
+                           Tiempo en Labor y Parto
+                        </span>
+
+                        <strong id="detalleTiempoLabor">
+                           -22/09/2026
+                        </strong>
+                     </div>
+                  </div>
+
+                  <div class="labor-parto__informacion-item">
+                     <i
+                        id="detalleUnidadOrigenIcono"
+                        class="bi bi-geo-alt"
+                     ></i>
+
+                     <div class="labor-parto__informacion-texto">
+                        <span id="detalleUnidadOrigenEtiqueta">
+                           Unidad de origen
+                        </span>
+
+                        <strong id="detalleUnidadOrigen">
+                           -
+                        </strong>
+                     </div>
+                  </div>
+
+                  <div class="labor-parto__informacion-item">
+                     <i
+                        id="detalleUnidadSalidaIcono"
+                        class="bi bi-box-arrow-right"
+                     ></i>
+
+                     <div class="labor-parto__informacion-texto">
+                        <span id="detalleUnidadSalidaEtiqueta">
+                           Unidad de salida
+                        </span>
+
+                        <strong id="detalleUnidadSalida">
+                           -
+                        </strong>
+                     </div>
+                  </div>
+
+               </div>
+
+
+               <!-- ================= -->
+               <!-- PESTAÑAS DETALLE -->
+               <!-- ================= -->
+               <div class="labor-parto__tabs">
+
+                  <button type="button" 
+                     class="activo"
+                     data-tab="movimientos"
+                  >
+                     <span class="material-symbols-outlined">
+                        sync_alt
+                     </span>
+                     Movimientos
+                  </button>
+
+                  <button
+                     type="button"
+                     data-tab="bebes"
+                  >
+                     <span class="material-symbols-outlined">
+                        child_care
+                     </span>
+                     Bebés
+                  </button>
+
+                  
+
+               </div>
+
+
+               <!-- Contenido pestaña -->
+               <div class="labor-parto__tab-contenido">
+
+                  <!-- Bebés -->
+                  <!-- Bebés -->
+                  <div id="detalleBebes" class="oculto labor-parto__bebes">
+
+                     <div class="labor-parto__subencabezado">
+
+                        <div class="labor-parto__subencabezado-titulo">
+                           Bebés activos
+                        </div>
+
+                        <button
+                           type="button"
+                           id="registrarBebeLaborParto"
+                           class="labor-parto__boton-accion"
+                        >
+                           <i class="bi bi-plus-square"></i>
+                           Registrar bebé
+                        </button>
+
+                     </div>
+
+
+                     <div class="labor-parto__tabla-bebes-contenedor">
+
+                        <table class="labor-parto__tabla labor-parto__tabla-bebes">
+
+                           <thead>
+                              <tr>
+                                 <th>Bebé</th>
+                                 <th>Sexo</th>
+                                 <th>Fecha y hora de nacimiento</th>
+                              </tr>
+                           </thead>
+
+                           <tbody id="tablaBebes">
+
+                           </tbody>
+
+                        </table>
+
+                     </div>
+
+                  </div>
+                  
+
+
+                     <!-- Movimientos -->
+                  <div
+                     id="detalleMovimientos"
+                     class="labor-parto__tabla-contenedor"
+                  >
+
+                     <table class="labor-parto__tabla labor-parto__tabla-movimientos">
+
+                        <thead>
+                           <tr>
+                              <th>Ind</th>
+                              <th>Detalle</th>
+                              <th>Fecha y hora</th>
+                              <th>Usuario</th>
+                           </tr>
+                        </thead>
+
+                        <tbody id="tablaMovimientos">
+
+                        </tbody>
+
+                     </table>
+
+                  </div>
+
+               </div>
+
+
+
+         </div>
+
+      </div>
+
+   </div>
+
+</div>
+
+{% endblock content %}
+
+
+{% block extra_css %}
+
+<link rel="stylesheet" href="{% static 'core/css/comunicacion/labor_parto.css' %}">
+
+{% endblock extra_css %}
+
+
+{% block extra_js %}
+
+<script>
+
+   var estadosLaborParto = null;
+   var unidadesEntradaLaborParto = null;
+   var unidadesSalidaLaborParto = null;
+
+   {% if estados_labor_parto %}
+      estadosLaborParto = {{ estados_labor_parto|safe }};
+   {% endif %}
+
+   {% if unidades_entrada_labor_parto %}
+      unidadesEntradaLaborParto = {{ unidades_entrada_labor_parto|safe }};
+   {% endif %}
+
+   {% if unidades_salida_labor_parto %}
+      unidadesSalidaLaborParto = {{ unidades_salida_labor_parto|safe }};
+   {% endif %}
+
+
+   const usuarioAutenticado = {
+      nombre: "{{ request.user.username|escapejs }}"
+   };
+
+
+</script>
+
+
+<script src="{% static 'core/scripts/helpers/iconos_personalizados.js' %}"></script>
+
+
+<script src="{% static 'core/scripts/modals/comunicacion_hospitalaria_modals.js' %}"></script>
+
+<script src="{% static 'core/scripts/features/comunicacionLaborParto.js' %}"></script>
+
+{% endblock extra_js %}

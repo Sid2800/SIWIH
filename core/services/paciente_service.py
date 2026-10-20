@@ -9,7 +9,7 @@ from core.services.ubicacion_service import UbicacionService
 from core.services.expediente_service import ExpedienteService
 from core.services.padre_service import PadreService
 from core.validators.fecha_validator import validar_fecha
-from django.db.models import Value, F, Max
+from django.db.models import Value, F, Max, Q, Case, When
 from django.db.models.functions import Concat, Coalesce, TruncDate
 from django.utils.timezone import now
 from django.contrib.auth.models import User
@@ -17,11 +17,12 @@ from django.db import transaction
 from datetime import datetime, date
 from django.db import connection, models
 from django.utils import timezone
+from django.db.models import CharField, BooleanField
 from django.core.exceptions import ValidationError
 from core.constants.domain_constants import LogApp
 from core.constants.choices_constants import TipoDefuncion
 from core.utils.utilidades_logging import *
-from core.constants.domain_constants import INDICADOR_ANIOS, EDAD_FERTIL_MAX, EDAD_FERTIL_MIN, GENERO_FEMENINO
+from core.constants.domain_constants import INDICADOR_ANIOS, EDAD_FERTIL_MAX, EDAD_FERTIL_MIN, GENERO_FEMENINO, TIPO_IDENTIFICACION_DNI, NACIONALIDAD_HONDURENIA
 
 
 
@@ -95,20 +96,88 @@ class PacienteService:
 
 
     @staticmethod
-    def obtener_pacientes(query=None):
-        qs = Paciente.objects.filter(estado="A").annotate(
-        nombre_completo=Concat(
-            F("primer_nombre"), Value(" "),
-            Coalesce(F("segundo_nombre"), Value("")), Value(" "),
-            F("primer_apellido"), Value(" "),
-            Coalesce(F("segundo_apellido"), Value(""))
+    def obtener_pacientes(query=None, limite=100):
+
+        qs = Paciente.objects.filter(
+            estado="A"
+        ).annotate(
+            nombre_completo_interno=Concat(
+                F("primer_nombre"),
+                Case(
+                    When(
+                        segundo_nombre__isnull=False,
+                        segundo_nombre__exact="",
+                        then=Value(""),
+                    ),
+                    When(
+                        segundo_nombre__isnull=False,
+                        then=Concat(
+                            Value(" "),
+                            F("segundo_nombre"),
+                        ),
+                    ),
+                    default=Value(""),
+                    output_field=CharField(),
+                ),
+                Value(" "),
+                F("primer_apellido"),
+                Case(
+                    When(
+                        segundo_apellido__isnull=False,
+                        segundo_apellido__exact="",
+                        then=Value(""),
+                    ),
+                    When(
+                        segundo_apellido__isnull=False,
+                        then=Concat(
+                            Value(" "),
+                            F("segundo_apellido"),
+                        ),
+                    ),
+                    default=Value(""),
+                    output_field=CharField(),
+                ),
+                output_field=CharField(),
             )
-        )
+        ). order_by('nombre_completo_interno')
 
         if query:
-            qs = qs.filter(nombre_completo__icontains=query)
+            query = str(query.replace("-", "").strip())
+            print(f"'''''{query} '''''{type(query)}")
+            qs = qs.filter(
+                Q(nombre_completo_interno__icontains=query)
+                |
+                Q(dni__icontains=query)
+                |
+                Q(expediente_numero__icontains=query)
+            )
 
-        return qs.values("id", "nombre_completo", "dni", "fecha_nacimiento", "sexo")
+        pacientes = list(qs.values(
+            "id",
+            "nombre_completo_interno",
+            "tipo",
+            "dni",
+            "expediente_numero",
+            "fecha_nacimiento",
+            "sexo",
+        )[:limite])
+
+        for paciente in pacientes:
+
+            dni = paciente['dni']
+            tipo = paciente['tipo']
+
+            if not dni:
+                paciente['dni'] = '---'
+
+            info = f"Exp: {paciente['expediente_numero']} | {"PAS" if tipo==2 else "DNI"}: {paciente['dni']} | Sexo: {paciente['sexo']}"
+            paciente['info'] = info
+            
+
+        return pacientes
+            
+                
+                
 
 
     @staticmethod
@@ -207,6 +276,16 @@ class PacienteService:
         where_clauses = []
         query_params = []
 
+        columns = [
+                    "NUMERO_IDENTIDAD",
+                    "PRIMER_NOMBRE",
+                    "SEGUNDO_NOMBRE",
+                    "PRIMER_APELLIDO",
+                    "SEGUNDO_APELLIDO",
+                    "NUMERO_IDENTIDAD",
+                    "NOMBRE_DEPARTAMENTO"
+                ]
+
   
         if params.get("search_sexo"):
             where_clauses.append("censo.CODIGO_SEXO = %s")
@@ -237,15 +316,7 @@ class PacienteService:
 
         where_clause = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
 
-        columns = [
-            "NUMERO_IDENTIDAD",
-            "PRIMER_NOMBRE",
-            "SEGUNDO_NOMBRE",
-            "PRIMER_APELLIDO",
-            "SEGUNDO_APELLIDO",
-            "NUMERO_IDENTIDAD",
-            "NOMBRE_DEPARTAMENTO"
-        ]
+        
         order_by_column = columns[order_column]
         order_by_direction = "ASC" if order_direction.upper() != "DESC" else "DESC"
 
@@ -267,10 +338,10 @@ class PacienteService:
                             "Censo" as origen,
                             DEPTO.NOMBRE_DEPARTAMENTO as sector__aldea__municipio__departamento__nombre_departamento,
                             DEPTO.CODIGO_DEPARTAMENTO AS sector__aldea__municipio__departamento__id,
-                            muni.NOMBRE_MUNICIPIO AS sector__aldea__municipio__nombre_municipio,
-                            muni.CODIGO_MUNICIPIO as sector__aldea__municipio__id,
-                            lp.NOMBRE_LUGAR_POBLADO AS sector__nombre_sector,
-                            lp.CODIGO_LUGAR_POBLADO as sector__id
+                            MUNI.NOMBRE_MUNICIPIO AS sector__aldea__municipio__nombre_municipio,
+                            MUNI.CODIGO_MUNICIPIO as sector__aldea__municipio__id,
+                            LP.NOMBRE_LUGAR_POBLADO AS sector__nombre_sector,
+                            LP.CODIGO_LUGAR_POBLADO as sector__id
                         FROM censo2025_siwi.tbl_censo AS censo
                         INNER JOIN tbl_lugar_poblado AS LP ON censo.CODIGO_LUGAR_POBLADO = LP.codigo_lugar_poblado 
                         INNER JOIN tbl_aldea AS ALDEA ON ALDEA.CODIGO_ALDEA = LP.codigo_aldea
@@ -291,7 +362,7 @@ class PacienteService:
         except Exception as e:
             log_error(
                 f"[FALLO_LISTAR_CENSO_AVANZADO] filtros={list(params.keys())} start={start} length={length} detalle={str(e)}",
-                app=LogApp.INTEGRACION
+                app=LogApp.PACIENTE
             )
             return {'error': 'Error al consultar el censo'}, 0
         
