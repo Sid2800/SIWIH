@@ -382,8 +382,6 @@ const TimeGrid = ( function () {
          Object.values(controles.views).forEach(input => {
 
                input.addEventListener("change", function () {
-
-                  console.log(this.value);
                   estado.view = this.value;
                   cambiarVista()
 

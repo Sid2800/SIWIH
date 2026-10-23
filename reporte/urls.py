@@ -8,6 +8,7 @@ from .views import paciente
 from .views import ingreso
 from .views import imagenologia
 from .views import referencia
+from .views import mapeo_camas
 # Reportes de paciente
 
 reportes_paciente = [
@@ -47,7 +48,11 @@ reportes_generales = [
     path("informes-catalogo/",vistas_gen.InformesCatalogo.as_view(), name="informes_catalogo") 
 ]
 
+reportes_mapeo_camas = [
+    path("mapeo-camas/sesion/<int:sesion_id>/", mapeo_camas.ReporteMapeoSesion.as_view(), name="reporte_mapeo_sesion",),
+]
+
 
 
 # URLs finales
-urlpatterns = reportes_paciente + reportes_ingreso + reportes_generales +reportes_imagenologia +reportes_referencia
+urlpatterns = reportes_paciente + reportes_ingreso + reportes_generales +reportes_imagenologia +reportes_referencia + reportes_mapeo_camas
