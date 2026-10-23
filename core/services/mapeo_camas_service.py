@@ -5,6 +5,8 @@ from django.utils.timezone import localtime, now
 
 from core.constants.domain_constants import LogApp
 from core.utils.utilidades_logging import log_error, log_warning
+from core.utils.utilidades_textos import formatear_expediente
+from core.services.usuario_service import UsuarioService
 from ingreso.models import Ingreso
 from mapeo_camas.constants.view_constants import (
     OBS_AJUSTE_MAPEO_SIN_ALTA,
@@ -1125,6 +1127,156 @@ class MapeoCamasService:
 
         return None
 
+
+    @staticmethod
+    def construir_data_reporte_sesion(sesion_id):
+        """
+        Prepara la información de una sesión de mapeo de camas
+        para entregársela al servicio generador del PDF.
+        """
+        from mapeo_camas.models import MapeoSesionCama, DetalleMapeoCama
+
+                
+        detalles_prefetch = Prefetch(
+            "detalles",
+            queryset=DetalleMapeoCama.objects.select_related(
+                "cama__sala__servicio",
+                "cama__cubiculo__sala__servicio",
+                "estado_actual",
+                "ingreso_actual__paciente",
+                "tipo_accion",
+                "usuario",
+                "observacion",
+            ).order_by("cama__numero_cama"),
+            to_attr="detalles_reporte",
+        )
+
+        sesion = (
+            MapeoSesionCama.objects
+            .select_related("usuario", "estado", "observacion")
+            .prefetch_related(
+                detalles_prefetch,
+                Prefetch(
+                    "servicios_incluidos",
+                    queryset=MapeoSesionServicio.objects
+                    .select_related("servicio")
+                    .order_by("servicio__nombre_servicio"),
+                    to_attr="servicios_reporte",
+                ),
+            )
+            .filter(pk=sesion_id)
+            .first()
+        )
+
+        if not sesion:
+            return None
+
+
+        from types import SimpleNamespace
+
+        servicios_data = {}
+        total_camas = 0
+        total_cambios = 0
+        total_validadas = 0
+
+        # 1. Registrar los servicios incluidos en la sesión.
+        for servicio_sesion in sesion.servicios_reporte:
+            servicio = servicio_sesion.servicio
+
+            servicios_data[servicio.id] = SimpleNamespace(
+                id=servicio.id,
+                nombre=servicio.nombre_servicio,
+                detalles=[],
+                total_camas=0,
+                total_cambios=0,
+                total_validadas=0,
+            )
+
+
+        # 2. Construir los detalles de cada cama.
+        for detalle in sesion.detalles_reporte:
+            cama = detalle.cama
+
+            cubiculo = cama.cubiculo
+            sala = (cubiculo.sala if cubiculo else None) or cama.sala
+            servicio = sala.servicio if sala else None
+
+            if not servicio or servicio.id not in servicios_data:
+                continue
+            servicio_data = servicios_data[servicio.id]
+
+
+            total_camas += 1
+            servicio_data.total_camas += 1
+
+            if detalle.hubo_cambio:
+                total_cambios += 1
+                servicio_data.total_cambios += 1
+
+            if detalle.fue_validada:
+                total_validadas += 1
+                servicio_data.total_validadas += 1
+
+            paciente = (
+                detalle.ingreso_actual.paciente
+                if detalle.ingreso_actual_id
+                else None
+            )
+
+            servicios_data[servicio.id].detalles.append(
+                SimpleNamespace(
+                    cama=SimpleNamespace(
+                        numero=cama.numero_cama,
+                    ),
+                    sala=sala.nombre_sala if sala else "",
+                    cubiculo=(
+                        cubiculo.nombre_cubiculo
+                        if cubiculo
+                        else ""
+                    ),
+                    estado=(
+                        detalle.estado_actual.codigo
+                        if detalle.estado_actual
+                        else ""
+                    ),
+                    paciente=str(paciente) if paciente else "- - - -",
+                    expediente=formatear_expediente(paciente.expediente_numero) if paciente else "- - - -",
+                    usuario=str(detalle.usuario),
+                    fecha_hora=detalle.fecha_hora,
+                    tipo_accion=detalle.tipo_accion.codigo,
+                    fue_validada=detalle.fue_validada,
+                    hubo_cambio=detalle.hubo_cambio,
+                    observacion=(
+                        detalle.observacion.codigo
+                        if detalle.observacion
+                        else ""
+                    ),
+                )
+            )
+
+
+
+        return {
+            "sesion": SimpleNamespace(
+                id=sesion.id,
+                estado_codigo=sesion.estado.codigo,
+                estado_categoria=sesion.estado.categoria,
+                fecha_inicio=sesion.fecha_inicio,
+                fecha_fin=sesion.fecha_fin,
+                usuario=str(sesion.usuario),
+                usuario_nombre=UsuarioService.obtener_nombre_empleado(sesion.usuario),
+                observacion=sesion.observacion_texto or "",
+            ),
+            "servicios": list(servicios_data.values()),
+            "resumen": SimpleNamespace(
+                total_servicios=len(servicios_data),
+                total_camas=total_camas,
+                total_cambios=total_cambios,
+                total_validadas=total_validadas,
+            ),
+        }
+    
+
     # Alias explicito para mantener el nombre funcional solicitado.
     SINCRONIZAR_CAMA_CON_INGRESO = sincronizar_cama_con_ingreso
     SINCRONIZAR_CAMBIO_CAMA_EN_INGRESO = sincronizar_cambio_cama_en_ingreso
@@ -1610,3 +1762,8 @@ class MapeoOperacionesMapaService:
             accion=accion,
         )
         raise ValidationError("No se pudo procesar la accion solicitada.")
+
+
+
+
+    

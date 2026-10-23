@@ -195,3 +195,43 @@ class UsuarioService:
 
         except Exception:
             return None
+
+
+    def obtener_nombre_empleado(
+            usuario,
+            nombre_predeterminado="Sin nombre registrado",
+        ):
+            if not usuario:
+                return nombre_predeterminado
+
+            empleado = getattr(usuario, "empleado", None)
+
+            if empleado:
+                nombres = (
+                    empleado.primer_nombre,
+                    empleado.segundo_nombre,
+                    empleado.primer_apellido,
+                )
+
+                nombre_completo = " ".join(
+                    nombre.strip()
+                    for nombre in nombres
+                    if nombre and nombre.strip()
+                )
+
+                if nombre_completo:
+                    return nombre_completo
+
+            # Si no tiene empleado, usar los datos del usuario de Django.
+            nombres_usuario = (
+                usuario.first_name,
+                usuario.last_name,
+            )
+
+            nombre_usuario = " ".join(
+                nombre.strip()
+                for nombre in nombres_usuario
+                if nombre and nombre.strip()
+            )
+
+            return nombre_usuario or nombre_predeterminado
