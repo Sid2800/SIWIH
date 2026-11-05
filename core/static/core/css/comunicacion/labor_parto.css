@@ -9,7 +9,7 @@
 
 .labor-parto {
    display: grid;
-   grid-template-columns: 48% 1fr;
+   grid-template-columns: 49% 1fr;
    gap: 1rem;
    align-items: start;
    height: calc(99vh - 12rem);
@@ -40,20 +40,22 @@
    align-items: center;
    justify-content: center;
    gap: 0.45rem;
+   max-height: 3.4rem;
 
    margin-top: 0.3rem;
    padding: 0.65rem 1.1rem;
 
-   border: 0.18rem solid rgb(70, 115, 175);
+   border: 0.18rem solid var(--lp-color-primario-hover);
    border-radius: 0.5rem;
 
-   background: rgb(70, 115, 175);
-   color: white;
+   background: var(--lp-color-primario);
+   color: var(--blanco);
 
-   font-size: 1.4rem;
+   font-size: 1.3rem;
    font-weight: 600;
 
    cursor: pointer;
+   box-shadow: var(--sombra-card);
 
    transition:
       background-color 0.2s ease,
@@ -62,24 +64,40 @@
       transform 0.15s ease;
 }
 
+
+.labor-parto__boton-accion--secundario {
+   background: var(--colorContendor);
+   border-color: var(--colorControlDeshabilitadoFondo);
+   color: var(--negro-suave);
+}
+
+
 .labor-parto__boton-accion:hover {
-   background: rgb(55, 95, 150);
-   border-color: rgb(55, 95, 150);
-   color: white;
+   background: var(--lp-color-primario-hover);
+   border-color: var(--lp-color-primario-hover);
+   color: var(--blanco);
+}
+
+.labor-parto__boton-accion--secundario:hover {
+   background: var(--colorTablaHover);
+   border-color: var(--colorControlDeshabilitadoFondo);
+   color: var(--negro-suave);
 }
 
 
 
-.labor-parto__boton-accion:disabled {
+.labor-parto__boton-accion:disabled,
+.labor-parto__boton-accion--secundario:disabled {
    background: var(--colorTablaceldaBorde);
    border-color: var(--colorLinea);
    color: var(--colorTextoSololectura);
-
    cursor: not-allowed;
    opacity: 0.6;
 }
 
-.labor-parto__boton-accion:not(:disabled):active {
+.labor-parto__boton-accion:not(:disabled):active ,
+.labor-parto__boton-accion--secundario:not(:disabled):active {
+
    transform: scale(0.98);
 }
 
@@ -104,13 +122,27 @@
    padding: 0 1rem;
 }
 
+.detalle-encabezado-contendor-botones{
+   margin-left: auto;
+   display: flex;
+   column-gap: 1rem;
+   justify-content: left;
+   align-items: center;
+
+}
+
+
 
 .labor-parto__encabezado button,
 .labor-parto__detalle-encabezado button{
-   margin-left: auto;
    font-size: 1.25rem;
    column-gap: 1rem;
    margin-top: 0;
+}
+
+.labor-parto__encabezado button{
+   margin-left: auto;
+   
 }
 
 
@@ -158,7 +190,7 @@
 
 .labor-parto__buscador i {
    font-size: 1.8rem;
-   color: #6c757d;
+   color: var(--colorControlDeshabilitadoFondo);
 }
 
 .labor-parto__buscador input {
@@ -184,9 +216,10 @@
    overflow-x: auto;
    flex: 1;
    overflow-y: auto;
-   background-color: rgba(0, 0, 0, 0.025);
+   background-color: var(--lp-fondo-contenedor-tabla);
    border-radius: .5rem;
-   margin-top: 1rem;
+   margin-top: .5rem;
+   margin-bottom: 1rem;
 }
 
 
@@ -253,11 +286,11 @@
 }
 
 .labor-parto__fila--seleccionada {
-    background-color: rgba(59, 130, 246, 0.20);
+    background-color: var(--lp-fondo-fila-seleccionada);
 }
 
 .labor-parto__fila--seleccionada:hover {
-    background-color: rgba(59, 130, 246, 0.30);
+    background-color: var(--lp-fondo-fila-seleccionada-hover);
 }
 
 
@@ -267,23 +300,6 @@
    gap: 1rem;
 }
 
-/* .labor-parto__paciente-icono {
-   display: flex;
-   align-items: center;
-   justify-content: center;
-   width: 4rem;
-   height: 4rem;
-   flex-shrink: 0;
-   border-radius: 50%;
-   background: var(--colorTablaHover)
-}
-
-
-.labor-parto__paciente-icono .material-symbols-outlined {
-   font-size: 4rem;
-   color: var(--negro-suave)
-}
- */
 
 .labor-parto__paciente strong,
 .labor-parto__paciente small {
@@ -571,7 +587,8 @@
 /* Detall episodio */
 
 
-.labor-parto__pill-alta {
+.labor-parto__pill-alta,
+.labor-parto__pill-salida-temporal{
    display: inline-flex;
    align-items: center;
    justify-content: center;
@@ -594,8 +611,9 @@
 }
 
 
-.labor-parto__pill-alta
-.material-symbols-outlined {
+.labor-parto__pill-alta .material-symbols-outlined,
+.labor-parto__pill-salida-temporal .material-symbols-outlined {
+
    font-size: 2.25rem;
 }
 
@@ -657,8 +675,8 @@
 
 
 .labor-parto__paciente-icono.grande{
-   color: #D45A91;
-   background: rgba(212, 90, 145, 0.10);
+   color: var(--lp-color-icono-paciente);
+   background: var(--lp-fondo-icono-paciente);
    border-radius: 50%;
    margin: .5rem;
    font-weight: 300;
@@ -708,6 +726,7 @@
    row-gap: .5rem;
 
 }
+
 
 
 
@@ -878,7 +897,7 @@
 .labor-parto__informacion-item i {
    flex-shrink: 0;
    font-size: 2.5rem;
-   color: rgb(47, 79, 121);
+   color: var(--lp-color-azul-institucional)
 }
 
 
@@ -899,7 +918,7 @@
 .labor-parto__informacion-texto > strong {
    font-size: 1.45rem;
    text-transform: uppercase;
-   color: rgb(47, 79, 121);
+   color: var(--lp-color-azul-institucional)
 
 }
 
@@ -918,10 +937,6 @@
    padding: 1rem;
    /* overflow: hidden; */
 }
-
-
-
-/* Subencabezado de cada pestaña */
 
 
 
@@ -968,10 +983,10 @@
 }
 
 .labor-parto__tabs button.activo {
-   color: rgb(47, 79, 121);
-   border-bottom-color: rgb(70, 115, 175);
-
+    color: var(--lp-color-azul-institucional);
+    border-bottom-color: var(--lp-color-primario);
 }
+
 
 .labor-parto__tabs button .material-symbols-outlined {
    font-size: 3.0rem;
@@ -1036,8 +1051,8 @@
 }
 
 .labor-parto__tabla-movimientos tbody tr:hover,
-.labor-parto__tabla-bebes tbody tr:hover{
-   background: rgba(70, 115, 175, 0.08);
+.labor-parto__tabla-bebes tbody tr:hover {
+    background: var(--lp-fondo-fila-hover);
 }
 
 
@@ -1076,17 +1091,17 @@
 
 /* modal AREGAR EPIDOSIO*/
 .contener-modal-titulo .icono-titulo-modal {
-   color: #4A80B8;
-   background: rgba(74, 128, 184, 0.10);
-   border-radius: 50%;
-   margin: .5rem;
-   font-weight: 300;
-   display: flex;
-   height: 4rem;
-   width: 4rem;
-   justify-content: center;
-   align-items: center;
-   margin-right: 1rem;
+    color: var(--lp-color-icono-titulo-modal);
+    background: var(--lp-fondo-icono-titulo-modal);
+    border-radius: 50%;
+    margin: .5rem;
+    font-weight: 300;
+    display: flex;
+    height: 4rem;
+    width: 4rem;
+    justify-content: center;
+    align-items: center;
+    margin-right: 1rem;
 }
 
 .contener-modal-titulo .icono-titulo-modal .material-symbols-outlined {
@@ -1131,10 +1146,10 @@
    gap: .45rem;
    min-height: 5.5rem;
    padding: .5rem 1rem;
-   border: 1px solid #D9DDE3;
+   border: 1px solid var(--colorControlDeshabilitadoFondo);
    border-radius: .6rem;
    background: var(--blanco-apagado);
-   color: #555;
+   color: var(--colorTextoBloqueado);
    cursor: pointer;
    transition:
       background-color .2s ease,
@@ -1162,16 +1177,18 @@
    text-align: center;
 }
 
+/* UNIDAD SELECCIONADA */
 .modalLaborPartoCampos .labor-parto__opcion-unidad:has(input[type="radio"]:checked) {
-   color: #438A8C;
-   background: rgba(67, 138, 140, 0.07);
-   border-color: rgba(67, 138, 140, 0.55);
-   box-shadow: 0 0 0 1px rgba(67, 138, 140, 0.10);
+   color: var(--lp-color-unidad-seleccionada);
+   background: var(--lp-fondo-unidad-seleccionada);
+   border-color: var(--lp-borde-unidad-seleccionada);
+   box-shadow: 0 0 0 1px var(--lp-sombra-unidad-seleccionada);
 }
 
+/* HOVER */
 .modalLaborPartoCampos .labor-parto__opcion-unidad:hover {
-   border-color: rgba(67, 138, 140, 0.45);
-   background: rgba(67, 138, 140, 0.04);
+   border-color: var(--lp-borde-unidad-hover);
+   background: var(--lp-fondo-unidad-hover);
 }
 
 /* ESTADO INICIAL */
@@ -1187,7 +1204,6 @@
 
    background: var(--fondo-estado);
    border-radius: .6rem;
-
    color: var(--color-estado);
 }
 
@@ -1206,8 +1222,6 @@
 
    border-radius: 1rem;
    border: .19rem solid var(--border-color-estado);
-   
-
 }
 
 
@@ -1235,8 +1249,7 @@
 
 
 .labor-parto-estado-contenido span {
-   color: #666;
-
+   color: var(--colorTextoBloqueado);
    font-size: 1.35rem;
    line-height: 1.4;
 }
@@ -1531,8 +1544,8 @@
 }
 
 
-.modalLaborPartoCampos .labor-parto__opcion-unidad {
-   min-height: 3rem;
+.modalLaborPartoCampos .labor-parto__opcion-unidad-icono {
+   width: 100%;
 }
 
 
@@ -1584,10 +1597,10 @@
    min-height: 5.5rem;
    min-height: 3rem;
    padding: .5rem 1rem;
-   border: 1px solid #D9DDE3;
+   border: 1px solid var(--lp-borde-opcion-unidad);
    border-radius: .6rem;
    background: var(--blanco-apagado);
-   color: #555;
+   color: var(--lp-texto-opcion-unidad);
    font-weight: 600;
    cursor: pointer;
    transition: background-color .2s ease,
@@ -1597,32 +1610,31 @@
 }
 
 
-
 /* HOMBRE: AZUL */
 .modalLaborPartoCampos
 .labor-parto__opcion-sexo[data-sexo="H"]:has(input[type="radio"]:checked) {
-   color: #3976B8;
-   background: rgba(57, 118, 184, 0.08);
-   border-color: rgba(57, 118, 184, 0.55);
-   box-shadow: 0 0 0 1px rgba(57, 118, 184, 0.10);
+   color: var(--lp-sexo-hombre);
+   background: var(--lp-sexo-hombre-fondo);
+   border: 1px solid var(--lp-sexo-hombre-borde);
+   box-shadow: 0 0 0 1px var(--lp-sexo-hombre-sombra);
 }
 
 /* MUJER: ROSA */
 .modalLaborPartoCampos
 .labor-parto__opcion-sexo[data-sexo="M"]:has(input[type="radio"]:checked) {
-   color: #C45F8A;
-   background: rgba(196, 95, 138, 0.08);
-   border-color: rgba(196, 95, 138, 0.55);
-   box-shadow: 0 0 0 1px rgba(196, 95, 138, 0.10);
+   color: var(--lp-sexo-mujer);
+   background: var(--lp-sexo-mujer-fondo);
+   border: 1px solid var(--lp-sexo-mujer-borde);
+   box-shadow: 0 0 0 1px var(--lp-sexo-mujer-sombra);
 }
 
 /* NO IDENTIFICADO: GRIS */
 .modalLaborPartoCampos
 .labor-parto__opcion-sexo[data-sexo="N"]:has(input[type="radio"]:checked) {
-   color: #6B7280;
-   background: rgba(107, 114, 128, 0.08);
-   border-color: rgba(107, 114, 128, 0.50);
-   box-shadow: 0 0 0 1px rgba(107, 114, 128, 0.10);
+   color: var(--lp-sexo-no-identificado);
+   background: var(--lp-sexo-no-identificado-fondo);
+   border: 1px solid var(--lp-sexo-no-identificado-borde);
+   box-shadow: 0 0 0 1px var(--lp-sexo-no-identificado-sombra);
 }
 
 

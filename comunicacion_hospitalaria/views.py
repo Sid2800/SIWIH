@@ -30,7 +30,35 @@ class MonitorLaborParto(UnidadRolRequiredMixin,TemplateView):
             EstadoLaborParto.opciones()
       )
       context["unidades_entrada_labor_parto"] = (UNIDADES_ENTRADA_LABOR_PARTO)
-      context["unidades_salida_labor_parto"] = (UNIDADES_SALIDA_LABOR_PARTO)
+      context["unidades_salida_labor_parto"] = {
+         unidad_id: LaborPartoService.obtener_indicador_salida(unidad_id)
+         for unidad_id in UNIDADES_SALIDA_LABOR_PARTO
+      }
+
+      return context
+
+
+
+class MonitorLaborPartoPublico(TemplateView):
+   template_name = "labor_parto_publico.html"
+
+   def get_context_data(self, **kwargs):
+      context = super().get_context_data(**kwargs)
+
+      context["estados_labor_parto"] = (
+         EstadoLaborParto.opciones()
+      )
+
+      # context["unidades_entrada_labor_parto"] = (
+      #    UNIDADES_ENTRADA_LABOR_PARTO
+      # )
+
+      # context["unidades_salida_labor_parto"] = {
+      #    unidad_id: LaborPartoService.obtener_indicador_salida(
+      #          unidad_id
+      #    )
+      #    for unidad_id in UNIDADES_SALIDA_LABOR_PARTO
+      # }
 
       return context
 
@@ -61,6 +89,14 @@ def listarEpisodiosLaborPartoAPI(request):
       direccion=direccion,
       filtros_estado=filtros_estado
    )
+
+   return JsonResponse(datos)
+
+
+
+def listarEpisodiosLaborPartoPublicoAPI(request):
+
+   datos = LaborPartoService.listar_episodios_publicos()
 
    return JsonResponse(datos)
 
@@ -293,6 +329,7 @@ def gestionarMovimientoLaborParto(request):
       )
 
 
+
 @require_POST
 def registrarAltaLaborParto(request):
    """
@@ -352,7 +389,6 @@ def registrarAltaLaborParto(request):
          {"error": "No se pudo registrar el alta"},
          status=500,
       )
-
 
 
 
@@ -444,4 +480,66 @@ def obtenerBebeLaborParto(request):
       )
 
    return JsonResponse(bebe, status=200)
+
+
+
+@require_POST
+def registrarSalidaTemporalLaborParto(request):
+   """
+   Registra una salida temporal de Labor y Parto hacia Quirófano.
+   """
+   if not verificar_permisos_usuario(
+      request.user,
+      COMUNICACION_HOSPITALARIA_EDICION_ROLES,
+      COMUNICACION_HOSPITALARIA_EDICION_UNIDADES,
+   ):
+      return JsonResponse(
+         {"error": "No tienes permisos para realizar esta acción"},
+         status=403,
+      )
+
+   try:
+      data = parse_json_request(request)
+
+      if not data:
+         return JsonResponse(
+            {"error": "El parámetro episodio_id es requerido."},
+            status=400,
+         )
+
+      guardo = LaborPartoService.registrarSalidaTemporal(data, request.user)
+
+      return JsonResponse(
+         {"guardado": guardo},
+         status=200,
+      )
+
+   except ValueError as e:
+      return JsonResponse(
+         {"error": str(e)},
+         status=400,
+      )
+
+   except ValidationError as e:
+      return JsonResponse(
+         {
+            "error": (
+               e.message_dict
+               if hasattr(e, "message_dict")
+               else e.messages
+            )
+         },
+         status=400,
+      )
+
+   except Exception:
+      log_error(
+         "Error al registrar salida temporal de Labor y Parto",
+         LogApp.COMUNICACION,
+      )
+      return JsonResponse(
+         {"error": "No se pudo registrar la salida temporal"},
+         status=500,
+      )
+
 

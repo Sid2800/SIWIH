@@ -4,11 +4,12 @@ from types import SimpleNamespace
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 
-from core.constants.domain_constants import UNIDADES_ENTRADA_LABOR_PARTO, UNIDADES_SALIDA_LABOR_PARTO
-from core.constants.choices_constants import EstadoLaborParto, Sexo
+from core.constants.domain_constants import UNIDADES_ENTRADA_LABOR_PARTO, UNIDADES_SALIDA_LABOR_PARTO, UNIDAD_SALIDA_QUIROFANO
+from core.constants.choices_constants import EstadoLaborParto, Sexo, TipoMovimientoLaborParto
 from core.validators.main_validator import validar_entero_positivo, validar_booleano, validar_texto_opcional
 from core.validators.fecha_validator import validar_fecha
 from core.validators.paciente import validar_paciente
+from servicio.validators import validar_unidad_clinica_activa
 from core.utils.utilidades_fechas import parsear_fecha_iso
 from comunicacion_hospitalaria.models import Episodio_labor_parto, Movimiento_labor_parto, Bebe_labor_parto
 
@@ -16,13 +17,18 @@ from comunicacion_hospitalaria.models import Episodio_labor_parto, Movimiento_la
 class LaborPartoValidator:
 
    @classmethod
-   def _validarEpisodioLaborParto(cls, id_episodio):
-      episodio = Episodio_labor_parto.objects.filter(id=id_episodio).first()
+   def _validarEpisodioLaborParto(cls, episodio_id, bloquear=False):
+      queryset = Episodio_labor_parto.objects.all()
 
-      if not episodio:
-         raise ValidationError("El episodio de Labor y Parto no existe.")
-      
-      return episodio
+      if bloquear:
+         queryset = queryset.select_for_update()
+
+      try:
+         return queryset.get(pk=episodio_id)
+      except Episodio_labor_parto.DoesNotExist:
+         raise ValidationError(
+            "El episodio de Labor y Parto no existe."
+         )
 
    @classmethod
    def _validarMovimientoLaborParto(cls, id_movimiento):
@@ -148,7 +154,7 @@ class LaborPartoValidator:
    @classmethod
    def validarReglasCriticasMovimientoLaborParto(cls, movimiento):
 
-      movimiento.episodio = cls._validarEpisodioLaborParto(movimiento.episodio_id)
+      movimiento.episodio = cls._validarEpisodioLaborParto(movimiento.episodio_id, bloquear=True)
 
       if movimiento.episodio.alta:
          raise ValidationError(
@@ -258,7 +264,7 @@ class LaborPartoValidator:
    @classmethod
    def validarReglasCriticasAltaLaborParto(cls, alta):
       # Validar que el episodio exista
-      alta.episodio = cls._validarEpisodioLaborParto(alta.episodio_id)
+      alta.episodio = cls._validarEpisodioLaborParto(alta.episodio_id,  bloquear=True,)
 
       # Evitar registrar el alta de un episodio que ya tiene alta
       if alta.episodio.alta:
@@ -347,3 +353,35 @@ class LaborPartoValidator:
                )
 
       return bebe
+
+
+
+   @classmethod
+   def validarReglasCriticasSalidaTemporal(cls, episodio_id):
+
+      episodio = cls._validarEpisodioLaborParto(
+            episodio_id,
+            bloquear=True,
+         )
+
+      if episodio.alta:
+         raise ValidationError(
+            "No se puede registrar una salida temporal para un episodio con alta."
+         )
+
+      movimiento_actual = episodio.movimiento_actual
+
+      if (
+         movimiento_actual
+         and movimiento_actual.tipo == TipoMovimientoLaborParto.SALIDA
+         and movimiento_actual.unidad_destino_id == UNIDAD_SALIDA_QUIROFANO
+      ):
+         raise ValidationError(
+            "El episodio ya se encuentra en una salida temporal."
+         )
+
+      unidad_salida = validar_unidad_clinica_activa(
+         UNIDAD_SALIDA_QUIROFANO
+      )
+      
+      return episodio, unidad_salida

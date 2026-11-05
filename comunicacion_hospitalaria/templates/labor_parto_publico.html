@@ -1,0 +1,421 @@
+{% extends "core/bases/base_publica.html" %}
+{% load static %}
+
+{% block title %}
+   Labor y Parto | SIWIH
+{% endblock title %}
+
+
+{% block extra_css %}
+
+   <link rel="stylesheet" href="{% static 'core/css/comunicacion/labor_parto.css' %}">
+
+   <link
+      rel="stylesheet"
+      href="{% static 'core/css/comunicacion/labor_parto_publico.css' %}"
+   >
+
+
+
+
+
+{% endblock extra_css %}
+
+
+{% block content %}
+
+   <div class="pantalla-labor-parto">
+
+
+      <header class="encabezado-labor-parto">
+
+         <div class="encabezado-labor-parto__identidad">
+            <div class="encabezado-labor-parto__icono">
+               {% comment %} Icono {% endcomment %}
+            </div>
+
+            <div class="encabezado-labor-parto__titulo">
+               <span>Labor y Parto</span>
+               <p>Hospital Dr. Enrique Aguilar Cerrato</p>
+            </div>
+         </div>
+
+
+         <div class="encabezado-labor-parto__informacion">
+
+            <div class="encabezado-labor-parto__reloj">
+                  <span id="fecha-actual"> - - - </span>
+                  <span id="hora-actual"> - - - </span>
+            </div>
+
+            <div class="encabezado-labor-parto__estado icon-verde-tenue icon-verde">
+               <span class="encabezado-labor-parto__envivo">
+                  <i class="bi bi-broadcast"></i>
+                  En vivo
+               </span>
+
+               <span class="encabezado-labor-parto__descripcion">
+                  Información actualizada<br>en tiempo real
+               </span>
+            </div>
+
+         </div>
+
+      </header>
+
+
+      <!-- CONTENEDOR PRINCIPAL -->
+      <div class="labor-parto">
+
+         <!-- LISTADO DE EPISODIOS -->
+         <div class="labor-parto__listado">
+
+            <div class="labor-parto__encabezado">
+
+                  <div class="labor-parto_encabezado__titulo">
+                     <span class="material-symbols-outlined">diversity_3</span>
+                     <span>Listado de Pacientes</span>
+                  </div>
+
+                  <span id="contadorEpisodios" class="labor-parto__contador">
+                     0
+                  </span>
+
+            </div>
+
+            <!-- TABLA -->
+            <div class="labor-parto__tabla-contenedor">
+
+                  <table class="labor-parto__tabla">
+
+                     <thead>
+                        <tr>
+                              <th>Estado</th>
+                              <th>Paciente</th>
+                              <th>Ingreso</th>
+                        </tr>
+                     </thead>
+
+                     <tbody id="tablaEpisodios">
+                     </tbody>
+
+                  </table>
+            
+            </div>
+
+            <!-- CONTADORES DEL MONITOR PÚBLICO -->
+            <div class="labor-parto__resumen">
+
+               <!-- PACIENTES EN ATENCIÓN -->
+               <div class="labor-parto__resumen-indicador">
+                  <span class="labor-parto__resumen-etiqueta">
+                        Pacientes en atención
+                  </span>
+
+                  <strong
+                        id="totalPacientesAtencion"
+                        class="labor-parto__resumen-total"
+                  >
+                        0
+                  </strong>
+               </div>
+
+               <!-- SALIDAS RECIENTES -->
+               <div class="labor-parto__resumen-indicador">
+                  <span class="labor-parto__resumen-etiqueta">
+                        Salidas recientes
+                  </span>
+
+                  <strong
+                        id="totalSalidasRecientes"
+                        class="labor-parto__resumen-total"
+                  >
+                        0
+                  </strong>
+               </div>
+
+            </div>
+
+         </div>
+
+         <!-- CARD: DETALLE DEL EPISODIO -->
+         <div class="labor-parto__detalle">
+
+            <!-- ENCABEZADO -->
+            <div class="labor-parto__detalle-encabezado">
+
+               <div class="labor-parto_encabezado__titulo">
+                     <span class="material-symbols-outlined">inbox_text_person</span>
+                     <span>Detalle del episodio</span>
+               </div>
+
+            </div>
+
+            <!-- ESTADO VACÍO: NINGÚN EPISODIO SELECCIONADO -->
+            <div
+               id="detallePacienteVacio"
+               class="labor-parto__detalle-vacio"
+            >
+               <span class="material-symbols-outlined">
+                     person_search
+               </span>
+
+               <p>
+                     Seleccione una paciente del listado
+                     para consultar su información.
+               </p>
+            </div>
+
+            <!-- CONTENIDO: EPISODIO SELECCIONADO -->
+            <div
+               id="detalleEpisodio"
+               class="labor-parto__detalle-contenido oculto"
+            >
+
+               <!-- IDENTIFICACIÓN DE LA PACIENTE -->
+               <div class="detalle-episodio__paciente">
+
+                  <div class="detalle-episodio__avatar">
+                        <span class="material-symbols-outlined" aria-hidden="true">
+                           pregnant_woman
+                        </span>
+                  </div>
+
+                  <div class="detalle-episodio__identidad">
+                        <span
+                           id="detalleNombrePacientePublico"
+                           class="detalle-episodio__nombre"
+                        > - - - </span>
+
+                  </div>
+
+               </div>
+
+               <!-- RESUMEN DEL ESTADO Y DEL EPISODIO -->
+               <section class="detalle-episodio__resumen">
+
+                  <!-- ESTADO ACTUAL -->
+                  <div class="detalle-episodio__estado">
+
+                        <div class="detalle-episodio__estado-actual-icono">
+                           
+                        </div>
+
+                        <div class="detalle-episodio__estado-info">
+
+
+                           <div class="detalle-episodio__indicadores">
+                              <span class="detalle-episodio__etiqueta">
+                                 Estado actual
+                              </span>
+                              <span class="detalle-episodio__etiqueta salida oculto" id="detalleSalidaDefinitiva">
+                                 Salida definitiva
+                              </span>
+                              <span class="detalle-episodio__etiqueta salida oculto" id="detalleSalidaTemporal">
+                                 Salida temporal
+                              </span>
+                           </div>
+
+                           <span id="detalleNombreEstado"> - - - - </span>
+
+                           <span id="detalleDescripcionEstado"> - - - - </span>
+
+                        </div>
+
+                  </div>
+
+                  <!-- INFORMACIÓN DEL EPISODIO -->
+                  <div class="detalle-episodio__informacion">
+
+                        <div class="detalle-episodio__dato">
+
+                           <div class="detalle-episodio__dato-icono">
+                              <span class="material-symbols-outlined" aria-hidden="true">
+                                    calendar_month
+                              </span>
+                           </div>
+
+                           <div class="detalle-episodio__dato-contenido">
+                              <span>Ingreso a Labor y Parto</span>
+                              <strong id="detalleFechaIngreso"> - - - </strong>
+                           </div>
+
+                        </div>
+
+                        <div class="detalle-episodio__dato">
+
+                           <div class="detalle-episodio__dato-icono">
+                              <span class="material-symbols-outlined" aria-hidden="true">
+                                    schedule
+                              </span>
+                           </div>
+
+                           <div class="detalle-episodio__dato-contenido">
+                              <span id="detalleTiempoServicioLabel">Tiempo en el servicio</span>
+                              <strong id="detalleTiempoServicio"> - - - </strong>
+                           </div>
+
+                        </div>
+
+                        <div class="detalle-episodio__dato">
+
+                           <div class="detalle-episodio__dato-icono">
+                              <span class="material-symbols-outlined" aria-hidden="true">
+                                    location_on
+                              </span>
+                           </div>
+
+                           <div class="detalle-episodio__dato-contenido">
+                              <span>Unidad de procedencia</span>
+                              <strong id="detalleUnidadProcedencia"> - - - </strong>
+                           </div>
+
+                        </div>
+
+                  </div>
+
+               </section>
+
+               
+               <!-- EVOLUCIÓN DE LABOR Y PARTO -->
+               <section
+                  class="detalle-episodio__evolucion"
+                  aria-label="Historial de Labor y Parto"
+               >
+                  <div class="detalle-episodio__evolucion-encabezado">
+                     <div class="detalle-episodio__evolucion-titulo">
+
+                           <div class="detalle-episodio-evolucion-titulo__icono">
+                              <span
+                                 class="material-symbols-outlined"
+                                 aria-hidden="true"
+                              >
+                                 timeline
+                              </span>
+                           </div>
+
+
+                           <span>Evolución de Labor y Parto</span>
+                     </div>
+                  </div>
+
+                  <div id="lineaTiempoEpisodio" class="detalle-episodio__linea-tiempo">
+
+                  </div>
+               </section>
+
+
+               <!-- INFORMACIÓN DEL BEBÉ -->
+               <section
+                  class="detalle-episodio__bebe"
+                  id="detalleInformacionBebe"
+                  aria-live="polite"
+               >
+               </section>
+            </div>
+
+
+         </div>
+
+         <!-- PIE INFORMATIVO DEL MONITOR -->
+         <footer class="labor-parto__pie-informativo">
+
+            <!-- AVISO DE PRIVACIDAD -->
+            <div class="labor-parto__aviso-privacidad">
+
+               <span
+                  class="material-symbols-outlined"
+                  aria-hidden="true"
+               >
+                  info
+               </span>
+
+               <p>
+                  Esta pantalla muestra únicamente información general.
+                  <br>
+                  Para detalles clínicos, consulte al personal de salud.
+               </p>
+
+            </div>
+
+            <!-- INDICADOR DE ACTUALIZACIÓN -->
+            <div
+               class="labor-parto__actualizacion"
+               aria-live="polite"
+            >
+
+               <div class="labor-parto__actualizacion-spinner">
+                  <span class="material-symbols-outlined" aria-hidden="true">
+                     autorenew
+                  </span>
+               </div>
+
+               <span class="labor-parto__actualizacion-texto">
+                  Próxima actualización en:
+                  <strong id="contadorActualizacion">8 segundos</strong>
+               </span>
+
+               <div
+                  class="labor-parto__actualizacion-progreso"
+                  role="progressbar"
+                  aria-label="Progreso hasta la próxima actualización"
+                  aria-valuemin="0"
+                  aria-valuemax="100"
+                  aria-valuenow="0"
+                  id="barraActualizacion"
+               >
+                  <div
+                     class="labor-parto__actualizacion-progreso-valor"
+                     id="barraActualizacionValor"
+                  ></div>
+               </div>
+
+            </div>
+
+         </footer>
+
+      </div>
+
+
+
+
+   </div>
+
+{% endblock content %}
+
+
+{% block extra_js %}
+{% comment %} 
+   <script
+      src="{% static 'comunicacion_hospitalaria/js/RenderizarPantalla.js' %}"
+      defer
+   ></script>
+
+   <script
+      src="{% static 'comunicacion_hospitalaria/js/ManejarPacientes.js' %}"
+      defer
+   ></script>
+
+   <script
+      src="{% static 'comunicacion_hospitalaria/js/ManejarEstados.js' %}"
+      defer
+   ></script>
+
+   <script
+      src="{% static 'comunicacion_hospitalaria/js/ManejarWebSocket.js' %}"
+      defer
+   ></script>
+{% endcomment %}
+
+<script src="{% static 'core/scripts/helpers/iconos_personalizados.js' %}"></script>
+
+
+<script>
+   document.querySelector(".encabezado-labor-parto__icono").innerHTML = IconosLaborParto.obtener("fetus");
+</script>
+
+<script src="{% static 'core/scripts/features/comunicacionLaborPartoPublico.js' %}"></script>
+
+
+
+{% endblock extra_js %} 

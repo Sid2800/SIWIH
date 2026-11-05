@@ -5,6 +5,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const logo = document.getElementById("logo");
       const aside = document.querySelector(".barra-navegacion");
+      if (!aside) return;
       const spans = aside.querySelectorAll("span");
       const palanca = document.getElementById("switch");
       const bolita = document.getElementById("bolita");

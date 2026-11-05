@@ -192,7 +192,7 @@
                   ></span>
 
                   <span class="labor-parto__filtro-texto">
-                     Altas
+                     Salidas
                   </span>
                </label>
 
@@ -262,28 +262,58 @@
                   <span>Detalle del episodio</span>
                </div>
 
+
+
                <!-- Acción: dar de alta -->
-               <button
-                  type="button"
-                  id="botonDarAlta"
-                  class="labor-parto__boton-accion oculto"
-               >
-                  <i class="bi bi-box-arrow-right"></i>
-                  Dar de alta
-               </button>
+               <div class="detalle-encabezado-contendor-botones">
+                  <button
+                     type="button"
+                     id="botonSalidaTemporal"
+                     class="labor-parto__boton-accion labor-parto__boton-accion--secundario oculto"
+                     title="Registrar salida temporal"
+                  >
+                     <i class="bi bi-scissors"></i>
+                     <span class="texto-boton">Salida temporal</span>
+                  </button>
 
 
-               <!-- Indicador: episodio dado de alta -->
-               <span
-                  id="indicadorAlta"
-                  class="labor-parto__pill-alta oculto"
-               >
-                  <span class="material-symbols-outlined">
-                     check_circle
+                  <!-- Acción: dar de alta -->
+                  <button
+                     type="button"
+                     id="botonDarAlta"
+                     class="labor-parto__boton-accion oculto"
+                  >
+                     <i class="bi bi-box-arrow-right"></i>
+                     Salida Definitiva
+                  </button>
+
+                  <!-- Indicador: episodio dado de alta -->
+                  <span
+                     id="indicadorAlta"
+                     class="labor-parto__pill-alta oculto"
+                  >
+                     <span class="material-symbols-outlined">
+                        check_circle
+                     </span>
+
+                     Salida 
                   </span>
 
-                  Alta
-               </span>
+                  <span
+                     id="indicadorSalidaTemporal"
+                     class="labor-parto__pill-salida-temporal oculto"
+                  >
+                     <span class="material-symbols-outlined">
+                        content_cut
+                     </span>
+
+                     Salida temporal
+                  </span>
+
+               </div>
+
+
+               
          </div>
 
 
@@ -483,12 +513,10 @@
                         id="btnActualizarEstado"
                         class="labor-parto__boton-accion"
                      >
-                        <span class="material-symbols-outlined">
-                           save
-                        </span>
-
-                        Actualizar estado
+                        <span class="material-symbols-outlined">save</span>
+                        <span class="texto-boton">Actualizar estado</span>
                      </button>
+
 
                   </div>
 
@@ -694,30 +722,26 @@
 
 {% block extra_js %}
 
+{{ estados_labor_parto|json_script:"estadosLaborParto" }}
+{{ unidades_entrada_labor_parto|json_script:"unidadesEntradaLaborParto" }}
+{{ unidades_salida_labor_parto|json_script:"unidadesSalidaLaborParto" }}
+
 <script>
+   const estadosLaborParto = JSON.parse(
+      document.getElementById("estadosLaborParto").textContent
+   );
 
-   var estadosLaborParto = null;
-   var unidadesEntradaLaborParto = null;
-   var unidadesSalidaLaborParto = null;
+   const unidadesEntradaLaborParto = JSON.parse(
+      document.getElementById("unidadesEntradaLaborParto").textContent
+   );
 
-   {% if estados_labor_parto %}
-      estadosLaborParto = {{ estados_labor_parto|safe }};
-   {% endif %}
-
-   {% if unidades_entrada_labor_parto %}
-      unidadesEntradaLaborParto = {{ unidades_entrada_labor_parto|safe }};
-   {% endif %}
-
-   {% if unidades_salida_labor_parto %}
-      unidadesSalidaLaborParto = {{ unidades_salida_labor_parto|safe }};
-   {% endif %}
-
+   const unidadesSalidaLaborParto = JSON.parse(
+      document.getElementById("unidadesSalidaLaborParto").textContent
+   );
 
    const usuarioAutenticado = {
       nombre: "{{ request.user.username|escapejs }}"
    };
-
-
 </script>
 
 

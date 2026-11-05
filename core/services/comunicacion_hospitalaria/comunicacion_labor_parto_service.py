@@ -8,16 +8,18 @@ from django.db.models import (
    CharField,
    Case,
    When,
-   Prefetch
+   Prefetch,
+   Window
    )
-from django.db.models.functions import Concat
+from django.db.models.functions import Concat, Lead
 from django.db.models import Max
 from django.utils import timezone
 from django.db import transaction
 from core.constants.choices_constants import EstadoLaborParto, EstadoRegistro, TipoMovimientoLaborParto
-from core.constants.domain_constants import UNIDAD_SALIDA_OBSTETRICIA, UNIDAD_SALIDA_QUIROFANO, UNIDAD_SALIDA_EXTERNO,UNIDADES_ENTRADA_LABOR_PARTO, UNIDADES_SALIDA_LABOR_PARTO
-from core.utils.utilidades_fechas import hora_local_iso, calcular_edad_texto
+from core.constants.domain_constants import UNIDAD_SALIDA_OBSTETRICIA, UNIDAD_SALIDA_QUIROFANO, UNIDAD_SALIDA_EXTERNO,UNIDADES_ENTRADA_LABOR_PARTO, UNIDADES_SALIDA_LABOR_PARTO, LogApp
+from core.utils.utilidades_fechas import hora_local_iso, calcular_edad_texto, calcular_duracion_texto
 from core.utils.utilidades_textos import formatear_dni, formatear_expediente
+from core.utils.utilidades_logging import log_info, log_error, log_warning
 
 
 
@@ -44,16 +46,43 @@ class LaborPartoService:
       if episodio.estado_actual is not None:
 
          return {
-               "texto": EstadoLaborParto.obtener_texto(
-                  episodio.estado_actual
-               ),
-               **EstadoLaborParto.obtener_color(
-                  episodio.estado_actual
-               ),
+            "texto": EstadoLaborParto.obtener_texto(
+               episodio.estado_actual
+            ),
+            "descripcion": EstadoLaborParto.obtener_descripcion(
+               episodio.estado_actual
+            ),
+            **EstadoLaborParto.obtener_color(
+               episodio.estado_actual
+            ),
          }
 
       return None
 
+
+   @classmethod
+   def _obtener_indicador_movimiento(cls, movimiento):
+      # Si es una salida, obtener el indicador de la unidad de destino.
+      if (
+         movimiento.tipo == TipoMovimientoLaborParto.SALIDA
+         and movimiento.unidad_destino_id
+      ):
+         return cls.obtener_indicador_salida(
+               movimiento.unidad_destino_id
+         )
+
+      # Si es un cambio de estado, obtener el indicador del estado nuevo.
+      if movimiento.estado_nuevo is not None:
+         return {
+               "texto": EstadoLaborParto.obtener_texto(
+                  movimiento.estado_nuevo
+               ),
+               **EstadoLaborParto.obtener_color(
+                  movimiento.estado_nuevo
+               ),
+         }
+
+      return None
 
 
    @classmethod
@@ -83,7 +112,6 @@ class LaborPartoService:
          partes.append(f"{horas} hora{'s' if horas != 1 else ''}")
 
       return " ".join(partes) if partes else "0 horas"
-
 
 
    @classmethod
@@ -119,7 +147,6 @@ class LaborPartoService:
       )
 
       return movimiento
-
 
 
    @classmethod
@@ -218,40 +245,51 @@ class LaborPartoService:
       return f"{horas} hora{'s' if horas != 1 else ''}"
 
 
-
    @classmethod
    def obtener_indicador_salida(cls, unidad_id):
-
       indicadores = {
-
          UNIDAD_SALIDA_OBSTETRICIA: {
-            "texto": UNIDADES_SALIDA_LABOR_PARTO.get(UNIDAD_SALIDA_OBSTETRICIA),
-            "color": "rgb(190, 95, 64)",
-            "fondo": "rgba(190, 95, 64, 0.07)",
-            "borderColor": "rgba(190, 95, 64, 0.50)",
-            "icono": "obstetricia",
-            },
-
-         UNIDAD_SALIDA_QUIROFANO: {
-            "texto": UNIDADES_SALIDA_LABOR_PARTO.get(UNIDAD_SALIDA_QUIROFANO),
-            "color": "rgb(91, 91, 98)",
-            "fondo": "rgba(91, 91, 98, 0.07)",
-            "borderColor": "rgba(91, 91, 98, 0.50)",
-            "icono": "quirofano",
+               "texto": UNIDADES_SALIDA_LABOR_PARTO.get(
+                  UNIDAD_SALIDA_OBSTETRICIA
+               ),
+               "descripcion": (
+                  "La paciente regresa a Obstetricia para continuar "
+                  "con su atención y recuperación."
+               ),
+               "color": "rgb(190, 95, 64)",
+               "fondo": "rgba(190, 95, 64, 0.07)",
+               "borderColor": "rgba(190, 95, 64, 0.50)",
+               "icono": "obstetricia",
          },
-
+         UNIDAD_SALIDA_QUIROFANO: {
+               "texto": UNIDADES_SALIDA_LABOR_PARTO.get(
+                  UNIDAD_SALIDA_QUIROFANO
+               ),
+               "descripcion": (
+                  "La paciente es trasladada a Quirófano para recibir "
+                  "atención mediante un procedimiento quirúrgico."
+               ),
+               "color": "rgb(91, 91, 98)",
+               "fondo": "rgba(91, 91, 98, 0.07)",
+               "borderColor": "rgba(91, 91, 98, 0.50)",
+               "icono": "quirofano",
+         },
          UNIDAD_SALIDA_EXTERNO: {
-            "texto": UNIDADES_SALIDA_LABOR_PARTO.get(UNIDAD_SALIDA_EXTERNO),
-            "color": "rgb(116, 117, 47)",
-            "fondo": "rgba(116, 117, 47, 0.07)",
-            "borderColor": "rgba(116, 117, 47, 0.50)",
-            "icono": "referencia",
-         }
-
+               "texto": UNIDADES_SALIDA_LABOR_PARTO.get(
+                  UNIDAD_SALIDA_EXTERNO
+               ),
+               "descripcion": (
+                  "La paciente ha sido trasladada a otro centro hospitalario "
+                  "de atención para continuar con los cuidados necesarios."
+               ),
+               "color": "rgb(116, 117, 47)",
+               "fondo": "rgba(116, 117, 47, 0.07)",
+               "borderColor": "rgba(116, 117, 47, 0.50)",
+               "icono": "referencia",
+         },
       }
 
       return indicadores.get(unidad_id)
-
 
 
    @classmethod
@@ -275,7 +313,6 @@ class LaborPartoService:
          "pagina_actual": pagina_obj.number,
          "total_paginas": paginator.num_pages,
       }
-
 
 
    @classmethod
@@ -327,14 +364,24 @@ class LaborPartoService:
             if estado in estados
          ]
 
+         # Episodios según su estado clínico actual
          if estados_seleccionados:
             filtros |= Q(
                   estado_actual__in=estados_seleccionados,
                   alta=False
             )
-
+            
+         # Salidas: temporales y definitivasQ
          if 5 in filtros_estado:
-            filtros |= Q(alta=True)
+            filtros |= (
+                  Q(alta=True)
+                  |
+                  Q(
+                     alta=False,
+                     movimiento_actual__tipo=TipoMovimientoLaborParto.SALIDA,
+                     movimiento_actual__unidad_destino=UNIDAD_SALIDA_QUIROFANO,
+                  )
+            )
 
          episodios_qs = episodios_qs.filter(filtros)
 
@@ -435,6 +482,10 @@ class LaborPartoService:
          movimiento_tipo = episodio["movimiento_actual__tipo"]
          unidad_destino_id = episodio["movimiento_actual__unidad_destino"]
 
+         episodio["paciente__expediente_numero"] = formatear_expediente(episodio["paciente__expediente_numero"])
+         episodio["paciente__dni"] = formatear_dni(episodio["paciente__dni"])
+
+
          # Mostrar el indicador de salida
          if movimiento_tipo == TipoMovimientoLaborParto.SALIDA:
 
@@ -490,63 +541,113 @@ class LaborPartoService:
 
    @classmethod
    def guardar_episodio(cls, episodio):
-      LaborPartoValidator.validarReglasCriticasEpisodioLaborParto(episodio)
-      nuevo_episodio = Episodio_labor_parto.objects.create(
-         paciente=episodio.paciente,
-         estado_actual=EstadoLaborParto.LABOR,
-         unidad_entrada_id=episodio.unidad_entrada_id,
-         fecha_ingreso=episodio.fecha_ingreso,
-         creado_por_id=episodio.usuario_id,
-         modificado_por_id=episodio.usuario_id,
-      )
+      try:
+         LaborPartoValidator.validarReglasCriticasEpisodioLaborParto(
+            episodio
+         )
 
-      return nuevo_episodio
+         nuevo_episodio = Episodio_labor_parto.objects.create(
+            paciente=episodio.paciente,
+            estado_actual=EstadoLaborParto.LABOR,
+            unidad_entrada_id=episodio.unidad_entrada_id,
+            fecha_ingreso=episodio.fecha_ingreso,
+            creado_por_id=episodio.usuario_id,
+            modificado_por_id=episodio.usuario_id,
+         )
+
+         return nuevo_episodio
+
+      except Exception:
+         log_error(
+            "Error inesperado al crear un episodio de Labor y Parto.",
+            app=LogApp.COMUNICACION,
+            paciente_id=episodio.paciente_id,
+            usuario_id=episodio.usuario_id,
+         )
+         raise
 
 
    @classmethod
    def procesar_movimiento(cls, movimiento):
-      with transaction.atomic():
-         LaborPartoValidator.validarReglasCriticasMovimientoLaborParto(
-            movimiento
+      try:
+         with transaction.atomic():
+               LaborPartoValidator.validarReglasCriticasMovimientoLaborParto(
+                  movimiento
+               )
+
+               episodio = movimiento.episodio
+               movimiento_actual = episodio.movimiento_actual
+
+               # Determinar el estado anterior.
+               if movimiento_actual:
+                  estado_anterior = movimiento_actual.estado_nuevo
+               else:
+                  estado_anterior = EstadoLaborParto.LABOR
+
+               # Crear el nuevo movimiento sin modificar el historial anterior.
+               nuevo_movimiento = Movimiento_labor_parto.objects.create(
+                  episodio=episodio,
+                  tipo=TipoMovimientoLaborParto.CAMBIO_ESTADO,
+                  estado_anterior=estado_anterior,
+                  estado_nuevo=movimiento.estado_nuevo,
+                  unidad_destino=None,
+                  fecha_movimiento=timezone.now(),
+                  usuario=movimiento.usuario,
+                  observacion=movimiento.observacion,
+               )
+
+               # Actualizar el episodio y su referencia al nuevo movimiento.
+               episodio.estado_actual = movimiento.estado_nuevo
+               episodio.movimiento_actual = nuevo_movimiento
+               episodio.save(
+                  update_fields=[
+                     "estado_actual",
+                     "movimiento_actual",
+                  ]
+               )
+
+               return nuevo_movimiento
+
+      except Exception:
+         log_error(
+               "Error al procesar un cambio de estado en Labor y Parto.",
+               app=LogApp.COMUNICACION,
+               episodio_id=movimiento.episodio_id,
+               usuario_id=movimiento.usuario_id,
          )
+         raise
 
-         episodio = movimiento.episodio
-         movimiento_actual = episodio.movimiento_actual
-
-         # Determinar el estado anterior.
-         if movimiento_actual:
-            estado_anterior = movimiento_actual.estado_nuevo
-         else:
-            estado_anterior = EstadoLaborParto.LABOR
-
-         # Crear el nuevo movimiento sin modificar el historial anterior.
-         nuevo_movimiento = Movimiento_labor_parto.objects.create(
-            episodio=episodio,
-            tipo=TipoMovimientoLaborParto.CAMBIO_ESTADO,
-            estado_anterior=estado_anterior,
-            estado_nuevo=movimiento.estado_nuevo,
-            unidad_destino=None,
-            fecha_movimiento=timezone.now(),
-            usuario=movimiento.usuario,
-            observacion=movimiento.observacion,
-         )
-
-         # Actualizar el episodio y su referencia al nuevo movimiento.
-         episodio.estado_actual = movimiento.estado_nuevo
-         episodio.movimiento_actual = nuevo_movimiento
-         episodio.save(
-            update_fields=[
-                  "estado_actual",
-                  "movimiento_actual",
-            ]
-         )
-
-         return nuevo_movimiento
 
 
    @classmethod
    def obtener_episodio_laborParto_detallado(cls, episodio_id):
 
+      def _construir_evento_inicial(episodio, fecha_fin=None):
+         estado_inicial = EstadoLaborParto.LABOR
+
+         return {
+            "id": None,
+            "tipo": None,
+            "tipo_texto": "INICIO DEL EPISODIO",
+            "estado_anterior": None,
+            "estado_anterior_texto": None,
+            "estado_nuevo": estado_inicial,
+            "estado_nuevo_texto": EstadoLaborParto.obtener_texto(
+                  estado_inicial
+            ),
+            "unidad_destino": None,
+            "indicador": {
+                  "texto": EstadoLaborParto.obtener_texto(estado_inicial),
+                  **EstadoLaborParto.obtener_color(estado_inicial),
+            },
+            "fecha_movimiento": hora_local_iso(episodio.fecha_ingreso),
+            "usuario": None,
+            "observacion": None,
+            "es_movimiento_actual": episodio.movimiento_actual is None,
+            "es_salida_temporal": False,
+            "es_alta": False,
+            "duracion": calcular_duracion_texto(episodio.fecha_ingreso, fecha_fin),
+         }
    
       episodio = (
          Episodio_labor_parto.objects
@@ -570,11 +671,19 @@ class LaborPartoService:
                      "unidad_destino__sala",
                      "unidad_destino__servicio_aux",
                      "usuario",
+                  ).annotate(
+                     fecha_siguiente=Window(
+                        expression=Lead("fecha_movimiento"),
+                        order_by=[
+                              F("fecha_movimiento").asc(),
+                              F("id").asc(),
+                        ],
+                     )
                   )
                   .filter(
                      estado=EstadoRegistro.ACTIVO
                   )
-                  .order_by("-fecha_movimiento")
+                  .order_by("-fecha_movimiento", "-id")
                ),
          )
          .filter(
@@ -605,6 +714,7 @@ class LaborPartoService:
          })
 
       movimientos = []
+      movimiento_actual = episodio.movimiento_actual
 
       for movimiento in episodio.movimientos.all():
 
@@ -643,12 +753,56 @@ class LaborPartoService:
                   if movimiento.unidad_destino
                   else None
                ),
+               "indicador": cls._obtener_indicador_movimiento(movimiento),
                "fecha_movimiento": hora_local_iso(
                   movimiento.fecha_movimiento
                ),
+               "duracion": calcular_duracion_texto(
+                  movimiento.fecha_movimiento,
+                  movimiento.fecha_siguiente or timezone.now()
+               ),
                "usuario": movimiento.usuario.get_full_name(),
                "observacion": movimiento.observacion,
+
+               "es_movimiento_actual": (
+                  movimiento_actual is not None
+                  and movimiento.id == movimiento_actual.id
+               ),
+               "es_salida_temporal": (
+                  movimiento.tipo == TipoMovimientoLaborParto.SALIDA
+                  and movimiento.unidad_destino_id == UNIDAD_SALIDA_QUIROFANO
+                  and not (
+                     episodio.alta
+                     and movimiento_actual is not None
+                     and movimiento.id == movimiento_actual.id
+                  )
+               ),
+               "es_alta": (
+                  episodio.alta
+                  and movimiento_actual is not None
+                  and movimiento.id == movimiento_actual.id
+               ),
          })
+
+      ultimo_movimiento = episodio.movimientos.last()
+
+      fecha_fin = (
+         ultimo_movimiento.fecha_movimiento
+         if ultimo_movimiento
+         else None
+      )
+
+      movimientos.append(
+         _construir_evento_inicial(episodio, fecha_fin)
+      )
+
+
+      salida_temporal = (
+         not episodio.alta
+         and movimiento_actual is not None
+         and movimiento_actual.tipo == TipoMovimientoLaborParto.SALIDA
+         and movimiento_actual.unidad_destino_id == UNIDAD_SALIDA_QUIROFANO
+      )
 
       return {
          "id": episodio.id,
@@ -670,6 +824,9 @@ class LaborPartoService:
 
 
          "alta": episodio.alta,
+
+         "salida_temporal": salida_temporal,
+
 
          "fecha_ingreso": hora_local_iso(
                episodio.fecha_ingreso
@@ -713,15 +870,15 @@ class LaborPartoService:
       }
 
 
-
    @classmethod
    def obtener_movimiento_laborParto_detallado(cls, movimiento_id):
-
 
       movimiento = (
          Movimiento_labor_parto.objects
          .select_related(
                "usuario",
+               "episodio",
+               "episodio__movimiento_actual",
          )
          .filter(
                id=movimiento_id,
@@ -732,6 +889,9 @@ class LaborPartoService:
 
       if not movimiento:
          return None
+
+      episodio = movimiento.episodio
+      movimiento_actual = episodio.movimiento_actual
 
       # Obtener el indicador de salida cuando corresponda
       estado_alta_info = None
@@ -744,12 +904,27 @@ class LaborPartoService:
                movimiento.unidad_destino_id
          )
 
-
       return {
-            "movimiento": {
+         "movimiento": {
                "id": movimiento.id,
                "tipo": movimiento.tipo,
                "estado_alta_info": estado_alta_info,
+
+               "es_salida_temporal": (
+                  movimiento.tipo == TipoMovimientoLaborParto.SALIDA
+                  and movimiento.unidad_destino_id == UNIDAD_SALIDA_QUIROFANO
+                  and not (
+                     episodio.alta
+                     and movimiento_actual is not None
+                     and movimiento.id == movimiento_actual.id
+                  )
+               ),
+               "es_alta": (
+                  episodio.alta
+                  and movimiento_actual is not None
+                  and movimiento.id == movimiento_actual.id
+               ),
+
                "tipo_display": movimiento.get_tipo_display(),
                "estado_anterior": movimiento.estado_anterior,
                "estado_anterior_display": movimiento.get_estado_anterior_display(),
@@ -759,163 +934,191 @@ class LaborPartoService:
                "observacion": movimiento.observacion,
                "estado": movimiento.estado,
                "usuario": {
-                     "id": movimiento.usuario_id,
-                     "nombre": movimiento.usuario.username,
+                  "id": movimiento.usuario_id,
+                  "nombre": movimiento.usuario.username,
                },
-            },
-
-         }
+         },
+      }
 
 
    @classmethod
    def gestionarMovimiento(cls, movimiento):
+      try:
+         with transaction.atomic():
 
-      with transaction.atomic():
+               LaborPartoValidator.validarReglasCriticasGestionMovimientoLaborParto(
+                  movimiento
+               )
 
-         LaborPartoValidator.validarReglasCriticasGestionMovimientoLaborParto(movimiento)
+               registro = movimiento.registro
 
-         registro = movimiento.registro
+               observacion_actual = registro.observacion or ""
+               observacion_nueva = movimiento.observacion or ""
 
-         observacion_actual = registro.observacion or ""
-         observacion_nueva = movimiento.observacion or ""
+               observacion_modificada = (
+                  observacion_actual != observacion_nueva
+               )
 
-         observacion_modificada = (
-               observacion_actual != observacion_nueva
-         )
+               if movimiento.activo and not observacion_modificada:
+                  return False
 
-         if movimiento.activo and not observacion_modificada:
-               return False
+               if observacion_modificada:
+                  registro.observacion = movimiento.observacion
+                  registro.save(update_fields=["observacion"])
 
-         if observacion_modificada:
-               registro.observacion = movimiento.observacion
-               registro.save(update_fields=["observacion"])
+               if movimiento.activo:
+                  return True
 
-         if movimiento.activo:
+               cls._desactivar_movimiento(registro)
+
                return True
 
-         cls._desactivar_movimiento(registro)
-
-         return True
+      except Exception:
+         log_error(
+               "Error al gestionar un movimiento de Labor y Parto.",
+               app=LogApp.COMUNICACION,
+               movimiento_id=movimiento.registro_id,
+               episodio_id=movimiento.registro.episodio_id,
+               usuario_id=movimiento.usuario_id,
+         )
+         raise
 
 
    @classmethod
    def registrarAlta(cls, alta):
+      try:
+         with transaction.atomic():
 
-      with transaction.atomic():
+               LaborPartoValidator.validarReglasCriticasAltaLaborParto(
+                  alta
+               )
 
-         LaborPartoValidator.validarReglasCriticasAltaLaborParto(alta)
+               episodio = alta.episodio
 
-         episodio = alta.episodio
+               # Registrar el movimiento de salida
+               movimiento = Movimiento_labor_parto.objects.create(
+                  episodio=episodio,
+                  tipo=TipoMovimientoLaborParto.SALIDA,
+                  estado_anterior=episodio.estado_actual,
+                  estado_nuevo=None,
+                  unidad_destino_id=alta.unidad_destino_id,
+                  fecha_movimiento=timezone.now(),
+                  usuario=alta.usuario,
+                  observacion=alta.observacion,
+               )
 
-         # Registrar el movimiento de salida
-         movimiento = Movimiento_labor_parto.objects.create(
-               episodio=episodio,
-               tipo=TipoMovimientoLaborParto.SALIDA,
-               estado_anterior=episodio.estado_actual,
-               estado_nuevo=None,
-               unidad_destino_id=alta.unidad_destino_id,
-               fecha_movimiento=timezone.now(),
-               usuario=alta.usuario,
-               observacion=alta.observacion,
+               # Registrar el alta del episodio
+               episodio.alta = True
+               episodio.fecha_alta = movimiento.fecha_movimiento
+               episodio.movimiento_actual = movimiento
+
+               episodio.save(update_fields=[
+                  "alta",
+                  "fecha_alta",
+                  "movimiento_actual",
+               ])
+
+               return True
+
+      except Exception:
+         log_error(
+               "Error al registrar el alta de un episodio de Labor y Parto.",
+               app=LogApp.COMUNICACION,
+               episodio_id=alta.episodio_id,
+               usuario_id=alta.usuario_id,
          )
-
-         # Registrar el alta del episodio
-         episodio.alta = True
-         episodio.fecha_alta = movimiento.fecha_movimiento
-         episodio.movimiento_actual = movimiento
-
-         episodio.save(update_fields=[
-               "alta",
-               "fecha_alta",
-               "movimiento_actual",
-         ])
-
-         return True
-
+         raise
 
 
    @classmethod
    def registrarBebe(cls, bebe):
-      with transaction.atomic():
+      try:
+         with transaction.atomic():
 
-         LaborPartoValidator.validarReglasCriticasBebeLaborParto(
-               bebe
-         )
+            LaborPartoValidator.validarReglasCriticasBebeLaborParto(
+                  bebe
+            )
 
-         episodio = bebe.episodio
+            episodio = bebe.episodio
 
-         # Editar o desactivar un bebé existente
-         if bebe.bebe_id is not None:
-               bebe_existente = bebe.bebe
+            # Editar o desactivar un bebé existente
+            if bebe.bebe_id is not None:
+                  bebe_existente = bebe.bebe
 
-               # Desactivar bebé: guardar únicamente estado y observaciones
-               if bebe.estado is False:
-                  bebe_existente.estado = False
-                  bebe_existente.observacion = bebe.observacion
+                  # Desactivar bebé: guardar únicamente estado y observaciones
+                  if bebe.estado is False:
+                     bebe_existente.estado = False
+                     bebe_existente.observacion = bebe.observacion
 
-                  bebe_existente.save(
-                     update_fields=["estado", "observacion"]
-                  )
+                     bebe_existente.save(
+                        update_fields=["estado", "observacion"]
+                     )
+
+                     return {
+                        "accion": "desactivado",
+                        "bebe": bebe_existente,
+                     }
+
+                  # Editar bebé: guardar únicamente los campos modificados
+                  update_fields = []
+
+                  if bebe_existente.sexo != bebe.sexo:
+                     bebe_existente.sexo = bebe.sexo
+                     update_fields.append("sexo")
+
+                  if bebe_existente.fecha_nacimiento != bebe.fecha_nacimiento:
+                     bebe_existente.fecha_nacimiento = bebe.fecha_nacimiento
+                     update_fields.append("fecha_nacimiento")
+
+                  if bebe_existente.observacion != bebe.observacion:
+                     bebe_existente.observacion = bebe.observacion
+                     update_fields.append("observacion")
+
+                  if update_fields:
+                     bebe_existente.save(update_fields=update_fields)
+                     accion = "actualizado"
+                  else:
+                     accion = "sin_cambios"
 
                   return {
-                     "accion": "desactivado",
+                     "accion": accion,
                      "bebe": bebe_existente,
                   }
 
-               # Editar bebé: guardar únicamente los campos modificados
-               update_fields = []
+            # Registrar un bebé nuevo como activo
+            ultimo_orden = (
+                  Bebe_labor_parto.objects
+                  .filter(episodio=episodio, estado=EstadoRegistro.ACTIVO)
+                  .aggregate(orden_maximo=Max("orden"))["orden_maximo"]
+                  or 0
+            )
 
-               if bebe_existente.sexo != bebe.sexo:
-                  bebe_existente.sexo = bebe.sexo
-                  update_fields.append("sexo")
+            nuevo_bebe = Bebe_labor_parto.objects.create(
+                  episodio=episodio,
+                  sexo=bebe.sexo,
+                  fecha_nacimiento=bebe.fecha_nacimiento,
+                  observacion=bebe.observacion,
+                  estado=True,
+                  orden=ultimo_orden + 1,
+            )
 
-               if bebe_existente.fecha_nacimiento != bebe.fecha_nacimiento:
-                  bebe_existente.fecha_nacimiento = bebe.fecha_nacimiento
-                  update_fields.append("fecha_nacimiento")
-
-               if bebe_existente.observacion != bebe.observacion:
-                  bebe_existente.observacion = bebe.observacion
-                  update_fields.append("observacion")
-
-               if update_fields:
-                  bebe_existente.save(update_fields=update_fields)
-                  accion = "actualizado"
-               else:
-                  accion = "sin_cambios"
-
-               return {
-                  "accion": accion,
-                  "bebe": bebe_existente,
-               }
-
-         # Registrar un bebé nuevo como activo
-         ultimo_orden = (
-               Bebe_labor_parto.objects
-               .filter(episodio=episodio, estado=EstadoRegistro.ACTIVO)
-               .aggregate(orden_maximo=Max("orden"))["orden_maximo"]
-               or 0
+            return {
+                  "accion": "creado",
+                  "bebe": nuevo_bebe,
+            }
+      except Exception:
+         log_error(
+               "Error al gestionar el registro de un bebé en Labor y Parto.",
+               app=LogApp.COMUNICACION,
+               episodio_id=bebe.episodio_id,
+               bebe_id=bebe.bebe_id,
          )
-
-         nuevo_bebe = Bebe_labor_parto.objects.create(
-               episodio=episodio,
-               sexo=bebe.sexo,
-               fecha_nacimiento=bebe.fecha_nacimiento,
-               observacion=bebe.observacion,
-               estado=True,
-               orden=ultimo_orden + 1,
-         )
-
-         return {
-               "accion": "creado",
-               "bebe": nuevo_bebe,
-         }
-
-
+         raise
 
 
    @classmethod
    def obtener_bebe_laborParto_detallado(cls, bebe_id):
-
+      
       bebe = (
          Bebe_labor_parto.objects
          .filter(
@@ -942,3 +1145,162 @@ class LaborPartoService:
          },
       }
 
+
+   @classmethod
+   def registrarSalidaTemporal(cls, data, usuario):
+      try:
+         with transaction.atomic():
+               episodio_id = data.get("episodio_id")
+
+               episodio, unidad_salida = (
+                  LaborPartoValidator.validarReglasCriticasSalidaTemporal(
+                     episodio_id
+                  )
+               )
+
+               nuevo_movimiento = Movimiento_labor_parto.objects.create(
+                  episodio=episodio,
+                  tipo=TipoMovimientoLaborParto.SALIDA,
+                  estado_anterior=episodio.estado_actual,
+                  estado_nuevo=None,
+                  unidad_destino=unidad_salida,
+                  fecha_movimiento=timezone.now(),
+                  usuario=usuario,
+                  observacion=None,
+               )
+
+               episodio.estado_actual = None
+               episodio.movimiento_actual = nuevo_movimiento
+
+               episodio.save(
+                  update_fields=[
+                     "estado_actual",
+                     "movimiento_actual",
+                  ]
+               )
+
+               return True
+
+      except Exception:
+         log_error(
+               "Error al registrar una salida temporal de Labor y Parto.",
+               app=LogApp.COMUNICACION,
+               episodio_id=data.get("episodio_id"),
+               usuario_id=getattr(usuario, "id", None),
+         )
+         raise
+
+
+   @classmethod
+   def listar_episodios_publicos(cls):
+      from datetime import timedelta
+      ahora = timezone.now()
+      limite = ahora - timedelta(hours=12)
+
+      episodios_qs = (
+         Episodio_labor_parto.objects
+         .filter(
+               estado=EstadoRegistro.ACTIVO,
+         )
+         .select_related(
+               "paciente",
+               "movimiento_actual",
+               "movimiento_actual__unidad_destino",
+         )
+         .filter(
+               Q(alta=False)
+               |
+               Q(
+                  alta=True,
+                  movimiento_actual__fecha_movimiento__gte=limite,
+               )
+         )
+         .order_by("-fecha_ingreso")
+      )
+
+      episodios = list(
+         episodios_qs.values(
+               "id",
+               "paciente__primer_nombre",
+               "paciente__segundo_nombre",
+               "paciente__primer_apellido",
+               "paciente__segundo_apellido",
+               "paciente__dni",
+               "paciente__expediente_numero",
+               "estado_actual",
+               "alta",
+               "movimiento_actual__tipo",
+               "movimiento_actual__unidad_destino",
+               "fecha_ingreso",
+         )
+      )
+
+      total_atencion = 0
+      total_salidas_temporales = 0
+      total_salidas_recientes = 0
+
+
+      for episodio in episodios:
+
+         movimiento_tipo = episodio["movimiento_actual__tipo"]
+         unidad_destino_id = episodio["movimiento_actual__unidad_destino"]
+         alta = episodio["alta"]
+
+
+         episodio["paciente__expediente_numero"] = formatear_expediente(episodio["paciente__expediente_numero"])
+
+         if alta:
+            total_salidas_recientes += 1
+
+         elif movimiento_tipo == TipoMovimientoLaborParto.SALIDA:
+            total_salidas_temporales += 1
+
+         else:
+            total_atencion += 1
+
+         if movimiento_tipo == TipoMovimientoLaborParto.SALIDA:
+
+               indicador = cls.obtener_indicador_salida(
+                  unidad_destino_id
+               )
+
+               if indicador:
+                  episodio["estado_actual_texto"] = indicador["texto"]
+                  episodio["estado_actual_color"] = {
+                     clave: valor
+                     for clave, valor in indicador.items()
+                     if clave != "texto"
+                  }
+               else:
+                  episodio["estado_actual_texto"] = None
+                  episodio["estado_actual_color"] = None
+
+         elif episodio["estado_actual"] is not None:
+
+               episodio["estado_actual_texto"] = (
+                  EstadoLaborParto.obtener_texto(
+                     episodio["estado_actual"]
+                  )
+               )
+
+               episodio["estado_actual_color"] = (
+                  EstadoLaborParto.obtener_color(
+                     episodio["estado_actual"]
+                  )
+               )
+
+         else:
+               episodio["estado_actual_texto"] = None
+               episodio["estado_actual_color"] = None
+
+         episodio["fecha_ingreso"] = hora_local_iso(
+               episodio["fecha_ingreso"]
+         )
+
+      return {
+         "total": len(episodios),
+         "total_atencion": total_atencion,
+         "total_salidas_temporales": total_salidas_temporales,
+         "total_salidas_recientes": total_salidas_recientes,
+         "episodios": episodios,
+      }

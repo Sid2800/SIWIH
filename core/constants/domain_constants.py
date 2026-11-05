@@ -77,8 +77,6 @@ class LogApp:
     ATENCION = "atencion"
     AGENDA = "agenda"
     COMUNICACION = "comunicacion"
-
-    
     S_EXP = "s_exp"          # Solicitud/Préstamo de Expedientes
 
 class EstadoTemporalPeriodo(str, Enum):

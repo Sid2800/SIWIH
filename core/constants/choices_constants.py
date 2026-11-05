@@ -161,35 +161,34 @@ class EstadoLaborParto(models.IntegerChoices):
 
         colores = {
 
-    cls.LABOR: {
-        "color": "rgb(83, 108, 166)",
-        "fondo": "rgba(83, 108, 166, 0.06)",
-        "borderColor": "rgba(83, 108, 166, 0.50)",
-        "icono": "trabajo_parto",
-    },
+            cls.LABOR: {
+                "color": "rgb(83, 108, 166)",
+                "fondo": "rgba(83, 108, 166, 0.06)",
+                "borderColor": "rgba(83, 108, 166, 0.50)",
+                "icono": "trabajo_parto",
+            },
 
-    cls.EXPULSIVO: {
-        "color": "rgb(150, 63, 82)",
-        "fondo": "rgba(150, 63, 82, 0.07)",
-        "borderColor": "rgba(150, 63, 82, 0.50)",
-        "icono": "expulsivo",
-    },
+            cls.EXPULSIVO: {
+                "color": "rgb(150, 63, 82)",
+                "fondo": "rgba(150, 63, 82, 0.07)",
+                "borderColor": "rgba(150, 63, 82, 0.50)",
+                "icono": "expulsivo",
+            },
 
-    cls.PUERPERIO_INMEDIATO: {
-        "color": "rgb(65, 137, 113)",
-        "fondo": "rgba(65, 137, 113, 0.06)",
-        "borderColor": "rgba(65, 137, 113, 0.50)",
-        "icono": "puerperio_inmediato",
-    },
+            cls.PUERPERIO_INMEDIATO: {
+                "color": "rgb(65, 137, 113)",
+                "fondo": "rgba(65, 137, 113, 0.06)",
+                "borderColor": "rgba(65, 137, 113, 0.50)",
+                "icono": "puerperio_inmediato",
+            },
 
-    cls.INTERMEDIO: {
-        "color": "rgb(143, 103, 166)",
-        "fondo": "rgba(143, 103, 166, 0.06)",
-        "borderColor": "rgba(143, 103, 166, 0.50)",
-        "icono": "cuidados_intermedios",
-    },
-
-}
+            cls.INTERMEDIO: {
+                "color": "rgb(143, 103, 166)",
+                "fondo": "rgba(143, 103, 166, 0.06)",
+                "borderColor": "rgba(143, 103, 166, 0.50)",
+                "icono": "cuidados_intermedios",
+            },
+        }
 
         return colores.get(estado)
 
@@ -201,6 +200,30 @@ class EstadoLaborParto(models.IntegerChoices):
             )
 
         return cls(estado)
+
+    @classmethod
+    def obtener_descripcion(cls, estado):
+        descripciones = {
+            cls.LABOR: (
+                "La paciente se encuentra en trabajo de parto "
+                "y permanece bajo atención del personal de salud."
+            ),
+            cls.EXPULSIVO: (
+                "La paciente se encuentra en la etapa del nacimiento "
+                "del bebé, bajo atención del personal de salud."
+            ),
+            cls.PUERPERIO_INMEDIATO: (
+                "Después del nacimiento, la mamá permanece bajo "
+                "vigilancia y recibe cuidados durante las primeras "
+                "horas de recuperación."
+            ),
+            cls.INTERMEDIO: (
+                "La paciente recibe atención y vigilancia "
+                "en la unidad de cuidados intermedios."
+            ),
+        }
+
+        return descripciones.get(estado, "")
 
 
 

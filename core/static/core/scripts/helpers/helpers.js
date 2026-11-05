@@ -51,6 +51,22 @@ function concatenarLimpio(...args) {
 
 
 
+function escaparHTML(valor) {
+   const caracteres = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;"
+   };
+
+   return String(valor ?? "").replace(
+      /[&<>"']/g,
+      caracter => caracteres[caracter]
+   );
+}
+
+
 
 //#region  Busquedas publicas
 
@@ -200,11 +216,8 @@ const API_URLS = {
    registrarAltaLaborParto: urls['registrarAltaLaborParto'],
    procesarBebeLaborParto: urls['procesarBebeLaborParto'],
    obtenerBebeLaborParto: urls['obtenerBebeLaborParto'],
-
-
-
-   
-
+   registrarSalidaTemporalLaborParto: urls['registrarSalidaTemporalLaborParto'],
+   listarEpisodiosPublicoAPI: urls['listarEpisodiosPublicoAPI'],
 };
 
 /**

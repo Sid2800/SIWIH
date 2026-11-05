@@ -54,6 +54,8 @@
    /*Para REsaltar*/
    --verdeOscuro: rgb(15, 47, 44);
    --borde-depuracion: 1px solid aquamarine;
+   --borde-depuracion2: 1px solid red;
+
 
 
 
@@ -105,9 +107,55 @@
 
    /*Radio Botton */
    --colorRadioBotonActivo: rgb(73, 168, 88);
-   --colorEliminarRojo  : rgba(220, 53, 69, 0.9)
+   --colorEliminarRojo  : rgba(220, 53, 69, 0.9);
 
+     /* COLORES LABOR Y PARTO */
+   --lp-color-primario: rgb(70, 115, 175);
+   --lp-color-primario-hover: rgb(55, 95, 150);
+   --lp-color-azul-institucional: rgb(47, 79, 121);
 
+   --lp-fondo-contenedor-tabla: rgba(0, 0, 0, 0.025);
+
+   --lp-fondo-fila-seleccionada: rgba(59, 130, 246, 0.20);
+   --lp-fondo-fila-seleccionada-hover: rgba(59, 130, 246, 0.30);
+   --lp-fondo-fila-hover: rgba(70, 115, 175, 0.08);
+
+   --lp-color-icono-titulo-modal: #4A80B8;
+   --lp-fondo-icono-titulo-modal: rgba(74, 128, 184, 0.10);
+
+   --lp-color-icono-paciente: #D45A91;
+   --lp-fondo-icono-paciente: rgba(212, 90, 145, 0.10);
+
+    /* Unidad seleccionada */
+   --lp-color-unidad-seleccionada: #438A8C;
+   --lp-fondo-unidad-seleccionada: rgba(67, 138, 140, 0.07);
+   --lp-borde-unidad-seleccionada: rgba(67, 138, 140, 0.55);
+   --lp-sombra-unidad-seleccionada: rgba(67, 138, 140, 0.10);
+
+    /* Hover de unidad */
+   --lp-fondo-unidad-hover: rgba(67, 138, 140, 0.04);
+   --lp-borde-unidad-hover: rgba(67, 138, 140, 0.45);
+
+     /* HOMBRE */
+   --lp-sexo-hombre: #3976B8;
+   --lp-sexo-hombre-fondo: rgba(57, 118, 184, 0.08);
+   --lp-sexo-hombre-borde: rgba(57, 118, 184, 0.55);
+   --lp-sexo-hombre-sombra: rgba(57, 118, 184, 0.10);
+
+    /* MUJER */
+   --lp-sexo-mujer: #C45F8A;
+   --lp-sexo-mujer-fondo: rgba(196, 95, 138, 0.08);
+   --lp-sexo-mujer-borde: rgba(196, 95, 138, 0.55);
+   --lp-sexo-mujer-sombra: rgba(196, 95, 138, 0.10);
+
+    /* NO IDENTIFICADO */
+   --lp-sexo-no-identificado: #6B7280;
+   --lp-sexo-no-identificado-fondo: rgba(107, 114, 128, 0.08);
+   --lp-sexo-no-identificado-borde: rgba(107, 114, 128, 0.50);
+   --lp-sexo-no-identificado-sombra: rgba(107, 114, 128, 0.10);
+
+   --lp-fondo-pie-informativo-inicio: #EAF2FC;
+   --lp-fondo-pie-informativo-fin: #F1F6FC;
    
 }
 
@@ -159,7 +207,55 @@
 
 
    --sombra-card: 0 .2rem 1rem rgba(255, 255, 255, .05);
-   
+
+
+
+     /* COLORES LABOR Y PARTO */
+
+   --lp-fondo-contenedor-tabla: rgba(0, 0, 0, 0.025);
+   --lp-color-azul-institucional: rgb(140, 166, 200);
+
+   --lp-fondo-fila-seleccionada: rgba(59, 130, 246, 0.25);
+   --lp-fondo-fila-seleccionada-hover: rgba(59, 130, 246, 0.35);
+   --lp-fondo-fila-hover: rgba(70, 115, 175, 0.16);
+
+   --lp-color-icono-titulo-modal: #82A9D1;
+   --lp-fondo-icono-titulo-modal: rgba(74, 128, 184, 0.16);
+
+   --lp-color-icono-paciente: #E47BAA;
+   --lp-fondo-icono-paciente: rgba(212, 90, 145, 0.16);
+
+    /* Unidad seleccionada */
+   --lp-color-unidad-seleccionada: #70B9B8;
+   --lp-fondo-unidad-seleccionada: rgba(67, 138, 140, 0.18);
+   --lp-borde-unidad-seleccionada: rgba(112, 185, 184, 0.65);
+   --lp-sombra-unidad-seleccionada: rgba(112, 185, 184, 0.16);
+
+    /* Hover de unidad */
+   --lp-fondo-unidad-hover: rgba(67, 138, 140, 0.12);
+   --lp-borde-unidad-hover: rgba(112, 185, 184, 0.50);
+
+
+     /* HOMBRE */
+   --lp-sexo-hombre: #75A9E0;
+   --lp-sexo-hombre-fondo: rgba(57, 118, 184, 0.18);
+   --lp-sexo-hombre-borde: rgba(117, 169, 224, 0.65);
+   --lp-sexo-hombre-sombra: rgba(117, 169, 224, 0.16);
+
+    /* MUJER */
+   --lp-sexo-mujer: #E28FB2;
+   --lp-sexo-mujer-fondo: rgba(196, 95, 138, 0.18);
+   --lp-sexo-mujer-borde: rgba(226, 143, 178, 0.65);
+   --lp-sexo-mujer-sombra: rgba(226, 143, 178, 0.16);
+
+    /* NO IDENTIFICADO */
+   --lp-sexo-no-identificado: #A5ACB8;
+   --lp-sexo-no-identificado-fondo: rgba(107, 114, 128, 0.20);
+   --lp-sexo-no-identificado-borde: rgba(165, 172, 184, 0.60);
+   --lp-sexo-no-identificado-sombra: rgba(165, 172, 184, 0.15);
+
+   --lp-fondo-pie-informativo-inicio: #26384F;
+   --lp-fondo-pie-informativo-fin: #303F54;
 }
 
 

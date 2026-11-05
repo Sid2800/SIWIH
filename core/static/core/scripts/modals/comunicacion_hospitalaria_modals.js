@@ -22,25 +22,25 @@ const RenderizarPacienteLaborParto = (function () {
                <div class="labor-parto__paciente-datos">
 
                   <span class="modalLaborPartoPacienteNombre">
-                     ${nombre}
+                     ${escaparHTML(nombre)}
                   </span>
 
 
 
                      <div class="labor-parto__dato">
                            <span class="labor-parto__dato-etiqueta">DNI:</span>
-                           <strong>${paciente.dni}</strong>
+                           <strong>${escaparHTML(paciente.dni)}</strong>
                      </div>
 
                      <div class="labor-parto__dato">
                            <span class="labor-parto__dato-etiqueta">Expediente:</span>
-                           <strong>${paciente.expediente_numero}</strong>
+                           <strong>${escaparHTML(paciente.expediente_numero)}</strong>
                      </div>
 
                      <div class="labor-parto__dato">
                            <span class="labor-parto__dato-etiqueta">Edad:</span>
-                           <strong>${paciente.edad}</strong>
-                     </div
+                           <strong>${escaparHTML(paciente.edad)}</strong>
+                     </div>
                </div>
          </div>
       `);
@@ -91,7 +91,7 @@ const ManejarEpisodioLaborParto = (function () {
             <input
                type="radio"
                name="unidadEntrada"
-               value="${id}"
+               value="${escaparHTML(id)}"
             >
 
             <span class="material-symbols-outlined">
@@ -99,7 +99,7 @@ const ManejarEpisodioLaborParto = (function () {
             </span>
 
             <span>
-               ${nombre}
+               ${escaparHTML(nombre)}
             </span>
          `;
 
@@ -115,6 +115,7 @@ const ManejarEpisodioLaborParto = (function () {
          primeraOpcion.checked = true;
       }
    }
+
 
    function inicializarEstadoInicial() {
 
@@ -145,7 +146,7 @@ const ManejarEpisodioLaborParto = (function () {
    }
 
 
-    //#region Modal
+   //#region Modal
 
    async function open(config = {}) {
 
@@ -155,9 +156,7 @@ const ManejarEpisodioLaborParto = (function () {
          ...config
       };
 
-
       const modal = await Swal.fire({
-
          title: `<div class="icono-titulo-modal"><span class="material-symbols-outlined">pregnant_woman</span></div>${estado.modo === "editar" ? "Editar Episodio" : "Agregar Episodio"}`,
 
          html: `
@@ -331,17 +330,14 @@ const ManejarEpisodioLaborParto = (function () {
             didOpen: () => inicializar(),
 
             preConfirm: async () => {
-               await procesarGuardado();
+               return await procesarGuardado();
             },
-
       });
 
       return modal.isConfirmed
          ? modal.value
          : null;
    }
-
-
     //#endregion
 
 
@@ -364,7 +360,6 @@ const ManejarEpisodioLaborParto = (function () {
 
 
    function inicializarControles() {
-
       controles = {
 
          formulario:document.getElementById("formulario-modal-episodio-labor-parto"),
@@ -384,64 +379,59 @@ const ManejarEpisodioLaborParto = (function () {
    }
 
 
-    //#endregion
+   //#endregion
 
 
-    //#region Paciente
+   //#region Paciente
 
-      async function inicializarPaciente() {
+   async function inicializarPaciente() {
 
-         controles.virtualPaciente = VirtualSelect.init({
-            ele: "#modal-labor-parto-paciente",
-            search: true,
-            placeholder: "Buscar paciente...",
-            searchPlaceholderText: "Buscar paciente...",
-            hasOptionDescription: true,
-            additionalClasses: 'custom-wrapper',
-            additionalDropboxClasses: 'custom-dropbox',
-            onServerSearch: buscarPacientes,
-         });
+      controles.virtualPaciente = VirtualSelect.init({
+         ele: "#modal-labor-parto-paciente",
+         search: true,
+         placeholder: "Buscar paciente...",
+         searchPlaceholderText: "Buscar paciente...",
+         hasOptionDescription: true,
+         additionalClasses: 'custom-wrapper',
+         additionalDropboxClasses: 'custom-dropbox',
+         onServerSearch: buscarPacientes,
+      });
 
-         const slect = document.querySelector('#modal-labor-parto-paciente')
-         slect._changeHandler  = function (){
-               const options = slect.getSelectedOptions();
-               if (!options) { 
-                  controles.pacienteInfo.value = ""; 
-                  return; 
-               }
-               controles.pacienteInfo.value = options.customData || "";
-         }
-
-         slect.addEventListener('change', slect._changeHandler);
-
+      const slect = document.querySelector('#modal-labor-parto-paciente')
+      slect._changeHandler  = function (){
+            const options = slect.getSelectedOptions();
+            if (!options) { 
+               controles.pacienteInfo.value = ""; 
+               return; 
+            }
+            controles.pacienteInfo.value = options.customData || "";
       }
 
+      slect.addEventListener('change', slect._changeHandler);
 
-      async function buscarPacientes(searchValue,virtualSelect) {
+   }
 
-         if (!searchValue || searchValue.length < 2) {
-            virtualSelect.setServerOptions([]);
-            return;
-         }
 
-         const data = await fetchData(API_URLS.busquedaPaciente,{valor_buscado:searchValue});
+   async function buscarPacientes(searchValue,virtualSelect) {
 
-         const opciones = data.map(item => ({
-            value: item.id,
-            label: item.nombre_completo_interno,
-            customData:item.info,
-            description:item.info,
-         }));
-
-         virtualSelect.setServerOptions(opciones);
-
+      if (!searchValue || searchValue.length < 2) {
+         virtualSelect.setServerOptions([]);
+         return;
       }
 
+      const data = await fetchData(API_URLS.busquedaPaciente,{valor_buscado:searchValue});
 
-    //#endregion
+      const opciones = data.map(item => ({
+         value: item.id,
+         label: item.nombre_completo_interno,
+         customData:item.info,
+         description:item.info,
+      }));
 
+      virtualSelect.setServerOptions(opciones);
 
-    //#region Fecha de ingreso
+   }
+
 
    function inicializarFechaIngreso() {
 
@@ -459,19 +449,7 @@ const ManejarEpisodioLaborParto = (function () {
    }
 
 
-    //#endregion
-
-
-
-    //#endregion
-
-
-
-
-
-
-    //#region Validaciones
-
+   //#region Validaciones
    function validarCampos() {
 
       const paciente =
@@ -535,7 +513,7 @@ const ManejarEpisodioLaborParto = (function () {
     //#endregion
 
 
-    //#region Persistencia
+   //#region Persistencia
 
    async function procesarGuardado() {
 
@@ -611,15 +589,7 @@ const ManejarEpisodioLaborParto = (function () {
       }
    }
 
-
-   async function editarEpisodio(formData) {
-
-      // POST editar episodio
-
-   }
-
-
-    //#endregion
+   //#endregion
 
 
    return {
@@ -650,8 +620,7 @@ const ManejarMovimientoLaborParto = (function () {
       };
 
       const modal = await Swal.fire({
-
-         title: `<div class="icono-titulo-modal"><span class="material-symbols-outlined">sync_alt </span></div>Cambiar estado`,
+         title: `<div class="icono-titulo-modal"><span class="material-symbols-outlined">${estado.episodio?.salida_temporal ? "assignment_return" : "sync_alt"}</span></div>${estado.episodio?.salida_temporal ? "Registrar retorno a Labor y Parto" : "Cambiar estado"}`,
 
          html: `
                <div class="tituloFormulario-subrallado"></div>
@@ -853,7 +822,7 @@ const ManejarMovimientoLaborParto = (function () {
     //#endregion
 
 
-    //#region Inicialización
+   //#region Inicialización
 
    function inicializar() {
 
@@ -876,12 +845,10 @@ const ManejarMovimientoLaborParto = (function () {
 
          selectorEstados: document.querySelector("#formulario-modal-movimiento-labor-parto .modalLaborPartoSelectorEstados"),
          observacion: document.getElementById("modal-movimiento-observacion"),
-
       };
-
    }
 
-    //#endregion
+   //#endregion
 
    function inicializarPaciente() {
       const episodio = estado.episodio;
@@ -948,7 +915,6 @@ const ManejarMovimientoLaborParto = (function () {
       );
 
       opciones.forEach((opcion) => {
-
          const estadoObj = estadosLaborParto.find(
                (item) => item.value == opcion.dataset.estado
          );
@@ -1026,15 +992,12 @@ const ManejarMovimientoLaborParto = (function () {
       if (!formData) {
          return false;
       }
-
-
       return await guardarMovimiento(formData);
 
    }
 
 
    async function guardarMovimiento(formData) {
-
       if (!formData) {
          return false;
       }
@@ -1107,11 +1070,9 @@ const ManejarMovimientoLaborParto = (function () {
 })();
 
 
-
 const ManejarDetalleMovimientoLaborParto = (function () {
 
     //#region Estado
-
    let estado = {};
    estado.movimiento = null;
    estado.movimiento_id = null;
@@ -1130,7 +1091,7 @@ const ManejarDetalleMovimientoLaborParto = (function () {
       };
 
       const modal = await Swal.fire({
-         title: `<div class="icono-titulo-modal"><span class="material-symbols-outlined">sync_alt </span></div>Detalle  movimiento`,
+         title: `<div class="icono-titulo-modal"><span id="iconoTituloMovimiento" class="material-symbols-outlined">sync_alt </span></div><div id="tituloMovimiento">Detalle  movimiento</div>`,
 
          html: `
             <div class="tituloFormulario-subrallado"></div>
@@ -1342,7 +1303,19 @@ const ManejarDetalleMovimientoLaborParto = (function () {
 
    async function inicializar() {
       inicializarControles();
-      await obtener_movimiento();
+
+      try {
+         await obtener_movimiento();
+      } catch (error) {
+         toastr.error(
+            error.message,
+            "Error al obtener el movimiento"
+         );
+
+         Swal.close();
+         return;
+      }
+
       inicializarPaciente();
       inicializarContextoEpisodio();
       inicializarMovimiento();
@@ -1352,6 +1325,9 @@ const ManejarDetalleMovimientoLaborParto = (function () {
       controles = {
          formulario: document.getElementById("formulario-modal-detalle-movimiento-labor-parto"),
          datosPaciente: document.getElementById("datosPacienteDetalleMovimiento"),
+         // titulo
+         iconoTitulo: document.getElementById("iconoTituloMovimiento"),
+         titulo: document.getElementById("tituloMovimiento"),
          
          // CONTEXTO DEL EPISODIO
          fechaIngreso: document.getElementById("modal-detalle-episodio-fecha-ingreso"),
@@ -1386,34 +1362,22 @@ const ManejarDetalleMovimientoLaborParto = (function () {
 
 
    async function obtener_movimiento() {
-
       if (!estado.movimiento_id) {
-         return;
+         throw new Error("No se recibió un movimiento válido.");
       }
 
-      try {
-         const data = await fetchData(
-            API_URLS.obtenerMovimientoLaborParto,
-            {
-               id: estado.movimiento_id,
-            }
-         );
-
-         if (!data) {
-            return;
+      const data = await fetchData(
+         API_URLS.obtenerMovimientoLaborParto,
+         {
+            id: estado.movimiento_id,
          }
+      );
 
-         estado.movimiento = data.movimiento;
-
-      } catch (error) {
-         toastr.error(
-            error.message,
-            "Error al obtener el movimiento"
-         );
-
+      if (!data?.movimiento) {
+         throw new Error("No se pudo recuperar la información del movimiento.");
       }
-      
-   
+
+      estado.movimiento = data.movimiento;
    }
     //#region Paciente
 
@@ -1437,7 +1401,6 @@ const ManejarDetalleMovimientoLaborParto = (function () {
    function inicializarContextoEpisodio() {
       const episodio = estado.episodio;
 
-
       if (!episodio) {
          return;
       }
@@ -1447,14 +1410,11 @@ const ManejarDetalleMovimientoLaborParto = (function () {
                                           ? `${formatearFechaLocal(episodio.fecha_ingreso)} - ${formatearHoraLocal(episodio.fecha_ingreso)}`
                                           : "-";
 
-
       const estadoActual = episodio.estado_actual_info;
-
-
 
       if (estadoActual) {
          controles.estadoActual.textContent = episodio.alta
-            ? `ALTA · ${estadoActual.texto}`
+            ? `SALIDA · ${estadoActual.texto}`
             : estadoActual.texto;
 
          controles.detalleEstadoActual.textContent =
@@ -1481,52 +1441,108 @@ const ManejarDetalleMovimientoLaborParto = (function () {
 
    }  
 
+
    function inicializarMovimiento(){
       const movimiento = estado.movimiento;
       if (!movimiento) {
          return;
       }
 
-      // ESTADO ANTERIOR
-      const estadoAnterior = estadosLaborParto.find(estado => estado.value === movimiento.estado_anterior);
-      controles.contenedorEstadoAnterior.style.setProperty("--color-estado", estadoAnterior.color);
-      controles.contenedorEstadoAnterior.style.setProperty("--fondo-estado", estadoAnterior.fondo);
-      controles.contenedorEstadoAnterior.style.setProperty("--border-color-estado", estadoAnterior.borderColor);
-      controles.iconoEstadoAnterior.innerHTML =IconosLaborParto.obtener(estadoAnterior.icono);
-      controles.textoEstadoAnterior.textContent = movimiento.estado_anterior_display;
+      const esSalidaTemporal = movimiento.es_salida_temporal === true;
+      const esAlta = movimiento.es_alta === true;
 
-
-      // ESTADO NUEVO
-
-      let estadoNuevo = estadosLaborParto.find(estado => estado.value === movimiento.estado_nuevo);
-      
-
-      if (
-         !estadoNuevo &&
-         movimiento.estado_alta_info
-      ) {
-         estadoNuevo = movimiento.estado_alta_info;
+      if (esSalidaTemporal) {
+         controles.iconoTitulo.textContent = "content_cut";
+         controles.titulo.textContent = "Detalle salida temporal";
+      } else if (esAlta) {
+         controles.iconoTitulo.textContent = "logout";
+         controles.titulo.textContent = "Detalle de alta";
+      } else {
+         controles.iconoTitulo.textContent = "sync_alt";
+         controles.titulo.textContent = "Detalle movimiento";
       }
 
+      // ESTADO ANTERIOR
+      let estadoAnterior = estadosLaborParto.find(
+         estado => estado.value === movimiento.estado_anterior
+      );
 
-      controles.contenedorEstadoNuevo.style.setProperty("--color-estado", estadoNuevo.color);
-      controles.contenedorEstadoNuevo.style.setProperty("--fondo-estado", estadoNuevo.fondo);
-      controles.contenedorEstadoNuevo.style.setProperty("--border-color-estado",estadoNuevo.borderColor);
-      controles.iconoEstadoNuevo.innerHTML = IconosLaborParto.obtener(estadoNuevo.icono);
-      controles.textoEstadoNuevo.textContent = movimiento.estado_nuevo_display || estadoNuevo.texto;
+      // Si no existe estado anterior, utilizar el indicador de QUIRÓFANO
+      if (!estadoAnterior && unidadesSalidaLaborParto) {
+         estadoAnterior = unidadesSalidaLaborParto["31"];
+      }
+
+      if (estadoAnterior) {
+         controles.contenedorEstadoAnterior.style.setProperty(
+            "--color-estado",
+            estadoAnterior.color
+         );
+
+         controles.contenedorEstadoAnterior.style.setProperty(
+            "--fondo-estado",
+            estadoAnterior.fondo
+         );
+
+         controles.contenedorEstadoAnterior.style.setProperty(
+            "--border-color-estado",
+            estadoAnterior.borderColor
+         );
+
+         controles.iconoEstadoAnterior.innerHTML =
+            IconosLaborParto.obtener(estadoAnterior.icono);
+
+         controles.textoEstadoAnterior.textContent =
+            movimiento.estado_anterior_display || estadoAnterior.texto;
+      }
+
+      // ESTADO NUEVO
+      let estadoNuevo;
+
+      if ( movimiento.estado_alta_info) {
+         // Alta definitiva
+         estadoNuevo = movimiento.estado_alta_info;
+      } else {
+         // Estado normal de Labor y Parto
+         estadoNuevo = estadosLaborParto.find(
+            estado => estado.value === movimiento.estado_nuevo
+         );
+      }
+
+      if (estadoNuevo) {
+         controles.contenedorEstadoNuevo.style.setProperty(
+            "--color-estado",
+            estadoNuevo.color
+         );
+
+         controles.contenedorEstadoNuevo.style.setProperty(
+            "--fondo-estado",
+            estadoNuevo.fondo
+         );
+
+         controles.contenedorEstadoNuevo.style.setProperty(
+            "--border-color-estado",
+            estadoNuevo.borderColor
+         );
+
+         controles.iconoEstadoNuevo.innerHTML =
+            IconosLaborParto.obtener(estadoNuevo.icono);
+
+         controles.textoEstadoNuevo.textContent =
+            movimiento.estado_nuevo_display || estadoNuevo.texto;
+      }
+
 
       controles.tipoMovimiento.textContent = movimiento.tipo_display;
       controles.fechaMovimiento.textContent = movimiento.fecha_movimiento
                                           ? `${formatearFechaLocal(movimiento.fecha_movimiento)} - ${formatearHoraLocal(movimiento.fecha_movimiento)}`
                                           : "-";
                                           
-      controles.usuarioResponsable.textContent = movimiento.usuario.nombre;
+      controles.usuarioResponsable.textContent = movimiento.usuario?.nombre || "No disponible";
       controles.observacion.value = movimiento.observacion;
       
    }
 
     //#endregion
-
 
 
     //#region Validaciones
@@ -1546,7 +1562,6 @@ const ManejarDetalleMovimientoLaborParto = (function () {
 
    async function procesarGuardado(mantenerActivo = true) {
       Swal.resetValidationMessage();
-
       const formData = validarCampos();
 
       if (!formData) {
@@ -1658,14 +1673,6 @@ const ManejarAltaLaborParto = (function () {
 
 
    function inicializarUnidadesSalida() {
-
-      const iconos = {
-         "23": "breastfeeding",
-         "31": "content_cut",
-         "35": "outbound",
-      };
-
-
       const unidades = estado.unidadesSalida;
 
       if (!unidades || !controles.unidadesSalida) {
@@ -1674,37 +1681,39 @@ const ManejarAltaLaborParto = (function () {
 
       controles.unidadesSalida.innerHTML = "";
 
-      Object.entries(unidades).forEach(([id, nombre]) => {
-
+      Object.entries(unidades).forEach(([id, unidad]) => {
          const opcion = document.createElement("label");
 
          opcion.className = "labor-parto__opcion-unidad";
          opcion.dataset.unidad = id;
 
          opcion.innerHTML = `
-               <input
-                  type="radio"
-                  name="unidadSalida"
-                  value="${id}"
-                  required
-               >
+            <input
+               type="radio"
+               name="unidadSalida"
+               value="${escaparHTML(id)}"
+               required
+            >
 
-               <span class="material-symbols-outlined">
-                  ${iconos[id] || "location_on"}
-               </span>
+            <span class="labor-parto__opcion-unidad-icono">
+               ${IconosLaborParto.obtener(unidad.icono)}
+            </span>
 
-               <span class="labor-parto__opcion-unidad-texto">
-                  ${nombre}
-               </span>
+            <span class="labor-parto__opcion-unidad-texto">
+               ${escaparHTML(unidad.texto)}
+            </span>
          `;
+
+         opcion.style.setProperty("--color-estado", unidad.color);
+         opcion.style.setProperty("--fondo-estado", unidad.fondo);
+         opcion.style.setProperty("--border-color-estado", unidad.borderColor);
 
          controles.unidadesSalida.appendChild(opcion);
       });
 
-      const primeraOpcion =
-         controles.unidadesSalida.querySelector(
-            'input[name="unidadSalida"]'
-         );
+      const primeraOpcion = controles.unidadesSalida.querySelector(
+         'input[name="unidadSalida"]'
+      );
 
       if (primeraOpcion) {
          primeraOpcion.checked = true;
@@ -1733,7 +1742,7 @@ const ManejarAltaLaborParto = (function () {
 
       const modal = await Swal.fire({
 
-         title: `<div class="icono-titulo-modal"><span class="material-symbols-outlined">logout</span></div>Dar de alta`,
+         title: `<div class="icono-titulo-modal"><span class="material-symbols-outlined">logout</span></div>Salida Definitiva`,
          html: `
                <div class="tituloFormulario-subrallado"></div>
 
@@ -1761,7 +1770,7 @@ const ManejarAltaLaborParto = (function () {
 
                   <fieldset class="modalLaborPartoCampos">
 
-                     <legend>Información del alta</legend>
+                     <legend>Información de la salida</legend>
 
                      <div class="informacionAltaLaborParto">
 
@@ -1770,7 +1779,7 @@ const ManejarAltaLaborParto = (function () {
                               <i class="bi bi-calendar-event"></i>
 
                               <div>
-                                 <label>Fecha y hora del alta</label>
+                                 <label>Fecha y hora de la salida</label>
 
                                  <div
                                        id="modal-alta-fecha-hora"
@@ -1786,7 +1795,7 @@ const ManejarAltaLaborParto = (function () {
                               <i class="bi bi-person-badge"></i>
 
                               <div>
-                                 <label>Responsable del alta</label>
+                                 <label>Responsable de la salida</label>
 
                                  <div
                                        id="modal-alta-responsable"
@@ -1825,11 +1834,9 @@ const ManejarAltaLaborParto = (function () {
          showCloseButton: true,
          showLoaderOnConfirm: true,
 
-         confirmButtonText:
-               '<i class="bi bi-floppy-fill"></i> Dar de alta',
+         confirmButtonText:'<i class="bi bi-floppy-fill"></i>Alta',
 
-         cancelButtonText:
-               '<i class="bi bi-x-circle-fill"></i> Cancelar',
+         cancelButtonText:'<i class="bi bi-x-circle-fill"></i> Cancelar',
 
          customClass: {
                popup: "contenedor-modal-episodio-labor-parto",
@@ -2163,7 +2170,7 @@ const ManejarBebeLaborParto = (function () {
 
                      </div>
 
-                     <div class="labor-parto__bebe-grid"">
+                     <div class="labor-parto__bebe-grid">
                         <div class="formularioCampoModal">
                            <label for="modal-bebe-orden">
                               Orden de nacimiento:
@@ -2243,7 +2250,14 @@ const ManejarBebeLaborParto = (function () {
 
                if (esEdicion) {
                   await obtenerBebe();
+
+                  if (!estado.bebe) {
+                     Swal.close();
+                     return;
+                  }
+
                   llenarFormulario();
+
                   Swal.getDenyButton()?.classList.remove("oculto");
                }
                inicializarOrden();
@@ -2354,8 +2368,6 @@ const ManejarBebeLaborParto = (function () {
 
 
    //#region Datos iniciales
-
-
    function inicializarOrden() {
       const esEdicion = Boolean(estado.bebeId);
 
@@ -2366,8 +2378,8 @@ const ManejarBebeLaborParto = (function () {
       controles.orden.value = `# ${orden}`;
    }
 
-   function obtenerSiguienteOrden() {
 
+   function obtenerSiguienteOrden() {
       const bebes = estado.episodio.bebes || [];
 
       if (!bebes.length) {
@@ -2380,7 +2392,6 @@ const ManejarBebeLaborParto = (function () {
    }
 
 
-   
    function inicializarPaciente() {
       const episodio = estado.episodio;
 
@@ -2398,9 +2409,7 @@ const ManejarBebeLaborParto = (function () {
    }
 
 
-
    function llenarFormulario() {
-
       const bebe = estado.bebe;
 
       controles.selectorSexo.querySelector(
@@ -2431,7 +2440,7 @@ const ManejarBebeLaborParto = (function () {
 
       if (!sexoSeleccionado) {
          Swal.showValidationMessage(
-               "Selecciona una unidad de salida."
+               "Selecciona el sexo del bebé."
          );
          return false;
       }
@@ -2448,7 +2457,6 @@ const ManejarBebeLaborParto = (function () {
          return false;
       }
 
-            
 
       const observacion =
          controles.observacion.value.trim();
@@ -2538,11 +2546,7 @@ const ManejarBebeLaborParto = (function () {
    }
 
 
-
-
-
    async function guardarBebe(datos) {
-
       try {
          const response = await fetch(
                API_URLS.procesarBebeLaborParto,
@@ -2559,9 +2563,6 @@ const ManejarBebeLaborParto = (function () {
          );
 
          const data = await response.json();
-
-
-
 
          if (response.status === 400) {
 
@@ -2593,10 +2594,8 @@ const ManejarBebeLaborParto = (function () {
                );
          }
 
-
          mostrarMensajeBebe(data.accion);
          return data;
-
 
       } catch (error) {
 
@@ -2619,26 +2618,7 @@ const ManejarBebeLaborParto = (function () {
    //#endregion
 
 
-   //#region CSRF
 
-   function obtenerCookie(nombre) {
-
-      const cookies = document.cookie
-         .split(";")
-         .map(cookie => cookie.trim());
-
-      const cookie = cookies.find(
-         valor => valor.startsWith(`${nombre}=`)
-      );
-
-      return cookie
-         ? decodeURIComponent(
-               cookie.substring(nombre.length + 1)
-         )
-         : null;
-   }
-
-   //#endregion
 
 
    return {

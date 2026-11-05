@@ -214,7 +214,12 @@ def _silenciar_polling_filter(record):
     """
     msg = record.getMessage()
     # Solo silenciar respuestas exitosas (200, 304) a endpoints de polling
-    rutas_polling = ['/s_exp/api/changes-check/', '/s_exp/api/alertas/']
+    rutas_polling = [
+        '/s_exp/api/changes-check/',
+        '/s_exp/api/alertas/',
+        '/listar-episodios-publico-API/',
+        '/obtener-episodio-labor-parto/',
+    ]
     for ruta in rutas_polling:
         if ruta in msg:
             # No silenciar si hay error (4xx, 5xx)

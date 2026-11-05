@@ -1184,8 +1184,6 @@ const ManejarDiaLaboral = (function (){
             return;
         }
 
-        console.log(opciones.value);
-
         const nuevo = {
             id: null, // null mientras no exista en BD,
             tipoAtencionId: Number(opciones.value),
