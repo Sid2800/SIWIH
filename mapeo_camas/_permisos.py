@@ -296,7 +296,7 @@ def _validar_mapeo_no_iniciado(usuario):
     """Valida que NO haya una sesión de mapeo en proceso (EN_PROGRESO).
     
     IMPORTANTE: Esta validación SOLO aplica a usuarios con rol/unidad MAPEO_CAMAS_INTENTOS_CAMBIO
-    (digitador en ADMI/SALA). Los demás usuarios pueden hacer cambios libremente.
+    (digitador en ENF). Los demás usuarios pueden hacer cambios libremente.
     
     Retorna JsonResponse 400 si existe una sesión activa y el usuario es restringido; 
     en caso contrario None.

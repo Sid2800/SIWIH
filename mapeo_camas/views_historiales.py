@@ -50,6 +50,7 @@ class MapeoCamasHistorialDetalleView(LoginRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+
         context["titulo"] = "Detalle de Historial"
         context["subtitulo"] = "Cards de detalle por registro"
         return context

@@ -714,7 +714,7 @@ function mapearAcompaniante(data) {
                                                                         mensajes: [mensaje]
                                                                     });
                         
-                        if (resultado) {
+                        if (resultadoModal) {
                             // Desactiva el botón aquí para evitar múltiples clics
                             botonInactivar.disabled = true;
 
