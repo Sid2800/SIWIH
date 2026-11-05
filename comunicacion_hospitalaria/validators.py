@@ -330,7 +330,8 @@ class LaborPartoValidator:
    def validarReglasCriticasBebeLaborParto(cls, bebe):
       # Validar que el episodio exista
       bebe.episodio = cls._validarEpisodioLaborParto(
-         bebe.episodio_id
+         bebe.episodio_id,
+         bloquear=True
       )
 
       # Evitar gestionar bebés de un episodio que ya tiene alta

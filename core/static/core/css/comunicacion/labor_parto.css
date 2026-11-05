@@ -6,6 +6,14 @@
 }
 
 
+.tituloFormulario-texto {
+   padding-bottom: .5rem;
+}
+
+.tituloFormulario-texto .formularioBotones-boton {
+   margin-left: auto;
+}
+
 
 .labor-parto {
    display: grid;
@@ -19,7 +27,7 @@
 .labor-parto__listado,
 .labor-parto__detalle {
    min-width: 0;
-   min-height: 0;
+   min-height: 0;                     
    box-sizing: border-box;
    
    display: flex;

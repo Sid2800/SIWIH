@@ -11,6 +11,11 @@ document.addEventListener("DOMContentLoaded", () => {
       const bolita = document.getElementById("bolita");
       const menu = document.querySelector(".ocultar-mostrar-barra-navegacion");
       const main = document.querySelector("main");
+      // ICONO SVG PARA LABOR 
+      const contenedorIconoLaborParto = document.getElementById('bn-labor-parto');
+      if (contenedorIconoLaborParto) {
+         contenedorIconoLaborParto.innerHTML = IconosLaborParto.obtener('fetus');
+      }
 
       const botonCerrarSesion = document.getElementById("bp-cerrar-usuario__boton");
 

@@ -12,7 +12,16 @@
       <div class="tituloFormulario-texto">
          <span class="material-symbols-outlined">breastfeeding</span>
          <h2 class="sin-margen">Pacientes en Labor y Parto</h2>
+
+         <a href="{% url 'monitor_labor_parto_publico' %}" class="formularioBotones-boton">
+            <i class="bi bi-display formularioBotones-icono"></i>
+            <span>PORTAL</span> 
+      </a>
+         
       </div>
+
+
+      
 
       <div class="tituloFormulario-subrallado"></div>
    </div>
@@ -341,7 +350,7 @@
          <!-- ================================= -->
          <div
                id="detalleEpisodio"
-               class="labor-parto__detalle-contenido"
+               class="labor-parto__detalle-contenido oculto"
          >
 
                <!-- Cabecera paciente -->
@@ -743,10 +752,6 @@
       nombre: "{{ request.user.username|escapejs }}"
    };
 </script>
-
-
-<script src="{% static 'core/scripts/helpers/iconos_personalizados.js' %}"></script>
-
 
 <script src="{% static 'core/scripts/modals/comunicacion_hospitalaria_modals.js' %}"></script>
 

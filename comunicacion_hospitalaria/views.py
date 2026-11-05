@@ -411,8 +411,6 @@ def procesarBebeLaborParto(request):
    try:
       data = parse_json_request(request)
 
-      print(data)
-
       bebe = LaborPartoValidator.validarArgumentosBebeLaborParto(
          data,
          request.user,

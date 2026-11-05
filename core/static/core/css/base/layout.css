@@ -201,6 +201,24 @@
    padding: 0 1rem 0 1rem;
 }
 
+.bn-navegacion-enlace__logo--labor-parto {
+   display: flex;
+   justify-content: center;
+   align-items: center;
+   margin: 0 .4rem 0 .65rem;
+   padding: 0;
+   max-height: 4.6rem;
+   width: 4rem;
+}
+
+
+.bn-navegacion-enlace__logo--labor-parto svg {
+   width: 100%;
+
+   display: block;
+   flex-shrink: 0;
+}
+
 
 .bn-navegacion__enlace:hover {
    background-color: var(--colorMenuHover);

@@ -37,15 +37,20 @@
                </a>
             </li>
 
+
+
+            {% if request.user|tiene_unidad:"ENF:" %}
+
             <li>
                <a href="{% url 'monitor_labor_parto' %}" class="bn-navegacion__enlace" title="Monitor de Labor y Parto">
-                  <i class="bi bi-heart-pulse bn-navegacion-enlace__logo"></i>
+                  <div id="bn-labor-parto" class="bn-navegacion-enlace__logo bn-navegacion-enlace__logo--labor-parto">
+                  
+                  </div>
                   <span class="bn-navegacion-enlace__texto">Labor y Parto</span>
                </a>
             </li>
+            {% endif %}
 
-
-            
 
                {% if request.user|tiene_unidad:"ADMI:" %}
                <li>
