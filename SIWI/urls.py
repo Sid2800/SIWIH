@@ -33,7 +33,7 @@ urlpatterns = [
     path('clinico/',include('clinico.urls')),
     path('agenda-medica/',include('agenda_medica.urls')),
     path('rrhh/',include('rrhh.urls')),
-
+    path('comunicacion_hospitalaria/',include('comunicacion_hospitalaria.urls')),
 
     path('s_exp/',include('s_exp.urls')),
     path('admin/', admin.site.urls),

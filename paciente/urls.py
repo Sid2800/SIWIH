@@ -4,7 +4,9 @@ from . import views
 
 busquedas = [
     path('busqueda-censo/', views.busqueda_censo, name='busqueda-censo'),
-    path('busqueda-paciente/', views.busquedaPacientesAPI, name='busqueda-paciente'),
+    path('busqueda-pacientes/', views.busquedaPacientesAPI, name='busqueda_pacientes'),
+    path('busqueda-paciente/', views.buscarPacienteAPI, name='busqueda_paciente'),
+
     path('obtener-paciente-censo/', views.obtener_paciente_censo, name='obtener-paciente-censo'),
     path('obtener-padre/', views.obtener_padre, name='obtener-padre'),
     path('busqueda-avanzada/', views.busquedaAvanzada, name='busqueda_avanzada'),

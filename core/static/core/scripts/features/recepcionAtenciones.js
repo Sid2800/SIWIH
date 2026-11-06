@@ -38,7 +38,6 @@ document.addEventListener('DOMContentLoaded', function () {
         };
     });
 
-    console.log(ingresosFormateados);
             
     let pendientes = [...ingresosFormateados];
     let porRecibir = [];
@@ -142,7 +141,7 @@ document.addEventListener('DOMContentLoaded', function () {
         timeout = setTimeout(() => {
             const search = busquedaPendientes.value.toLowerCase();
             const servicio = servicioSelect.value;
-            console.log(pendientes);
+            
             let filtered = pendientes.filter(exp => {
                 const coincideTexto = exp.nombre.toLowerCase().includes(search) || exp.exp.toString().includes(search) || exp.dni.toString().includes(search);
                 const coincideServicio = servicio === 'todos' || exp.idServicio == servicio;

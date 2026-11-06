@@ -62,3 +62,25 @@ def validar_booleano(valor, nombre_campo="campo"):
     )
 
 
+def validar_texto_opcional(valor, nombre_campo="campo", max_length=255):
+
+    if valor is None:
+        return None
+
+    if not isinstance(valor, str):
+        raise ValidationError(
+            f"El campo {nombre_campo} debe ser texto válido."
+        )
+
+    valor = valor.strip()
+
+    if not valor:
+        return None
+
+    if len(valor) > max_length:
+        raise ValidationError(
+            f"El campo {nombre_campo} no puede superar "
+            f"los {max_length} caracteres."
+        )
+
+    return valor

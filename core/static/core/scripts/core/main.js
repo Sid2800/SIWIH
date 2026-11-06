@@ -5,11 +5,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const logo = document.getElementById("logo");
       const aside = document.querySelector(".barra-navegacion");
+      if (!aside) return;
       const spans = aside.querySelectorAll("span");
       const palanca = document.getElementById("switch");
       const bolita = document.getElementById("bolita");
       const menu = document.querySelector(".ocultar-mostrar-barra-navegacion");
       const main = document.querySelector("main");
+      // ICONO SVG PARA LABOR 
+      const contenedorIconoLaborParto = document.getElementById('bn-labor-parto');
+      if (contenedorIconoLaborParto) {
+         contenedorIconoLaborParto.innerHTML = IconosLaborParto.obtener('fetus');
+      }
 
       const botonCerrarSesion = document.getElementById("bp-cerrar-usuario__boton");
 

@@ -869,6 +869,7 @@ legend{
 
 #modal-defuncion-motivo,
 #modal-atencion-observacion,
+.formularioCampoModal textarea,
 .formularioCampo textarea {
    height: auto;
    max-height: 8rem;
@@ -2857,6 +2858,7 @@ select[disabled] {
 .modalCadaverCampos,
 .modalAgregarEditarEstudio,
 .modalSeguimientoTIC,
+.modalLaborPartoCampos,
 .modalNoAtencion{
    width: 100%;
    padding: 2.1rem 1.5rem 1.5rem 1.5rem;
@@ -2870,6 +2872,7 @@ select[disabled] {
    font-family: var(--fuenteTablaTitulo);
 }
 .modalObitoCampos,
+.modalLaborPartoCampos,
 .modalDefuncionCampos{
    padding: 1.5rem;
    row-gap: 1rem;
@@ -4956,9 +4959,10 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
 
 .contenedor-modal-galeria,
 .contenedor-modal-obito,
-.contenedor-modal-periodo-laboral,
+.contenedor-modal-episodio-labor-parto,
 .contenedor-modal-dia-laboral,
 .contenedor-modal-ausencia,
+.contenedor-modal-labor-parto,
 .contenedor-modal-procesos{
    background-color: var(--colorContendor);
    width: 98%;
@@ -4967,6 +4971,7 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
 
 .contenedor-modal-galeria.swal2-popup,
 .contenedor-modal-ausencia.swal2-popup,
+.contenedor-modal-episodio-labor-parto.swal2-popup,
 .contenedor-modal-periodo-laboral.swal2-popup{
    grid-template-columns: 1fr;
 }
@@ -4982,6 +4987,7 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
 .contenedor-modal-obito .tituloFormulario-subrallado,
 .contenedor-modal-periodo-laboral .tituloFormulario-subrallado,
 .contenedor-modal-ausencia .tituloFormulario-subrallado,
+.contenedor-modal-episodio-labor-parto .tituloFormulario-subrallado,
 .contenedor-modal-procesos .tituloFormulario-subrallado{
    margin-bottom: 1.2rem;
    height: .3rem;
@@ -5048,6 +5054,7 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
    /*modal*/
    .contenedor-modal-galeria,
    .contenedor-modal-obito,
+   .contenedor-modal-episodio-labor-parto,
    .contenedor-modal-periodo-laboral,
    .contenedor-modal-ausencia,
    .contenedor-modal-procesos{

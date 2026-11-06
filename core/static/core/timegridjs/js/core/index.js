@@ -953,7 +953,9 @@ const TimeGrid = ( function () {
       function inicializarListenersHeader() {
          Object.values(controles.views).forEach(input => {
                input.addEventListener("change", function () {
-                  cambiarVista(this.value)
+                  estado.view = this.value;
+                  cambiarVista()
+
                });
 
          });
