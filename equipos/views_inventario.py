@@ -22,6 +22,7 @@ from .models import (
     EstadoDispositivo,
     MarcaDispositivo,
     ModeloDispositivo,
+    PlanMantenimiento,
     TipoDispositivo,
 )
 from .decorators import exige_editar_equipos, exige_ver_equipos
@@ -504,6 +505,29 @@ def detalle_dispositivo(request, dispositivo_id):
     # por que esa garantia vence mas tarde de lo que dice el contrato.
     pausas = list(garantia.garantia.pausas.all()) if garantia.tiene_garantia else []
 
+    # El preventivo de este equipo, si alguien lo programo. La ficha dice las
+    # dos fechas que de verdad importan -cuando se hizo la ultima y cuando
+    # toca la siguiente- porque es lo primero que se pregunta al mirar un
+    # aparato, y no estaba en ninguna pantalla.
+    plan = (
+        PlanMantenimiento.objects.filter(dispositivo=dispositivo)
+        .select_related("responsable")
+        .first()
+    )
+
+    ultima_realizada = plan.ultima_realizada if plan else None
+    proxima_visita = plan.proxima_visita if plan else None
+
+    # Las ultimas hojas de trabajo donde aparece este aparato. Se limita a
+    # diez: el historial completo vive en el listado de ordenes, y una ficha
+    # con doscientas filas deja de ser una ficha.
+    atenciones = (
+        dispositivo.atenciones_mantenimiento.select_related(
+            "orden", "orden__tipo", "orden__operario"
+        )
+        .order_by("-orden__fecha", "-id")[:10]
+    )
+
     return render(
         request,
         'equipos/detalle_dispositivo_equipos.html',
@@ -521,6 +545,10 @@ def detalle_dispositivo(request, dispositivo_id):
             "garantia": garantia,
             "garantia_css": CSS_ESTADO_GARANTIA.get(garantia.estado, ""),
             "pausas": pausas,
+            "plan_mantenimiento": plan,
+            "ultima_realizada": ultima_realizada,
+            "proxima_visita": proxima_visita,
+            "atenciones": atenciones,
             **contexto_imagenes,
         }
     )

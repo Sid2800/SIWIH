@@ -5755,6 +5755,12 @@ tbody tr:last-child .botonTablaBajar{
    --verde-oscuro: #0f766e;
    --rojo: #b91c1c;
 
+   /* El mismo teal cuando va de texto o de borde en lugar de fondo. Como
+      fondo, --verde-oscuro lleva texto blanco encima y se lee igual en los
+      dos temas; como texto sobre el panel oscuro no se distingue del fondo,
+      asi que necesita su propio valor. */
+   --eq-acento-texto: var(--verde-oscuro);
+
    /* Avisos en rojo dentro de los paneles del catalogo. */
    --eq-aviso-fondo: rgba(220, 53, 69, .12);
    --eq-aviso-borde: rgba(220, 53, 69, .45);
@@ -9630,6 +9636,10 @@ form.equipos-catalogo__buscador {
       necesario para que siga leyendose como rojo. */
    --rojo: #f87171;
 
+   /* Lo mismo con el teal cuando va de texto: #0f766e sobre el panel oscuro
+      queda practicamente invisible. El fondo teal no se toca. */
+   --eq-acento-texto: #5eead4;
+
    --eq-aviso-fondo: rgba(220, 53, 69, .18);
    --eq-aviso-borde: rgba(248, 113, 113, .55);
    --eq-aviso-texto: #fca5a5;
@@ -9723,4 +9733,507 @@ form.equipos-catalogo__buscador {
    el velo claro de por defecto deslumbra. */
 .darkmode .equipos-procedencias__dialogo::backdrop {
    background-color: rgba(0, 0, 0, .65);
+}
+
+
+/* =====================================================================
+   MANTENIMIENTO
+   Calendario, planes y hoja de trabajo.
+
+   Todo el color sale de las variables del modulo declaradas arriba, asi que
+   el modo oscuro no necesita ni una regla propia aqui: cambiando --eq-panel y
+   los grises, estas pantallas se voltean solas. Es justamente el error que se
+   corrigio en el catalogo -colores escritos dentro de cada regla sobre
+   variables inexistentes- y no tiene sentido repetirlo.
+   ===================================================================== */
+
+.equipos-mantenimiento__accesos {
+   display: flex;
+   flex-wrap: wrap;
+   gap: 1rem;
+   margin-bottom: 2rem;
+}
+
+.equipos-mantenimiento__boton-nueva {
+   background-color: var(--verde-oscuro);
+   color: var(--eq-sobre-acento);
+}
+
+.equipos-mantenimiento__bloque {
+   background-color: var(--eq-panel);
+   border: 1px solid var(--eq-borde-campo);
+   border-radius: 8px;
+   padding: 1.6rem;
+   margin-bottom: 2rem;
+}
+
+/* El bloque de lo atrasado se marca en rojo porque es lo unico de la pantalla
+   que exige una decision hoy. */
+.equipos-mantenimiento__bloque--alerta {
+   border-color: var(--eq-aviso-borde);
+   background-color: var(--eq-aviso-fondo);
+}
+
+.equipos-mantenimiento__bloque-titulo {
+   display: flex;
+   align-items: center;
+   justify-content: space-between;
+   gap: 1rem;
+   margin-bottom: 1.2rem;
+}
+
+.equipos-mantenimiento__bloque-titulo h3 {
+   font-size: 1.6rem;
+   display: flex;
+   align-items: center;
+   gap: .6rem;
+}
+
+.equipos-mantenimiento__contador {
+   background-color: var(--gris-claro);
+   border-radius: 999px;
+   padding: .2rem 1rem;
+   font-weight: 600;
+   min-width: 3rem;
+   text-align: center;
+}
+
+.equipos-mantenimiento__tabla {
+   width: 100%;
+   border-collapse: collapse;
+}
+
+.equipos-mantenimiento__tabla th,
+.equipos-mantenimiento__tabla td {
+   padding: .7rem .8rem;
+   text-align: left;
+   border-bottom: 1px solid var(--eq-borde-campo);
+}
+
+.equipos-mantenimiento__tabla small {
+   display: block;
+   color: var(--gris-texto);
+}
+
+.equipos-mantenimiento__fecha-vencida {
+   color: var(--rojo);
+   font-weight: 600;
+}
+
+.equipos-mantenimiento__vacio,
+.equipos-mantenimiento__nota {
+   color: var(--gris-texto);
+   font-size: 1.35rem;
+   margin: .4rem 0;
+}
+
+.equipos-mantenimiento__nota--aviso {
+   color: var(--rojo);
+}
+
+.equipos-mantenimiento__accion {
+   background: none;
+   border: 1px solid var(--eq-borde-campo);
+   border-radius: 6px;
+   padding: .3rem .9rem;
+   cursor: pointer;
+   color: inherit;
+   font-size: 1.3rem;
+   text-decoration: none;
+   display: inline-block;
+}
+
+.equipos-mantenimiento__accion:hover {
+   border-color: var(--eq-acento-texto);
+   color: var(--eq-acento-texto);
+}
+
+/* ---------------------------------------------------------------------
+   Calendario
+   Se dibuja como una lista de dias con tarjeta y no como una rejilla de mes,
+   a proposito: un dia puede llevar quince equipos, y en una casilla de rejilla
+   eso se convierte en "+12 mas" que obliga a abrir cada dia para saber que
+   toca.
+   --------------------------------------------------------------------- */
+.equipos-calendario__controles {
+   display: flex;
+   flex-wrap: wrap;
+   align-items: end;
+   gap: 1.6rem;
+   margin-bottom: 2rem;
+}
+
+.equipos-calendario__navegacion {
+   display: flex;
+   align-items: center;
+   gap: 1rem;
+}
+
+.equipos-calendario__mes {
+   font-size: 1.7rem;
+   min-width: 16rem;
+   text-align: center;
+}
+
+.equipos-calendario__responsable {
+   display: flex;
+   flex-direction: column;
+   gap: .3rem;
+}
+
+.equipos-calendario__responsable span {
+   font-size: 1.3rem;
+   color: var(--gris-texto);
+}
+
+.equipos-calendario {
+   display: grid;
+   gap: 1.2rem;
+}
+
+.equipos-calendario__dia {
+   background-color: var(--eq-panel);
+   border: 1px solid var(--eq-borde-campo);
+   border-left: 4px solid var(--eq-borde-campo);
+   border-radius: 8px;
+   padding: 1.2rem 1.4rem;
+}
+
+.equipos-calendario__dia--hoy {
+   border-left-color: var(--eq-acento-texto);
+}
+
+/* El fin de semana se marca de otro color porque solo aparece cuando alguien
+   dijo que si puede trabajarlo: verlo distinto evita pensar que es un error
+   del calculo. */
+.equipos-calendario__dia--finde {
+   background-color: var(--gris-claro);
+}
+
+.equipos-calendario__dia-titulo {
+   display: flex;
+   justify-content: space-between;
+   align-items: baseline;
+   margin-bottom: .8rem;
+   text-transform: capitalize;
+}
+
+.equipos-calendario__dia-total {
+   font-size: 1.3rem;
+   color: var(--gris-texto);
+}
+
+.equipos-calendario__visitas,
+.equipos-calendario__atrasadas {
+   list-style: none;
+   margin: 0;
+   padding: 0;
+   display: grid;
+   gap: .6rem;
+}
+
+.equipos-calendario__visita,
+.equipos-calendario__atrasadas li {
+   display: flex;
+   flex-wrap: wrap;
+   align-items: center;
+   justify-content: space-between;
+   gap: 1rem;
+   padding: .6rem 0;
+   border-top: 1px solid var(--eq-borde-campo);
+}
+
+.equipos-calendario__visita-datos {
+   display: flex;
+   flex-wrap: wrap;
+   align-items: baseline;
+   gap: .8rem;
+}
+
+.equipos-calendario__visita-datos small {
+   color: var(--gris-texto);
+}
+
+/* Una fecha que movio una persona no es la que salio del calculo, y conviene
+   que se vea: explica por que la cadena no cuadra con la frecuencia. */
+.equipos-calendario__movida {
+   border: 1px solid var(--eq-borde-campo);
+   border-radius: 999px;
+   padding: 0 .6rem;
+   font-size: 1.1rem;
+   color: var(--gris-texto);
+}
+
+.equipos-calendario__visita-acciones {
+   display: flex;
+   flex-wrap: wrap;
+   align-items: center;
+   gap: .6rem;
+}
+
+.equipos-calendario__mover {
+   max-width: 15rem;
+}
+
+.equipos-calendario__omitir {
+   background: none;
+   border: 1px solid var(--eq-borde-campo);
+   border-radius: 6px;
+   padding: .3rem .8rem;
+   cursor: pointer;
+   color: var(--gris-texto);
+   font-size: 1.3rem;
+}
+
+.equipos-calendario__visita--omitida,
+.equipos-calendario__visita--estado-3 {
+   opacity: .6;
+}
+
+.equipos-calendario__estado {
+   font-size: 1.3rem;
+   color: var(--gris-texto);
+}
+
+/* ---------------------------------------------------------------------
+   Hoja de trabajo
+   --------------------------------------------------------------------- */
+.equipos-orden__cabecera {
+   display: flex;
+   flex-wrap: wrap;
+   justify-content: space-between;
+   align-items: start;
+   gap: 1.6rem;
+   background-color: var(--eq-panel);
+   border: 1px solid var(--eq-borde-campo);
+   border-radius: 8px;
+   padding: 1.6rem;
+   margin-bottom: 2rem;
+}
+
+.equipos-orden__datos {
+   display: grid;
+   grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+   gap: 1.2rem 2rem;
+   margin: 0;
+   flex: 1 1 40rem;
+}
+
+.equipos-orden__datos dt {
+   font-size: 1.2rem;
+   text-transform: uppercase;
+   color: var(--gris-texto);
+   letter-spacing: .03em;
+}
+
+.equipos-orden__datos dd {
+   margin: .2rem 0 0;
+   font-size: 1.5rem;
+}
+
+.equipos-orden__acciones-cabecera {
+   display: flex;
+   flex-wrap: wrap;
+   gap: .8rem;
+}
+
+.equipos-orden__estado--1 { color: var(--eq-acento-texto); font-weight: 600; }
+.equipos-orden__estado--2 { color: var(--gris-texto); }
+.equipos-orden__estado--3 { color: var(--rojo); }
+
+.equipos-orden__cerrar {
+   background-color: var(--rojo);
+   color: var(--eq-sobre-acento);
+}
+
+.equipos-orden__observaciones {
+   background-color: var(--gris-claro);
+   border-radius: 6px;
+   padding: 1rem 1.2rem;
+   margin-bottom: 2rem;
+}
+
+.equipos-orden__mensaje {
+   background-color: var(--gris-claro);
+   border-left: 4px solid var(--eq-acento-texto);
+   padding: 1rem 1.2rem;
+   margin-bottom: 1.6rem;
+}
+
+.equipos-orden__agregar,
+.equipos-orden__agregar-actividad {
+   display: flex;
+   flex-wrap: wrap;
+   align-items: end;
+   gap: 1.2rem;
+   margin-top: 1.6rem;
+   padding-top: 1.6rem;
+   border-top: 1px solid var(--eq-borde-campo);
+}
+
+.equipos-plan__form {
+   border-top: none;
+   padding-top: 0;
+   background-color: var(--eq-panel);
+   border: 1px solid var(--eq-borde-campo);
+   border-radius: 8px;
+   padding: 1.6rem;
+}
+
+.equipos-orden__campo {
+   display: flex;
+   flex-direction: column;
+   gap: .3rem;
+   flex: 1 1 20rem;
+   position: relative;
+}
+
+.equipos-orden__campo label {
+   font-size: 1.3rem;
+   color: var(--gris-texto);
+}
+
+/* El campo de la actividad es el que mas se usa de toda la pantalla: se
+   escribe linea tras linea, de pie junto al aparato. Se le da el ancho que
+   haga falta. */
+.equipos-orden__campo--actividad {
+   flex: 3 1 34rem;
+}
+
+.equipos-orden__error {
+   color: var(--rojo);
+   font-size: 1.3rem;
+   margin: .2rem 0 0;
+}
+
+.equipos-orden__lista {
+   margin: 0;
+   padding-left: 2.4rem;
+   display: grid;
+   gap: .4rem;
+}
+
+.equipos-orden__lista li {
+   display: flex;
+   align-items: center;
+   justify-content: space-between;
+   gap: 1rem;
+   padding: .3rem 0;
+}
+
+.equipos-orden__linea-texto {
+   flex: 1;
+}
+
+.equipos-orden__quitar {
+   background: none;
+   border: none;
+   cursor: pointer;
+   color: var(--gris-texto);
+   font-size: 1.4rem;
+   line-height: 1;
+   padding: .2rem .5rem;
+}
+
+.equipos-orden__quitar:hover {
+   color: var(--rojo);
+}
+
+/* ---------------------------------------------------------------------
+   Sugerencias del autocompletado
+   Salen de lo que ya se escribio antes en equipos de este tipo. La lista se
+   pinta por encima y en posicion absoluta para que al aparecer no empuje el
+   boton de agregar hacia abajo: se escribe una linea tras otra y el boton
+   tiene que quedarse donde esta.
+   --------------------------------------------------------------------- */
+.equipos-orden__sugerencias {
+   list-style: none;
+   margin: 0;
+   padding: .4rem;
+   position: absolute;
+   top: 100%;
+   left: 0;
+   right: 0;
+   z-index: 20;
+   background-color: var(--eq-panel);
+   border: 1px solid var(--eq-borde-campo);
+   border-radius: 6px;
+   box-shadow: 0 6px 18px rgba(0, 0, 0, .18);
+   max-height: 26rem;
+   overflow-y: auto;
+}
+
+.equipos-orden__sugerencias button {
+   display: block;
+   width: 100%;
+   text-align: left;
+   background: none;
+   border: none;
+   cursor: pointer;
+   padding: .6rem .8rem;
+   color: inherit;
+   font-size: 1.4rem;
+   border-radius: 4px;
+}
+
+.equipos-orden__sugerencias button:hover {
+   background-color: var(--gris-claro);
+}
+
+.equipos-orden__sugerencias small {
+   color: var(--gris-texto);
+   font-size: 1.15rem;
+}
+
+.equipos-orden__habituales {
+   margin-top: 1.6rem;
+}
+
+.equipos-orden__habituales-lista {
+   list-style: none;
+   margin: .6rem 0 0;
+   padding: 0;
+   display: flex;
+   flex-wrap: wrap;
+   gap: .6rem;
+}
+
+.equipos-orden__habituales-lista button {
+   background-color: var(--gris-claro);
+   border: 1px solid var(--eq-borde-campo);
+   border-radius: 999px;
+   padding: .35rem 1rem;
+   cursor: pointer;
+   color: inherit;
+   font-size: 1.3rem;
+}
+
+.equipos-orden__habituales-lista button:hover {
+   border-color: var(--eq-acento-texto);
+}
+
+.equipos-orden__aviso,
+.equipos-calendario__aviso {
+   margin-top: 1.6rem;
+   min-height: 2rem;
+   color: var(--eq-acento-texto);
+   font-size: 1.4rem;
+}
+
+.equipos-orden__aviso--error {
+   color: var(--rojo);
+}
+
+@media (max-width: 700px) {
+   .equipos-orden__cabecera,
+   .equipos-orden__agregar,
+   .equipos-orden__agregar-actividad,
+   .equipos-calendario__controles {
+      flex-direction: column;
+      align-items: stretch;
+   }
+
+   .equipos-mantenimiento__tabla {
+      font-size: 1.3rem;
+   }
 }

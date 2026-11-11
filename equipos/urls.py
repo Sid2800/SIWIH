@@ -231,4 +231,98 @@ urlpatterns = [
         views.datos_empleado,
         name='datos_empleado_equipos'
     ),
+
+    # -----------------------------------------------------------------------
+    # MANTENIMIENTO
+    #
+    # Las pantallas van primero y los puntos JSON despues. Lo que termina en
+    # mover/, actividades/ o sugerencias/ responde a fetch desde la propia
+    # pagina: la hoja de trabajo se llena de pie junto al aparato y una
+    # recarga por linea perderia lo escrito arriba.
+    # -----------------------------------------------------------------------
+    path(
+        'mantenimiento/',
+        views.panel_mantenimiento,
+        name='panel_mantenimiento_equipos'
+    ),
+    path(
+        'mantenimiento/calendario/',
+        views.calendario_mantenimiento,
+        name='calendario_mantenimiento_equipos'
+    ),
+    path(
+        'dispositivos/<int:dispositivo_id>/programar-mantenimiento/',
+        views.programar_mantenimiento,
+        name='programar_mantenimiento_equipos'
+    ),
+    path(
+        'mantenimiento/planes/<int:plan_id>/estado/',
+        views.cambiar_estado_plan,
+        name='cambiar_estado_plan_equipos'
+    ),
+    path(
+        'mantenimiento/visitas/<int:visita_id>/realizar/',
+        views.realizar_visita,
+        name='realizar_visita_equipos'
+    ),
+    path(
+        'mantenimiento/visitas/<int:visita_id>/mover/',
+        views.mover_visita_calendario,
+        name='mover_visita_equipos'
+    ),
+    path(
+        'mantenimiento/visitas/<int:visita_id>/omitir/',
+        views.omitir_visita_calendario,
+        name='omitir_visita_equipos'
+    ),
+    path(
+        'mantenimiento/ordenes/',
+        views.listado_ordenes,
+        name='listado_ordenes_equipos'
+    ),
+    path(
+        'mantenimiento/ordenes/nueva/',
+        views.crear_orden,
+        name='crear_orden_equipos'
+    ),
+    path(
+        'mantenimiento/ordenes/<int:orden_id>/',
+        views.orden_trabajo,
+        name='orden_trabajo_equipos'
+    ),
+    path(
+        'mantenimiento/ordenes/<int:orden_id>/equipos/agregar/',
+        views.agregar_equipo_orden,
+        name='agregar_equipo_orden_equipos'
+    ),
+    path(
+        'mantenimiento/ordenes/equipos/<int:fila_id>/quitar/',
+        views.quitar_equipo_orden,
+        name='quitar_equipo_orden_equipos'
+    ),
+    path(
+        'mantenimiento/ordenes/<int:orden_id>/actividades/agregar/',
+        views.agregar_actividad_orden,
+        name='agregar_actividad_orden_equipos'
+    ),
+    path(
+        'mantenimiento/ordenes/actividades/<int:linea_id>/quitar/',
+        views.quitar_actividad_orden,
+        name='quitar_actividad_orden_equipos'
+    ),
+    path(
+        'mantenimiento/ordenes/<int:orden_id>/cerrar/',
+        views.cerrar_orden,
+        name='cerrar_orden_equipos'
+    ),
+    path(
+        'mantenimiento/ordenes/<int:orden_id>/imprimir/',
+        views.imprimir_orden,
+        name='imprimir_orden_equipos'
+    ),
+    path(
+        'mantenimiento/sugerir-actividades/',
+        views.sugerir_actividades,
+        name='sugerir_actividades_equipos'
+    ),
 ]

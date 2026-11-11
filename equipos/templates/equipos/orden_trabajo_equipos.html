@@ -1,0 +1,265 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}{{ orden.numero_orden }}{% endblock title %}
+
+{% block content %}
+<div class="contenedor2 equipos-pagina equipos-mantenimiento equipos-orden"
+     data-orden="{{ orden.pk }}"
+     data-tipo="{{ orden.tipo_id }}"
+     data-url-agregar-equipo="{% url 'agregar_equipo_orden_equipos' orden.pk %}"
+     data-url-quitar-equipo="{% url 'quitar_equipo_orden_equipos' 0 %}"
+     data-url-agregar-actividad="{% url 'agregar_actividad_orden_equipos' orden.pk %}"
+     data-url-quitar-actividad="{% url 'quitar_actividad_orden_equipos' 0 %}"
+     data-url-sugerencias="{% url 'sugerir_actividades_equipos' %}">
+
+    <div class="equipos-listado__encabezado">
+        <div class="equipos-listado__titulo">
+            <div class="tituloFormulario">
+                <div class="equipos-encabezado-superior">
+                    <div class="tituloFormulario-texto">
+                        <i class="bi bi-clipboard-check"></i>
+                        <h2 class="sin-margen">{{ orden.numero_orden }}</h2>
+                    </div>
+                    <a class="equipos-volver equipos-encabezado-volver"
+                       href="{% url 'listado_ordenes_equipos' %}">
+                        <i class="bi bi-arrow-left"></i>
+                        Órdenes
+                    </a>
+                </div>
+                <div class="tituloFormulario-subrallado"></div>
+            </div>
+        </div>
+    </div>
+
+    {% if messages %}
+        {% for mensaje in messages %}
+            <p class="equipos-orden__mensaje">{{ mensaje }}</p>
+        {% endfor %}
+    {% endif %}
+
+    <section class="equipos-orden__cabecera">
+        <dl class="equipos-orden__datos">
+            <div><dt>Tipo de equipo</dt><dd>{{ orden.tipo.nombre }}</dd></div>
+            <div><dt>Clase</dt><dd>{{ orden.get_clase_display }}</dd></div>
+            <div><dt>Fecha</dt><dd>{{ orden.fecha|date:"d/m/Y" }}</dd></div>
+            <div>
+                <dt>Operario</dt>
+                <dd>{{ orden.operario.get_full_name|default:orden.operario.username }}</dd>
+            </div>
+            <div>
+                <dt>Jefe que firma</dt>
+                <dd>{{ orden.jefe_servicio|default:"Pendiente de firma" }}</dd>
+            </div>
+            <div>
+                <dt>Estado</dt>
+                <dd class="equipos-orden__estado equipos-orden__estado--{{ orden.estado }}">
+                    {{ orden.get_estado_display }}
+                </dd>
+            </div>
+            {% if orden.origen == 2 %}
+                {# La solicitud llego en papel: quien la pidio no usa el
+                   sistema, y la fecha en que pidio no es la fecha en que se
+                   digito. Las dos cosas se muestran por separado. #}
+                <div><dt>Solicitado por</dt><dd>{{ orden.solicitado_por }}</dd></div>
+                <div>
+                    <dt>Pedido el</dt>
+                    <dd>{{ orden.fecha_solicitud|date:"d/m/Y"|default:"Sin fecha" }}</dd>
+                </div>
+            {% endif %}
+            {% if total_minutos %}
+                <div><dt>Tiempo total</dt><dd>{{ total_minutos }} minutos</dd></div>
+            {% endif %}
+        </dl>
+
+        <div class="equipos-orden__acciones-cabecera">
+            <a class="formularioBotones-boton"
+               href="{% url 'imprimir_orden_equipos' orden.pk %}"
+               target="_blank" rel="noopener">
+                <i class="bi bi-printer"></i>
+                Imprimir
+            </a>
+            {% if puede_editar %}
+                <form method="post" action="{% url 'cerrar_orden_equipos' orden.pk %}">
+                    {% csrf_token %}
+                    <button type="submit" class="formularioBotones-boton equipos-orden__cerrar">
+                        <i class="bi bi-lock"></i>
+                        Cerrar orden
+                    </button>
+                </form>
+            {% endif %}
+        </div>
+    </section>
+
+    {% if orden.observaciones %}
+        <p class="equipos-orden__observaciones">{{ orden.observaciones }}</p>
+    {% endif %}
+
+    {# ------------------------------------------------------------------- #}
+    {# Equipos atendidos                                                    #}
+    {# ------------------------------------------------------------------- #}
+    <section class="equipos-mantenimiento__bloque">
+        <header class="equipos-mantenimiento__bloque-titulo">
+            <h3 class="sin-margen">
+                <i class="bi bi-hdd-stack"></i>
+                Equipos atendidos
+            </h3>
+            <span class="equipos-mantenimiento__contador" data-contador-equipos>
+                {{ equipos|length }}
+            </span>
+        </header>
+
+        <table class="equipos-listado__tabla equipos-mantenimiento__tabla">
+            <thead>
+                <tr>
+                    <th>Equipo</th>
+                    <th>Ambiente</th>
+                    <th>Inicio</th>
+                    <th>Final</th>
+                    <th>Minutos</th>
+                    {% if puede_editar %}<th></th>{% endif %}
+                </tr>
+            </thead>
+            <tbody data-filas-equipos>
+                {% for fila in equipos %}
+                    <tr data-fila="{{ fila.pk }}">
+                        <td>
+                            <a href="{% url 'detalle_dispositivo_equipos' fila.dispositivo_id %}">
+                                {{ fila.dispositivo.codigo }}
+                            </a>
+                            {% if fila.dispositivo.marca %}
+                                <small>{{ fila.dispositivo.marca.nombre }}</small>
+                            {% endif %}
+                        </td>
+                        <td>{{ fila.ambiente|default:"—" }}</td>
+                        <td>{{ fila.hora_inicio|time:"H:i"|default:"—" }}</td>
+                        <td>{{ fila.hora_final|time:"H:i"|default:"—" }}</td>
+                        <td>{{ fila.minutos|default:"—" }}</td>
+                        {% if puede_editar %}
+                            <td>
+                                <button type="button" class="equipos-orden__quitar"
+                                        data-quita-equipo="{{ fila.pk }}"
+                                        aria-label="Quitar este equipo de la orden">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+                            </td>
+                        {% endif %}
+                    </tr>
+                {% empty %}
+                    <tr data-sin-equipos>
+                        <td colspan="6" class="equipos-mantenimiento__vacio">
+                            Todavía no hay equipos en esta hoja.
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        {% if puede_editar %}
+            <form class="equipos-orden__agregar" data-form-equipo
+                  method="post" action="{% url 'agregar_equipo_orden_equipos' orden.pk %}">
+                {% csrf_token %}
+                {% for campo in form_equipo %}
+                    <div class="equipos-orden__campo">
+                        <label for="{{ campo.id_for_label }}">{{ campo.label }}</label>
+                        {{ campo }}
+                    </div>
+                {% endfor %}
+                <button type="submit" class="formularioBotones-boton">
+                    <i class="bi bi-plus-lg"></i>
+                    Agregar equipo
+                </button>
+            </form>
+        {% endif %}
+    </section>
+
+    {# ------------------------------------------------------------------- #}
+    {# Lo que se hizo                                                       #}
+    {#                                                                      #}
+    {# Se escribe linea por linea, en el orden en que se trabajo. No hay    #}
+    {# lista precargada con casillas: cada aparato llega distinto, y una    #}
+    {# casilla sin marcar no distingue entre "no se hizo" y "no aplicaba".  #}
+    {# ------------------------------------------------------------------- #}
+    <section class="equipos-mantenimiento__bloque equipos-orden__actividades">
+        <header class="equipos-mantenimiento__bloque-titulo">
+            <h3 class="sin-margen">
+                <i class="bi bi-list-ol"></i>
+                Lo que se hizo
+            </h3>
+            <span class="equipos-mantenimiento__contador" data-contador-actividades>
+                {{ actividades|length }}
+            </span>
+        </header>
+
+        <ol class="equipos-orden__lista" data-lineas>
+            {% for linea in actividades %}
+                <li data-linea="{{ linea.pk }}">
+                    <span class="equipos-orden__linea-texto">{{ linea.texto }}</span>
+                    {% if puede_editar %}
+                        <button type="button" class="equipos-orden__quitar"
+                                data-quita-actividad="{{ linea.pk }}"
+                                aria-label="Quitar esta línea">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    {% endif %}
+                </li>
+            {% empty %}
+                <li data-sin-lineas class="equipos-mantenimiento__vacio">
+                    Escriba la primera actividad.
+                </li>
+            {% endfor %}
+        </ol>
+
+        {% if puede_editar %}
+            <form class="equipos-orden__agregar-actividad" data-form-actividad>
+                {% csrf_token %}
+                <div class="equipos-orden__campo equipos-orden__campo--actividad">
+                    <label for="{{ form_actividad.nombre.id_for_label }}">
+                        {{ form_actividad.nombre.label }}
+                    </label>
+                    {{ form_actividad.nombre }}
+                    {# Las sugerencias salen de lo que ya se escribio antes en
+                       equipos de este tipo. El catalogo nace vacio y se llena
+                       con el uso; nada viene importado de ninguna plantilla. #}
+                    <ul class="equipos-orden__sugerencias" data-sugerencias hidden></ul>
+                </div>
+                <div class="equipos-orden__campo">
+                    <label for="{{ form_actividad.detalle.id_for_label }}">
+                        {{ form_actividad.detalle.label }}
+                    </label>
+                    {{ form_actividad.detalle }}
+                </div>
+                <button type="submit" class="formularioBotones-boton">
+                    <i class="bi bi-plus-lg"></i>
+                    Agregar
+                </button>
+            </form>
+
+            {% if habituales %}
+                <div class="equipos-orden__habituales">
+                    <p class="equipos-mantenimiento__nota">
+                        Lo que normalmente se le hace a un
+                        {{ orden.tipo.nombre|lower }}. Un clic la escribe en el
+                        campo; agregarla sigue siendo decisión suya.
+                    </p>
+                    <ul class="equipos-orden__habituales-lista">
+                        {% for actividad in habituales %}
+                            <li>
+                                <button type="button" data-habitual="{{ actividad.nombre }}">
+                                    {{ actividad.nombre }}
+                                </button>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% endif %}
+        {% endif %}
+    </section>
+
+    <p class="equipos-orden__aviso" data-aviso role="status" aria-live="polite"></p>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script src="{% static 'core/scripts/equipos/ordenTrabajo.js' %}"></script>
+{% endblock extra_js %}

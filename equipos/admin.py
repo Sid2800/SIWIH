@@ -1,6 +1,8 @@
 from django.contrib import admin
 
 from .models import (
+    ActividadEnOrdenTrabajo,
+    ActividadMantenimiento,
     AreaGestora,
     CategoriaEquipo,
     AsignacionDispositivo,
@@ -10,11 +12,15 @@ from .models import (
     GarantiaDispositivo,
     MarcaDispositivo,
     ModeloDispositivo,
+    EquipoEnOrdenTrabajo,
     OrdenTrabajoBajaDispositivo,
+    OrdenTrabajoMantenimiento,
+    PlanMantenimiento,
     Procedencia,
     TecnologiaEquipo,
     TipoDispositivo,
     UbicacionFisica,
+    VisitaPreventiva,
 )
 
 
@@ -274,3 +280,99 @@ class AsignacionDispositivoAdmin(admin.ModelAdmin):
             obj.creado_por = request.user
         obj.modificado_por = request.user
         super().save_model(request, obj, form, change)
+
+
+# ---------------------------------------------------------------------------
+# MANTENIMIENTO
+#
+# El trabajo diario se hace en las pantallas del modulo, no aqui. El admin
+# sirve para lo otro: corregir una actividad mal escrita del catalogo, mirar
+# una orden vieja sin pasar por el calendario, o desactivar un plan cuando la
+# pantalla no alcanza.
+# ---------------------------------------------------------------------------
+
+@admin.register(ActividadMantenimiento)
+class ActividadMantenimientoAdmin(admin.ModelAdmin):
+    """El catalogo que se llena con el uso.
+
+    Es el unico sitio donde corregir una errata que ya se escribio. Se puede
+    retirar una linea de las sugerencias con `activa`, sin borrarla: las
+    ordenes viejas que la usaron tienen que seguir diciendo lo mismo.
+    """
+
+    list_display = ("nombre", "veces_usada", "activa", "fecha_ultimo_uso")
+    list_filter = ("activa",)
+    search_fields = ("nombre", "clave")
+    # clave y veces_usada los mantiene el sistema: la primera se deriva del
+    # nombre y el segundo lo lleva el servicio con F() para no perder usos
+    # cuando dos personas cierran ordenes a la vez.
+    readonly_fields = ("clave", "veces_usada", "fecha_primer_uso", "fecha_ultimo_uso")
+    ordering = ("-veces_usada", "nombre")
+
+
+@admin.register(PlanMantenimiento)
+class PlanMantenimientoAdmin(admin.ModelAdmin):
+    list_display = (
+        "dispositivo",
+        "responsable",
+        "frecuencia_meses",
+        "fecha_inicio",
+        "trabaja_fines_de_semana",
+        "activo",
+    )
+    list_filter = ("activo", "trabaja_fines_de_semana", "frecuencia_meses")
+    search_fields = ("dispositivo__numero_serie", "responsable__username")
+    autocomplete_fields = ("dispositivo", "responsable", "creado_por")
+    readonly_fields = ("fecha_creado", "fecha_modificado")
+
+
+@admin.register(VisitaPreventiva)
+class VisitaPreventivaAdmin(admin.ModelAdmin):
+    list_display = (
+        "plan",
+        "fecha_programada",
+        "estado",
+        "fecha_realizada",
+        "movida_a_mano",
+    )
+    list_filter = ("estado", "movida_a_mano")
+    date_hierarchy = "fecha_programada"
+    # Se deja en solo lectura a proposito: una visita se mueve, se registra o
+    # se omite desde el calendario, porque cada una de esas tres cosas
+    # arrastra consecuencias -el corrimiento de las siguientes, el recalculo
+    # desde la fecha realizada- que editar la fila a mano no dispara.
+    readonly_fields = ("movida_a_mano",)
+
+
+class EquipoEnOrdenInline(admin.TabularInline):
+    model = EquipoEnOrdenTrabajo
+    extra = 0
+    autocomplete_fields = ("dispositivo",)
+
+
+class ActividadEnOrdenInline(admin.TabularInline):
+    model = ActividadEnOrdenTrabajo
+    extra = 0
+    autocomplete_fields = ("actividad",)
+
+
+@admin.register(OrdenTrabajoMantenimiento)
+class OrdenTrabajoMantenimientoAdmin(admin.ModelAdmin):
+    list_display = (
+        "numero_orden",
+        "fecha",
+        "tipo",
+        "clase",
+        "operario",
+        "estado",
+    )
+    list_filter = ("estado", "clase", "origen")
+    search_fields = ("tipo__nombre", "solicitado_por")
+    date_hierarchy = "fecha"
+    autocomplete_fields = ("tipo", "operario", "jefe_servicio", "creado_por")
+    readonly_fields = ("fecha_creado", "fecha_cierre", "cerrada_por")
+    inlines = (EquipoEnOrdenInline, ActividadEnOrdenInline)
+
+    @admin.display(description="Orden")
+    def numero_orden(self, orden):
+        return orden.numero_orden

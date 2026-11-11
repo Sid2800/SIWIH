@@ -1,0 +1,64 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Registrar visita realizada{% endblock title %}
+
+{% block content %}
+<div class="contenedor2 equipos-pagina equipos-mantenimiento">
+    <div class="equipos-listado__encabezado">
+        <div class="equipos-listado__titulo">
+            <div class="tituloFormulario">
+                <div class="equipos-encabezado-superior">
+                    <div class="tituloFormulario-texto">
+                        <i class="bi bi-check2-square"></i>
+                        <h2 class="sin-margen">Registrar visita realizada</h2>
+                    </div>
+                    <a class="equipos-volver equipos-encabezado-volver"
+                       href="{% url 'calendario_mantenimiento_equipos' %}">
+                        <i class="bi bi-arrow-left"></i>
+                        Calendario
+                    </a>
+                </div>
+                <div class="tituloFormulario-subrallado"></div>
+            </div>
+        </div>
+    </div>
+
+    <p class="equipos-mantenimiento__nota">
+        {{ dispositivo.codigo }} — {{ dispositivo.tipo.nombre }}.
+        Estaba programada para el
+        {{ visita.fecha_programada|date:"d/m/Y" }}.
+    </p>
+
+    <p class="equipos-mantenimiento__nota">
+        Al guardar se abre la hoja de trabajo para escribir lo que se hizo. Si
+        ya hay una hoja abierta de este tipo en esa fecha y con el mismo
+        operario, el equipo se suma a ella: una salida a revisar cinco
+        monitores es una hoja, no cinco.
+    </p>
+
+    <p class="equipos-mantenimiento__nota">
+        La siguiente visita se contará desde la fecha que escriba aquí, no
+        desde la que estaba programada.
+    </p>
+
+    <form class="equipos-orden__agregar equipos-plan__form" method="post">
+        {% csrf_token %}
+
+        {% for campo in form %}
+            <div class="equipos-orden__campo">
+                <label for="{{ campo.id_for_label }}">{{ campo.label }}</label>
+                {{ campo }}
+                {% if campo.errors %}
+                    <p class="equipos-orden__error">{{ campo.errors }}</p>
+                {% endif %}
+            </div>
+        {% endfor %}
+
+        <button type="submit" class="formularioBotones-boton">
+            <i class="bi bi-check-lg"></i>
+            Registrar y escribir lo hecho
+        </button>
+    </form>
+</div>
+{% endblock content %}

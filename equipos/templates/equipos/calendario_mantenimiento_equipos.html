@@ -1,0 +1,171 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Calendario de mantenimiento{% endblock title %}
+
+{% block content %}
+<div class="contenedor2 equipos-pagina equipos-mantenimiento"
+     data-calendario
+     data-url-mover="{% url 'mover_visita_equipos' 0 %}"
+     data-url-omitir="{% url 'omitir_visita_equipos' 0 %}">
+
+    <div class="equipos-listado__encabezado">
+        <div class="equipos-listado__titulo">
+            <div class="tituloFormulario">
+                <div class="equipos-encabezado-superior">
+                    <div class="tituloFormulario-texto">
+                        <i class="bi bi-calendar3"></i>
+                        <h2 class="sin-margen">Calendario de mantenimiento</h2>
+                    </div>
+                    <a class="equipos-volver equipos-encabezado-volver"
+                       href="{% url 'panel_mantenimiento_equipos' %}">
+                        <i class="bi bi-arrow-left"></i>
+                        Mantenimiento
+                    </a>
+                </div>
+                <div class="tituloFormulario-subrallado"></div>
+            </div>
+        </div>
+    </div>
+
+    <form class="equipos-calendario__controles" method="get">
+        <div class="equipos-calendario__navegacion">
+            <a class="formularioBotones-boton equipos-listado__boton-filtro--secundario"
+               href="?mes={{ mes_anterior }}&responsable={{ responsable_elegido.pk }}">
+                <i class="bi bi-chevron-left"></i>
+            </a>
+            <strong class="equipos-calendario__mes">{{ mes|date:"F Y"|capfirst }}</strong>
+            <a class="formularioBotones-boton equipos-listado__boton-filtro--secundario"
+               href="?mes={{ mes_siguiente }}&responsable={{ responsable_elegido.pk }}">
+                <i class="bi bi-chevron-right"></i>
+            </a>
+        </div>
+
+        <label class="equipos-calendario__responsable">
+            <span>Responsable</span>
+            <select name="responsable" class="formularioCampo-select"
+                    onchange="this.form.submit()">
+                {% for usuario in responsables %}
+                    <option value="{{ usuario.pk }}"
+                            {% if usuario.pk == responsable_elegido.pk %}selected{% endif %}>
+                        {{ usuario.get_full_name|default:usuario.username }}
+                    </option>
+                {% endfor %}
+            </select>
+        </label>
+
+        <input type="hidden" name="mes" value="{{ mes|date:'Y-m' }}">
+    </form>
+
+    {% if atrasadas %}
+        {# Lo vencido no desaparece al cambiar de mes: sigue debiendose. #}
+        <section class="equipos-mantenimiento__bloque equipos-mantenimiento__bloque--alerta">
+            <header class="equipos-mantenimiento__bloque-titulo">
+                <h3 class="sin-margen">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    Atrasado
+                </h3>
+            </header>
+            <ul class="equipos-calendario__atrasadas">
+                {% for visita in atrasadas %}
+                    <li>
+                        <span class="equipos-mantenimiento__fecha-vencida">
+                            {{ visita.fecha_programada|date:"d/m/Y" }}
+                        </span>
+                        <a href="{% url 'detalle_dispositivo_equipos' visita.plan.dispositivo_id %}">
+                            {{ visita.plan.dispositivo.codigo }}
+                        </a>
+                        {{ visita.plan.dispositivo.tipo.nombre }}
+                        <a class="equipos-mantenimiento__accion"
+                           href="{% url 'realizar_visita_equipos' visita.pk %}">
+                            Registrar
+                        </a>
+                    </li>
+                {% endfor %}
+            </ul>
+        </section>
+    {% endif %}
+
+    <section class="equipos-calendario">
+        {% if dias %}
+            {% for dia in dias %}
+                <article class="equipos-calendario__dia{% if dia.fecha == hoy %} equipos-calendario__dia--hoy{% endif %}{% if dia.es_fin_de_semana %} equipos-calendario__dia--finde{% endif %}">
+                    <header class="equipos-calendario__dia-titulo">
+                        <strong>{{ dia.fecha|date:"l d" }}</strong>
+                        <span class="equipos-calendario__dia-total">
+                            {{ dia.total }} equipo{{ dia.total|pluralize }}
+                        </span>
+                    </header>
+
+                    <ul class="equipos-calendario__visitas">
+                        {% for visita in dia.visitas %}
+                            <li class="equipos-calendario__visita equipos-calendario__visita--estado-{{ visita.estado }}"
+                                data-visita="{{ visita.pk }}">
+                                <div class="equipos-calendario__visita-datos">
+                                    <a href="{% url 'detalle_dispositivo_equipos' visita.plan.dispositivo_id %}">
+                                        {{ visita.plan.dispositivo.codigo }}
+                                    </a>
+                                    <span>{{ visita.plan.dispositivo.tipo.nombre }}</span>
+                                    {% if visita.plan.dispositivo.marca %}
+                                        <small>{{ visita.plan.dispositivo.marca.nombre }}</small>
+                                    {% endif %}
+                                    {% if visita.movida_a_mano %}
+                                        <small class="equipos-calendario__movida"
+                                               title="Esta fecha la movió una persona, no el cálculo">
+                                            movida
+                                        </small>
+                                    {% endif %}
+                                </div>
+
+                                {% if visita.esta_pendiente %}
+                                    <div class="equipos-calendario__visita-acciones">
+                                        <a class="equipos-mantenimiento__accion"
+                                           href="{% url 'realizar_visita_equipos' visita.pk %}">
+                                            Registrar
+                                        </a>
+                                        {# Mover arrastra a las siguientes, y la
+                                           pantalla se repinta sin recargar. #}
+                                        <input type="date"
+                                               class="formularioCampo-date equipos-calendario__mover"
+                                               value="{{ visita.fecha_programada|date:'Y-m-d' }}"
+                                               data-mueve="{{ visita.pk }}"
+                                               aria-label="Mover esta visita a otra fecha">
+                                        <button type="button"
+                                                class="equipos-calendario__omitir"
+                                                data-omite="{{ visita.pk }}">
+                                            Omitir
+                                        </button>
+                                    </div>
+                                {% else %}
+                                    <span class="equipos-calendario__estado">
+                                        {{ visita.get_estado_display }}
+                                        {% if visita.fecha_realizada %}
+                                            el {{ visita.fecha_realizada|date:"d/m/Y" }}
+                                        {% endif %}
+                                        {% if visita.orden_id %}
+                                            <a href="{% url 'orden_trabajo_equipos' visita.orden_id %}">
+                                                {{ visita.orden.numero_orden }}
+                                            </a>
+                                        {% endif %}
+                                    </span>
+                                {% endif %}
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </article>
+            {% endfor %}
+        {% else %}
+            <p class="equipos-mantenimiento__vacio">
+                {{ responsable_elegido.get_full_name|default:responsable_elegido.username }}
+                no tiene visitas este mes.
+            </p>
+        {% endif %}
+    </section>
+
+    <p class="equipos-calendario__aviso" data-aviso role="status" aria-live="polite"></p>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script src="{% static 'core/scripts/equipos/calendarioMantenimiento.js' %}"></script>
+{% endblock extra_js %}

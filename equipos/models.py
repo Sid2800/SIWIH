@@ -1,3 +1,5 @@
+import re
+import unicodedata
 from calendar import monthrange
 from datetime import date, timedelta
 
@@ -1648,3 +1650,734 @@ class PausaGarantia(models.Model):
                 f"{self.fecha_retorno} ({self.dias} días)"
             )
         return f"{codigo}: fuera desde {self.fecha_salida}"
+
+
+# ===========================================================================
+# MANTENIMIENTO
+#
+# El preventivo se programa solo: cada equipo tiene un plan con su frecuencia
+# y un responsable, y de ahi salen las visitas que llenan el calendario. El
+# correctivo no se programa, llega cuando se dana algo.
+#
+# Lo que se hizo en la visita se escribe linea por linea, no se marca de una
+# lista precargada: cada aparato llega distinto y una plantilla con casillas
+# sin marcar no dice si la tarea no se hizo o si nunca aplicaba. Cada linea
+# escrita queda en el catalogo de actividades, de modo que la siguiente vez se
+# sugiere en lugar de volver a teclearla.
+# ===========================================================================
+
+# Hasta donde se dibuja el calendario hacia adelante. Dos anios alcanzan para
+# planificar compras y vacaciones sin llenar la tabla de visitas que nadie va
+# a mirar; cada visita realizada empuja el horizonte.
+HORIZONTE_PREVENTIVO_MESES = 24
+
+
+class ClaseMantenimiento(models.IntegerChoices):
+    PREVENTIVO = 1, "Preventivo"
+    CORRECTIVO = 2, "Correctivo"
+
+
+class EstadoVisitaPreventiva(models.IntegerChoices):
+    PROGRAMADA = 1, "Programada"
+    REALIZADA = 2, "Realizada"
+    OMITIDA = 3, "Omitida"
+
+
+class EstadoOrdenTrabajo(models.IntegerChoices):
+    ABIERTA = 1, "Abierta"
+    CERRADA = 2, "Cerrada"
+    ANULADA = 3, "Anulada"
+
+
+class OrigenOrdenTrabajo(models.IntegerChoices):
+    """Como entro el trabajo al sistema.
+
+    El hospital trabaja en hibrido a proposito: hay personal que no usa
+    telefono y pide las cosas en papel. En ese caso quien recibe el papel es
+    el mismo que levanta la orden, y conviene que quede dicho de donde salio
+    para no confundir la fecha en que se pidio con la fecha en que se digito.
+    """
+
+    DIGITAL = 1, "Registrado en el sistema"
+    PAPEL = 2, "Solicitud en papel"
+
+
+def normalizar_actividad(valor):
+    """Clave con la que dos actividades se consideran la misma.
+
+    Sin esto el catalogo se llena de variantes de la misma linea: "Limpieza
+    general", "limpieza general" y "Limpieza general." serian tres
+    actividades distintas y la sugerencia dejaria de servir justo donde mas
+    hace falta. Se quitan tildes, mayusculas, espacios de sobra y la
+    puntuacion final, que es lo que cambia entre una escritura y otra; el
+    texto que se guarda y se imprime sigue siendo el que escribio la persona.
+    """
+    texto = re.sub(r"\s+", " ", (valor or "")).strip()
+
+    if not texto:
+        return ""
+
+    sin_tildes = "".join(
+        letra
+        for letra in unicodedata.normalize("NFD", texto.lower())
+        if unicodedata.category(letra) != "Mn"
+    )
+
+    return re.sub(r"[\s.,;:]+$", "", sin_tildes).strip()
+
+
+class ActividadMantenimiento(models.Model):
+    """Una linea de trabajo que alguien escribio alguna vez.
+
+    El catalogo nace vacio y se llena con el uso. No se importa de ninguna
+    parte a proposito: la hoja de calculo que se venia usando arrastraba tres
+    tareas del amalgamador copiadas en casi todas las hojas, y cargarlas
+    habria puesto a pedir "lubricacion de partes moviles del motor" en un
+    glucometro durante anios. Lo que entra aqui es lo que de verdad se hizo.
+    """
+
+    nombre = models.CharField(
+        max_length=250,
+        verbose_name="Actividad",
+    )
+    # Columna derivada de nombre. Es la que lleva la unicidad para que dos
+    # escrituras de la misma linea no creen dos filas; nombre se conserva tal
+    # como se escribio porque es lo que sale impreso en la orden.
+    clave = models.CharField(max_length=250, unique=True, editable=False)
+    # Contador para ordenar las sugerencias: lo que mas se hace sale primero.
+    # Se lleva en la fila y no se cuenta con un COUNT cada vez porque el
+    # autocompletado responde a cada tecla.
+    veces_usada = models.PositiveIntegerField(default=0, editable=False)
+    fecha_primer_uso = models.DateTimeField(auto_now_add=True)
+    fecha_ultimo_uso = models.DateTimeField(auto_now=True)
+    # Permite retirar de las sugerencias una linea mal escrita sin borrarla:
+    # las ordenes viejas que la usaron tienen que seguir diciendo lo mismo.
+    activa = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        db_table = "equipo_actividad_mantenimiento"
+        verbose_name = "Actividad de mantenimiento"
+        verbose_name_plural = "Actividades de mantenimiento"
+        ordering = ["-veces_usada", "nombre"]
+
+    def clean(self):
+        self.nombre = re.sub(r"\s+", " ", (self.nombre or "")).strip()
+        self.clave = normalizar_actividad(self.nombre)
+
+        if not self.clave:
+            raise ValidationError({"nombre": "Debe escribir la actividad."})
+
+        if len(self.nombre) < 4:
+            raise ValidationError(
+                {"nombre": "La actividad es demasiado corta para entenderse."}
+            )
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+
+        if kwargs.get("update_fields") is not None:
+            kwargs["update_fields"] = set(kwargs["update_fields"]) | {"clave"}
+
+        return super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.nombre
+
+
+class ActividadTipoDispositivo(models.Model):
+    """Cuantas veces se uso una actividad en equipos de un tipo.
+
+    Es lo que permite sugerir primero lo que se le hace a un autoclave cuando
+    se esta llenando la orden de un autoclave. Se guarda aparte del catalogo
+    general para poder decidir mas adelante si la sugerencia se limita al tipo
+    o se abre a todo lo escrito, sin tocar la base: las dos consultas salen de
+    aqui.
+    """
+
+    actividad = models.ForeignKey(
+        ActividadMantenimiento,
+        on_delete=models.CASCADE,
+        related_name="usos_por_tipo",
+    )
+    tipo = models.ForeignKey(
+        TipoDispositivo,
+        on_delete=models.CASCADE,
+        related_name="actividades_usadas",
+    )
+    veces_usada = models.PositiveIntegerField(default=0, editable=False)
+    fecha_ultimo_uso = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "equipo_actividad_tipo"
+        verbose_name = "Actividad usada por tipo"
+        verbose_name_plural = "Actividades usadas por tipo"
+        ordering = ["-veces_usada", "actividad__nombre"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["actividad", "tipo"],
+                name="equipo_actividad_tipo_unica",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.tipo.nombre}: {self.actividad.nombre}"
+
+
+def corresponde_dia_habil(fecha, incluye_fin_de_semana=False):
+    """Mueve una fecha al siguiente lunes si cayo en sabado o domingo.
+
+    El taller trabaja de lunes a viernes, asi que una fecha calculada que cae
+    en fin de semana no sirve como esta. Se mueve hacia adelante y no hacia
+    atras porque adelantar acortaria el intervalo entre preventivos, que es
+    justo lo que la frecuencia quiere garantizar.
+
+    Algunas personas si pueden ir sabado o domingo, y eso se pregunta una vez
+    al asignarles el plan; cuando aceptaron, la fecha se respeta tal cual.
+    """
+    if fecha is None or incluye_fin_de_semana:
+        return fecha
+
+    # weekday(): lunes 0 ... sabado 5, domingo 6.
+    dias_de_sobra = fecha.weekday() - 4
+
+    if dias_de_sobra <= 0:
+        return fecha
+
+    return fecha + timedelta(days=3 - dias_de_sobra)
+
+
+def sumar_meses(fecha, meses):
+    """Misma fecha `meses` despues, sin salirse del calendario.
+
+    Se cuenta en meses y no en dias por lo mismo que las garantias: "cada seis
+    meses" quiere decir el mismo dia del mes, no 180 dias despues. Un 31 de
+    enero mas un mes es el 28 o 29 de febrero, porque el 31 de febrero no
+    existe.
+    """
+    if fecha is None or not meses:
+        return None
+
+    total_meses = fecha.month - 1 + meses
+    anio = fecha.year + total_meses // 12
+    mes = total_meses % 12 + 1
+    dia = min(fecha.day, monthrange(anio, mes)[1])
+
+    return date(anio, mes, dia)
+
+
+class PlanMantenimiento(models.Model):
+    """El preventivo de un equipo: cada cuanto toca y quien lo hace.
+
+    Es uno por equipo y no una lista de fechas sueltas: la frecuencia y el
+    responsable son lo estable, y las fechas se calculan. Asi un cambio de
+    responsable o de frecuencia no obliga a reescribir el calendario a mano.
+
+    El plan se puede desactivar sin borrarlo. Un equipo que se fue a
+    reparacion larga deja de generar visitas, pero su historial de
+    mantenimientos no desaparece.
+    """
+
+    dispositivo = models.OneToOneField(
+        Dispositivo,
+        on_delete=models.PROTECT,
+        related_name="plan_mantenimiento",
+        verbose_name="Equipo",
+    )
+    # El calendario es de la persona: cada tecnico abre el suyo y ve lo que le
+    # toca. No hay tope de equipos por dia a proposito, porque revisar quince
+    # monitores de la misma sala es una manana y revisar un autoclave es un
+    # dia; el que conoce el trabajo es quien reparte.
+    responsable = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="planes_mantenimiento_equipos",
+        verbose_name="Responsable",
+    )
+    # Se copia del tipo (o de la excepcion del equipo) al crear el plan, pero
+    # queda en el plan: cambiar la frecuencia del tipo no debe mover de golpe
+    # el calendario de todos los equipos ya programados sin que nadie lo pida.
+    frecuencia_meses = models.PositiveSmallIntegerField(
+        validators=[MinValueValidator(1)],
+        verbose_name="Frecuencia (meses)",
+    )
+    fecha_inicio = models.DateField(
+        verbose_name="Primera visita",
+        help_text="De aquí salen las siguientes, sumando la frecuencia.",
+    )
+    # Se pregunta al asignar, no se supone. Decidirlo por el tecnico es como
+    # acaban apareciendo visitas en domingo que nadie va a atender.
+    trabaja_fines_de_semana = models.BooleanField(
+        default=False,
+        verbose_name="Puede trabajar sábado o domingo",
+        help_text=(
+            "En blanco, las fechas que caigan en fin de semana se pasan al "
+            "lunes siguiente."
+        ),
+    )
+    activo = models.BooleanField(default=True, db_index=True)
+    observaciones = models.TextField(blank=True)
+    creado_por = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="planes_mantenimiento_equipos_creados",
+    )
+    fecha_creado = models.DateTimeField(auto_now_add=True)
+    fecha_modificado = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "equipo_plan_mantenimiento"
+        verbose_name = "Plan de mantenimiento"
+        verbose_name_plural = "Planes de mantenimiento"
+        ordering = ["dispositivo__tipo__nombre", "dispositivo_id"]
+        indexes = [
+            models.Index(
+                fields=["responsable", "activo"],
+                name="bio_plan_responsable_idx",
+            ),
+        ]
+
+    def clean(self):
+        errores = {}
+
+        if not self.frecuencia_meses:
+            errores["frecuencia_meses"] = (
+                "Debe indicar cada cuántos meses toca el preventivo."
+            )
+
+        if not self.fecha_inicio:
+            errores["fecha_inicio"] = "Debe indicar la fecha de la primera visita."
+
+        if errores:
+            raise ValidationError(errores)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    @property
+    def ultima_realizada(self):
+        """La visita realizada mas reciente, que es el ancla del calculo."""
+        return (
+            self.visitas.filter(estado=EstadoVisitaPreventiva.REALIZADA)
+            .order_by("-fecha_realizada", "-id")
+            .first()
+        )
+
+    @property
+    def proxima_visita(self):
+        return (
+            self.visitas.filter(estado=EstadoVisitaPreventiva.PROGRAMADA)
+            .order_by("fecha_programada", "id")
+            .first()
+        )
+
+    def __str__(self):
+        return f"{self.dispositivo.codigo} cada {self.frecuencia_meses} meses"
+
+
+class VisitaPreventiva(models.Model):
+    """Un dia en el calendario: a este equipo le toca revision.
+
+    Las visitas futuras existen como filas porque hay que poder verlas y
+    moverlas; no se calculan al dibujar la pantalla. Mover una arrastra a las
+    que vienen detras -si el preventivo de marzo se corre dos semanas, el de
+    septiembre tambien- y las ya realizadas no se tocan nunca, porque son un
+    hecho y no una intencion.
+    """
+
+    plan = models.ForeignKey(
+        PlanMantenimiento,
+        on_delete=models.CASCADE,
+        related_name="visitas",
+    )
+    fecha_programada = models.DateField(db_index=True)
+    estado = models.PositiveSmallIntegerField(
+        choices=EstadoVisitaPreventiva.choices,
+        default=EstadoVisitaPreventiva.PROGRAMADA,
+        db_index=True,
+    )
+    fecha_realizada = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Fecha en que se hizo",
+    )
+    # La orden que documenta el trabajo. Una orden cubre varios equipos, asi
+    # que varias visitas de distintos equipos pueden apuntar a la misma.
+    orden = models.ForeignKey(
+        "OrdenTrabajoMantenimiento",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="visitas",
+    )
+    # Deja ver en el calendario que esa fecha no es la que salio del calculo.
+    movida_a_mano = models.BooleanField(default=False, editable=False)
+    observaciones = models.CharField(max_length=250, blank=True)
+
+    class Meta:
+        db_table = "equipo_visita_preventiva"
+        verbose_name = "Visita preventiva"
+        verbose_name_plural = "Visitas preventivas"
+        ordering = ["fecha_programada", "id"]
+        indexes = [
+            models.Index(
+                fields=["fecha_programada", "estado"],
+                name="bio_visita_fecha_estado_idx",
+            ),
+        ]
+
+    def clean(self):
+        errores = {}
+
+        if self.estado == EstadoVisitaPreventiva.REALIZADA:
+            if not self.fecha_realizada:
+                errores["fecha_realizada"] = (
+                    "Una visita realizada necesita la fecha en que se hizo."
+                )
+            elif self.fecha_realizada > timezone.localdate():
+                errores["fecha_realizada"] = (
+                    "La fecha en que se hizo no puede ser futura."
+                )
+        elif self.fecha_realizada:
+            errores["fecha_realizada"] = (
+                "Solo una visita realizada lleva fecha de realización."
+            )
+
+        if errores:
+            raise ValidationError(errores)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    @property
+    def esta_pendiente(self):
+        return self.estado == EstadoVisitaPreventiva.PROGRAMADA
+
+    @property
+    def esta_atrasada(self):
+        return self.esta_pendiente and self.fecha_programada < timezone.localdate()
+
+    def __str__(self):
+        return f"{self.plan.dispositivo.codigo} - {self.fecha_programada}"
+
+
+class OrdenTrabajoMantenimiento(models.Model):
+    """La hoja de trabajo: un tipo de equipo, varios aparatos, una lista de lo hecho.
+
+    Reproduce la hoja que el taller ya venia llenando en papel, donde una sola
+    hoja cubre todos los equipos del mismo tipo que se atendieron en esa
+    salida y lleva un unico numero de orden. Se respeta esa forma porque es
+    como se firma y como se archiva: partirla en una orden por aparato
+    multiplicaria por quince el papeleo de revisar quince monitores de la
+    misma sala.
+
+    De ahi que el tipo este en la orden y no en cada fila: la lista de
+    actividades es comun a todos los equipos de la hoja, y una lista comun
+    solo tiene sentido si todos son del mismo tipo.
+    """
+
+    # Prefijo de esta serie. Las ordenes de mantenimiento llevan su propio
+    # correlativo, separado del de las bajas (OTB): sin prefijo el numero 7 de
+    # una serie y el 7 de la otra se escriben igual en el papel sin ser la
+    # misma orden.
+    PREFIJO = "OTM"
+
+    tipo = models.ForeignKey(
+        TipoDispositivo,
+        on_delete=models.PROTECT,
+        related_name="ordenes_mantenimiento",
+        verbose_name="Tipo de equipo",
+    )
+    clase = models.PositiveSmallIntegerField(
+        choices=ClaseMantenimiento.choices,
+        default=ClaseMantenimiento.PREVENTIVO,
+        db_index=True,
+        verbose_name="Clase de mantenimiento",
+    )
+    estado = models.PositiveSmallIntegerField(
+        choices=EstadoOrdenTrabajo.choices,
+        default=EstadoOrdenTrabajo.ABIERTA,
+        db_index=True,
+    )
+    origen = models.PositiveSmallIntegerField(
+        choices=OrigenOrdenTrabajo.choices,
+        default=OrigenOrdenTrabajo.DIGITAL,
+        verbose_name="Origen de la solicitud",
+    )
+    fecha = models.DateField(
+        default=timezone.localdate,
+        db_index=True,
+        verbose_name="Fecha del trabajo",
+    )
+    # Quien hizo el trabajo. Es un usuario del sistema y no un texto porque es
+    # el mismo a quien se le asignan las visitas en el calendario; si fueran
+    # dos cosas distintas no habria forma de ver que le toca a cada uno.
+    operario = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="ordenes_mantenimiento_equipos",
+        verbose_name="Operario",
+    )
+    # El jefe del departamento o servicio que recibe el trabajo y firma la
+    # hoja. Es opcional porque la firma se recoge en papel y puede llegar
+    # despues de cerrar la orden.
+    jefe_servicio = models.ForeignKey(
+        Empleado,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="ordenes_mantenimiento_equipos_firmadas",
+        verbose_name="Jefe de departamento o servicio",
+    )
+    # Cuando la solicitud llego en papel, quien la pidio y cuando. Queda como
+    # texto porque el solicitante no suele tener usuario en el sistema, que es
+    # justamente el motivo de que haya pedido en papel.
+    solicitado_por = models.CharField(
+        max_length=150,
+        blank=True,
+        verbose_name="Solicitado por",
+    )
+    fecha_solicitud = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Fecha de la solicitud",
+        help_text="Cuándo se pidió, que no es cuándo se digitó.",
+    )
+    observaciones = models.TextField(blank=True)
+    creado_por = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="ordenes_mantenimiento_equipos_creadas",
+    )
+    fecha_creado = models.DateTimeField(auto_now_add=True)
+    cerrada_por = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="ordenes_mantenimiento_equipos_cerradas",
+    )
+    fecha_cierre = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "equipo_orden_trabajo_mantenimiento"
+        verbose_name = "Orden de trabajo de mantenimiento"
+        verbose_name_plural = "Órdenes de trabajo de mantenimiento"
+        ordering = ["-fecha", "-id"]
+        indexes = [
+            models.Index(
+                fields=["estado", "fecha"],
+                name="bio_orden_estado_fecha_idx",
+            ),
+            models.Index(
+                fields=["operario", "fecha"],
+                name="bio_orden_operario_fecha_idx",
+            ),
+        ]
+
+    @property
+    def numero_orden(self):
+        """El numero que va en el papel: OTM-2026-00031.
+
+        El anio es el de la fecha del trabajo y no el de hoy: una orden de
+        diciembre que se digita en enero sigue perteneciendo al anio en que se
+        hizo el trabajo.
+        """
+        if not self.pk:
+            return "SIN ASIGNAR"
+
+        anio = (self.fecha or timezone.localdate()).year
+        return f"{self.PREFIJO}-{anio}-{self.pk:05d}"
+
+    @property
+    def esta_abierta(self):
+        return self.estado == EstadoOrdenTrabajo.ABIERTA
+
+    def clean(self):
+        errores = {}
+        self.solicitado_por = (self.solicitado_por or "").strip()
+
+        if self.fecha and self.fecha > timezone.localdate():
+            errores["fecha"] = "La fecha del trabajo no puede ser futura."
+
+        if self.origen == OrigenOrdenTrabajo.PAPEL and not self.solicitado_por:
+            errores["solicitado_por"] = (
+                "Una solicitud en papel necesita el nombre de quien la pidió."
+            )
+
+        if self.fecha_solicitud and self.fecha:
+            if self.fecha_solicitud > self.fecha:
+                errores["fecha_solicitud"] = (
+                    "La solicitud no puede ser posterior al trabajo."
+                )
+
+        if errores:
+            raise ValidationError(errores)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.numero_orden} - {self.tipo.nombre}"
+
+
+class EquipoEnOrdenTrabajo(models.Model):
+    """Una fila de la hoja: un aparato concreto que se atendio en esa orden.
+
+    Las horas van en la fila y no en la orden porque es lo que dice el papel:
+    en la misma salida un monitor puede llevar veinte minutos y el siguiente
+    una hora, y esos tiempos son lo que justifica la jornada.
+    """
+
+    orden = models.ForeignKey(
+        OrdenTrabajoMantenimiento,
+        on_delete=models.CASCADE,
+        related_name="equipos",
+    )
+    dispositivo = models.ForeignKey(
+        Dispositivo,
+        on_delete=models.PROTECT,
+        related_name="atenciones_mantenimiento",
+        verbose_name="Equipo",
+    )
+    # El "Ambiente" de la hoja: donde estaba el aparato ese dia. Se copia de
+    # la ubicacion del equipo al agregarlo, pero queda escrito aqui porque si
+    # el equipo se traslada despues, la hoja firmada tiene que seguir diciendo
+    # donde se atendio.
+    ambiente = models.CharField(
+        max_length=120,
+        blank=True,
+        verbose_name="Ambiente",
+    )
+    hora_inicio = models.TimeField(null=True, blank=True, verbose_name="Hora inicio")
+    hora_final = models.TimeField(null=True, blank=True, verbose_name="Hora final")
+    observaciones = models.CharField(max_length=250, blank=True)
+
+    class Meta:
+        db_table = "equipo_orden_trabajo_equipo"
+        verbose_name = "Equipo atendido en la orden"
+        verbose_name_plural = "Equipos atendidos en la orden"
+        ordering = ["id"]
+        constraints = [
+            # El mismo aparato no se lista dos veces en la misma hoja: seria
+            # imposible saber cual de las dos filas es la buena.
+            models.UniqueConstraint(
+                fields=["orden", "dispositivo"],
+                name="equipo_orden_dispositivo_unico",
+            ),
+        ]
+
+    def clean(self):
+        errores = {}
+        self.ambiente = (self.ambiente or "").strip()
+
+        if self.hora_inicio and self.hora_final:
+            if self.hora_final <= self.hora_inicio:
+                errores["hora_final"] = (
+                    "La hora final tiene que ser posterior a la de inicio."
+                )
+
+        if self.hora_final and not self.hora_inicio:
+            errores["hora_inicio"] = "Falta la hora de inicio."
+
+        # Todos los aparatos de la hoja son del tipo de la hoja, porque la
+        # lista de actividades es comun. Mezclar tipos dejaria la orden
+        # diciendo que a un glucometro se le hizo lo de un autoclave.
+        if self.orden_id and self.dispositivo_id:
+            if self.dispositivo.tipo_id != self.orden.tipo_id:
+                errores["dispositivo"] = (
+                    f"La orden es de {self.orden.tipo.nombre} y este equipo "
+                    f"es {self.dispositivo.tipo.nombre}."
+                )
+
+        if errores:
+            raise ValidationError(errores)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    @property
+    def minutos(self):
+        """Cuanto duro la atencion, para poder sumar la jornada."""
+        if not self.hora_inicio or not self.hora_final:
+            return None
+
+        inicio = self.hora_inicio.hour * 60 + self.hora_inicio.minute
+        final = self.hora_final.hour * 60 + self.hora_final.minute
+
+        return final - inicio
+
+    def __str__(self):
+        return f"{self.orden.numero_orden} - {self.dispositivo.codigo}"
+
+
+class ActividadEnOrdenTrabajo(models.Model):
+    """Una linea de lo que se hizo, escrita en el momento.
+
+    Se agregan de una en una, en el orden en que se trabajo, y no se marcan de
+    una lista precargada: cada aparato llega distinto y una plantilla con
+    casillas sin marcar no distingue entre "no se hizo" y "nunca aplicaba".
+    La linea apunta al catalogo para poder sugerirla la proxima vez, y el
+    detalle guarda lo particular de esta vez -que pieza, que lectura- que no
+    tiene sentido meter en el catalogo.
+    """
+
+    orden = models.ForeignKey(
+        OrdenTrabajoMantenimiento,
+        on_delete=models.CASCADE,
+        related_name="actividades",
+    )
+    actividad = models.ForeignKey(
+        ActividadMantenimiento,
+        on_delete=models.PROTECT,
+        related_name="lineas",
+    )
+    # El orden importa: la hoja se lee como una secuencia de trabajo.
+    posicion = models.PositiveSmallIntegerField(default=1)
+    detalle = models.CharField(
+        max_length=250,
+        blank=True,
+        verbose_name="Detalle",
+        help_text="Lo particular de esta vez, si hace falta.",
+    )
+    registrado_por = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="actividades_mantenimiento_equipos_registradas",
+    )
+    fecha_registro = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "equipo_orden_trabajo_actividad"
+        verbose_name = "Actividad realizada"
+        verbose_name_plural = "Actividades realizadas"
+        ordering = ["posicion", "id"]
+        constraints = [
+            # La misma actividad no se escribe dos veces en la misma hoja. Si
+            # de verdad se repitio -se limpio al principio y al final- lo que
+            # cambia es el detalle, y eso va en una sola linea.
+            models.UniqueConstraint(
+                fields=["orden", "actividad"],
+                name="equipo_orden_actividad_unica",
+            ),
+        ]
+
+    def clean(self):
+        self.detalle = (self.detalle or "").strip()
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    @property
+    def texto(self):
+        """Como se lee la linea en la hoja impresa."""
+        if self.detalle:
+            return f"{self.actividad.nombre} — {self.detalle}"
+        return self.actividad.nombre
+
+    def __str__(self):
+        return f"{self.orden.numero_orden} - {self.actividad.nombre}"

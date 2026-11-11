@@ -1,0 +1,70 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Nueva orden de trabajo{% endblock title %}
+
+{% block content %}
+<div class="contenedor2 equipos-pagina equipos-mantenimiento">
+    <div class="equipos-listado__encabezado">
+        <div class="equipos-listado__titulo">
+            <div class="tituloFormulario">
+                <div class="equipos-encabezado-superior">
+                    <div class="tituloFormulario-texto">
+                        <i class="bi bi-clipboard-plus"></i>
+                        <h2 class="sin-margen">Nueva orden de trabajo</h2>
+                    </div>
+                    <a class="equipos-volver equipos-encabezado-volver"
+                       href="{% url 'listado_ordenes_equipos' %}">
+                        <i class="bi bi-arrow-left"></i>
+                        Órdenes
+                    </a>
+                </div>
+                <div class="tituloFormulario-subrallado"></div>
+            </div>
+        </div>
+    </div>
+
+    <p class="equipos-mantenimiento__nota">
+        Una hoja cubre todos los equipos del mismo tipo que se atendieron en
+        esa salida, como el formato en papel. El tipo se fija ahora y no se
+        cambia después: la lista de lo que se hizo es común a todos.
+    </p>
+
+    <p class="equipos-mantenimiento__nota">
+        Si la solicitud llegó en papel, elija ese origen y escriba quién la
+        pidió. Quien recibe el papel es quien levanta la orden.
+    </p>
+
+    <form class="equipos-orden__agregar equipos-plan__form" method="post"
+          data-form-orden
+          data-url-empleados="{% url 'buscar_empleados_equipos' %}">
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+            <p class="equipos-orden__error">{{ form.non_field_errors }}</p>
+        {% endif %}
+
+        {% for campo in form %}
+            <div class="equipos-orden__campo">
+                <label for="{{ campo.id_for_label }}">{{ campo.label }}</label>
+                {{ campo }}
+                {% if campo.help_text %}
+                    <small class="equipos-mantenimiento__nota">{{ campo.help_text }}</small>
+                {% endif %}
+                {% if campo.errors %}
+                    <p class="equipos-orden__error">{{ campo.errors }}</p>
+                {% endif %}
+            </div>
+        {% endfor %}
+
+        <button type="submit" class="formularioBotones-boton">
+            <i class="bi bi-plus-lg"></i>
+            Abrir orden
+        </button>
+    </form>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script src="{% static 'core/scripts/equipos/ordenCabecera.js' %}"></script>
+{% endblock extra_js %}

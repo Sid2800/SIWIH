@@ -425,3 +425,11 @@ EQUIPOS_CATALOGO_UNIDADES = ["EQ"]
 # crea el registro, deja el equipo dado de baja y bloquea su edicion.
 EQUIPOS_BAJA_ROLES = ["admin", "digitador"]
 EQUIPOS_BAJA_UNIDADES = ["EQ"]
+
+# Programar y ejecutar mantenimientos: planes, calendario y ordenes de
+# trabajo. Va aparte de la edicion del inventario porque es otro oficio:
+# quien registra un equipo nuevo no es necesariamente quien lo repara, y al
+# tecnico de taller no hace falta darle de alta aparatos para que cierre sus
+# ordenes.
+EQUIPOS_MANTENIMIENTO_ROLES = ["admin", "digitador"]
+EQUIPOS_MANTENIMIENTO_UNIDADES = ["EQ"]

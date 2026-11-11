@@ -1,0 +1,128 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Órdenes de trabajo{% endblock title %}
+
+{% block content %}
+<div class="contenedor2 equipos-pagina equipos-mantenimiento">
+    <div class="equipos-listado__encabezado">
+        <div class="equipos-listado__titulo">
+            <div class="tituloFormulario">
+                <div class="equipos-encabezado-superior">
+                    <div class="tituloFormulario-texto">
+                        <i class="bi bi-list-check"></i>
+                        <h2 class="sin-margen">Órdenes de trabajo</h2>
+                    </div>
+                    <a class="equipos-volver equipos-encabezado-volver"
+                       href="{% url 'panel_mantenimiento_equipos' %}">
+                        <i class="bi bi-arrow-left"></i>
+                        Mantenimiento
+                    </a>
+                </div>
+                <div class="tituloFormulario-subrallado"></div>
+            </div>
+        </div>
+    </div>
+
+    <form class="equipos-listado__controles" method="get">
+        <input type="search" name="q" value="{{ busqueda }}"
+               class="formularioCampo-text"
+               placeholder="Número de orden o tipo de equipo">
+
+        <select name="estado" class="formularioCampo-select">
+            <option value="">Todos los estados</option>
+            {% for valor, etiqueta in estados %}
+                <option value="{{ valor }}"
+                        {% if estado == valor|stringformat:"s" %}selected{% endif %}>
+                    {{ etiqueta }}
+                </option>
+            {% endfor %}
+        </select>
+
+        <select name="clase" class="formularioCampo-select">
+            <option value="">Preventivo y correctivo</option>
+            {% for valor, etiqueta in clases %}
+                <option value="{{ valor }}"
+                        {% if clase == valor|stringformat:"s" %}selected{% endif %}>
+                    {{ etiqueta }}
+                </option>
+            {% endfor %}
+        </select>
+
+        <button type="submit" class="formularioBotones-boton">
+            <i class="bi bi-search"></i>
+            Buscar
+        </button>
+
+        <a class="formularioBotones-boton equipos-listado__boton-filtro--secundario"
+           href="{% url 'listado_ordenes_equipos' %}">
+            Limpiar
+        </a>
+
+        <a class="formularioBotones-boton equipos-mantenimiento__boton-nueva"
+           href="{% url 'crear_orden_equipos' %}">
+            <i class="bi bi-plus-lg"></i>
+            Nueva
+        </a>
+    </form>
+
+    <div class="equipos-listado__tabla-contenedor">
+        <table class="equipos-listado__tabla equipos-mantenimiento__tabla">
+            <thead>
+                <tr>
+                    <th>Orden</th>
+                    <th>Fecha</th>
+                    <th>Tipo de equipo</th>
+                    <th>Clase</th>
+                    <th>Equipos</th>
+                    <th>Actividades</th>
+                    <th>Operario</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for orden in ordenes %}
+                    <tr>
+                        <td>
+                            <a href="{% url 'orden_trabajo_equipos' orden.pk %}">
+                                {{ orden.numero_orden }}
+                            </a>
+                        </td>
+                        <td>{{ orden.fecha|date:"d/m/Y" }}</td>
+                        <td>{{ orden.tipo.nombre }}</td>
+                        <td>{{ orden.get_clase_display }}</td>
+                        <td>{{ orden.total_equipos }}</td>
+                        <td>{{ orden.total_actividades }}</td>
+                        <td>{{ orden.operario.get_full_name|default:orden.operario.username }}</td>
+                        <td class="equipos-orden__estado equipos-orden__estado--{{ orden.estado }}">
+                            {{ orden.get_estado_display }}
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="8" class="equipos-mantenimiento__vacio">
+                            No hay órdenes que coincidan.
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if pagina.has_other_pages %}
+        <nav class="equipos-listado__paginacion" aria-label="Páginas de órdenes">
+            {% if pagina.has_previous %}
+                <a href="?pagina={{ pagina.previous_page_number }}&q={{ busqueda }}&estado={{ estado }}&clase={{ clase }}">
+                    Anterior
+                </a>
+            {% endif %}
+            <span>Página {{ pagina.number }} de {{ pagina.paginator.num_pages }}</span>
+            {% if pagina.has_next %}
+                <a href="?pagina={{ pagina.next_page_number }}&q={{ busqueda }}&estado={{ estado }}&clase={{ clase }}">
+                    Siguiente
+                </a>
+            {% endif %}
+        </nav>
+    {% endif %}
+</div>
+{% endblock content %}

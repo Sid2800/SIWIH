@@ -1,0 +1,142 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Programar mantenimiento{% endblock title %}
+
+{% block content %}
+<div class="contenedor2 equipos-pagina equipos-mantenimiento">
+    <div class="equipos-listado__encabezado">
+        <div class="equipos-listado__titulo">
+            <div class="tituloFormulario">
+                <div class="equipos-encabezado-superior">
+                    <div class="tituloFormulario-texto">
+                        <i class="bi bi-calendar-plus"></i>
+                        <h2 class="sin-margen">
+                            {% if plan %}Plan de mantenimiento{% else %}Programar mantenimiento{% endif %}
+                        </h2>
+                    </div>
+                    <a class="equipos-volver equipos-encabezado-volver"
+                       href="{% url 'detalle_dispositivo_equipos' dispositivo.pk %}">
+                        <i class="bi bi-arrow-left"></i>
+                        {{ dispositivo.codigo }}
+                    </a>
+                </div>
+                <div class="tituloFormulario-subrallado"></div>
+            </div>
+        </div>
+    </div>
+
+    <p class="equipos-mantenimiento__nota">
+        {{ dispositivo.codigo }} — {{ dispositivo.tipo.nombre }}
+        {% if dispositivo.marca %}{{ dispositivo.marca.nombre }}{% endif %}
+        {% if dispositivo.modelo %}{{ dispositivo.modelo.nombre }}{% endif %}
+    </p>
+
+    {% if frecuencia_del_tipo %}
+        <p class="equipos-mantenimiento__nota">
+            Su tipo se revisa cada {{ frecuencia_del_tipo }} meses.
+            {% if dispositivo.frecuencia_es_excepcion %}
+                Este equipo es una excepción: cada
+                {{ dispositivo.frecuencia_mantenimiento_meses }} meses.
+            {% endif %}
+        </p>
+    {% else %}
+        <p class="equipos-mantenimiento__nota equipos-mantenimiento__nota--aviso">
+            Su tipo no tiene frecuencia declarada. Elíjala aquí y quedará en
+            este plan; conviene además declararla en el catálogo del tipo para
+            que los demás equipos iguales la hereden.
+        </p>
+    {% endif %}
+
+    <form class="equipos-orden__agregar equipos-plan__form" method="post">
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+            <p class="equipos-orden__error">{{ form.non_field_errors }}</p>
+        {% endif %}
+
+        {% for campo in form %}
+            <div class="equipos-orden__campo">
+                <label for="{{ campo.id_for_label }}">{{ campo.label }}</label>
+                {{ campo }}
+                {% if campo.help_text %}
+                    <small class="equipos-mantenimiento__nota">{{ campo.help_text }}</small>
+                {% endif %}
+                {% if campo.errors %}
+                    <p class="equipos-orden__error">{{ campo.errors }}</p>
+                {% endif %}
+            </div>
+        {% endfor %}
+
+        <button type="submit" class="formularioBotones-boton">
+            <i class="bi bi-check-lg"></i>
+            {% if plan %}Guardar cambios{% else %}Programar{% endif %}
+        </button>
+    </form>
+
+    {% if plan %}
+        <section class="equipos-mantenimiento__bloque">
+            <header class="equipos-mantenimiento__bloque-titulo">
+                <h3 class="sin-margen">
+                    <i class="bi bi-clock-history"></i>
+                    Visitas
+                </h3>
+                <form method="post"
+                      action="{% url 'cambiar_estado_plan_equipos' plan.pk %}">
+                    {% csrf_token %}
+                    <button type="submit" class="equipos-mantenimiento__accion">
+                        {% if plan.activo %}Desactivar plan{% else %}Reactivar plan{% endif %}
+                    </button>
+                </form>
+            </header>
+
+            {% if not plan.activo %}
+                <p class="equipos-mantenimiento__nota equipos-mantenimiento__nota--aviso">
+                    El plan está desactivado: no ocupa el calendario de nadie.
+                    Lo realizado se conserva.
+                </p>
+            {% endif %}
+
+            <table class="equipos-listado__tabla equipos-mantenimiento__tabla">
+                <thead>
+                    <tr>
+                        <th>Programada</th>
+                        <th>Estado</th>
+                        <th>Se hizo</th>
+                        <th>Orden</th>
+                        <th>Nota</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for visita in visitas %}
+                        <tr>
+                            <td>
+                                {{ visita.fecha_programada|date:"d/m/Y" }}
+                                {% if visita.movida_a_mano %}
+                                    <small class="equipos-calendario__movida">movida</small>
+                                {% endif %}
+                            </td>
+                            <td>{{ visita.get_estado_display }}</td>
+                            <td>{{ visita.fecha_realizada|date:"d/m/Y"|default:"—" }}</td>
+                            <td>
+                                {% if visita.orden_id %}
+                                    <a href="{% url 'orden_trabajo_equipos' visita.orden_id %}">
+                                        {{ visita.orden.numero_orden }}
+                                    </a>
+                                {% else %}—{% endif %}
+                            </td>
+                            <td>{{ visita.observaciones|default:"" }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="5" class="equipos-mantenimiento__vacio">
+                                Sin visitas todavía.
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+    {% endif %}
+</div>
+{% endblock content %}

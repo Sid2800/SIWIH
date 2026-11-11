@@ -71,6 +71,21 @@ def puede_dar_baja_equipos(user):
     )
 
 
+def puede_gestionar_mantenimiento_equipos(user):
+    """Programar preventivos y levantar ordenes de trabajo.
+
+    Va aparte de la edicion del inventario porque es otro oficio. Quien da de
+    alta un aparato nuevo no es necesariamente quien lo repara, y al tecnico
+    de taller no hace falta concederle el alta de equipos para que cierre sus
+    ordenes.
+    """
+    return _tiene(
+        user,
+        constantes.EQUIPOS_MANTENIMIENTO_ROLES,
+        constantes.EQUIPOS_MANTENIMIENTO_UNIDADES,
+    )
+
+
 def puede_usar_formularios_equipos(user):
     """Permiso de los buscadores que alimentan los formularios.
 
@@ -78,4 +93,8 @@ def puede_usar_formularios_equipos(user):
     el alta como la edicion, asi que basta con cualquiera de las dos
     capacidades. Se resuelve aqui para que las vistas no repitan la disyuncion.
     """
-    return puede_editar_equipos(user) or puede_administrar_catalogos_equipos(user)
+    return (
+        puede_editar_equipos(user)
+        or puede_administrar_catalogos_equipos(user)
+        or puede_gestionar_mantenimiento_equipos(user)
+    )

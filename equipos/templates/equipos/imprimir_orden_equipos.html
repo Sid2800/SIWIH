@@ -1,0 +1,211 @@
+{% load static %}<!DOCTYPE html>
+{# La hoja en papel, con el mismo formato que el taller venia llenando a mano.
+
+   No extiende la plantilla base a proposito: lo que se imprime es la hoja y
+   nada mas. Un menu lateral y una barra de navegacion en el papel gastan la
+   mitad del folio y no se firman.
+
+   Los estilos van aqui dentro por la misma razon: esta pagina se abre, se
+   imprime y se cierra, y cargar la hoja de estilos del sistema entero
+   arrastraria reglas de pantalla que al imprimir estorban. #}
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <title>{{ orden.numero_orden }}</title>
+    <style>
+        @page { size: letter portrait; margin: 1.5cm; }
+
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 11px;
+            color: #000;
+            background: #fff;
+            margin: 0;
+        }
+
+        .encabezado { text-align: center; margin-bottom: 10px; }
+        .encabezado h1 { font-size: 13px; margin: 0; text-transform: uppercase; }
+        .encabezado h2 { font-size: 12px; margin: 2px 0; font-weight: normal; }
+        .encabezado .numero {
+            float: right;
+            border: 1px solid #000;
+            padding: 3px 8px;
+            font-weight: bold;
+        }
+
+        .relacion {
+            margin: 10px 0 6px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+        th, td {
+            border: 1px solid #000;
+            padding: 3px 4px;
+            text-align: left;
+            vertical-align: top;
+        }
+        th { background: #e8e8e8; font-size: 10px; text-transform: uppercase; }
+        td.vacia { height: 18px; }
+
+        .tareas { margin-bottom: 12px; }
+        .tareas h3 {
+            font-size: 11px;
+            margin: 0 0 4px;
+            text-transform: uppercase;
+        }
+        .tareas ol { margin: 0; padding-left: 20px; }
+        .tareas li { margin-bottom: 2px; }
+
+        .observaciones {
+            border: 1px solid #000;
+            min-height: 45px;
+            padding: 4px;
+            margin-bottom: 20px;
+        }
+        .observaciones strong { text-transform: uppercase; font-size: 10px; }
+
+        .firmas { width: 100%; margin-top: 30px; }
+        .firmas td {
+            border: none;
+            text-align: center;
+            padding-top: 25px;
+            width: 50%;
+        }
+        .firmas .linea {
+            border-top: 1px solid #000;
+            padding-top: 3px;
+            margin: 0 20px;
+            text-transform: uppercase;
+            font-size: 10px;
+        }
+
+        .pie { margin-top: 14px; font-size: 9px; color: #444; }
+
+        @media print {
+            .no-imprimir { display: none; }
+        }
+
+        .no-imprimir {
+            margin-bottom: 14px;
+            text-align: right;
+        }
+        .no-imprimir button {
+            padding: 6px 14px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="no-imprimir">
+        <button type="button" onclick="window.print()">Imprimir</button>
+    </div>
+
+    <div class="encabezado">
+        <span class="numero">N.° O.T.: {{ orden.numero_orden }}</span>
+        <h1>Hospital Dr. Enrique Aguilar Cerrato</h1>
+        <h2>Unidad de Mantenimiento</h2>
+        <h2>Orden de trabajo — {{ orden.get_clase_display }}</h2>
+    </div>
+
+    <p class="relacion">Relación de equipos: {{ orden.tipo.nombre }}</p>
+
+    <table>
+        <thead>
+            <tr>
+                <th style="width:5%">Cant.</th>
+                <th style="width:20%">Ambiente</th>
+                <th style="width:25%">N.° inv. / equipo</th>
+                <th style="width:10%">Hora inicio</th>
+                <th style="width:10%">Hora final</th>
+                <th style="width:12%">Fecha</th>
+                <th style="width:18%">Operario</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for fila in equipos %}
+                <tr>
+                    <td>1</td>
+                    <td>{{ fila.ambiente }}</td>
+                    <td>
+                        {{ fila.dispositivo.inventario_bienes_nacionales|default:fila.dispositivo.codigo }}
+                        {% if fila.dispositivo.marca %}
+                            — {{ fila.dispositivo.marca.nombre }}
+                        {% endif %}
+                        {% if fila.dispositivo.numero_serie %}
+                            (s/n {{ fila.dispositivo.numero_serie }})
+                        {% endif %}
+                    </td>
+                    <td>{{ fila.hora_inicio|time:"H:i" }}</td>
+                    <td>{{ fila.hora_final|time:"H:i" }}</td>
+                    <td>{{ orden.fecha|date:"d/m/Y" }}</td>
+                    <td>{{ orden.operario.get_full_name|default:orden.operario.username }}</td>
+                </tr>
+            {% endfor %}
+
+            {# El formato en papel reserva un numero fijo de filas. Se rellena
+               para que la tabla impresa no quede cortada a media caja. #}
+            {% for _ in filas_en_blanco %}
+                <tr>
+                    <td class="vacia"></td>
+                    <td class="vacia"></td>
+                    <td class="vacia"></td>
+                    <td class="vacia"></td>
+                    <td class="vacia"></td>
+                    <td class="vacia"></td>
+                    <td class="vacia"></td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="tareas">
+        <h3>Tareas realizadas</h3>
+        {% if actividades %}
+            <ol>
+                {% for linea in actividades %}
+                    <li>{{ linea.texto }}</li>
+                {% endfor %}
+            </ol>
+        {% else %}
+            <p>—</p>
+        {% endif %}
+    </div>
+
+    <div class="observaciones">
+        <strong>Observaciones:</strong>
+        {{ orden.observaciones }}
+    </div>
+
+    {% if orden.origen == 2 %}
+        <p class="pie">
+            Solicitud recibida en papel de {{ orden.solicitado_por }}
+            {% if orden.fecha_solicitud %}
+                el {{ orden.fecha_solicitud|date:"d/m/Y" }}
+            {% endif %}.
+        </p>
+    {% endif %}
+
+    <table class="firmas">
+        <tr>
+            <td>
+                <div class="linea">Firma responsable de mantenimiento</div>
+            </td>
+            <td>
+                <div class="linea">
+                    Firma jefe de departamento o servicio
+                    {% if orden.jefe_servicio %}
+                        <br>{{ orden.jefe_servicio }}
+                    {% endif %}
+                </div>
+            </td>
+        </tr>
+    </table>
+
+    <p class="pie">
+        {{ orden.numero_orden }} — {{ orden.get_estado_display }}.
+        Impreso desde SIWIH.
+    </p>
+</body>
+</html>

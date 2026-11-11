@@ -11,6 +11,7 @@
 #   views_autocomplete.py  puntos JSON de los Select2
 #   views_catalogos.py     tipos, marcas, modelos y procedencias
 #   views_garantias.py     panel de garantias y pausas por reparacion
+#   views_mantenimiento.py calendario, planes y ordenes de trabajo
 
 # MediaService no es una vista, pero se reexporta a proposito: hay codigo que
 # lo sustituye por un doble apuntando a equipos.views.MediaService, y quitarlo
@@ -60,6 +61,25 @@ from .views_garantias import (
     registrar_retorno_garantia,
     registrar_salida_garantia,
     terminar_garantia,
+)
+from .views_mantenimiento import (
+    agregar_actividad_orden,
+    agregar_equipo_orden,
+    calendario_mantenimiento,
+    cambiar_estado_plan,
+    cerrar_orden,
+    crear_orden,
+    imprimir_orden,
+    listado_ordenes,
+    mover_visita_calendario,
+    omitir_visita_calendario,
+    orden_trabajo,
+    panel_mantenimiento,
+    programar_mantenimiento,
+    quitar_actividad_orden,
+    quitar_equipo_orden,
+    realizar_visita,
+    sugerir_actividades,
 )
 from .views_inventario import (
     agregar_imagen_dispositivo,
@@ -113,6 +133,24 @@ __all__ = [
     "editar_procedencia_catalogo",
     "cambiar_estado_procedencia",
     "quitar_marca_tipo",
+    # mantenimiento
+    "panel_mantenimiento",
+    "calendario_mantenimiento",
+    "programar_mantenimiento",
+    "cambiar_estado_plan",
+    "realizar_visita",
+    "mover_visita_calendario",
+    "omitir_visita_calendario",
+    "listado_ordenes",
+    "crear_orden",
+    "orden_trabajo",
+    "agregar_equipo_orden",
+    "quitar_equipo_orden",
+    "agregar_actividad_orden",
+    "quitar_actividad_orden",
+    "cerrar_orden",
+    "imprimir_orden",
+    "sugerir_actividades",
     # garantias
     "panel_garantias",
     "gestionar_garantia",

@@ -491,15 +491,103 @@
                         {% endif %}
                     </dd>
                 </div>
-                <div><dt>Último mantenimiento</dt><dd>Pendiente de registrar</dd></div>
-                <div><dt>Próximo mantenimiento</dt><dd>Pendiente de programar</dd></div>
+                <div>
+                    <dt>Último mantenimiento</dt>
+                    <dd>
+                        {% if ultima_realizada %}
+                            {{ ultima_realizada.fecha_realizada|date:"d/m/Y" }}
+                            {% if ultima_realizada.orden_id %}
+                                <small>
+                                    <a href="{% url 'orden_trabajo_equipos' ultima_realizada.orden_id %}">
+                                        {{ ultima_realizada.orden.numero_orden }}
+                                    </a>
+                                </small>
+                            {% endif %}
+                        {% else %}
+                            Sin registrar
+                        {% endif %}
+                    </dd>
+                </div>
+                <div>
+                    <dt>Próximo mantenimiento</dt>
+                    <dd>
+                        {% if proxima_visita %}
+                            {{ proxima_visita.fecha_programada|date:"d/m/Y" }}
+                            {% if proxima_visita.esta_atrasada %}
+                                <small class="equipos-mantenimiento__fecha-vencida">
+                                    atrasado
+                                </small>
+                            {% endif %}
+                        {% elif plan_mantenimiento %}
+                            Sin visitas programadas
+                        {% else %}
+                            Sin programar
+                        {% endif %}
+                    </dd>
+                </div>
+                {% if plan_mantenimiento %}
+                    <div>
+                        <dt>Responsable</dt>
+                        <dd>
+                            {{ plan_mantenimiento.responsable.get_full_name|default:plan_mantenimiento.responsable.username }}
+                            {% if not plan_mantenimiento.activo %}
+                                <small>(plan desactivado)</small>
+                            {% endif %}
+                        </dd>
+                    </div>
+                {% endif %}
             </dl>
+
             <div class="equipos-detalle__mantenimiento">
-                <span class="equipos-estado">
-                    <i class="bi bi-info-circle"></i> Sin historial
-                </span>
-                <p>El mantenimiento se conectará en la siguiente etapa.</p>
+                {% comment %}
+                   Un equipo con frecuencia declarada pero sin plan no aparece
+                   en el calendario de nadie, y nadie lo echa de menos hasta
+                   que falla. Por eso aqui se dice y se ofrece el enlace.
+                {% endcomment %}
+                {% if not plan_mantenimiento %}
+                    <span class="equipos-estado">
+                        <i class="bi bi-calendar-x"></i> Sin plan de mantenimiento
+                    </span>
+                    {% if dispositivo.frecuencia_mantenimiento %}
+                        <p>
+                            Tiene frecuencia declarada pero ningún calendario lo
+                            reclama.
+                        </p>
+                    {% endif %}
+                {% endif %}
+                <a class="formularioBotones-boton"
+                   href="{% url 'programar_mantenimiento_equipos' dispositivo.pk %}">
+                    <i class="bi bi-calendar-plus"></i>
+                    {% if plan_mantenimiento %}Ver plan{% else %}Programar mantenimiento{% endif %}
+                </a>
             </div>
+
+            {% if atenciones %}
+                <table class="equipos-listado__tabla equipos-mantenimiento__tabla">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Orden</th>
+                            <th>Clase</th>
+                            <th>Operario</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for fila in atenciones %}
+                            <tr>
+                                <td>{{ fila.orden.fecha|date:"d/m/Y" }}</td>
+                                <td>
+                                    <a href="{% url 'orden_trabajo_equipos' fila.orden_id %}">
+                                        {{ fila.orden.numero_orden }}
+                                    </a>
+                                </td>
+                                <td>{{ fila.orden.get_clase_display }}</td>
+                                <td>{{ fila.orden.operario.get_full_name|default:fila.orden.operario.username }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% endif %}
         </section>
 
         <section class="equipos-detalle__tarjeta equipos-detalle__tarjeta--historial">

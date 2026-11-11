@@ -12,6 +12,7 @@ from django.shortcuts import redirect
 
 from .permisos import (
     puede_administrar_catalogos_equipos,
+    puede_gestionar_mantenimiento_equipos,
     puede_dar_baja_equipos,
     puede_editar_equipos,
     puede_usar_formularios_equipos,
@@ -51,6 +52,14 @@ exige_ver_equipos = _exigir(puede_visualizar_equipos)
 exige_editar_equipos = _exigir(puede_editar_equipos)
 exige_catalogo_equipos = _exigir(puede_administrar_catalogos_equipos)
 exige_baja_equipos = _exigir(puede_dar_baja_equipos)
+exige_mantenimiento_equipos = _exigir(puede_gestionar_mantenimiento_equipos)
+
+# El calendario y la orden de trabajo se llenan sin recargar: mover una visita
+# o agregar una linea de actividad son peticiones fetch, y un redirect a
+# acceso_denegado llegaria como HTML que el JavaScript no sabe leer.
+exige_mantenimiento_equipos_json = _exigir(
+    puede_gestionar_mantenimiento_equipos, como_json=True
+)
 
 # Los buscadores de los formularios responden a fetch, no a una navegacion.
 exige_formularios_equipos_json = _exigir(puede_usar_formularios_equipos, como_json=True)

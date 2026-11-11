@@ -1,14 +1,18 @@
 from django import forms
+from django.contrib.auth.models import User
 from django.db.models import Q
 from django.urls import reverse
 from django.utils import timezone
 
-from core.constants.choices_constants import EstadoRegistro
+from core.constants import permisos as constantes_permisos
+from core.constants.choices_constants import AlcanceUsuario, EstadoRegistro
 from core.validators.image_validator import validar_imagen_basica
 from expediente.models import ExpedienteUbicacion
 from rrhh.models import Empleado
+from usuario.models import PerfilUnidad
 
 from .models import (
+    ActividadEnOrdenTrabajo,
     AreaGestora,
     BajaDispositivo,
     CategoriaEquipo,
@@ -21,11 +25,16 @@ from .models import (
     ModalidadProcedencia,
     ModeloDispositivo,
     MotivoCierreGarantia,
+    OrdenTrabajoMantenimiento,
+    OrigenOrdenTrabajo,
+    PlanMantenimiento,
     Procedencia,
     TipoDispositivo,
     TipoProcedencia,
     TecnologiaEquipo,
     UbicacionFisica,
+    EquipoEnOrdenTrabajo,
+    normalizar_actividad,
     normalizar_inventario_bienes_nacionales,
     normalizar_inventario_numero_ficha,
     normalizar_nombre_catalogo,
@@ -223,24 +232,6 @@ class ColoresOrdenadosField(forms.CharField):
         # in_bulk devuelve un diccionario sin orden util: se recorre la lista
         # original para conservar el que eligio el usuario.
         return [catalogo[numero] for numero in identificadores]
-
-
-class ListaOcultaWidget(forms.HiddenInput):
-    """Campo oculto que lleva varios identificadores en un solo valor.
-
-    Los pinta separados por coma -"3,7"-, que es como los arma el navegador
-    conforme el usuario va agregando. Sin esto el widget escribiria la lista
-    de Python tal cual, "[3, 7]", y al reenviar el formulario esos corchetes
-    no serian identificadores de nada.
-    """
-
-    def format_value(self, valor):
-        if isinstance(valor, (list, tuple)):
-            return ",".join(
-                str(elemento) for elemento in valor if elemento not in (None, "")
-            )
-
-        return super().format_value(valor)
 
 
 def _identificadores_de_lista(valor):
@@ -1756,3 +1747,489 @@ class RetornoGarantiaForm(forms.Form):
 
     def clean_observaciones_retorno(self):
         return (self.cleaned_data.get("observaciones_retorno") or "").strip()
+
+
+# ---------------------------------------------------------------------------
+# Quien puede ser responsable o operario de un mantenimiento
+# ---------------------------------------------------------------------------
+
+def usuarios_de_mantenimiento():
+    """Los usuarios a los que se les puede asignar una visita o una orden.
+
+    Se resuelve con la misma regla que el permiso: rol de mantenimiento mas
+    unidad EQ, o alcance global, o superusuario. Un desplegable con todos los
+    usuarios del hospital convertiria asignar una visita en buscar una aguja,
+    y -peor- permitiria asignarsela a alguien que no puede abrir el
+    calendario, dejando el trabajo en un sitio donde nadie lo ve.
+
+    No se usa el comprobador de permisos usuario por usuario porque aqui hace
+    falta un queryset: comprobar uno a uno significaria traer todos los
+    usuarios a memoria cada vez que se dibuja el formulario.
+    """
+    perfiles = PerfilUnidad.objects.filter(
+        rol__in=constantes_permisos.EQUIPOS_MANTENIMIENTO_ROLES
+    )
+
+    de_la_unidad = perfiles.filter(
+        servicio_unidad__nombre_corto_unidad__in=(
+            constantes_permisos.EQUIPOS_MANTENIMIENTO_UNIDADES
+        )
+    ).values_list("usuario_id", flat=True)
+
+    globales = perfiles.filter(alcance=AlcanceUsuario.GLOBAL).values_list(
+        "usuario_id", flat=True
+    )
+
+    return (
+        User.objects.filter(is_active=True)
+        .filter(Q(pk__in=de_la_unidad) | Q(pk__in=globales) | Q(is_superuser=True))
+        .distinct()
+        .order_by("first_name", "last_name", "username")
+    )
+
+
+def _nombre_de_usuario(usuario):
+    """Como se lee un usuario en un desplegable.
+
+    El nombre completo si lo tiene; el usuario si no. Una lista de nombres de
+    cuenta -jgarcia, mlopez- obliga a saberse quien es quien de memoria.
+    """
+    completo = (usuario.get_full_name() or "").strip()
+    return completo or usuario.username
+
+
+def _etiqueta_de_equipo(dispositivo):
+    """Como se lee un equipo al agregarlo a la hoja.
+
+    El codigo primero porque es lo que esta pegado en el aparato, y despues
+    marca, modelo y serie, que es como se distinguen dos iguales de la misma
+    sala.
+    """
+    partes = [dispositivo.codigo]
+
+    if dispositivo.marca_id:
+        partes.append(dispositivo.marca.nombre)
+
+    if dispositivo.modelo_id:
+        partes.append(dispositivo.modelo.nombre)
+
+    if dispositivo.numero_serie:
+        partes.append(f"s/n {dispositivo.numero_serie}")
+
+    return " - ".join(partes)
+
+
+
+# ===========================================================================
+# MANTENIMIENTO
+# ===========================================================================
+
+
+class PlanMantenimientoForm(forms.ModelForm):
+    """Programa el preventivo de un equipo.
+
+    La frecuencia viene propuesta de su tipo, que es donde se declara el
+    criterio, y se puede cambiar aqui si este aparato es una excepcion. La
+    pregunta del fin de semana aparece siempre y no solo cuando la fecha cae
+    en sabado: lo que se esta preguntando es si esa persona puede trabajar fin
+    de semana, no si este dia concreto le toca.
+    """
+
+    FRECUENCIA_CHOICES = FRECUENCIA_MANTENIMIENTO_CHOICES
+
+    class Meta:
+        model = PlanMantenimiento
+        fields = [
+            "responsable",
+            "frecuencia_meses",
+            "fecha_inicio",
+            "trabaja_fines_de_semana",
+            "observaciones",
+        ]
+        widgets = {
+            "responsable": forms.Select(
+                attrs={"class": "formularioCampo-select"},
+            ),
+            "fecha_inicio": forms.DateInput(
+                attrs={"class": "formularioCampo-date", "type": "date"},
+                format="%Y-%m-%d",
+            ),
+            "trabaja_fines_de_semana": forms.CheckboxInput(
+                attrs={"class": "formularioCampo-check"},
+            ),
+            "observaciones": forms.Textarea(
+                attrs={
+                    "class": "formularioCampo-text no-resize",
+                    "rows": 2,
+                    "placeholder": "Opcional",
+                },
+            ),
+        }
+
+    def __init__(self, *args, dispositivo=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.dispositivo = dispositivo or getattr(self.instance, "dispositivo", None)
+
+        self.fields["frecuencia_meses"] = forms.TypedChoiceField(
+            choices=[("", "Seleccione")] + self.FRECUENCIA_CHOICES,
+            coerce=int,
+            empty_value=None,
+            label="Frecuencia",
+            widget=forms.Select(attrs={"class": "formularioCampo-select"}),
+            help_text="Propuesta según el tipo de equipo. Cámbiela si este es una excepción.",
+        )
+
+        # Solo pueden ser responsables quienes trabajan el mantenimiento. Un
+        # desplegable con todos los usuarios del hospital convierte asignar
+        # una visita en buscar una aguja, y permite asignarsela a alguien que
+        # ni siquiera puede abrir el calendario.
+        self.fields["responsable"].queryset = usuarios_de_mantenimiento()
+        self.fields["responsable"].label_from_instance = _nombre_de_usuario
+
+        if self.dispositivo is not None and not self.initial.get("frecuencia_meses"):
+            propuesta = self.dispositivo.frecuencia_mantenimiento
+
+            if propuesta:
+                self.initial["frecuencia_meses"] = propuesta
+
+        if not self.initial.get("fecha_inicio") and not self.instance.pk:
+            self.initial["fecha_inicio"] = timezone.localdate()
+
+    def clean_fecha_inicio(self):
+        fecha = self.cleaned_data.get("fecha_inicio")
+
+        # Una primera visita en el pasado dejaria el plan naciendo atrasado y
+        # el calendario abriendo con una alerta que nadie provoco.
+        if fecha and fecha < timezone.localdate():
+            raise forms.ValidationError(
+                "La primera visita no puede quedar en el pasado."
+            )
+
+        return fecha
+
+    def save(self, commit=True):
+        plan = super().save(commit=False)
+
+        if self.dispositivo is not None:
+            plan.dispositivo = self.dispositivo
+
+        if commit:
+            plan.save()
+
+        return plan
+
+
+class OrdenTrabajoForm(forms.ModelForm):
+    """La cabecera de la hoja de trabajo.
+
+    El tipo se fija al crearla y despues no se cambia: la lista de actividades
+    y los equipos ya agregados cuelgan de el, y cambiarlo dejaria la hoja
+    diciendo que a un glucometro se le hizo lo de un autoclave.
+    """
+
+    class Meta:
+        model = OrdenTrabajoMantenimiento
+        fields = [
+            "tipo",
+            "clase",
+            "origen",
+            "fecha",
+            "operario",
+            "jefe_servicio",
+            "solicitado_por",
+            "fecha_solicitud",
+            "observaciones",
+        ]
+        widgets = {
+            "clase": forms.Select(attrs={"class": "formularioCampo-select"}),
+            "origen": forms.Select(attrs={"class": "formularioCampo-select"}),
+            "fecha": forms.DateInput(
+                attrs={"class": "formularioCampo-date", "type": "date"},
+                format="%Y-%m-%d",
+            ),
+            "operario": forms.Select(attrs={"class": "formularioCampo-select"}),
+            "solicitado_por": forms.TextInput(
+                attrs={
+                    "class": "formularioCampo-text",
+                    "placeholder": "Quién pidió el trabajo",
+                    "maxlength": 150,
+                },
+            ),
+            "fecha_solicitud": forms.DateInput(
+                attrs={"class": "formularioCampo-date", "type": "date"},
+                format="%Y-%m-%d",
+            ),
+            "observaciones": forms.Textarea(
+                attrs={
+                    "class": "formularioCampo-text no-resize",
+                    "rows": 3,
+                    "placeholder": "Opcional",
+                },
+            ),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # Los tipos se dibujan completos: son unas decenas y es el campo con
+        # el que se empieza la hoja, asi que conviene poder recorrerlo.
+        self.fields["tipo"].queryset = TipoDispositivo.objects.filter(
+            activo=True
+        ).select_related("categoria")
+        self.fields["tipo"].empty_label = "Seleccione el tipo de equipo"
+
+        self.fields["operario"].queryset = usuarios_de_mantenimiento()
+        self.fields["operario"].label_from_instance = _nombre_de_usuario
+
+        # El de empleados sigue el patron del resto del modulo: el queryset
+        # nace vacio y Select2 consulta por AJAX. La tabla de empleados es el
+        # hospital entero, y dibujarla en cada carga son miles de <option>
+        # que el navegador va a tirar de todos modos.
+        self.fields["jefe_servicio"] = EmpleadoChoiceField(
+            queryset=Empleado.objects.none(),
+            required=False,
+            label="Jefe de departamento o servicio",
+            widget=forms.Select(
+                attrs={
+                    "class": "formularioCampo-select",
+                    "id": "jefe_servicio_orden",
+                    "data-placeholder": "Buscar por DNI o nombre",
+                },
+            ),
+            help_text="Opcional: la firma se recoge en papel y puede llegar después.",
+        )
+        self.fields["jefe_servicio"].empty_label = "Pendiente de firma"
+
+        # Se abre el queryset solo al empleado elegido, para que la validacion
+        # lo acepte sin tener que traer la tabla entera.
+        elegido = self.data.get("jefe_servicio") or self.initial.get(
+            "jefe_servicio"
+        )
+
+        if elegido and str(elegido).isdigit():
+            filtro = Q(pk=int(elegido))
+
+            if self.is_bound:
+                filtro &= Q(estado=EstadoRegistro.ACTIVO)
+
+            self.fields["jefe_servicio"].queryset = Empleado.objects.filter(filtro)
+        elif self.instance.pk and self.instance.jefe_servicio_id:
+            self.fields["jefe_servicio"].queryset = Empleado.objects.filter(
+                pk=self.instance.jefe_servicio_id
+            )
+
+        if not self.initial.get("fecha") and not self.instance.pk:
+            self.initial["fecha"] = timezone.localdate()
+
+        if self.instance.pk:
+            # Ni el tipo ni la clase se cambian con la hoja ya empezada.
+            for nombre in ("tipo", "clase"):
+                self.fields[nombre].disabled = True
+
+    def clean(self):
+        datos = super().clean()
+
+        # La orden en papel exige decir quien la pidio, y la fecha de la
+        # solicitud importa ahi: es lo que separa cuanto tardo el taller de
+        # cuanto tardo el papel en llegar.
+        if datos.get("origen") == OrigenOrdenTrabajo.PAPEL:
+            if not (datos.get("solicitado_por") or "").strip():
+                self.add_error(
+                    "solicitado_por",
+                    "Una solicitud en papel necesita el nombre de quien la pidió.",
+                )
+
+        return datos
+
+
+class EquipoEnOrdenForm(forms.ModelForm):
+    """Una fila de la hoja: el aparato y las horas que llevo.
+
+    El buscador de equipos se limita al tipo de la orden, porque todos los de
+    la hoja comparten la lista de actividades.
+    """
+
+    class Meta:
+        model = EquipoEnOrdenTrabajo
+        fields = ["dispositivo", "ambiente", "hora_inicio", "hora_final", "observaciones"]
+        widgets = {
+            "ambiente": forms.TextInput(
+                attrs={
+                    "class": "formularioCampo-text",
+                    "placeholder": "Dónde se atendió",
+                    "maxlength": 120,
+                },
+            ),
+            "hora_inicio": forms.TimeInput(
+                attrs={"class": "formularioCampo-text", "type": "time"},
+                format="%H:%M",
+            ),
+            "hora_final": forms.TimeInput(
+                attrs={"class": "formularioCampo-text", "type": "time"},
+                format="%H:%M",
+            ),
+            "observaciones": forms.TextInput(
+                attrs={
+                    "class": "formularioCampo-text",
+                    "placeholder": "Opcional",
+                    "maxlength": 250,
+                },
+            ),
+        }
+
+    def __init__(self, *args, orden=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.orden = orden or getattr(self.instance, "orden", None)
+
+        candidatos = Dispositivo.objects.select_related("tipo", "marca", "modelo")
+
+        if self.orden is not None:
+            candidatos = candidatos.filter(tipo_id=self.orden.tipo_id)
+
+            # Un equipo ya listado en la hoja no se vuelve a ofrecer: la
+            # unicidad lo rechazaria despues con un error que no explica nada.
+            ya_estan = self.orden.equipos.values_list("dispositivo_id", flat=True)
+            candidatos = candidatos.exclude(pk__in=list(ya_estan))
+
+        # Un equipo dado de baja no se atiende. Aparecer en el desplegable
+        # solo permite levantar una orden sobre algo que ya no existe.
+        candidatos = candidatos.filter(baja__isnull=True)
+
+        self.fields["dispositivo"].queryset = candidatos
+        self.fields["dispositivo"].label_from_instance = _etiqueta_de_equipo
+        self.fields["dispositivo"].widget.attrs.update(
+            {"class": "formularioCampo-select"}
+        )
+
+    def save(self, commit=True):
+        fila = super().save(commit=False)
+
+        if self.orden is not None:
+            fila.orden = self.orden
+
+        # El ambiente se propone desde donde esta el equipo, pero queda
+        # escrito en la fila: si manana lo trasladan, la hoja firmada tiene
+        # que seguir diciendo donde se atendio.
+        if not fila.ambiente and fila.dispositivo_id:
+            # activa es una propiedad, no una columna: la asignacion
+            # abierta es la que no tiene fecha_fin.
+            abierta = (
+                fila.dispositivo.asignaciones.filter(fecha_fin__isnull=True)
+                .select_related("ubicacion_fisica", "ubicacion")
+                .first()
+            )
+            donde = getattr(abierta, "ubicacion_fisica", None) or getattr(
+                abierta, "ubicacion", None
+            )
+
+            if donde:
+                fila.ambiente = str(donde)[:120]
+
+        if commit:
+            fila.save()
+
+        return fila
+
+
+class ActividadEnOrdenForm(forms.Form):
+    """Una linea de lo que se hizo, escrita a mano en el momento.
+
+    Es un Form y no un ModelForm porque lo que llega es texto libre: la
+    actividad del catalogo se resuelve despues, y si no existia se crea. Lo
+    que el tecnico escribe nunca se rechaza por no estar en una lista.
+    """
+
+    nombre = forms.CharField(
+        max_length=250,
+        label="Actividad realizada",
+        widget=forms.TextInput(
+            attrs={
+                "class": "formularioCampo-text",
+                "placeholder": "Qué se hizo",
+                "autocomplete": "off",
+                "maxlength": 250,
+            },
+        ),
+    )
+    detalle = forms.CharField(
+        max_length=250,
+        required=False,
+        label="Detalle",
+        widget=forms.TextInput(
+            attrs={
+                "class": "formularioCampo-text",
+                "placeholder": "Opcional: qué pieza, qué lectura",
+                "maxlength": 250,
+            },
+        ),
+    )
+
+    def clean_nombre(self):
+        nombre = (self.cleaned_data.get("nombre") or "").strip()
+
+        if len(normalizar_actividad(nombre)) < 4:
+            raise forms.ValidationError(
+                "Escriba la actividad completa: así no se entiende después."
+            )
+
+        return nombre
+
+
+class MoverVisitaForm(forms.Form):
+    """Cambia la fecha de una visita programada."""
+
+    fecha = forms.DateField(
+        label="Nueva fecha",
+        widget=forms.DateInput(
+            attrs={"class": "formularioCampo-date", "type": "date"},
+            format="%Y-%m-%d",
+        ),
+    )
+
+    def clean_fecha(self):
+        fecha = self.cleaned_data.get("fecha")
+
+        # Mover una visita al pasado es registrarla como hecha por la puerta
+        # de atras, sin orden de trabajo y sin que conste quien la hizo.
+        if fecha and fecha < timezone.localdate():
+            raise forms.ValidationError(
+                "No se puede programar una visita en el pasado. Si ya se hizo, "
+                "regístrela como realizada."
+            )
+
+        return fecha
+
+
+class RealizarVisitaForm(forms.Form):
+    """Registra que la visita se hizo, y cuando."""
+
+    fecha_realizada = forms.DateField(
+        label="Fecha en que se hizo",
+        widget=forms.DateInput(
+            attrs={"class": "formularioCampo-date", "type": "date"},
+            format="%Y-%m-%d",
+        ),
+    )
+    observaciones = forms.CharField(
+        max_length=250,
+        required=False,
+        widget=forms.TextInput(
+            attrs={"class": "formularioCampo-text", "maxlength": 250},
+        ),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if not self.initial.get("fecha_realizada"):
+            self.initial["fecha_realizada"] = timezone.localdate()
+
+    def clean_fecha_realizada(self):
+        fecha = self.cleaned_data.get("fecha_realizada")
+
+        if fecha and fecha > timezone.localdate():
+            raise forms.ValidationError(
+                "No se puede registrar como hecho un trabajo que no se ha hecho."
+            )
+
+        return fecha

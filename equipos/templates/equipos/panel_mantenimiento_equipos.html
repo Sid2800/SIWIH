@@ -1,0 +1,235 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Mantenimiento{% endblock title %}
+
+{% block content %}
+<div class="contenedor2 equipos-pagina equipos-mantenimiento">
+    <div class="equipos-listado__encabezado">
+        <div class="equipos-listado__titulo">
+            <div class="tituloFormulario">
+                <div class="equipos-encabezado-superior">
+                    <div class="tituloFormulario-texto">
+                        <i class="bi bi-tools"></i>
+                        <h2 class="sin-margen">Mantenimiento</h2>
+                    </div>
+                    <a class="equipos-volver equipos-encabezado-volver"
+                       href="{% url 'inicio_equipos' %}">
+                        <i class="bi bi-arrow-left"></i>
+                        Equipos
+                    </a>
+                </div>
+                <div class="tituloFormulario-subrallado"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="equipos-mantenimiento__accesos">
+        <a class="formularioBotones-boton"
+           href="{% url 'calendario_mantenimiento_equipos' %}">
+            <i class="bi bi-calendar3"></i>
+            Mi calendario
+        </a>
+        <a class="formularioBotones-boton"
+           href="{% url 'listado_ordenes_equipos' %}">
+            <i class="bi bi-list-check"></i>
+            Órdenes de trabajo
+        </a>
+        <a class="formularioBotones-boton equipos-mantenimiento__boton-nueva"
+           href="{% url 'crear_orden_equipos' %}">
+            <i class="bi bi-plus-lg"></i>
+            Nueva orden
+        </a>
+    </div>
+
+    {# Lo atrasado va primero y sin paginar: la longitud de esta lista es en
+       si misma la noticia. Verla de diez en diez la esconde. #}
+    <section class="equipos-mantenimiento__bloque equipos-mantenimiento__bloque--alerta">
+        <header class="equipos-mantenimiento__bloque-titulo">
+            <h3 class="sin-margen">
+                <i class="bi bi-exclamation-triangle"></i>
+                Preventivos atrasados
+            </h3>
+            <span class="equipos-mantenimiento__contador">{{ total_atrasadas }}</span>
+        </header>
+
+        {% if atrasadas %}
+            <table class="equipos-listado__tabla equipos-mantenimiento__tabla">
+                <thead>
+                    <tr>
+                        <th>Tocaba</th>
+                        <th>Equipo</th>
+                        <th>Tipo</th>
+                        <th>Responsable</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for visita in atrasadas %}
+                        <tr>
+                            <td class="equipos-mantenimiento__fecha-vencida">
+                                {{ visita.fecha_programada|date:"d/m/Y" }}
+                            </td>
+                            <td>
+                                <a href="{% url 'detalle_dispositivo_equipos' visita.plan.dispositivo_id %}">
+                                    {{ visita.plan.dispositivo.codigo }}
+                                </a>
+                            </td>
+                            <td>{{ visita.plan.dispositivo.tipo.nombre }}</td>
+                            <td>{{ visita.plan.responsable.get_full_name|default:visita.plan.responsable.username }}</td>
+                            <td>
+                                <a class="equipos-mantenimiento__accion"
+                                   href="{% url 'realizar_visita_equipos' visita.pk %}">
+                                    Registrar
+                                </a>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="equipos-mantenimiento__vacio">
+                Nada atrasado. Todos los preventivos están al día.
+            </p>
+        {% endif %}
+    </section>
+
+    <section class="equipos-mantenimiento__bloque">
+        <header class="equipos-mantenimiento__bloque-titulo">
+            <h3 class="sin-margen">
+                <i class="bi bi-calendar-week"></i>
+                Próximos {{ dias_horizonte }} días
+            </h3>
+        </header>
+
+        {% if proximas %}
+            <table class="equipos-listado__tabla equipos-mantenimiento__tabla">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Equipo</th>
+                        <th>Tipo</th>
+                        <th>Responsable</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for visita in proximas %}
+                        <tr>
+                            <td>{{ visita.fecha_programada|date:"d/m/Y" }}</td>
+                            <td>
+                                <a href="{% url 'detalle_dispositivo_equipos' visita.plan.dispositivo_id %}">
+                                    {{ visita.plan.dispositivo.codigo }}
+                                </a>
+                            </td>
+                            <td>{{ visita.plan.dispositivo.tipo.nombre }}</td>
+                            <td>{{ visita.plan.responsable.get_full_name|default:visita.plan.responsable.username }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="equipos-mantenimiento__vacio">
+                No hay preventivos programados en las próximas dos semanas.
+            </p>
+        {% endif %}
+    </section>
+
+    <section class="equipos-mantenimiento__bloque">
+        <header class="equipos-mantenimiento__bloque-titulo">
+            <h3 class="sin-margen">
+                <i class="bi bi-folder2-open"></i>
+                Órdenes abiertas
+            </h3>
+        </header>
+
+        {% if ordenes_abiertas %}
+            <table class="equipos-listado__tabla equipos-mantenimiento__tabla">
+                <thead>
+                    <tr>
+                        <th>Orden</th>
+                        <th>Fecha</th>
+                        <th>Tipo</th>
+                        <th>Clase</th>
+                        <th>Equipos</th>
+                        <th>Operario</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for orden in ordenes_abiertas %}
+                        <tr>
+                            <td>
+                                <a href="{% url 'orden_trabajo_equipos' orden.pk %}">
+                                    {{ orden.numero_orden }}
+                                </a>
+                            </td>
+                            <td>{{ orden.fecha|date:"d/m/Y" }}</td>
+                            <td>{{ orden.tipo.nombre }}</td>
+                            <td>{{ orden.get_clase_display }}</td>
+                            <td>{{ orden.total_equipos }}</td>
+                            <td>{{ orden.operario.get_full_name|default:orden.operario.username }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="equipos-mantenimiento__vacio">No hay órdenes abiertas.</p>
+        {% endif %}
+    </section>
+
+    {# Un equipo con frecuencia declarada pero sin plan no aparece en ningun
+       calendario, y nadie lo echa de menos hasta que falla. Por eso se lista. #}
+    <section class="equipos-mantenimiento__bloque">
+        <header class="equipos-mantenimiento__bloque-titulo">
+            <h3 class="sin-margen">
+                <i class="bi bi-calendar-x"></i>
+                Equipos sin programar
+            </h3>
+            <span class="equipos-mantenimiento__contador">{{ total_sin_plan }}</span>
+        </header>
+
+        {% if sin_plan %}
+            <p class="equipos-mantenimiento__nota">
+                Tienen frecuencia declarada pero ningún calendario los reclama.
+            </p>
+            <table class="equipos-listado__tabla equipos-mantenimiento__tabla">
+                <thead>
+                    <tr>
+                        <th>Equipo</th>
+                        <th>Tipo</th>
+                        <th>Cada</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for equipo in sin_plan %}
+                        <tr>
+                            <td>
+                                <a href="{% url 'detalle_dispositivo_equipos' equipo.pk %}">
+                                    {{ equipo.codigo }}
+                                </a>
+                            </td>
+                            <td>{{ equipo.tipo.nombre }}</td>
+                            <td>{{ equipo.frecuencia_mantenimiento }} meses</td>
+                            <td>
+                                <a class="equipos-mantenimiento__accion"
+                                   href="{% url 'programar_mantenimiento_equipos' equipo.pk %}">
+                                    Programar
+                                </a>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% if total_sin_plan > sin_plan|length %}
+                <p class="equipos-mantenimiento__nota">
+                    Se muestran {{ sin_plan|length }} de {{ total_sin_plan }}.
+                </p>
+            {% endif %}
+        {% else %}
+            <p class="equipos-mantenimiento__vacio">
+                Todos los equipos con frecuencia tienen su plan.
+            </p>
+        {% endif %}
+    </section>
+</div>
+{% endblock content %}
