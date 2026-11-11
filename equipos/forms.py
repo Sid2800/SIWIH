@@ -32,6 +32,17 @@ from .models import (
 )
 
 
+# Cada cuantos meses toca el preventivo. Son las mismas opciones para el
+# tipo y para el equipo: si el tipo dice "semestral" y el equipo dice
+# "semestral", tienen que significar lo mismo y poder compararse.
+FRECUENCIA_MANTENIMIENTO_CHOICES = [
+    (1, "Mensual"),
+    (3, "Trimestral"),
+    (6, "Semestral"),
+    (12, "Anual"),
+]
+
+
 class CostoLempirasField(forms.DecimalField):
     """Costo escrito como se usa en Honduras: L 1,234.56
 
@@ -465,12 +476,7 @@ class ImagenDispositivoForm(forms.Form):
 class DispositivoCreateForm(forms.ModelForm):
     # Este mismo formulario se reutiliza para registrar y editar equipos.
     # Ademas de campos de Dispositivo, maneja la asignacion inicial/actual.
-    FRECUENCIA_CHOICES = [
-        (1, "Mensual"),
-        (3, "Trimestral"),
-        (6, "Semestral"),
-        (12, "Anual"),
-    ]
+    FRECUENCIA_CHOICES = FRECUENCIA_MANTENIMIENTO_CHOICES
 
     ubicacion = UbicacionChoiceField(
         queryset=ExpedienteUbicacion.objects.none(),
@@ -520,12 +526,14 @@ class DispositivoCreateForm(forms.ModelForm):
             }
         ),
     )
+    # En blanco manda la del tipo, que es el caso normal. Este campo es para
+    # el aparato que se sale de la regla.
     frecuencia_mantenimiento_meses = forms.TypedChoiceField(
-        choices=[("", "Sin frecuencia definida"), *FRECUENCIA_CHOICES],
+        choices=[("", "La que tenga su tipo"), *FRECUENCIA_CHOICES],
         coerce=int,
         empty_value=None,
         required=False,
-        label="Frecuencia de mantenimiento",
+        label="Frecuencia propia",
         widget=forms.Select(
             attrs={
                 "class": "formularioCampo-select",
@@ -1256,10 +1264,12 @@ class TipoCatalogoForm(forms.ModelForm):
         fields = [
             "nombre",
             "tecnologia",
+            "frecuencia_mantenimiento_meses",
             "descripcion",
         ]
         labels = {
             "tecnologia": "Tecnología",
+            "frecuencia_mantenimiento_meses": "Mantenimiento preventivo",
         }
         help_texts = {
             "tecnologia": (
@@ -1280,6 +1290,12 @@ class TipoCatalogoForm(forms.ModelForm):
                 attrs={
                     "class": "formularioCampo-select",
                     "id": "tecnologia_tipo_catalogo",
+                }
+            ),
+            "frecuencia_mantenimiento_meses": forms.Select(
+                attrs={
+                    "class": "formularioCampo-select",
+                    "id": "frecuencia_tipo_catalogo",
                 }
             ),
             "descripcion": forms.TextInput(
@@ -1312,6 +1328,14 @@ class TipoCatalogoForm(forms.ModelForm):
             filtro_tecnologia
         )
         self.fields["tecnologia"].empty_label = "Seleccione la tecnología"
+
+        # Cada cuantos meses toca el preventivo a los equipos de este tipo.
+        # Sin frecuencia el tipo sigue sirviendo para inventariar, pero sus
+        # equipos no entran al calendario de preventivos.
+        self.fields["frecuencia_mantenimiento_meses"].widget.choices = [
+            ("", "Sin mantenimiento programado"),
+            *FRECUENCIA_MANTENIMIENTO_CHOICES,
+        ]
 
         # Lo que el navegador tiene que pintar: el desplegable de categorias y
         # la lista de las ya agregadas, en su orden.

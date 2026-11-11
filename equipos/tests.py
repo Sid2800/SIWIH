@@ -1,4 +1,4 @@
-"""Pruebas de las reglas que el modulo no puede permitirse equivocar.
+﻿"""Pruebas de las reglas que el modulo no puede permitirse equivocar.
 
 Se cubren las que tienen una respuesta exacta y verificable: el calculo del
 vencimiento de garantia, la clasificacion por categoria incluyendo hibridos, y
@@ -11,11 +11,14 @@ import datetime
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
+from django.db.utils import IntegrityError
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
+from core.constants.choices_constants import EstadoRegistro
 from expediente.models import ExpedienteUbicacion
+from rrhh.models import Empleado
 from servicio.models import Unidad
 
 from .services.garantia_service import calcular_estado_garantia
@@ -35,6 +38,7 @@ from .models import (
     MarcaDispositivo,
     ModalidadProcedencia,
     ModeloDispositivo,
+    OrdenTrabajoBajaDispositivo,
     MotivoCierreGarantia,
     PausaGarantia,
     Procedencia,
@@ -44,6 +48,41 @@ from .models import (
     UbicacionFisica,
 )
 
+
+def _dispositivo_de_prueba(usuario):
+    """Equipo minimo, con lo justo para colgarle asignaciones y ordenes."""
+    categoria = CategoriaEquipo.objects.get(nombre="MEDICO")
+    tecnologia = TecnologiaEquipo.objects.get(nombre="ELECTRONICO")
+    tipo = TipoDispositivo.objects.create(
+        nombre="EQUIPO DE PRUEBA %s" % usuario.pk,
+        categoria=categoria,
+        tecnologia=tecnologia,
+    )
+    marca = MarcaDispositivo.objects.create(nombre="MARCA DE PRUEBA %s" % usuario.pk)
+    tipo.marcas.add(marca)
+    modelo = ModeloDispositivo.objects.create(
+        nombre="MODELO DE PRUEBA",
+        tipo=tipo,
+        marca=marca,
+    )
+
+    procedencia = Procedencia.objects.create(
+        nombre="PROVEEDOR DE PRUEBA %s" % usuario.pk,
+        tipo=TipoProcedencia.EMPRESA,
+    )
+
+    return Dispositivo.objects.create(
+        tipo=tipo,
+        marca=marca,
+        modelo=modelo,
+        area_gestora=AreaGestora.objects.create(
+            nombre="AREA DE PRUEBA %s" % usuario.pk
+        ),
+        modalidad_procedencia=ModalidadProcedencia.COMPRA,
+        procedencia=procedencia,
+        creado_por=usuario,
+        modificado_por=usuario,
+    )
 
 class GarantiaCalculadaTests(TestCase):
     """El vencimiento se cuenta en meses de calendario, no en dias."""
@@ -665,6 +704,240 @@ class MarcaEnTipoFormTests(TestCase):
 
         self.assertFalse(formulario.is_valid())
         self.assertIn("nombre", formulario.errors)
+
+
+class FichaDelEquipoAbreTests(TestCase):
+    """La ficha tiene que abrir, con y sin garantia.
+
+    No habia ninguna prueba que la pidiera, y asi se quedo un buen rato
+    devolviendo error 500: al mover las pausas del equipo a la garantia se
+    quito la linea que las buscaba, pero no la que las mandaba a la plantilla.
+    Una peticion de verdad lo habria dicho en el acto.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.usuario = User.objects.create_superuser(
+            username="zz_ficha",
+            password="clave-de-prueba",
+        )
+        cls.dispositivo = _dispositivo_de_prueba(cls.usuario)
+
+    def setUp(self):
+        self.client.force_login(self.usuario)
+
+    def _abrir(self):
+        return self.client.get(
+            reverse("detalle_dispositivo_equipos", args=[self.dispositivo.pk])
+        )
+
+    def test_abre_sin_garantia(self):
+        respuesta = self._abrir()
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertContains(respuesta, self.dispositivo.codigo)
+
+    def test_abre_con_garantia_y_muestra_sus_pausas(self):
+        garantia = GarantiaDispositivo.objects.create(
+            dispositivo=self.dispositivo,
+            fecha_inicio=datetime.date(2026, 1, 1),
+            meses=12,
+            registrado_por=self.usuario,
+        )
+        PausaGarantia.objects.create(
+            garantia=garantia,
+            fecha_salida=datetime.date(2026, 2, 1),
+            fecha_retorno=datetime.date(2026, 2, 11),
+            motivo="Enviado al proveedor.",
+            observaciones_retorno="Regresó reparado.",
+            registrado_por=self.usuario,
+        )
+
+        respuesta = self._abrir()
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertContains(respuesta, "Historial de pausas")
+        self.assertContains(respuesta, "Enviado al proveedor.")
+
+    def test_muestra_la_frecuencia_y_de_donde_sale(self):
+        self.dispositivo.tipo.frecuencia_mantenimiento_meses = 6
+        self.dispositivo.tipo.save()
+
+        respuesta = self._abrir()
+
+        self.assertContains(respuesta, "Cada 6 meses")
+        self.assertContains(respuesta, "del tipo")
+
+
+class AsignacionUnicaAbiertaTests(TestCase):
+    """Un equipo no puede quedar con dos responsables a la vez.
+
+    La regla estaba en clean(), pero preguntar y despues insertar deja una
+    rendija: dos ediciones del mismo equipo a la vez pasan las dos la
+    comprobacion. Ahora la impone tambien el motor, con una columna unica que
+    vale el id del equipo mientras la asignacion sigue abierta.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.usuario = User.objects.create_superuser(
+            username="zz_asignacion",
+            password="clave-de-prueba",
+        )
+        cls.dispositivo = _dispositivo_de_prueba(cls.usuario)
+        cls.empleado = Empleado.objects.create(
+            dni="0801199012345",
+            primer_nombre="ANA",
+            primer_apellido="LOPEZ",
+            estado=EstadoRegistro.ACTIVO,
+            creado_por=cls.usuario,
+            modificado_por=cls.usuario,
+        )
+        unidad = Unidad.objects.create(
+            nombre_unidad="TALLER DE PRUEBA",
+            nombre_corto_unidad="TAL",
+            creado_por=cls.usuario,
+            modificado_por=cls.usuario,
+        )
+        cls.ubicacion = ExpedienteUbicacion.objects.create(
+            unidad_no_clinica=unidad,
+            tipo=ExpedienteUbicacion.TIPO_NO_CLINICA,
+        )
+
+    def _asignacion(self, **extra):
+        datos = {
+            "dispositivo": self.dispositivo,
+            "ubicacion": self.ubicacion,
+            "responsable": self.empleado,
+            "creado_por": self.usuario,
+            "modificado_por": self.usuario,
+        }
+        datos.update(extra)
+        return AsignacionDispositivo(**datos)
+
+    def test_la_abierta_lleva_el_id_del_equipo_en_el_candado(self):
+        abierta = self._asignacion()
+        abierta.save()
+
+        self.assertEqual(
+            abierta.equipo_con_asignacion_abierta,
+            self.dispositivo.pk,
+        )
+
+    def test_al_cerrarla_el_candado_se_suelta(self):
+        asignacion = self._asignacion()
+        asignacion.save()
+
+        asignacion.fecha_fin = timezone.now()
+        asignacion.save()
+
+        self.assertIsNone(asignacion.equipo_con_asignacion_abierta)
+
+    def test_el_motor_rechaza_una_segunda_abierta(self):
+        """Saltandose clean(), que es justo lo que haria una carrera."""
+        self._asignacion().save()
+        intrusa = self._asignacion()
+        intrusa.equipo_con_asignacion_abierta = self.dispositivo.pk
+
+        with self.assertRaises(IntegrityError):
+            # bulk_create no pasa por save() ni por full_clean(), asi que lo
+            # unico que puede pararlo es la base.
+            AsignacionDispositivo.objects.bulk_create([intrusa])
+
+    def test_cerrada_la_primera_se_puede_abrir_otra(self):
+        primera = self._asignacion()
+        primera.save()
+        primera.fecha_fin = timezone.now()
+        primera.save()
+
+        segunda = self._asignacion()
+        segunda.save()
+
+        self.assertEqual(
+            AsignacionDispositivo.objects.filter(
+                dispositivo=self.dispositivo,
+                fecha_fin__isnull=True,
+            ).count(),
+            1,
+        )
+
+
+class FrecuenciaDeMantenimientoTests(TestCase):
+    """La frecuencia se declara en el tipo; el equipo solo la excepciona."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.usuario = User.objects.create_superuser(
+            username="zz_frecuencia",
+            password="clave-de-prueba",
+        )
+        cls.dispositivo = _dispositivo_de_prueba(cls.usuario)
+
+    def test_sin_nada_en_el_equipo_manda_la_del_tipo(self):
+        self.dispositivo.tipo.frecuencia_mantenimiento_meses = 6
+        self.dispositivo.tipo.save()
+        self.dispositivo.frecuencia_mantenimiento_meses = None
+
+        self.assertEqual(self.dispositivo.frecuencia_mantenimiento, 6)
+        self.assertFalse(self.dispositivo.frecuencia_es_excepcion)
+
+    def test_la_del_equipo_gana_cuando_la_tiene(self):
+        self.dispositivo.tipo.frecuencia_mantenimiento_meses = 6
+        self.dispositivo.tipo.save()
+        self.dispositivo.frecuencia_mantenimiento_meses = 3
+
+        self.assertEqual(self.dispositivo.frecuencia_mantenimiento, 3)
+        self.assertTrue(self.dispositivo.frecuencia_es_excepcion)
+
+    def test_sin_ninguna_de_las_dos_no_hay_frecuencia(self):
+        """Ese equipo no entra al calendario de preventivos."""
+        self.dispositivo.tipo.frecuencia_mantenimiento_meses = None
+        self.dispositivo.tipo.save()
+        self.dispositivo.frecuencia_mantenimiento_meses = None
+
+        self.assertIsNone(self.dispositivo.frecuencia_mantenimiento)
+
+    def test_el_tipo_la_guarda_desde_su_formulario(self):
+        formulario = TipoCatalogoForm(data={
+            "nombre": "AUTOCLAVE DE PRUEBA",
+            "tecnologia": TecnologiaEquipo.objects.get(nombre="ELECTRONICO").pk,
+            "categorias": str(CategoriaEquipo.objects.get(nombre="MEDICO").pk),
+            "frecuencia_mantenimiento_meses": 6,
+        })
+
+        self.assertTrue(formulario.is_valid(), formulario.errors)
+        self.assertEqual(formulario.save().frecuencia_mantenimiento_meses, 6)
+
+    def test_el_tipo_puede_no_llevar_mantenimiento_programado(self):
+        formulario = TipoCatalogoForm(data={
+            "nombre": "MUEBLE DE PRUEBA",
+            "tecnologia": TecnologiaEquipo.objects.get(nombre="ELECTRONICO").pk,
+            "categorias": str(CategoriaEquipo.objects.get(nombre="MEDICO").pk),
+            "frecuencia_mantenimiento_meses": "",
+        })
+
+        self.assertTrue(formulario.is_valid(), formulario.errors)
+        self.assertIsNone(formulario.save().frecuencia_mantenimiento_meses)
+
+
+class SeriesDeOrdenDeTrabajoTests(TestCase):
+    """Baja y mantenimiento son tramites distintos y no comparten numero."""
+
+    def test_la_orden_de_baja_lleva_su_prefijo(self):
+        usuario = User.objects.create_superuser(
+            username="zz_orden",
+            password="clave-de-prueba",
+        )
+        orden = OrdenTrabajoBajaDispositivo.objects.create(
+            dispositivo=_dispositivo_de_prueba(usuario),
+            creado_por=usuario,
+        )
+
+        self.assertTrue(
+            orden.numero_orden.startswith("OTB-"),
+            orden.numero_orden,
+        )
+        self.assertEqual(OrdenTrabajoBajaDispositivo.PREFIJO, "OTB")
 
 
 class CategoriasDelTipoTests(TestCase):

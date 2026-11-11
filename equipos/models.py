@@ -312,6 +312,21 @@ class TipoDispositivo(models.Model):
         db_table="equipo_tipo_marca",
         verbose_name="Marcas",
     )
+    # Cada cuantos meses toca el preventivo a los equipos de este tipo. El
+    # criterio es del tipo y no del aparato -todos los autoclaves se revisan
+    # igual- asi que se declara una vez aqui y cada equipo solo lo cambia si
+    # el suyo es una excepcion. Es opcional porque hay tipos que no llevan
+    # preventivo programado.
+    frecuencia_mantenimiento_meses = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1)],
+        verbose_name="Frecuencia de mantenimiento (meses)",
+        help_text=(
+            "Meses entre mantenimientos preventivos de este tipo. Cada "
+            "equipo puede cambiarla si es una excepción."
+        ),
+    )
     descripcion = models.CharField(max_length=250, blank=True)
     activo = models.BooleanField(default=True, db_index=True)
 
@@ -320,6 +335,13 @@ class TipoDispositivo(models.Model):
         verbose_name = "Tipo de equipo"
         verbose_name_plural = "Tipos de equipo"
         ordering = ["categoria__nombre", "nombre"]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(frecuencia_mantenimiento_meses__isnull=True)
+                | Q(frecuencia_mantenimiento_meses__gt=0),
+                name="equipo_tipo_frecuencia_positiva",
+            ),
+        ]
 
     def clean(self):
         # clean() centraliza reglas del modelo. Django lo ejecuta desde full_clean().
@@ -628,11 +650,17 @@ class Dispositivo(models.Model):
         default=CriticidadDispositivo.MEDIA,
         db_index=True,
     )
+    # Excepcion para este aparato. En blanco manda la del tipo, que es el
+    # caso normal: ver la propiedad frecuencia_mantenimiento.
     frecuencia_mantenimiento_meses = models.PositiveSmallIntegerField(
         null=True,
         blank=True,
         validators=[MinValueValidator(1)],
-        help_text="Cantidad de meses entre mantenimientos preventivos.",
+        verbose_name="Frecuencia propia (meses)",
+        help_text=(
+            "Solo si este equipo es una excepción. En blanco se usa la "
+            "frecuencia de su tipo."
+        ),
     )
     fecha_instalacion = models.DateField(null=True, blank=True)
     # La garantia no vive aqui: un equipo puede tener varias a lo largo de su
@@ -723,6 +751,24 @@ class Dispositivo(models.Model):
         historial: una garantia renovada o terminada a mano no se borra.
         """
         return self.garantias.filter(fecha_cierre__isnull=True).first()
+
+    @property
+    def frecuencia_mantenimiento(self):
+        """Cada cuantos meses toca el preventivo de este equipo.
+
+        Manda lo que diga el aparato y, si no dice nada -que es lo normal-, lo
+        que diga su tipo. Devuelve None cuando ninguno de los dos la tiene: ese
+        equipo no entra al calendario de preventivos hasta que se le ponga.
+        """
+        if self.frecuencia_mantenimiento_meses:
+            return self.frecuencia_mantenimiento_meses
+
+        return self.tipo.frecuencia_mantenimiento_meses if self.tipo_id else None
+
+    @property
+    def frecuencia_es_excepcion(self):
+        """Si este equipo lleva una frecuencia distinta a la de su tipo."""
+        return bool(self.frecuencia_mantenimiento_meses)
 
     @property
     def tecnologia(self):
@@ -927,13 +973,19 @@ class OrdenTrabajoBajaDispositivo(models.Model):
         verbose_name_plural = "Órdenes de trabajo para baja"
         ordering = ["-fecha_creado"]
 
+    # Prefijo de esta serie. Las ordenes de baja y las de mantenimiento son
+    # tramites distintos con su propio correlativo, asi que llevan prefijo
+    # propio: sin el, el numero 7 de una serie y el 7 de la otra se escriben
+    # igual en el papel y no son la misma orden.
+    PREFIJO = "OTB"
+
     @property
     def numero_orden(self):
         # El año pertenece a la emisión original; una reimpresión futura no
         # cambia el identificador administrativo.
         if not self.pk or not self.fecha_creado:
             return "SIN ASIGNAR"
-        return f"OT-{self.fecha_creado.year}-{self.pk:05d}"
+        return f"{self.PREFIJO}-{self.fecha_creado.year}-{self.pk:05d}"
 
     def __str__(self):
         return f"{self.numero_orden} - {self.dispositivo.codigo}"
@@ -1064,6 +1116,24 @@ class AsignacionDispositivo(models.Model):
         related_name="asignaciones_dispositivos_equipos_modificadas",
     )
 
+    # Columna tecnica que impone "una sola asignacion abierta por equipo" en
+    # el motor. Vale el id del equipo mientras la asignacion sigue abierta y
+    # NULL en cuanto se cierra; como MySQL admite varios NULL en un indice
+    # unico, solo puede haber una fila abierta por equipo.
+    #
+    # clean() ya comprobaba la regla, pero preguntar y despues insertar deja
+    # una rendija: dos ediciones del mismo equipo a la vez pasan las dos la
+    # comprobacion y las dos insertan, y el equipo queda con dos responsables
+    # abiertos sin que nadie se entere. Mismo recurso que en GarantiaDispositivo
+    # y PausaGarantia, y por el mismo motivo: MySQL ignora los UniqueConstraint
+    # con condicion (aviso W036 de Django).
+    equipo_con_asignacion_abierta = models.BigIntegerField(
+        null=True,
+        blank=True,
+        unique=True,
+        editable=False,
+    )
+
     class Meta:
         db_table = "equipo_asignacion_dispositivo"
         verbose_name = "Asignación de equipo"
@@ -1127,7 +1197,17 @@ class AsignacionDispositivo(models.Model):
             raise ValidationError(errores)
 
     def save(self, *args, **kwargs):
+        # Mantiene la columna que hace cumplir la unicidad en el motor.
+        self.equipo_con_asignacion_abierta = (
+            self.dispositivo_id if self.activa else None
+        )
         self.full_clean()
+
+        if kwargs.get("update_fields") is not None:
+            kwargs["update_fields"] = set(kwargs["update_fields"]) | {
+                "equipo_con_asignacion_abierta"
+            }
+
         return super().save(*args, **kwargs)
 
     def __str__(self):

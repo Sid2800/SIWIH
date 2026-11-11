@@ -498,6 +498,11 @@ def detalle_dispositivo(request, dispositivo_id):
     # La ficha solo informa de la garantia vigente. Pausar, renovar y terminar
     # se manejan desde Garantias, asi que aqui no viaja nada para operar.
     garantia = calcular_estado_garantia(dispositivo)
+    # Las pausas colgaban del equipo y ahora cuelgan de la garantia, porque un
+    # equipo puede tener varias a lo largo de su vida y cada una responde por
+    # las suyas. La ficha muestra las de la vigente, que son las que explican
+    # por que esa garantia vence mas tarde de lo que dice el contrato.
+    pausas = list(garantia.garantia.pausas.all()) if garantia.tiene_garantia else []
 
     return render(
         request,

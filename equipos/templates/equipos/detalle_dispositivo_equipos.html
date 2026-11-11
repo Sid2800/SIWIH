@@ -472,10 +472,22 @@
                 <div>
                     <dt>Frecuencia</dt>
                     <dd>
-                        {% if dispositivo.frecuencia_mantenimiento_meses %}
-                            Cada {{ dispositivo.frecuencia_mantenimiento_meses }} meses
+                        {% comment %}
+                           La que manda es la del equipo si la tiene y la de
+                           su tipo si no, asi que se dice tambien de donde
+                           sale: ver "cada 6 meses" sin saber si es la regla
+                           del tipo o una excepcion de este aparato no deja
+                           claro que pasa si se cambia una de las dos.
+                        {% endcomment %}
+                        {% if dispositivo.frecuencia_mantenimiento %}
+                            Cada {{ dispositivo.frecuencia_mantenimiento }} meses
+                            {% if dispositivo.frecuencia_es_excepcion %}
+                                <small>(propia de este equipo)</small>
+                            {% else %}
+                                <small>(del tipo {{ dispositivo.tipo.nombre }})</small>
+                            {% endif %}
                         {% else %}
-                            Sin frecuencia definida
+                            Sin mantenimiento programado
                         {% endif %}
                     </dd>
                 </div>

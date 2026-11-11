@@ -74,6 +74,17 @@
                                 </button>
                             </div>
                         </div>
+                        {% comment %}
+                           Cada cuántos meses toca el preventivo. Se declara
+                           aquí y no en cada equipo porque el criterio es del
+                           tipo: todos los autoclaves se revisan igual. El
+                           equipo solo lo cambia si es una excepción.
+                        {% endcomment %}
+                        <div class="equipos-catalogo__campo">
+                            <span>Mantenimiento preventivo</span>
+                            {{ form_tipo.frecuencia_mantenimiento_meses }}
+                            {{ form_tipo.frecuencia_mantenimiento_meses.errors }}
+                        </div>
                     </div>
 
                     {% comment %}
