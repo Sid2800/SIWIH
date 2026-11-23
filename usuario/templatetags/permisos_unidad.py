@@ -186,3 +186,5 @@ def tiene_unidades_config(user, nombre_constante):
         usuario=user,
         servicio_unidad__nombre_corto_unidad__in=unidades
     ).exists()
+
+

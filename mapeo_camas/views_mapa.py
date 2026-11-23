@@ -551,7 +551,8 @@ def mapa_camas_data(request):
 @login_required
 @require_GET
 def buscar_pacientes_mapa(request):
-    if not _tiene_permiso_mapear(request.user):
+    # [2026-09-15] El buscador tambien sirve a cambios manuales autorizados.
+    if not (_tiene_permiso_mapear(request.user) or _tiene_permiso_cambios_mapa(request.user)):
         return JsonResponse({"ok": False, "error": "Acceso denegado."}, status=403)
     termino = (request.GET.get("q") or "").strip()
     tipo_busqueda = (request.GET.get("tipo") or "dni").strip().lower()
@@ -761,9 +762,16 @@ def actualizar_cama_mapa(request):
             return JsonResponse({"ok": False, "error": "El ingreso seleccionado no existe."}, status=404)
 
     if _es_rol_intentos_restringido(request.user):
-        if estado_codigo not in ESTADOS_EDICION_DIRECTA_ROL_RESTRINGIDO:
+        # [2026-09-15] Enfermeria puede ocupar una cama vacia con un ingreso activo.
+        permite_ocupar_cama_vacia = (
+            estado_codigo == "OCUPADA"
+            and asignacion.estado
+            and asignacion.estado.codigo == "VACIA"
+            and ingreso_nuevo is not None
+        )
+        if estado_codigo not in ESTADOS_EDICION_DIRECTA_ROL_RESTRINGIDO and not permite_ocupar_cama_vacia:
             return JsonResponse(
-                {"ok": False, "error": "Este rol solo puede hacer pre-altas o pasar la cama a vacia desde edicion directa."},
+                {"ok": False, "error": "Este rol solo puede ocupar camas vacias con un ingreso activo, mover pacientes o manejar pre-altas desde camas ocupadas."},
                 status=403,
             )
 

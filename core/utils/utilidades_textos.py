@@ -25,6 +25,7 @@ def formatear_dni(dni):
         
     return dni 
 
+
 def formatear_expediente(numero):
     """
     Convierte un número a un string de 6 dígitos, completando con ceros a la izquierda.

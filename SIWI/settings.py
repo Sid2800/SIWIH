@@ -35,7 +35,7 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True if os.getenv("DEBUG", "0") == "1" else False
 
-ALLOWED_HOSTS = ['SIWIH', '127.0.0.1', '192.168.88.8', '192.168.88.28', '192.168.88.173', '100.84.35.113','192.168.99.82']
+ALLOWED_HOSTS = ['SIWIH', '127.0.0.1', '192.168.88.28', '192.168.88.173', '100.91.100.55',]
 
 # Application definition
 
@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'dal',
     'dal_select2',
+    'channels',
     'core',
     'servicio',
     'ubicacion',
@@ -63,7 +64,8 @@ INSTALLED_APPS = [
     'agenda_medica',
     's_exp',
     'mapeo_camas',
-    'rrhh'
+    'rrhh',
+    'comunicacion_hospitalaria'
 ]
 
 MIDDLEWARE = [
@@ -99,6 +101,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'SIWI.wsgi.application'
+ASGI_APPLICATION = 'SIWI.asgi.application'
 
 
 # Database
@@ -213,7 +216,12 @@ def _silenciar_polling_filter(record):
     """
     msg = record.getMessage()
     # Solo silenciar respuestas exitosas (200, 304) a endpoints de polling
-    rutas_polling = ['/s_exp/api/changes-check/', '/s_exp/api/alertas/']
+    rutas_polling = [
+        '/s_exp/api/changes-check/',
+        '/s_exp/api/alertas/',
+        '/listar-episodios-publico-API/',
+        '/obtener-episodio-labor-parto/',
+    ]
     for ruta in rutas_polling:
         if ruta in msg:
             # No silenciar si hay error (4xx, 5xx)
