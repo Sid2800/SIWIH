@@ -40,6 +40,7 @@ $(document).ready(function () {
         }
 
         filtroActual = filtro;
+        paginaActual = 0;
         cargarMisSolicitudes(filtro);
     });
 
@@ -48,6 +49,7 @@ $(document).ready(function () {
         fechaInicioActual = $('#fecha-inicio').val();
         fechaFinActual = $('#fecha-fin').val();
         filtroActual = 'rango';
+        paginaActual = 0;
         cargarMisSolicitudes('rango', fechaInicioActual, fechaFinActual);
     });
 });
@@ -58,28 +60,27 @@ $(document).ready(function () {
  * @param {string} fechaInicio - Fecha inicio (YYYY-MM-DD) cuando filtro='rango'.
  * @param {string} fechaFin - Fecha fin (YYYY-MM-DD) cuando filtro='rango'.
  */
-// Cuantas filas pide la pantalla por tanda. El servidor impone su propio
-// techo; esto solo dice cuanto se muestra de entrada.
-const SOLICITUDES_POR_TANDA = 10;
+// Solicitudes por página. El servidor impone su propio techo; esto solo
+// dice cuántas se ven a la vez.
+const SOLICITUDES_POR_PAGINA = 10;
 
-// Lo que ya esta en pantalla, para poder pedir la tanda siguiente y para que
-// el modal de devolucion parcial siga encontrando sus expedientes.
+// Página que se está viendo (empieza en 0). Los refrescos automáticos la
+// respetan: que llegue un aviso no puede devolver al usuario a la página 1.
+let paginaActual = 0;
+
+// Lo que está en pantalla, para que el modal de devolución parcial siga
+// encontrando sus expedientes.
 let solicitudesCargadas = [];
 
-function cargarMisSolicitudes(filtro = '', fechaInicio = '', fechaFin = '', esPolling = false, desde = 0) {
-    const params = { limite: SOLICITUDES_POR_TANDA, desde: desde };
+function cargarMisSolicitudes(filtro = '', fechaInicio = '', fechaFin = '', esPolling = false) {
+    const desde = paginaActual * SOLICITUDES_POR_PAGINA;
+    const params = { limite: SOLICITUDES_POR_PAGINA, desde: desde };
     if (filtro) params.filtro = filtro;
     if (fechaInicio) params.fecha_inicio = fechaInicio;
     if (fechaFin) params.fecha_fin = fechaFin;
 
     const headers = {};
     if (esPolling) headers['X-Polling-Request'] = 'true';
-
-    // Una tanda siguiente se agrega a lo que ya hay; cualquier otra carga
-    // -cambio de filtro, refresco- empieza de cero. Sin esta distincion,
-    // pulsar "ver mas" y que luego entre un refresco dejaria la lista
-    // duplicada.
-    const anexar = desde > 0;
 
     $.ajax({
         url: window.urls.s_exp_mis_solicitudes_api,
@@ -88,14 +89,21 @@ function cargarMisSolicitudes(filtro = '', fechaInicio = '', fechaFin = '', esPo
         headers: headers,
         success: function (resp) {
             const filas = resp.data || [];
+            const total = resp.total || 0;
 
-            solicitudesCargadas = anexar
-                ? solicitudesCargadas.concat(filas)
-                : filas;
+            // Si la página se quedó vacía (por ejemplo, se finalizaron las
+            // solicitudes que había en ella), ir a la última que tenga algo.
+            if (!filas.length && total > 0 && paginaActual > 0) {
+                paginaActual = Math.max(0, Math.ceil(total / SOLICITUDES_POR_PAGINA) - 1);
+                cargarMisSolicitudes(filtro, fechaInicio, fechaFin, esPolling);
+                return;
+            }
+
+            solicitudesCargadas = filas;
 
             renderSolicitudes(solicitudesCargadas, filtro, {
-                total: resp.total,
-                hayMas: resp.hay_mas,
+                total: total,
+                desde: desde,
             });
         },
         error: function () {
@@ -105,19 +113,62 @@ function cargarMisSolicitudes(filtro = '', fechaInicio = '', fechaFin = '', esPo
     });
 }
 
-// "Ver mas" pide la tanda siguiente contando lo que ya hay en pantalla.
-$(document).on('click', '#btn-ver-mas-solicitudes', function () {
-    const boton = $(this);
-    boton.prop('disabled', true).text('Cargando...');
+// Cambio de página, con el mismo paginador que Gestión de Solicitudes.
+$(document).on('click', '.sexp-paginador .dt-paging-button:not(.disabled):not(.current)', function () {
+    const destino = parseInt($(this).attr('data-pagina'), 10);
+    if (isNaN(destino)) return;
 
-    cargarMisSolicitudes(
-        filtroActual,
-        fechaInicioActual,
-        fechaFinActual,
-        false,
-        solicitudesCargadas.length
-    );
+    paginaActual = destino;
+    cargarMisSolicitudes(filtroActual, fechaInicioActual, fechaFinActual, false);
+
+    const lista = document.getElementById('timeline-solicitudes');
+    if (lista) lista.scrollIntoView({ behavior: 'smooth', block: 'start' });
 });
+
+/**
+ * Números de página a mostrar, con '…' en los huecos (como DataTables):
+ * siempre la primera y la última, y dos a cada lado de la actual.
+ */
+function paginasVisibles(actual, totalPaginas) {
+    const paginas = [];
+    for (let i = 0; i < totalPaginas; i++) {
+        if (i === 0 || i === totalPaginas - 1 || Math.abs(i - actual) <= 2) {
+            paginas.push(i);
+        } else if (paginas[paginas.length - 1] !== '…') {
+            paginas.push('…');
+        }
+    }
+    return paginas;
+}
+
+function htmlPaginador(meta) {
+    const totalPaginas = Math.ceil(meta.total / SOLICITUDES_POR_PAGINA);
+    const inicio = meta.total ? meta.desde + 1 : 0;
+    const fin = meta.desde + solicitudesCargadas.length;
+
+    let botones = '';
+    if (totalPaginas > 1) {
+        const boton = (pagina, texto, extra) =>
+            `<button type="button" class="dt-paging-button ${extra || ''}" data-pagina="${pagina}"` +
+            `${extra && extra.indexOf('disabled') >= 0 ? ' aria-disabled="true"' : ''}>${texto}</button>`;
+
+        botones += boton(paginaActual - 1, '←', paginaActual === 0 ? 'previous disabled' : 'previous');
+        paginasVisibles(paginaActual, totalPaginas).forEach(function (p) {
+            botones += p === '…'
+                ? '<span class="ellipsis">…</span>'
+                : boton(p, p + 1, p === paginaActual ? 'current' : '');
+        });
+        botones += boton(paginaActual + 1, '→',
+            paginaActual >= totalPaginas - 1 ? 'next disabled' : 'next');
+    }
+
+    return `<div class="dt-container sexp-paginador" style="margin-top:1.5rem;">
+                <div class="dt-layout-row" style="display:flex;flex-wrap:wrap;gap:1rem;justify-content:space-between;align-items:center;">
+                    <div class="dt-info">Mostrando ${inicio} a ${fin} de ${meta.total}</div>
+                    ${botones ? `<div class="dt-paging"><nav aria-label="Paginación">${botones}</nav></div>` : ''}
+                </div>
+            </div>`;
+}
 
 function renderSolicitudes(data, filtro = '', meta = {}) {
     const container = $('#timeline-solicitudes');
@@ -290,22 +341,10 @@ function renderSolicitudes(data, filtro = '', meta = {}) {
         html += `</div></div>`;
     });
 
-    // Pie: cuanto se esta viendo del total, y el boton para traer mas. Sin
-    // decir el total, una lista de diez es indistinguible de "solo hay diez",
-    // que es justo la confusion que un limite introduce si no se avisa.
+    // Pie: cuánto se está viendo del total y el paginador. Sin el total, una
+    // página de diez es indistinguible de "solo hay diez".
     if (meta && typeof meta.total === 'number') {
-        html += `<p style="opacity:0.6; text-align:center; margin-top:1rem;">
-                     Mostrando ${data.length} de ${meta.total}
-                 </p>`;
-
-        if (meta.hayMas) {
-            html += `<p style="text-align:center;">
-                         <button type="button" id="btn-ver-mas-solicitudes"
-                                 class="formularioBotones-boton">
-                             Ver más
-                         </button>
-                     </p>`;
-        }
+        html += htmlPaginador(meta);
     }
 
     container.html(html);
