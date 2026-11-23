@@ -189,7 +189,7 @@ class AusenciaService:
             )
 
          # Inactivar cupos
-         ConfiguracionDiaService._inactivarCupos(
+         ConfiguracionDiaService._bloquearCupos(
             cupos,
             usuario
          )
@@ -279,6 +279,9 @@ class AusenciaService:
 
             return ausencias
 
+
+
+
       @classmethod
       def transformar_ausencias(cls, ausencias):
 
@@ -310,6 +313,7 @@ class AusenciaService:
                               "cupo_id": None,
                               "cita_id": None,
                               "ausencia_id": ausencia.id,
+                              "tipo_atencion_id": None,
                               "tipo_movimiento": "AUSENCIA",
 
                         }
@@ -458,9 +462,12 @@ class AusenciaService:
 
 
 
+
+
       @classmethod
       def crearAusencia(cls, ausencia, usuario ):
          from core.services.agenda_medica.agenda_medica_service import AgendaMedicaService
+         from rrhh.models import PersonalSalud
          from agenda_medica.validators import AusenciaValidator
 
 
@@ -478,31 +485,33 @@ class AusenciaService:
          }
 
          try:
-         
-            # Validaciones críticas
-            AusenciaValidator.validarReglasCriticasAusencias(ausencia)
-            cupos = list(
-                  AgendaMedicaService.obtenerCuposConHistorialActual(
-                     [ausencia.personal_id],
-                     ausencia.fecha_inicio,
-                     ausencia.fecha_final
-                  )
-            )
-
-
             with transaction.atomic():
 
-
-               # Crear ausencia
-               ausencia_db = cls._crearAusencia(
-                  ausencia,
-                  usuario
+               # Bloquear personal de salud
+               PersonalSalud.objects.select_for_update().get(
+                     pk=ausencia.personal_id
                )
 
+               # Validaciones críticas, incluido solapamiento
+               AusenciaValidator.validarReglasCriticasAusencias(ausencia)
 
-               cupoCitas = cls._procesarCuposAfectados(cupos, ausencia_db, usuario)
+               # Consultar cupos después de adquirir el bloqueo
+               cupos = list(
+                     AgendaMedicaService.obtenerCuposConHistorialActual(
+                        [ausencia.personal_id],
+                        ausencia.fecha_inicio,
+                        ausencia.fecha_final
+                     )
+               )
 
-               
+               # Crear ausencia
+               ausencia_db = cls._crearAusencia(ausencia, usuario)
+
+               # Procesar cupos y citas
+               cupoCitas = cls._procesarCuposAfectados(
+                     cupos, ausencia_db, usuario
+               )
+
                resultado["cupos"]["eliminados"] = cupoCitas["cupos"]
                resultado["citas"]["sin_cupo"] = cupoCitas["citas"]
                resultado["success"] = True
@@ -510,12 +519,11 @@ class AusenciaService:
                return resultado
 
          except ValidationError:
-                     raise
-         
+            raise
          except Exception:
             log_error(
-                  "[AusenciaService]: crearAusencia fallo",
-                  LogApp.AGENDA
+               "[AusenciaService]: crearAusencia fallo",
+               LogApp.AGENDA
             )
             raise
 
@@ -523,6 +531,7 @@ class AusenciaService:
       @classmethod
       def editarAusencia(cls, ausencia, usuario ):
          from core.services.agenda_medica.agenda_medica_service import AgendaMedicaService
+         from rrhh.models import PersonalSalud
          from agenda_medica.validators import AusenciaValidator
          from core.services.agenda_medica.configuracion_dia_service import ConfiguracionDiaService
          from core.services.cita.cita_service import CitaService
@@ -540,9 +549,6 @@ class AusenciaService:
          }
 
          try:
-            # Validaciones críticas
-            AusenciaValidator.validarReglasCriticasAusencias(ausencia)
-            AusenciaValidator.validarPersistenciaAusencia(ausencia.ausencia_db, ausencia.fecha_modificado)
 
             #inicio de la edicion 
             # 1. DESACTIVACIÓN (SOLO FUTURO)
@@ -550,6 +556,20 @@ class AusenciaService:
                # Se libera todo el rango original guardado en BD //
                # / debemos ver si para ese mismo personal exite un perio laboral configurado
                with transaction.atomic():
+                  # Bloquear al personal de salud
+                  PersonalSalud.objects.select_for_update().get(
+                        pk=ausencia.personal_id
+                  )
+
+                  # Validaciones después de adquirir el bloqueo
+                  AusenciaValidator.validarReglasCriticasAusencias(ausencia)
+
+                  AusenciaValidator.validarPersistenciaAusencia(
+                        ausencia.ausencia_db,
+                        ausencia.fecha_modificado
+                  )
+
+                  # Recuperar los cupos del rango original
                   fechas_resultado = PeriodoLaboralService.obtener_configuraciones_para_rango(
                      ausencia.ausencia_db.personal_salud_id,
                      ausencia.ausencia_db.fecha_inicio,
@@ -578,9 +598,21 @@ class AusenciaService:
             # 2. EDICIÓN DE AUSENCIA ACTIVA
             else:
 
-               rango = cls._obtenerRangoCambioAusencia(ausencia)
 
                with transaction.atomic():
+
+                  # Bloquear al personal de salud
+                  PersonalSalud.objects.select_for_update().get(
+                        pk=ausencia.personal_id
+                  )
+
+                  # Validaciones críticas
+                  AusenciaValidator.validarReglasCriticasAusencias(ausencia)
+                  AusenciaValidator.validarPersistenciaAusencia(ausencia.ausencia_db, ausencia.fecha_modificado)
+
+
+                  rango = cls._obtenerRangoCambioAusencia(ausencia)
+
 
                   for extremo in ["inicio", "fin"]:
 
@@ -635,7 +667,7 @@ class AusenciaService:
                   # Actualizar la ausencia AL FINAL
                   ausencia.ausencia_db.fecha_inicio = ausencia.fecha_inicio
                   ausencia.ausencia_db.fecha_fin = ausencia.fecha_final
-                  ausencia.ausencia_db.tipo = ausencia.tipo_id
+                  ausencia.ausencia_db.tipo_id = ausencia.tipo_id
                   ausencia.ausencia_db.observaciones = ausencia.observaciones
                   ausencia.ausencia_db.modificado_por = usuario
 

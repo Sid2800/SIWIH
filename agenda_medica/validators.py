@@ -4,6 +4,7 @@ from clinico.validators import validar_tipo_atencion_activo
 from rrhh.validators import validar_personal_salud_activo
 from core.services.agenda_medica.periodo_laboral_service import PeriodoLaboralService
 from core.services.agenda_medica.ausencia_service import AusenciaService
+
 from django.core.exceptions import ValidationError
 from datetime import datetime, timedelta, time, date
 from types import SimpleNamespace
@@ -19,16 +20,57 @@ from cita.models import Historial_cita
 class PeriodoLaboralValidator:
 
     @classmethod
-    def _validarExistenciaPeriodoLaboral(cls, id_periodo):
-        periodo = PeriodoLaboralService.obtener_periodo_laboral(id_periodo)
+    def _validarExistenciaPeriodoLaboral(cls, id_periodo, bloquear=False):
+        periodo = PeriodoLaboralService.obtener_periodo_laboral(id_periodo, bloquear=bloquear)
 
         if not periodo:
             raise ValidationError(
                 "El período laboral indicado no existe."
             )
         return periodo
-    
 
+    @classmethod
+    def _validarNoTrasladoPeriodoLaboral(cls,
+        fecha_inicio_original,
+        fecha_final_original,
+        fecha_inicio_nueva,
+        fecha_final_nueva
+    ):
+        # REDUCCIÓN: el nuevo rango está contenido en el original.
+        if (
+            fecha_inicio_nueva >= fecha_inicio_original
+            and fecha_final_nueva <= fecha_final_original
+        ):
+            return
+
+        # AMPLIACIÓN: el nuevo rango contiene al original.
+        if (
+            fecha_inicio_nueva <= fecha_inicio_original
+            and fecha_final_nueva >= fecha_final_original
+        ):
+            return
+
+        raise ValidationError(
+            "Las nuevas fechas no pueden trasladar el período laboral. "
+            "Solo se permite reducir o ampliar el período original."
+        )
+
+    @classmethod
+    def validarPeriodoFuturo(cls, periodo):
+
+        estado = periodo.estado_temporal
+
+        if estado == EstadoTemporalPeriodo.EN_EJECUCION:
+            raise ValidationError(
+                "No se pueden modificar los días laborales de un período en ejecución."
+            )
+
+        if estado == EstadoTemporalPeriodo.FINALIZADO:
+            raise ValidationError(
+                "No se pueden modificar los días laborales de un período finalizado."
+            )
+
+        
     @classmethod
     def validarArgumentosPeriodoLaboral(cls,data, usuario):
 
@@ -82,7 +124,15 @@ class PeriodoLaboralValidator:
             # FUTURO
             else:
                 validar_fecha(fecha_inicio, permitir_futuro=True, permitir_pasado=False)
-                validar_fecha(fecha_final, permitir_futuro=True,permitir_pasado=False )
+                validar_fecha(fecha_final, permitir_futuro=True, permitir_pasado=False)
+
+                # Validar que el nuevo rango no traslade el período.
+                cls._validarNoTrasladoPeriodoLaboral(
+                    periodo.fecha_inicio,
+                    periodo.fecha_fin,
+                    fecha_inicio,
+                    fecha_final
+                )
 
 
         # Validación para creación
@@ -93,7 +143,8 @@ class PeriodoLaboralValidator:
         validar_rango_fechas(
             fecha_inicio,
             fecha_final,
-            permitir_fin_igual_inicio=True
+            permitir_fin_igual_inicio=True,
+            dias_maximo=365
         )
 
         return SimpleNamespace(
@@ -108,71 +159,117 @@ class PeriodoLaboralValidator:
             fecha_impacto=fecha_impacto
         )
         
+    @classmethod
+    def validarSolapamientoEdicionPeriodo(cls, periodo_front, periodo_registro):
+        conflicto = Periodo_laboral.objects.filter(
+            personal_salud_id=periodo_front.personal_id,
+            jornada_laboral_id=periodo_front.jornada_id,
+            estado=EstadoRegistro.ACTIVO,
+            fecha_inicio__lte=periodo_front.fecha_final,
+            fecha_fin__gte=periodo_front.fecha_inicio
+        ).exclude(
+            id=periodo_registro.id
+        ).exists()
+
+        if conflicto:
+            raise ValidationError(
+                "El rango de fechas se solapa con otro período laboral existente."
+            )
+
+
 
     @classmethod
-    def validarReglasCriticasPeriodoLaboral(cls, periodo):
+    def validarReglasEdicionPeriodoLaboral(cls, periodo_front, periodo_registro):
 
-        if not periodo:
+        # Cambio de personal
+        if periodo_front.personal_id != periodo_registro.personal_salud.id:
+            raise ValidationError(
+                "No se permite el cambio de personal en un período laboral."
+            )
+
+        # Cambio de jornada laboral
+        if periodo_front.jornada_id != periodo_registro.jornada_laboral.id:
+            raise ValidationError(
+                "No se permite el cambio de jornada en un período laboral."
+            )
+
+        # Estado real del período registrado
+        estado = periodo_registro.estado_temporal
+
+        # Validar según estado
+        if estado == EstadoTemporalPeriodo.FINALIZADO:
+
+            raise ValidationError(
+                "El período ha finalizado, no es posible modificarlo."
+            )
+
+        elif estado == EstadoTemporalPeriodo.EN_EJECUCION:
+
+            hoy = timezone.localdate()
+
+            if periodo_front.estado is False:
+                raise ValidationError(
+                    "No se permite desactivar un periodo en ejecucion"
+                )
+
+            # No permitir modificar fecha inicial
+            if periodo_front.fecha_inicio != periodo_registro.fecha_inicio:
+                raise ValidationError(
+                    "No se permite modificar la fecha inicial "
+                    "de un período en ejecución."
+                )
+
+            # Fecha final debe ser mayor a hoy
+            if periodo_front.fecha_final <= hoy:
+                raise ValidationError(
+                    "La fecha final de un período en ejecución "
+                    "debe ser mayor a hoy."
+                )
+
+        elif estado == EstadoTemporalPeriodo.FUTURO:
+
+            cls._validarNoTrasladoPeriodoLaboral(
+                periodo_registro.fecha_inicio,
+                periodo_registro.fecha_fin,
+                periodo_front.fecha_inicio,
+                periodo_front.fecha_final
+            )
+
+        if (
+            periodo_front.fecha_inicio < periodo_registro.fecha_inicio
+            or periodo_front.fecha_final > periodo_registro.fecha_fin
+        ):
+            cls.validarSolapamientoEdicionPeriodo(
+                periodo_front,
+                periodo_registro
+            )
+
+
+    @classmethod
+    def validarReglasCriticasPeriodoLaboral(cls, periodo_front):
+        if not periodo_front:
             return None
 
-        periodo_registro = None
+        personal_salud = validar_personal_salud_activo(
+            periodo_front.personal_id
+        )
 
-        # Validar que el personal exista y esté activo
-        personal_salud = validar_personal_salud_activo(periodo.personal_id)
+        if periodo_front.id:
+            periodo_registro = cls._validarExistenciaPeriodoLaboral(
+                periodo_front.id
+            )
 
-        # Fase de modificación
-        if periodo.id:
+            cls.validarReglasEdicionPeriodoLaboral(
+                periodo_front,
+                periodo_registro
+            )
 
-            # Validar que exista y esté activo
-            periodo_registro = cls._validarExistenciaPeriodoLaboral(periodo.id)
+            return periodo_registro
 
-            # Cambio de personal
-            if personal_salud.id != periodo_registro.personal_salud.id:
-                raise ValidationError(
-                    "No se permite el cambio de personal en un período laboral."
-                )
+        return None
+            
 
-            # Cambio de jornada laboral
-            if periodo.jornada_id != periodo_registro.jornada_laboral.id:
-                raise ValidationError(
-                    "No se permite el cambio de jornada en un período laboral."
-                )
 
-            # Estado real del período registrado
-            estado = periodo_registro.estado_temporal
-
-            # Validar según estado
-            if estado == EstadoTemporalPeriodo.FINALIZADO:
-
-                raise ValidationError(
-                    "El período ha finalizado, no es posible modificarlo."
-                )
-
-            elif estado == EstadoTemporalPeriodo.EN_EJECUCION:
-
-                hoy = timezone.localdate()
-
-                if periodo.estado is False:
-                    raise ValidationError(
-                        "No se permite desactivar un periodo en ejecucion"
-                    )
-
-                # No permitir modificar fecha inicial
-                if periodo.fecha_inicio != periodo_registro.fecha_inicio:
-                    raise ValidationError(
-                        "No se permite modificar la fecha inicial "
-                        "de un período en ejecución."
-                    )
-
-                # Fecha final debe ser mayor a hoy
-                if periodo.fecha_final <= hoy:
-                    raise ValidationError(
-                        "La fecha final de un período en ejecución "
-                        "debe ser mayor a hoy."
-                    )
-
-        return periodo_registro
-        
 
 
 class DiaLaboralValidator:
@@ -193,14 +290,6 @@ class DiaLaboralValidator:
         
         return dia_registro
     
-    @classmethod
-    def _validarEstadoNoFuturo(cls, periodo):
-
-        if periodo.estado_temporal != EstadoTemporalPeriodo.FUTURO:
-            raise ValidationError(
-                "El período indicado no permite cambios mientras esta en ejecucion"
-            )
-
         
     # se usa en calidaror de quitar dia quirugico
     @classmethod
@@ -309,8 +398,8 @@ class DiaLaboralValidator:
         periodo_id = data.get('periodoId')
 
 
-        validar_entero_positivo(numero_dia, "Dia Semana")
-        validar_entero_positivo(valor=periodo_id, nombre_campo="Id Periodo")
+        numero_dia = validar_entero_positivo(numero_dia, "Dia Semana")
+        periodo_id = validar_entero_positivo(periodo_id, "Id Periodo")
 
         fecha_modificado = data.get('fechaModificado')
         fecha_modificado = parsear_fecha_iso(fecha_modificado)
@@ -366,14 +455,10 @@ class DiaLaboralValidator:
                 continue
 
             # Validar orden siempre
-            validar_entero_positivo(
-                config.orden,
-                "Orden"
-            )
-
-            validar_entero_positivo(config.id_tipo_atencion, "Id tipo atencion")
-            validar_entero_positivo(config.cupos, "cupos")
-            validar_entero_positivo(config.duracion, "duracion")
+            config.orden = validar_entero_positivo(config.orden, "Orden")
+            config.id_tipo_atencion = validar_entero_positivo(config.id_tipo_atencion, "Id tipo atencion")
+            config.cupos = validar_entero_positivo(config.cupos, "cupos")
+            config.duracion = validar_entero_positivo(config.duracion, "duracion")
             # Calcular minutos ocupados
             minutos_ocupados += config.cupos * config.duracion
 
@@ -382,7 +467,7 @@ class DiaLaboralValidator:
 
 
 
-        # EL RESTO 
+        # EL RESTO // valida que la fehca inicial no supere la incial y su formato
         hora_ini, hora_fin = validar_horario(data.get('horaInicio'), data.get('horaFin'))
 
 
@@ -415,9 +500,9 @@ class DiaLaboralValidator:
     @classmethod
     def validarCreacionDiaLaboral(cls, dia_configuracion):
         # Validar que exista y esté activo
-        periodo_registro = PeriodoLaboralValidator._validarExistenciaPeriodoLaboral(dia_configuracion.periodo_id)
+        periodo_registro = PeriodoLaboralValidator._validarExistenciaPeriodoLaboral(dia_configuracion.periodo_id, bloquear=True)
 
-        cls._validarEstadoNoFuturo(periodo_registro)
+        PeriodoLaboralValidator.validarPeriodoFuturo(periodo_registro)
 
 
         # Validar que el día exista dentro del período
@@ -454,7 +539,7 @@ class DiaLaboralValidator:
 
 
     @classmethod
-    def validarEdicionDiaLaboral(cls, dia_configuracion):
+    def validarEdicionDiaLaboral(cls, dia_configuracion, bloquear=False):
 
         dia_id = dia_configuracion.dia_id
         periodo_id = dia_configuracion.periodo_id
@@ -464,10 +549,10 @@ class DiaLaboralValidator:
         dia_id = validar_entero_positivo(dia_id, "Dia Id")
 
         #primero que el periodo  exista 
-        dia_configuracion.periodo_registro = PeriodoLaboralValidator._validarExistenciaPeriodoLaboral(periodo_id)
+        dia_configuracion.periodo_registro = PeriodoLaboralValidator._validarExistenciaPeriodoLaboral(periodo_id, bloquear=bloquear)
 
         #validar que periodo no se futuro
-        cls._validarEstadoNoFuturo(dia_configuracion.periodo_registro )
+        PeriodoLaboralValidator.validarPeriodoFuturo(dia_configuracion.periodo_registro )
 
         #validar que el dia exista dentro del periodo
         cls._validarDiaDentroPeriodo(dia_configuracion.periodo_registro, n_dia)
@@ -500,16 +585,15 @@ class DiaLaboralValidator:
             )
         
         
-        ids_recibidos = set()
+        ids_conf_recibidos_edicion = set()
 
         for config in dia_configuracion.configuraciones:
-
             # Solo validar las que ya existen en BD
             if config.id is None:
                 continue
 
             # Validar ids duplicados
-            if config.id in ids_recibidos:
+            if config.id in ids_conf_recibidos_edicion:
                 log_error(
                     f"La configuración {config.id} fue enviada más de una vez.",
                     LogApp.AGENDA
@@ -519,7 +603,7 @@ class DiaLaboralValidator:
                     "Se recibieron configuraciones duplicadas."
                 )
 
-            ids_recibidos.add(config.id)
+            ids_conf_recibidos_edicion.add(config.id)
 
             # Validar pertenencia al día laboral
             if config.id not in ids_configuraciones_bd:
@@ -532,59 +616,20 @@ class DiaLaboralValidator:
                     "La configuración recibida no pertenece al día laboral."
                 )
 
+        if ids_conf_recibidos_edicion != ids_configuraciones_bd:
+            raise ValueError(
+                "No se recibieron todas las configuraciones existentes."
+            )
+
+
 
     @classmethod
-    def validarEliminarDiaLaboral(cls, data):
+    def validarEliminarDiaLaboral(cls, dia_id):
+        from core.services.agenda_medica.configuracion_dia_service import ConfiguracionDiaService 
 
-        dia_id = data.get("diaID")
 
-        validar_entero_positivo(
-            dia_id,
-            "Id día laboral"
-        )
+        dia_laboral = ConfiguracionDiaService.obtener_dia_laboral_cupos_historial_citas(dia_id)
 
-        dia_laboral = (
-            Dia_laboral.objects
-            .filter(
-                id=dia_id,
-                estado=EstadoRegistro.ACTIVO
-            )
-            .prefetch_related(
-                Prefetch(
-                    "configuraciones_cupo",
-                    queryset=Configuracion_cupo.objects.prefetch_related(
-                        Prefetch(
-                            "cupos_agenda",
-                            queryset=(
-                                Cupo_agenda.objects
-                                .filter(
-                                    estado__in=[
-                                        EstadoCupoAgenda.DISPONIBLE,
-                                        EstadoCupoAgenda.ASIGNADO
-                                    ]
-                                )
-                                .prefetch_related(
-                                    Prefetch(
-                                        "historial_citas",
-                                        queryset=Historial_cita.objects.filter(
-                                            actual=True,
-                                            tipo_movimiento__in=[
-                                                TipoMovimientoCita.ASIGNACION,
-                                                TipoMovimientoCita.REPROGRAMACION
-                                            ]
-                                        ),
-                                        to_attr="historial_actual"
-                                    )
-                                )
-                            ),
-                            to_attr="cupos_registro"
-                        )
-                    ),
-                    to_attr="configuraciones_registro"
-                )
-            )
-            .first()
-        )
 
         if dia_laboral is None:
 
@@ -611,7 +656,7 @@ class AgendaMedicaValidator:
         fecha_inicio = params.get("fecha_inicio")
         fecha_fin = params.get("fecha_fin")
 
-        validar_entero_positivo(medico, "Persnal de salud")
+        validar_entero_positivo(medico, "Personal de salud")
 
         if not fecha_inicio:
             raise ValidationError(
@@ -692,7 +737,7 @@ class DiaQuirurgicoValidator:
 
         periodo_registro = (
             PeriodoLaboralValidator
-            ._validarExistenciaPeriodoLaboral(periodo_id)
+            ._validarExistenciaPeriodoLaboral(periodo_id, bloquear=True)
         )
 
         existe_dia_laboral = Dia_laboral.objects.filter(
@@ -727,6 +772,13 @@ class DiaQuirurgicoValidator:
             raise ValidationError(
                 "El día laboral seleccionado no corresponde a un día quirúrgico."
             )
+
+        periodo = PeriodoLaboralValidator._validarExistenciaPeriodoLaboral(
+            dia_laboral.periodo_laboral_id,
+            bloquear=True
+        )
+
+        PeriodoLaboralValidator.validarPeriodoFuturo(periodo)
 
         return dia_laboral
 
@@ -875,10 +927,6 @@ class AusenciaValidator:
 
         # 4. Validar solapamiento con otras ausencias activas
         cls._validarSolapamientoAusencia(criterios)
-
-        
-
-
 
 
     @classmethod

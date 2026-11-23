@@ -154,7 +154,6 @@ class AgendaMedicaService:
                         continue
 
                   if cupo.historial_actual:
-
                         historial = cupo.historial_actual[0]
                         cita = historial.cita
 
@@ -170,18 +169,17 @@ class AgendaMedicaService:
                         "iconColor": cls.AGENDA_COLORES_MOVIMIENTO.get(
                               historial.tipo_movimiento,
                               "rgba(0, 0, 0, 1)"
-                        ),
+                              ),
                         "icon": "circle",
                         "data": {
                               "cupo_id": cupo.id,
                               "cita_id": cita.id,
                               "ausencia_id": None,
+                              "tipo_atencion_id": cupo.tipo_atencion_id,
                               "tipo_movimiento": historial.get_tipo_movimiento_display(),
+                              }
                         }
-                        }
-
                   else:
-
                         entry = {
                         "id": cupo.id,
                         "title": "Cupo libre",
@@ -197,8 +195,9 @@ class AgendaMedicaService:
                               "cupo_id": cupo.id,
                               "cita_id": None,
                               "ausencia_id": None,
+                              "tipo_atencion_id": cupo.tipo_atencion_id,
                               "tipo_movimiento": "LIBRE",
-                        }
+                              }
                         }
 
                   entries.append(entry)

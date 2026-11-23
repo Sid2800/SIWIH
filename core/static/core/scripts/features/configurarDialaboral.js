@@ -45,17 +45,31 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (!modal) return;
 
-        const resultado = modal.resultado;
+        if (idDiaLaboral) {
 
-        if (resultado) {
             await informarCambios({
-                titulo: idDiaLaboral
-                    ? "Cambios aplicados a la agenda"
-                    : "Configuración creada correctamente",
-                mensajes: construirMensajesCambios(resultado),
+                titulo: "Cambios aplicados a la agenda",
+                mensajes: construirMensajesCambios(modal.resultado),
                 icono: "info"
             });
+
+            window.location.reload();
+
+        } else {
+
+
+            toastr.success(
+                "Configuración creada correctamente.",
+                "Proceso realizado",
+                {
+                    timeOut: 1000,
+                    onHidden: () => window.location.reload()
+                }
+            );
         }
+
+
+        
     });
     //#endregion
 

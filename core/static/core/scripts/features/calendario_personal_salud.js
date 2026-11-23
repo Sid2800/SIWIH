@@ -9,6 +9,8 @@ document.addEventListener("DOMContentLoaded", () => {
       fechaSeleccionada: null,
       personalSalud: null,
       entries: [],
+      filtros_tipos_atencion: [],
+      seleccionTiposAtencion: new Map(), // PERMANENCIA EN LOS FILTROS DE TIPO DE ATENCION
       rangoDatos: {
          inicio: null,
          fin: null,
@@ -26,8 +28,10 @@ document.addEventListener("DOMContentLoaded", () => {
       LIBRE: "LIBRE",
       ASIGNACION: "ASIGNACION",
       REPROGRAMACION: "REPROGRAMACION",
-      AUSENCIA: "AUSENCIA"
+      AUSENCIA: "AUSENCIA",
+      DIA_QUIRURGICO: "DIA_QUIRURGICO"
    });
+
 
 
    inicializar();
@@ -58,7 +62,9 @@ document.addEventListener("DOMContentLoaded", () => {
       controles.cupoProgramada = document.getElementById("chk-cupo-programada");
       controles.cupoReprogramada = document.getElementById("chk-cupo-reprogramada");
       controles.cupoAusencia = document.getElementById("chk-cupo-ausencia");
+      controles.cupoQuirurgico = document.getElementById("chk-cupo-quirurgico");
 
+      controles.filtrosTipoAtencion = document.getElementById("filtrosTipoAtencion");
    }
 
 
@@ -73,9 +79,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
          locale: "es",
 
-         view: "workweek",
+         view: "month",
 
-         title: "TITULO DE PRUEBA ",
+         title: "TITULO DE CALENDARIO ",
          
          navigation: true,
 
@@ -149,14 +155,76 @@ document.addEventListener("DOMContentLoaded", () => {
 
    }
 
-   function inicializarEventos() {
+   function renderizarFiltrosTipoAtencion() {
 
+      const contenedor = controles.filtrosTipoAtencion;
+      const opciones = estado.filtros_tipos_atencion;
+
+      if (!contenedor) return;
+
+      // VALORES MARCADOS EN LOS FILTROS DE TIPO DE ATENCION
+      contenedor.querySelectorAll(
+         ".agenda-filtro-tipo-atencion__checkbox"
+      ).forEach(checkbox => {
+
+         estado.seleccionTiposAtencion.set(
+            String(checkbox.value),
+            checkbox.checked
+         );
+
+      });
+
+      contenedor.replaceChildren();
+      if (!Array.isArray(opciones) || opciones.length === 0) {
+         const mensaje = document.createElement("span");
+         mensaje.className = "agenda-filtros-tipo-atencion__vacio";
+         mensaje.textContent = "No hay tipos de atención disponibles para filtrar.";
+
+         contenedor.appendChild(mensaje);
+         return;
+      }
+
+      const fragmento = document.createDocumentFragment();
+
+      opciones.forEach(opcion => {
+
+         const id = `chk-tipo-atencion-${opcion.value}`;
+         const tipoId = String(opcion.value);
+
+         const label = document.createElement("label");
+         label.className = "agenda-filtro-tipo-atencion";
+         label.htmlFor = id;
+
+         const checkbox = document.createElement("input");
+         checkbox.type = "checkbox";
+         checkbox.id = id;
+         checkbox.className = "agenda-filtro-tipo-atencion__checkbox";
+         checkbox.value = opcion.value;
+         checkbox.checked = estado.seleccionTiposAtencion.has(tipoId)
+            ? estado.seleccionTiposAtencion.get(tipoId)
+            : true;
+
+         const pill = document.createElement("span");
+         pill.className = "agenda-filtro-tipo-atencion__pill";
+         pill.textContent = opcion.text;
+
+         pill.style.setProperty("--tipo-atencion-color", opcion.color);
+         pill.style.setProperty("--tipo-atencion-border-color", opcion.borderColor);
+
+         label.append(checkbox, pill);
+         fragmento.appendChild(label);
+      });
+
+      contenedor.appendChild(fragmento);
+   }
+
+
+   function inicializarEventos() {
       // LISTENER PERSONAL DE SALUD
       const select = controles.personalSalud;
 
       select._changeHandler = function () {
          const options = select.getSelectedOptions();
-
 
          if (!options) {
             return;
@@ -168,7 +236,11 @@ document.addEventListener("DOMContentLoaded", () => {
          estado.calendario.cambiarTitulo(
             estado.nombrePersonal
          );
-         estado.calendario.actualizar();
+         // Invalidar datos del profesional anterior
+         estado.rangoDatos.mes = null;
+         estado.rangoDatos.anio = null;
+
+         cargarAgenda();
 
       };
 
@@ -192,10 +264,8 @@ document.addEventListener("DOMContentLoaded", () => {
             );
 
             cargarAgenda();
-
          }
       );
-
 
       // LISTENERS FILTROS
       controles.cupoLibre.addEventListener(
@@ -216,6 +286,23 @@ document.addEventListener("DOMContentLoaded", () => {
       controles.cupoAusencia.addEventListener(
          "change",
          aplicarFiltros
+      );
+
+      controles.cupoQuirurgico.addEventListener(
+         "change",
+         aplicarFiltros
+      );
+
+      // LISTENER FILTROS POR TIPO DE ATENCIÓN
+      controles.filtrosTipoAtencion.addEventListener(
+         "change",
+         function(event) {
+            if (!event.target.matches(".agenda-filtro-tipo-atencion__checkbox")) {
+                  return;
+            }
+            aplicarFiltros();
+
+         }
       );
 
 
@@ -310,12 +397,10 @@ document.addEventListener("DOMContentLoaded", () => {
    async function cargarAgenda() {
 
       if (!requiereCargarAgenda(estado.fecha)) {
-         estado.calendario.cambiarEntries(
-            estado.entries
-         );
+         return;
+      }
 
-         estado.calendario.actualizar();
-
+      if (!estado.idPersonal){
          return;
       }
 
@@ -324,8 +409,6 @@ document.addEventListener("DOMContentLoaded", () => {
          const rango = obtenerRangoDatos(
             estado.fecha
          );
-
-
 
          const criterios = {
             medico: estado.idPersonal,
@@ -341,16 +424,22 @@ document.addEventListener("DOMContentLoaded", () => {
             criterios
          );
 
+
          estado.entries = data.entries;
+         estado.filtros_tipos_atencion = data.opciones_tipos_atencion;
          estado.rangoDatos = rango;
 
          if (Array.isArray(data.workingDays) && data.workingDays.length > 0) {
             estado.calendario.cambiarDiasLaborales(data.workingDays);
          }
 
+         /// actualizar los filtros de tipo de atención en la interfaz
+         renderizarFiltrosTipoAtencion();
+
          // Aplicar los filtros activos a las nuevas entries antes de mostrarlas.
          // Esta función actualiza las entries y renderiza el calendario.
          aplicarFiltros();
+
 
 
       } catch (error) {
@@ -369,43 +458,64 @@ document.addEventListener("DOMContentLoaded", () => {
 
    function aplicarFiltros() {
 
+      // FILTROS POR ESTADO
       const mostrarLibres = controles.cupoLibre.checked;
       const mostrarProgramadas = controles.cupoProgramada.checked;
       const mostrarReprogramadas = controles.cupoReprogramada.checked;
       const mostrarAusencias = controles.cupoAusencia.checked;
+      const mostrarQuirurgicos = controles.cupoQuirurgico.checked;
 
-      const entriesFiltradas = estado.entries.filter(
-         entry => {
 
-            const tipoMovimiento =
-               entry.data.tipo_movimiento;
+      // FILTROS POR TIPO DE ATENCIÓN
+      const checkboxes = controles.filtrosTipoAtencion.querySelectorAll(
+         ".agenda-filtro-tipo-atencion__checkbox"
+      );
 
-            return (
-               (
-                  tipoMovimiento === TIPOS_MOVIMIENTO.LIBRE &&
-                  mostrarLibres
-               ) ||
-               (
-                  tipoMovimiento === TIPOS_MOVIMIENTO.ASIGNACION &&
-                  mostrarProgramadas
-               ) ||
-               (
-                  tipoMovimiento === TIPOS_MOVIMIENTO.REPROGRAMACION &&
-                  mostrarReprogramadas
-               ) ||
-               (
-                  tipoMovimiento === TIPOS_MOVIMIENTO.AUSENCIA &&
-                  mostrarAusencias
-               )
-            );
+      const tiposAtencionSeleccionados = Array.from(checkboxes)
+         .filter(checkbox => checkbox.checked)
+         .map(checkbox => checkbox.value);
 
+
+      // PRIMER FILTRO: ESTADO
+      const entriesFiltradasEstado = estado.entries.filter(entry => {
+
+         const tipoMovimiento = entry.data.tipo_movimiento;
+
+         return (
+               (tipoMovimiento === TIPOS_MOVIMIENTO.LIBRE && mostrarLibres) ||
+               (tipoMovimiento === TIPOS_MOVIMIENTO.ASIGNACION && mostrarProgramadas) ||
+               (tipoMovimiento === TIPOS_MOVIMIENTO.REPROGRAMACION && mostrarReprogramadas) ||
+               (tipoMovimiento === TIPOS_MOVIMIENTO.AUSENCIA && mostrarAusencias) ||
+               (tipoMovimiento === TIPOS_MOVIMIENTO.DIA_QUIRURGICO && mostrarQuirurgicos)
+         );
+
+      });
+
+
+      // SEGUNDO FILTRO: TIPO DE ATENCIÓN
+      const entriesFiltradas = entriesFiltradasEstado.filter(entry => {
+
+         const tipoAtencionId = entry.data.tipo_atencion_id;
+
+         // AUSENCIAS Y DÍAS QUIRÚRGICOS NO TIENEN TIPO DE ATENCIÓN
+         if (tipoAtencionId === null) {
+               return true;
          }
-      );
 
-      estado.calendario.cambiarEntries(
-         entriesFiltradas
-      );
+         // SI NO HAY FILTROS DISPONIBLES, CONSERVAR LOS CUPOS
+         if (checkboxes.length === 0) {
+               return true;
+         }
 
+         return tiposAtencionSeleccionados.includes(
+               String(tipoAtencionId)
+         );
+
+      });
+
+
+      // ACTUALIZAR CALENDARIO
+      estado.calendario.cambiarEntries(entriesFiltradas);
       estado.calendario.actualizar();
 
    }

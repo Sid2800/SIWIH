@@ -6,33 +6,44 @@
 
 {% block content %}
    <div class="contenedor2" style="height: 100%;"> 
-
+{% comment %} 
       <div class="tituloFormulario" style="margin-bottom: 2rem;">
          <div class="tituloFormulario-texto"> 
                <i class="bi bi-calendar3"></i>
                <h2 class="sin-margen">Agenda Medica</h2>
          </div>
          <div class="tituloFormulario-subrallado"></div>
-      </div>
+      </div> {% endcomment %}
 
-      <div class="agenda-medica-calendario">
+      <div class="agenda-medica-calendario"
+            style="
+               {% for variable, color in colores_estado_cupo.items %}
+                  {{ variable }}: {{ color }};
+               {% endfor %}
+            ">
 
          <div class="agenda-medica-calendario__filtros">
+
+            <!-- ENCABEZADO GENERAL -->
+            <div class="agenda-medica-calendario__filtros-encabezado">
+               <i class="bi bi-sliders"></i>
+               <span>Controles de agenda</span>
+            </div>
 
             <div class="agenda-medica-calendario__selector-personal-dia">
 
                <div class="agenda-medica-calendario__selector-personal">
-                  <label for="seleccionarPersonalSalud">
-                     Personal de salud
-                  </label>
+                  {% comment %} <label for="seleccionarPersonalSalud">
+                     Personal de salud 
+                  </label> {% endcomment %}
 
                   <div id="seleccionarPersonalSalud"></div>
                </div>
 
                <div class="agenda-medica-calendario__selector-fecha">
-                  <label for="fechaSeleccionada">
+                  {% comment %} <label for="fechaSeleccionada">
                      Fecha
-                  </label>
+                  </label> {% endcomment %}
 
                   <div id="fechaSeleccionada"></div>
                </div>
@@ -132,9 +143,48 @@
                      </span>
                   </label>
 
+
+                  <label
+                     class="ck-formulario agenda-filtro-cupo--quirurgico"
+                     for="chk-cupo-quirurgico"
+                  >
+                     <input
+                        type="checkbox"
+                        id="chk-cupo-quirurgico"
+                        class="ck-formulario__checkbox"
+                        checked
+                     >
+
+                     <div class="ck-formulario__base">
+                        <div class="ck-formulario__bolita"></div>
+                     </div>
+
+                     <span class="ck-formulario__label">
+                        <i class="bi bi-circle-fill"></i>
+                        Días quirúrgicos
+                     </span>
+                  </label>
+
+               </div>
+
+               <div class="agenda-medica-calendario__filtros-tipo-atencion">
+
+                  <span class="agenda-medica-calendario__filtros-titulo">
+                     <i class="bi bi-funnel-fill"></i>
+                     Tipo de atención
+                     {{ opciones_tipos_atencion }}
+                  </span>
+
+                  <div id="filtrosTipoAtencion">
+
+                     
+
+                  </div>
+
                </div>
 
             </div>
+
 
          </div>
 
@@ -161,6 +211,7 @@
 
 <script> 
    const idPersonal = {{ personal_salud_id }}
+
 </script>
 
 

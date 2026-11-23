@@ -7,13 +7,14 @@ class CitaService:
    @classmethod
    def obtenerCitasActualesPorConfiguraciones(cls, ids_configuraciones):
 
-      return Historial_cita.objects.filter(
-         actual=True,
-         tipo_movimiento__in=[
-               TipoMovimientoCita.ASIGNACION,
-               TipoMovimientoCita.REPROGRAMACION
-         ],
-         cupo_agenda__configuracion_cupo_id__in=ids_configuraciones
+      return Historial_cita.objects.select_related("cupo_agenda"
+         ).filter(
+            actual=True,
+            tipo_movimiento__in=[
+                  TipoMovimientoCita.ASIGNACION,
+                  TipoMovimientoCita.REPROGRAMACION
+            ],
+            cupo_agenda__configuracion_cupo_id__in=ids_configuraciones
       )
 
 

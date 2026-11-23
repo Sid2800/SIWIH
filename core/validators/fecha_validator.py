@@ -26,27 +26,36 @@ def validar_fecha(fecha, anio_minimo=2000, permitir_futuro=False, permitir_pasad
     
     return fecha_dt
 
+
 def validar_rango_fechas(
-        fecha_inicio,
-        fecha_final,
-        permitir_fin_igual_inicio=False
-    ):
-        # Validar relación entre fechas
-        if permitir_fin_igual_inicio:
+    fecha_inicio,
+    fecha_final,
+    permitir_fin_igual_inicio=False,
+    dias_maximo=None
+):
+    # Validar relación entre fechas
+    if permitir_fin_igual_inicio:
+        if fecha_final < fecha_inicio:
+            raise ValidationError(
+                "La fecha final no puede ser menor "
+                "que la fecha inicial."
+            )
+    else:
+        if fecha_final <= fecha_inicio:
+            raise ValidationError(
+                "La fecha final debe ser mayor "
+                "que la fecha inicial."
+            )
 
-            if fecha_final < fecha_inicio:
-                raise ValidationError(
-                    "La fecha final no puede ser menor "
-                    "que la fecha inicial."
-                )
+    # Validar duración máxima
+    if dias_maximo is not None:
+        dias_periodo = (fecha_final - fecha_inicio).days + 1
 
-        else:
-
-            if fecha_final <= fecha_inicio:
-                raise ValidationError(
-                    "La fecha final debe ser mayor "
-                    "que la fecha inicial."
-                )
+        if dias_periodo > dias_maximo:
+            raise ValidationError(
+                f"El rango de fechas no puede superar "
+                f"los {dias_maximo} días."
+            )
 
 
 def validar_anio(anio):

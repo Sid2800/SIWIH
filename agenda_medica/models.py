@@ -48,7 +48,10 @@ class Periodo_laboral(models.Model):
         return Cupo_agenda.objects.filter(
             configuracion_cupo__dia_laboral__periodo_laboral=self
         ).exclude(
-            estado=EstadoCupoAgenda.INACTIVO
+            estado__in=[
+                EstadoCupoAgenda.INACTIVO,
+                EstadoCupoAgenda.BLOQUEADO
+            ]
         ).count()
 
     def clean(self): 
@@ -89,7 +92,10 @@ class Dia_laboral(models.Model):
         return Cupo_agenda.objects.filter(
             configuracion_cupo__dia_laboral=self
         ).exclude(
-            estado=EstadoCupoAgenda.INACTIVO
+            estado__in=[
+                EstadoCupoAgenda.INACTIVO,
+                EstadoCupoAgenda.BLOQUEADO
+            ]
         ).count()
 
     @property
@@ -148,7 +154,10 @@ class Configuracion_cupo(models.Model):
     @property
     def total_cupos(self):
         return self.cupos_agenda.exclude(
-            estado=EstadoCupoAgenda.INACTIVO
+            estado__in=[
+                EstadoCupoAgenda.INACTIVO,
+                EstadoCupoAgenda.BLOQUEADO
+            ]
         ).count()
 
     class Meta: 

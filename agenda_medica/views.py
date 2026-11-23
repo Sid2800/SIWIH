@@ -10,7 +10,7 @@ from django.http import JsonResponse
 from django.utils import timezone
 from core.constants.permisos import AGENDA_MEDICA_EDITOR_ROLES, AGENDA_MEDICA_EDITOR_UNIDADES, AGENDA_MEDICA_VISUALIZACION_ROLES, AGENDA_MEDICA_VISUALIZACION_UNIDADES
 from core.constants.domain_constants import LogApp
-from core.constants.choices_constants import TipoAusencia
+from core.constants.choices_constants import TipoAusencia, TipoMovimientoCita
 from django.views.decorators.http import require_GET
 from django.urls import  reverse
 from core.utils.utilidades_fechas import formatear_fecha_dd_mm_yyyy
@@ -62,7 +62,6 @@ class ListaAusencias(UnidadRolRequiredMixin,TemplateView):
         return context
 
 
-
 class CalendarioPersonalSalud(UnidadRolRequiredMixin, TemplateView):
 
     template_name = "agenda_medica/calendario_personal_salud.html"
@@ -76,10 +75,18 @@ class CalendarioPersonalSalud(UnidadRolRequiredMixin, TemplateView):
         idPersonal = kwargs.get("personal_salud_id",0)
         context["personal_salud_id"] = idPersonal
 
+        context["colores_estado_cupo"] = {
+            "--agenda-color-libre": AgendaMedicaService.AGENDA_COLOR_LIBRE,
+            "--agenda-color-programada": AgendaMedicaService.AGENDA_COLORES_MOVIMIENTO.get(TipoMovimientoCita.ASIGNACION, 'rgba(0, 0, 0, 1)'),
+            "--agenda-color-reprogramada": AgendaMedicaService.AGENDA_COLORES_MOVIMIENTO.get(TipoMovimientoCita.REPROGRAMACION, 'rgba(0, 0, 0, 1)'),
+            "--agenda-color-ausencia": AusenciaService.AGENDA_ICON_COLOR_AUSENCIA,
+            "--agenda-color-quirurgico": DiaQuirurgicoService.AGENDA_ICON_COLOR_DIA_QUIRURGICO,
+        }
+
+
 
 
         return context
-    
     
 
 class ConfigurarPeriodo(UnidadRolRequiredMixin,DetailView):
@@ -96,7 +103,6 @@ class ConfigurarPeriodo(UnidadRolRequiredMixin,DetailView):
         id_periodo = self.kwargs["pk"]
         dias_configurados = (PeriodoLaboralService.construir_dias_semana_ui(id_periodo))
 
-        print(dias_configurados)
         context['dias_configurados'] = dias_configurados
         return context
     
@@ -425,76 +431,57 @@ def obtenerPeriodoLaboral(request):
     }, status=200)
 
 
+
 def guardarPeriodoLaboral(request):
-    
     if not verificar_permisos_usuario(request.user, AGENDA_MEDICA_EDITOR_ROLES, AGENDA_MEDICA_EDITOR_UNIDADES):
         return JsonResponse({'error': 'No tienes permisos para realizar esta accion'}, status=403)
-    
+
     try:
         data = parse_json_request(request)
-    except ValueError as e:
-        return JsonResponse({'error': str(e)}, status=400)
-    
-    try:
         periodo = PeriodoLaboralValidator.validarArgumentosPeriodoLaboral(data, request.user.id)
+        resultadoGuardado = PeriodoLaboralService.procesarPeriodoLaboral( periodo,request.user)
+
+        return JsonResponse(
+            {'guardo': bool(resultadoGuardado)},
+            status=200
+        )
+
     except ValueError as e:
         return JsonResponse(
             {'error': str(e)},
             status=400
         )
+
     except ValidationError as e:
         return JsonResponse(
             {'error': e.messages[0]},
             status=400
         )
 
+    except Exception as e:
+        return JsonResponse({'error': 'No se pudo guardar el periodo'}, status=500)
+
+
+
+def validarImpactoPeriodoLaboral(request):
+    if not verificar_permisos_usuario(request.user, AGENDA_MEDICA_EDITOR_ROLES, AGENDA_MEDICA_EDITOR_UNIDADES):
+        return JsonResponse({'error': 'No tienes permisos para realizar esta accion'}, status=403)
 
     try:
-        #PeriodoLaboralService.analizarImpactoPeriodoLaboral(periodo)
-        resultadoGuardado = PeriodoLaboralService.procesarPeriodoLaboral(periodo,request.user)
+        data = parse_json_request(request)
+        periodo = PeriodoLaboralValidator.validarArgumentosPeriodoLaboral(data, request.user.id)
+        resultado = PeriodoLaboralService.analizarImpactoPeriodoLaboral(periodo)
 
-        if resultadoGuardado:
-            return JsonResponse({'guardo': True}, status=200)
-        else:
-            return JsonResponse({'guardo': False}, status=200)
+        return JsonResponse({'resultado': resultado}, status=200)
+
+    except ValueError as e:
+        return JsonResponse({'error': str(e)}, status=400)
 
     except ValidationError as e:
         return JsonResponse({'error': e.messages[0]}, status=400)
 
     except Exception as e:
         print(e)
-        return JsonResponse({'error': 'No se pudo guardar el periodo'}, status=500)
-
-
-def validarImpactoPeriodoLaboral(request):
-    if not verificar_permisos_usuario(request.user, AGENDA_MEDICA_EDITOR_ROLES, AGENDA_MEDICA_EDITOR_UNIDADES):
-        return JsonResponse({'error': 'No tienes permisos para realizar esta accion'}, status=403)
-    
-    try:
-        data = parse_json_request(request)
-    except ValueError as e:
-        return JsonResponse({'error': e.messages[0]}, status=400)
-
-    try:
-        periodo = PeriodoLaboralValidator.validarArgumentosPeriodoLaboral(data, request.user.id)
-    except ValueError as e:
-        return JsonResponse(
-            {'error': e.messages[0]},
-            status=400
-        )
-    except ValidationError as e:
-        return JsonResponse(
-            {'error': e.messages[0]},
-            status=400
-        )
-
-    try:
-        resultado = PeriodoLaboralService.analizarImpactoPeriodoLaboral(periodo)
-
-        return JsonResponse({'resultado': resultado}, status=200)
-    except ValidationError as e:
-        return JsonResponse({'error': e.messages[0]}, status=400)
-    except Exception as e:
         return JsonResponse({'error': 'No se pudo procesar el periodo'}, status=500)
 
 
@@ -502,255 +489,151 @@ def validarImpactoPeriodoLaboral(request):
 def validarImpactoAusencia(request):
     if not verificar_permisos_usuario(request.user, AGENDA_MEDICA_EDITOR_ROLES, AGENDA_MEDICA_EDITOR_UNIDADES):
         return JsonResponse({'error': 'No tienes permisos para realizar esta accion'}, status=403)
-    
+
     try:
         data = parse_json_request(request)
-    except ValueError as e:
-        return JsonResponse({'error': e.messages[0]}, status=400)
-
-    try:
         ausencia = AusenciaValidator.validarArgumentosAusencia(data, request.user.id)
-    except ValueError as e:
-        return JsonResponse(
-            {'error': e.messages[0]},
-            status=400
-        )
-    except ValidationError as e:
-        return JsonResponse(
-            {'error': e.messages[0]},
-            status=400
-        )
-
-
-    try:
         resultado = AusenciaService.analizarImpactoAusencia(ausencia)
 
         return JsonResponse({'resultado': resultado}, status=200)
-    
+
+    except ValueError as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
     except ValidationError as e:
         return JsonResponse({'error': e.messages[0]}, status=400)
-    except Exception as e:
-        return JsonResponse({'error': 'No se pudo procesar el periodo'}, status=500)
 
+    except Exception:
+        return JsonResponse({'error': 'No se pudo procesar la ausencia'}, status=500)
 
 
 
 @require_POST
 def guardarDiaLaboral(request):
-    
     if not verificar_permisos_usuario(request.user, AGENDA_MEDICA_EDITOR_ROLES, AGENDA_MEDICA_EDITOR_UNIDADES):
         return JsonResponse({'error': 'No tienes permisos para realizar esta accion'}, status=403)
-    
-    try:
-        data = parse_json_request(request)
-    except ValueError as e:
-        return JsonResponse(
-            {"error": "El cuerpo de la solicitud contiene un JSON inválido."},
-            status=400
-        )
-    
-    try:
-        diaLaboralConfigurado = DiaLaboralValidator.validarArgumentosDiaLaboral(data)
-    except ValueError as e:
-        return JsonResponse(
-            {"error": "Error interno del servidor."},
-            status=500
-        )
-    except ValidationError as e:
-        return JsonResponse(
-            {'error': e.messages[0]},
-            status=400
-        )
 
     try:
-        #PeriodoLaboralService.analizarImpactoPeriodoLaboral(periodo) al editar
-        resultado = ConfiguracionDiaService.crear_dia_laboral(diaLaboralConfigurado,request.user)
-        if resultado:
-            return JsonResponse({'guardo': True}, status=200)
-    
+        data = parse_json_request(request)
+        diaLaboralConfigurado = DiaLaboralValidator.validarArgumentosDiaLaboral(data)
+        resultado = ConfiguracionDiaService.crear_dia_laboral(diaLaboralConfigurado, request.user)
+
+        return JsonResponse({'guardo': bool(resultado)}, status=200)
+
+    except ValueError:
+        return JsonResponse({'error': 'Error interno del servidor. Contacte al área de informática.'}, status=500)
 
     except ValidationError as e:
         return JsonResponse({'error': e.messages[0]}, status=400)
 
-    except Exception as e:
-        log_error(
-                f"[ConfiguracionDiaService]: crear_dia_laboral {e}",
-                LogApp.AGENDA
-            )
+    except Exception:
         return JsonResponse({'error': 'No se pudo guardar el periodo'}, status=500)
     
-
 
 @require_POST
 def guardarAusencia(request):
-    
     if not verificar_permisos_usuario(request.user, AGENDA_MEDICA_EDITOR_ROLES, AGENDA_MEDICA_EDITOR_UNIDADES):
         return JsonResponse({'error': 'No tienes permisos para realizar esta accion'}, status=403)
-    
+
     try:
         data = parse_json_request(request)
-    except ValueError as e:
-        return JsonResponse(
-            {"error": "El cuerpo de la solicitud contiene un JSON inválido."},
-            status=400
-        )
-    
-    try:
         ausencia = AusenciaValidator.validarArgumentosAusencia(data, request.user.id)
-    except ValueError as e:
-        return JsonResponse(
-            {'error': e.messages[0]},
-            status=400
-        )
-    except ValidationError as e:
-        return JsonResponse(
-            {'error': e.messages[0]},
-            status=400
-        )
+        resultado = AusenciaService.crearAusencia(ausencia, request.user)
 
-
-    try:
-        resultado = AusenciaService.crearAusencia(ausencia,request.user)
         return JsonResponse({'resultado': resultado}, status=200)
-            
+
+    except ValueError as e:
+        return JsonResponse({'error': str(e)}, status=500)
 
     except ValidationError as e:
         return JsonResponse({'error': e.messages[0]}, status=400)
 
-    except Exception as e:
-        log_error(
-                f"[ConfiguracionDiaService]: crear_dia_laboral {e}",
-                LogApp.AGENDA
-            )
-        return JsonResponse({'error': 'No se pudo guardar el periodo'}, status=500)
-    
+    except Exception:
+        return JsonResponse({'error': 'No se pudo guardar la ausencia'}, status=500)
+
+
 
 
 @require_POST
 def editarAusencia(request):
-    
     if not verificar_permisos_usuario(request.user, AGENDA_MEDICA_EDITOR_ROLES, AGENDA_MEDICA_EDITOR_UNIDADES):
         return JsonResponse({'error': 'No tienes permisos para realizar esta accion'}, status=403)
-    
+
     try:
         data = parse_json_request(request)
-    except ValueError as e:
-        return JsonResponse(
-            {"error": "El cuerpo de la solicitud contiene un JSON inválido."},
-            status=400
-        )
-    
-    try:
         ausencia = AusenciaValidator.validarArgumentosAusencia(data, request.user.id)
-    except ValueError as e:
-        return JsonResponse(
-            {'error': e.messages[0]},
-            status=400
-        )
-    except ValidationError as e:
-        return JsonResponse(
-            {'error': e.messages[0]},
-            status=400
-        )
+        resultado = AusenciaService.editarAusencia(ausencia, request.user)
 
-
-    try:
-
-        
-        resultado = AusenciaService.editarAusencia(ausencia,request.user)
-
-        # print(ausencia)
         return JsonResponse({'resultado': resultado}, status=200)
-            
+
+    except ValueError:
+        return JsonResponse(
+            {'error': 'Error interno del servidor. Contacte al área de informática.'},
+            status=500
+        )
 
     except ValidationError as e:
         return JsonResponse({'error': e.messages[0]}, status=400)
 
-    except Exception as e:
-        log_error(
-                f"[ConfiguracionDiaService]: crear_dia_laboral {e}",
-                LogApp.AGENDA
-            )
-        return JsonResponse({'error': 'No se pudo guardar el periodo'}, status=500)
-    
+    except Exception:
+        return JsonResponse({'error': 'No se pudo editar la ausencia'}, status=500)
 
 
 
 @require_POST
 def definirDiaQuirurgico(request):
-
     if not verificar_permisos_usuario(request.user, AGENDA_MEDICA_EDITOR_ROLES, AGENDA_MEDICA_EDITOR_UNIDADES):
-            return JsonResponse({'error': 'No tienes permisos para realizar esta accion'}, status=403)
+        return JsonResponse({'error': 'No tienes permisos para realizar esta accion'}, status=403)
 
     try:
         data = parse_json_request(request)
-    except ValueError as e:
-        return JsonResponse(
-            {"error": "El cuerpo de la solicitud contiene un JSON inválido."},
-            status=400
-        )
-    
-    try:
         DiaQuirurgicoService.crear_dia_quirurgico(data, request.user)
+
         return JsonResponse({'guardo': True}, status=200)
 
-
-    except ValueError as e:
+    except ValueError:
         return JsonResponse(
-            {"error": "Error interno del servidor."},
+            {'error': 'Error interno del servidor. Contacte al área de informática.'},
             status=500
         )
+
     except ValidationError as e:
+        return JsonResponse({'error': e.messages[0]}, status=400)
+
+    except Exception:
         return JsonResponse(
-            {'error': e.messages[0]},
-            status=400
+            {'error': 'No se pudo configurar el día quirúrgico.'},
+            status=500
         )
-
-    except Exception as e:
-        log_error(f"[DiaQuirurgicoService]: crear_dia_quirurgico {e}", LogApp.AGENDA)
-
-        return JsonResponse(
-            {'error': 'No se pudo configurar el día quirúrgico.'},status=500)
 
 
 
 
 @require_http_methods(["DELETE"])
 def quitarDiaQuirurgico(request):
-
     if not verificar_permisos_usuario(request.user, AGENDA_MEDICA_EDITOR_ROLES, AGENDA_MEDICA_EDITOR_UNIDADES):
-            return JsonResponse({'error': 'No tienes permisos para realizar esta accion'}, status=403)
+        return JsonResponse({'error': 'No tienes permisos para realizar esta accion'}, status=403)
 
     try:
         data = parse_json_request(request)
-    except ValueError as e:
-        return JsonResponse(
-            {"error": "El cuerpo de la solicitud contiene un JSON inválido."},
-            status=400
-        )
-    
-    try:
         DiaQuirurgicoService.quitar_dia_quirurgico(data, request.user)
 
         return JsonResponse({'guardo': True}, status=200)
 
-
-    except ValueError as e:
+    except ValueError:
         return JsonResponse(
-            {"error": "Error interno del servidor."},
+            {'error': 'Error interno del servidor. Contacte al área de informática.'},
             status=500
         )
+
     except ValidationError as e:
+        return JsonResponse({'error': e.messages[0]}, status=400)
+
+    except Exception:
         return JsonResponse(
-            {'error': e.messages[0]},
-            status=400
+            {'error': 'No se pudo quitar el día quirúrgico.'},
+            status=500
         )
-
-    except Exception as e:
-        log_error(f"[DiaQuirurgicoService]: quitar_dia_quirurgico {e}", LogApp.AGENDA)
-
-        return JsonResponse(
-            {'error': 'No se pudo quitar el día quirurgico.'},status=500)
 
 
 
@@ -805,37 +688,35 @@ def obtenerAusencia(request):
 def validarImpactoDiaLaboral(request):
     if not verificar_permisos_usuario(request.user, AGENDA_MEDICA_EDITOR_ROLES, AGENDA_MEDICA_EDITOR_UNIDADES):
         return JsonResponse({'error': 'No tienes permisos para realizar esta accion'}, status=403)
-    
+
     try:
         data = parse_json_request(request)
-    except ValueError as e:
-        return JsonResponse({"error": "Error interno del servidor."}, status=500)
-    
-
-    try:
         dia_laboral = DiaLaboralValidator.validarArgumentosDiaLaboral(data)
 
-    except ValueError as e:
-        return JsonResponse({"error": "Error interno del servidor."}, status=500)
-    
-    except ValidationError as e:
+        resultado, f_modificado = ConfiguracionDiaService.analizarImpactoEditarDiaLaboral(dia_laboral)
+
+        if resultado:
+            return JsonResponse({
+                'conflictos': True,
+                'impactos': resultado,
+                'f_modificado': f_modificado
+            }, status=200)
+
+        return JsonResponse({
+            'conflictos': False,
+            'impactos': None
+        }, status=200)
+
+    except ValueError:
         return JsonResponse(
-            {'error': e.messages[0]},
-            status=400
+            {'error': 'Error interno del servidor. Contacte al área de informática.'},
+            status=500
         )
 
-    try:
-        resultado, f_modificado= ConfiguracionDiaService.analizarImpactoEditarDiaLaboral(dia_laboral)
-
-        
-        if resultado:
-            return JsonResponse({'conflictos': True, 'impactos':resultado, 'f_modificado':f_modificado}, status=200)
-        else:
-            return JsonResponse({'conflictos': False, 'impactos':None }, status=200)
-        
     except ValidationError as e:
         return JsonResponse({'error': e.messages[0]}, status=400)
-    except Exception as e:
+
+    except Exception:
         return JsonResponse({'error': 'No se pudo procesar el periodo'}, status=500)
 
 
@@ -843,51 +724,34 @@ def validarImpactoDiaLaboral(request):
 def editarDiaLaboral(request):
     if not verificar_permisos_usuario(request.user, AGENDA_MEDICA_EDITOR_ROLES, AGENDA_MEDICA_EDITOR_UNIDADES):
         return JsonResponse({'error': 'No tienes permisos para realizar esta accion'}, status=403)
-    
+
     try:
         data = parse_json_request(request)
-    except ValueError as e:
-        return JsonResponse({"error": "Error interno del servidor."}, status=500)
-    
-
-    try:
         dia_laboral = DiaLaboralValidator.validarArgumentosDiaLaboral(data)
+        resultado = ConfiguracionDiaService.editarDiaLaboral(dia_laboral, request.user)
 
-        
+        return JsonResponse({
+            'guarda': True,
+            'resultado': resultado
+        }, status=200)
 
-    except ValueError as e:
-        return JsonResponse({"error": "Error interno del servidor."}, status=500)
-    
-    except ValidationError as e:
+    except ValueError:
         return JsonResponse(
-            {'error': e.messages[0]},
-            status=400
+            {'error': 'Error interno del servidor. Contacte al área de informática.'},
+            status=500
         )
-
-    try:
-        resultado= ConfiguracionDiaService.editarDiaLaboral(dia_laboral, request.user)
-
-        return JsonResponse(
-                    {
-                        "guarda": True,
-                        "resultado": resultado
-                    },
-                    status=200
-                )
-    
 
     except ValidationError as e:
         return JsonResponse({'error': e.messages[0]}, status=400)
-    except Exception as e:
-        log_error(e, LogApp.AGENDA)
 
+    except Exception:
         return JsonResponse({'error': 'No se pudo procesar el periodo'}, status=500)
 
+    
 
 
 @require_http_methods(["DELETE"])
 def eliminarDiaLaboral(request):
-
     if not verificar_permisos_usuario(request.user, AGENDA_MEDICA_EDITOR_ROLES, AGENDA_MEDICA_EDITOR_UNIDADES):
         return JsonResponse(
             {'error': 'No tienes permisos para realizar esta acción'},
@@ -896,48 +760,27 @@ def eliminarDiaLaboral(request):
 
     try:
         data = parse_json_request(request)
+        resultado = ConfiguracionDiaService.eliminarDiaLaboral(data, request.user)
+
+        return JsonResponse({
+            'success': True,
+            'resultado': resultado
+        }, status=200)
 
     except ValueError:
         return JsonResponse(
-            {"error": "El cuerpo de la solicitud contiene un JSON inválido."},
-            status=400
-        )
-
-    try:
-        resultado = ConfiguracionDiaService.eliminarDiaLaboral(
-            data,
-            request.user
-        )
-
-        
-        return JsonResponse({'success': True, 'resultado': resultado}, status=200)
-
-    except ValueError as e:
-
-        return JsonResponse(
-            {'error': str(e)},
-            status=400
+            {'error': 'Error interno del servidor. Contacte al área de informática.'},
+            status=500
         )
 
     except ValidationError as e:
+        return JsonResponse({'error': e.messages[0]}, status=400)
 
-        return JsonResponse(
-            {'error': e.messages[0]},
-            status=400
-        )
-
-    except Exception as e:
-
-        log_error(
-            f"[ConfiguracionDiaService]: eliminarDiaLaboral {e}",
-            LogApp.AGENDA
-        )
-
+    except Exception:
         return JsonResponse(
             {'error': 'No se pudo eliminar el día laboral.'},
             status=500
         )
-
 
 
 
@@ -965,22 +808,53 @@ class AgendaMedicaAPI(View):
             )
 
             datos = AgendaMedicaService.obtener_cupos(criterios)
-
             entries, dias_con_entries = AgendaMedicaService.transformar_cupos(datos)
 
 
+            tipos_atencion = {}
+
+            for entry in entries:
+                tipo_id = entry["data"]["tipo_atencion_id"]
+
+                if tipo_id is None:
+                    continue
+
+                colores = AgendaMedicaService.AGENDA_COLORES_TIPO_ATENCION.get(
+                    tipo_id,
+                    {
+                        "color": "rgba(0, 0, 0, 0.05)",
+                        "borderColor": "rgba(0, 0, 0, 0.5)",
+                    }   )
+
+                tipos_atencion[tipo_id] = {
+                    "value": tipo_id,
+                    "text": entry["agrupation"],
+                    "color": colores["color"],
+                    "borderColor": colores["borderColor"],
+                }
+
+            opciones_tipos_atencion = list(tipos_atencion.values())
+
+            opciones_tipos_atencion = sorted(
+                tipos_atencion.values(),
+                key=lambda opcion: opcion["text"].casefold()
+            )
 
             data = AusenciaService.obtener_ausencias(criterios)
             ausencias, dias_con_ausencias = AusenciaService.transformar_ausencias(data)
 
-            entries = entries + ausencias
-            dias_con_entries = sorted(
-                set(dias_con_entries) | set(dias_con_ausencias)
-            )
 
+            dataqx = DiaQuirurgicoService.obtener_dias_quirurgicos(criterios)
+            dias_quirurgicos, dias_con_dias_quirurgicos = DiaQuirurgicoService.transformar_dias_quirurgicos(dataqx)
+
+            entries = entries + ausencias + dias_quirurgicos
+            dias_con_entries = sorted(
+                set(dias_con_entries) | set(dias_con_dias_quirurgicos)
+            )
 
             return JsonResponse({
                 "entries": entries,
+                "opciones_tipos_atencion": opciones_tipos_atencion,
                 "workingDays": dias_con_entries,
             })
 

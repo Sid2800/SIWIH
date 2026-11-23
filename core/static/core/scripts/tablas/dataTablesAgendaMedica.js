@@ -658,7 +658,11 @@ document.addEventListener("DOMContentLoaded", () => {
                     `${selectedRow.personal_salud__empleado__primer_nombre}-${selectedRow.personal_salud__empleado__primer_apellido}`
                 ).substring(0, 30);
 
-            window.location.href = API_URLS.configurarPeridoLaboral.replace('0', selectedRow.id).replace('slug',nombreSlug);
+
+            window.location.href = construirURL(API_URLS.configurarPeridoLaboral, {
+                id: selectedRow.id,
+                slug: nombreSlug
+            });
         } else {
             toastr.error("No hay ninguna fila seleccionada.");
         }

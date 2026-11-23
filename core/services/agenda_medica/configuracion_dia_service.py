@@ -3,10 +3,11 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from core.constants.choices_constants import EstadoRegistro, EstadoCupoAgenda, TipoMovimientoCita
 from core.constants.domain_constants import LogApp
-from core.utils.utilidades_fechas import obtener_fechas_por_dia_semana
+from core.utils.utilidades_fechas import obtener_fechas_por_dia_semana, filtro_rango_fecha
 from core.utils.utilidades_logging import log_error, log_info
+from core.validators.main_validator import validar_entero_positivo
 
-from agenda_medica.models import Dia_laboral, Configuracion_cupo, Cupo_agenda
+from agenda_medica.models import Dia_laboral, Configuracion_cupo, Cupo_agenda, Tipo_atencion
 from cita.models import Historial_cita
 from agenda_medica.validators import DiaLaboralValidator, PeriodoLaboralService
 from core.services.cita.cita_service import CitaService
@@ -130,18 +131,11 @@ class ConfiguracionDiaService:
                 dia_laboral=dia_laboral,
                 estado=EstadoRegistro.ACTIVO
             )
+            .order_by("orden")
         )
 
-        fechas_dias = obtener_fechas_por_dia_semana(
-            periodo_laboral.fecha_inicio,
-            periodo_laboral.fecha_fin,
-            dia_laboral.dia_semana
-        )
+        fechas_dias = PeriodoLaboralService.obtener_fechas_validas_dia_laboral(periodo_laboral, dia_laboral.dia_semana)
 
-        fechas_dias = AusenciaService.obtener_fechas_validas(
-            fechas_dias,
-            periodo_laboral.personal_salud
-        )
 
         cls._crear_cupos_agenda(
             dia_laboral,
@@ -205,7 +199,53 @@ class ConfiguracionDiaService:
             "total_cupos": total_cupos,
             "configuraciones": configuraciones,
         }
-                
+
+
+    @classmethod
+    def obtener_dia_laboral_cupos_historial_citas(cls, dia_id):
+        return (Dia_laboral.objects
+                    .filter(
+                        id=dia_id,
+                        estado=EstadoRegistro.ACTIVO
+                    )
+                    .prefetch_related(
+                        Prefetch(
+                            "configuraciones_cupo",
+                            queryset=Configuracion_cupo.objects.prefetch_related(
+                                Prefetch(
+                                    "cupos_agenda",
+                                    queryset=(
+                                        Cupo_agenda.objects
+                                        .filter(
+                                            estado__in=[
+                                                EstadoCupoAgenda.DISPONIBLE,
+                                                EstadoCupoAgenda.ASIGNADO
+                                            ]
+                                        )
+                                        .prefetch_related(
+                                            Prefetch(
+                                                "historial_citas",
+                                                queryset=Historial_cita.objects.filter(
+                                                    actual=True,
+                                                    tipo_movimiento__in=[
+                                                        TipoMovimientoCita.ASIGNACION,
+                                                        TipoMovimientoCita.REPROGRAMACION
+                                                    ]
+                                                ),
+                                                to_attr="historial_actual"
+                                            )
+                                        )
+                                    ),
+                                    to_attr="cupos_registro"
+                                )
+                            ),
+                            to_attr="configuraciones_registro"
+                        )
+                    )
+                    .first()
+                )
+
+
 
     @classmethod
     def crear_dia_laboral(cls, dia_configuracion, usuario):
@@ -258,6 +298,14 @@ class ConfiguracionDiaService:
                 diaConfiguracion.id,
                 0
             ),
+        }
+
+
+    @staticmethod
+    def _determinarImpactoAgregarConfiguracionDia(config, cantidad_dias, tipo_atencion):
+        return {
+            "tipoAtencion": tipo_atencion.nombre_tipo_atencion,
+            "cupos": cantidad_dias * config.cupos
         }
 
 
@@ -385,15 +433,15 @@ class ConfiguracionDiaService:
                     )
                 )
 
-            #obtener los resgitros que requieren adicion en base
-            cambios.configuraciones_agregar = [
-                config
-                for config in dia_laboral.configuraciones
-                if config.id is None
-            ]
+        #obtener los resgitros que requieren adicion en base
+        cambios.configuraciones_agregar = [
+            config
+            for config in dia_laboral.configuraciones
+            if config.id is None
+        ]
 
-            if cambios.configuraciones_agregar:
-                cambios.secuencia = True
+        if cambios.configuraciones_agregar:
+            cambios.secuencia = True
 
         return cambios
 
@@ -424,6 +472,7 @@ class ConfiguracionDiaService:
 
             
             impactos = {
+                "agregar": [],
                 "eliminar": [],
                 "editar": [],
                 "general": [],
@@ -450,7 +499,6 @@ class ConfiguracionDiaService:
             citas = CitaService.obtenerCitasActualesPorConfiguraciones(
                 ids_configuraciones
             )
- 
 
             citas_por_configuracion = Counter(
                 cita.cupo_agenda.configuracion_cupo_id
@@ -477,15 +525,29 @@ class ConfiguracionDiaService:
                 cupos_eliminar += reducido_edicion
                 impactos["editar"].extend(mensajes)
 
+            for config in cambios.configuraciones_agregar:
 
-    
+                tipo_atencion = Tipo_atencion.objects.get(
+                    pk=config.id_tipo_atencion
+                )
+
+                impacto = cls._determinarImpactoAgregarConfiguracionDia(
+                    config,
+                    cantidad_dias,
+                    tipo_atencion
+                )
+
+                impactos["agregar"].append(impacto)
 
             if cambios.secuencia:
+
                 impactos["general"].append(
                     {
                         "tipo": "RECALCULO_SECUENCIA",
                         "mensaje": (
-                            f"La secuencia de horarios de {dia_laboral.dia_registro.total_cupos - cupos_eliminar}  cupos será recalculada"
+                            f"Se recalcularán los horarios de "
+                            f"{dia_laboral.dia_registro.total_cupos - cupos_eliminar} cupos. "
+                            "Algunos podrían conservar su horario actual."
                         )
                     }
                 )
@@ -500,9 +562,6 @@ class ConfiguracionDiaService:
             raise
 
         #     Determinar qué citas quedan huérfanas.
-
-
-
 
 
     def _incrementarCupos(configuracion, cantidad_cupos, fechas_dias, usuario):
@@ -804,11 +863,7 @@ class ConfiguracionDiaService:
     @classmethod
     def editarDiaLaboral(cls, dia_laboral, usuario):
         try:
-            DiaLaboralValidator.validarEdicionDiaLaboral(dia_laboral)  
-            DiaLaboralValidator.validarPersistenciaDiaLaboral(dia_laboral.dia_registro, dia_laboral.fecha_modificado)
-
-            cambios = cls._obtenerCambiosEditarDiaLaboral(dia_laboral)
-
+        
             resultado = {
                 "cupos": {
                     "agregados": 0,
@@ -823,6 +878,12 @@ class ConfiguracionDiaService:
             }
 
             with transaction.atomic():
+                DiaLaboralValidator.validarEdicionDiaLaboral(dia_laboral, bloquear=True)  
+                DiaLaboralValidator.validarPersistenciaDiaLaboral(dia_laboral.dia_registro, dia_laboral.fecha_modificado)
+    
+                cambios = cls._obtenerCambiosEditarDiaLaboral(dia_laboral)
+    
+
             # 1. Actualizar Día Laboral (si cambió horario)
                 update_fields = []
 
@@ -845,7 +906,11 @@ class ConfiguracionDiaService:
                     cupos = (
                         Cupo_agenda.objects
                         .filter(
-                            configuracion_cupo_id__in=ids_configuraciones
+                            configuracion_cupo_id__in=ids_configuraciones,
+                            estado__in=[
+                                        EstadoCupoAgenda.DISPONIBLE,
+                                        EstadoCupoAgenda.ASIGNADO,
+                                    ]
                         )
                         .prefetch_related(
                             Prefetch(
@@ -873,12 +938,16 @@ class ConfiguracionDiaService:
                     CitaService.cancelarRelacionCupo(historiales_afectados,usuario)
                     resultado["citas"]["sin_cupo"] += len(historiales_afectados)
 
+                    cantidad_cupos = cupos.count()
+
                     #INACTIVAMOS LOS CUPOS
                     cupos.update(
                         estado=EstadoCupoAgenda.INACTIVO,
                         modificado_por=usuario,
                     )
-                    resultado["cupos"]["eliminados"] += cupos.count()
+                    resultado["cupos"]["eliminados"] += cantidad_cupos
+
+
 
 
                     #INACTIVAMOS LA CONFIGURACION CUPO
@@ -890,15 +959,9 @@ class ConfiguracionDiaService:
 
             # # 3. Editar configuraciones
                 periodo = dia_laboral.periodo_registro
-                fechas_dias = obtener_fechas_por_dia_semana(
-                    periodo.fecha_inicio,
-                    periodo.fecha_fin,
+                fechas_dias = PeriodoLaboralService.obtener_fechas_validas_dia_laboral(
+                    periodo,
                     dia_laboral.dia_numero
-                )
-
-                fechas_dias = AusenciaService.obtener_fechas_validas(
-                    fechas_dias,
-                    periodo.personal_salud
                 )
 
                 for conf in cambios.configuraciones_editar:
@@ -950,7 +1013,6 @@ class ConfiguracionDiaService:
                 ])
 
 
-            # # 7. Actualizar/Reprogramar cupos y citas afectadas
 
             # 8 marcar que dia laboral se  modifico
                 update_fields.extend([
@@ -964,7 +1026,7 @@ class ConfiguracionDiaService:
 
         except Exception as e:
             log_error(
-                "[ConfiguracionDiaService]: analizarImpactoEditarDiaLaboral",
+                "[ConfiguracionDiaService]: EditarDiaLaboral",
                 LogApp.AGENDA
             )
             raise
@@ -984,21 +1046,31 @@ class ConfiguracionDiaService:
             )
 
     @classmethod
-    def _inactivarCupos(cls, cupos, usuario):
+    def _actualizarEstadoCupos(cls, cupos, estado, usuario):
+        fecha_modificado = timezone.now()
         for cupo in cupos:
-            cupo.estado = EstadoCupoAgenda.INACTIVO
+            cupo.estado = estado
             cupo.modificado_por = usuario
-            cupo.fecha_modificado = timezone.now()
+            cupo.fecha_modificado = fecha_modificado
 
         if cupos:
             Cupo_agenda.objects.bulk_update(
                 cupos,
-                [
-                    "estado",
-                    "modificado_por",
-                    "fecha_modificado",
-                ]
+                ["estado", "modificado_por", "fecha_modificado"]
             )
+
+    @classmethod
+    def _inactivarCupos(cls, cupos, usuario):
+        cls._actualizarEstadoCupos(
+            cupos, EstadoCupoAgenda.INACTIVO, usuario
+        )
+
+
+    @classmethod
+    def _bloquearCupos(cls, cupos, usuario):
+        cls._actualizarEstadoCupos(
+            cupos, EstadoCupoAgenda.BLOQUEADO, usuario
+        )
 
 
     @classmethod
@@ -1016,14 +1088,10 @@ class ConfiguracionDiaService:
         )
 
 
+        
     @classmethod
     def eliminarDiaLaboral(cls, data, usuario):
-
-        dia_laboral = (
-            DiaLaboralValidator
-            .validarEliminarDiaLaboral(data)
-        )
-
+        from agenda_medica.validators import PeriodoLaboralValidator
 
         resultado = {
             "cupos": {
@@ -1034,20 +1102,57 @@ class ConfiguracionDiaService:
             }
         }
 
-        configuraciones = dia_laboral.configuraciones_registro
+        dia_id = data.get("diaID")
 
-        cupos = []
-        historiales_citas = []
+        validar_entero_positivo(
+            dia_id,
+            "Id día laboral"
+        )
 
-        for configuracion in configuraciones:
-            for cupo in configuracion.cupos_registro:
-                cupos.append(cupo)
-                historiales_citas.extend(cupo.historial_actual) 
+        # Obtener el período al que pertenece el día laboral
+        periodo_id = (
+            Dia_laboral.objects
+            .filter(
+                pk=dia_id,
+                estado=EstadoRegistro.ACTIVO
+            )
+            .values_list("periodo_laboral_id", flat=True)
+            .first()
+        )
 
+        if periodo_id is None:
+            raise ValidationError(
+                "El día laboral indicado no existe o ya no está activo."
+            )
 
-        resultado["cupos"]["eliminados"] = len(cupos)
-        resultado["citas"]["sin_cupo"] = len(historiales_citas)
         with transaction.atomic():
+
+            # Bloquear el período padre
+            periodo = PeriodoLaboralValidator._validarExistenciaPeriodoLaboral(
+                periodo_id,
+                bloquear=True
+            )
+
+            PeriodoLaboralValidator.validarPeriodoFuturo(periodo)
+
+            # Validar día laboral y recuperar sus relaciones
+            dia_laboral = DiaLaboralValidator.validarEliminarDiaLaboral(
+                dia_id
+            )
+
+            configuraciones = dia_laboral.configuraciones_registro
+
+            cupos = []
+            historiales_citas = []
+
+            for configuracion in configuraciones:
+                for cupo in configuracion.cupos_registro:
+                    cupos.append(cupo)
+                    historiales_citas.extend(cupo.historial_actual)
+
+            resultado["cupos"]["eliminados"] = len(cupos)
+            resultado["citas"]["sin_cupo"] = len(historiales_citas)
+
             # 1. Inactivar día laboral
             cls._inactivarDiaLaboral(dia_laboral, usuario)
             # 2. Inactivar configuraciones
@@ -1057,5 +1162,6 @@ class ConfiguracionDiaService:
             # 4. Procesar historiales de citas
             CitaService.cancelarRelacionCupo(historiales_citas, usuario)
 
-
         return resultado
+
+

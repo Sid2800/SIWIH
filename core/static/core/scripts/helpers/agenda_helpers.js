@@ -24,6 +24,7 @@ const AgendaMedicaHelper = (function () {
 
          return {
             entries: data.entries,
+            opciones_tipos_atencion: data.opciones_tipos_atencion || [],
             workingDays: data.workingDays
          };
 

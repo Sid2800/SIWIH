@@ -52,9 +52,7 @@
    ==============================*/
 
    --tg-time-width: 50px;
-   --tg-header-height: 85px;
-   --tg-row-height: 8px;
-   --tg-month-row-height: 18px;
+   --tg-month-row-height: 19px;
 
    /*==============================
       Layout
@@ -109,6 +107,10 @@
    font-family: var(--fuenteTablaTitulo);
    font-size: 2.5rem;
    font-weight: 600;
+
+   white-space: nowrap;
+overflow: hidden;
+text-overflow: ellipsis;
 }
 
 .tg-title-range{
@@ -280,6 +282,8 @@
 
    border-bottom: .1rem solid var(--tg-color-border);
 }
+
+
 
 .tg-week-day-header-number{
    display: flex;
@@ -507,9 +511,9 @@
 
    opacity: .95;
    cursor: pointer;
-   font-size: 14px;
+   font-size: 12px;
    line-height: 1.2;
-   column-gap: 8px;
+   column-gap: 5px;
 }
 
 .tg-entry-day{
@@ -697,6 +701,7 @@
    border-radius: 8px;
    font-size: 13px;
    padding: 2px 7px;
+   column-gap: .3rem;
    justify-content: space-between;
    min-width: 0;
    overflow: hidden;
@@ -732,7 +737,7 @@
    white-space: nowrap;
    overflow: hidden;
    text-overflow: ellipsis;
-   font-size: 12px;
+   font-size: 11px;
 
 }
 
@@ -780,13 +785,13 @@
       display: block;
    }
 
-  
+   
 
 }
-/* 
-@media (min-width: 60rem){
 
-   .tg-entry{
-      align-items: center;
+@media (min-width: 100rem){
+
+   .tg-entry {
+      font-size: 14px;
    }
-} */
+}

@@ -73,6 +73,9 @@ const TimeGrid = ( function () {
       // Group color
       useGroupColor: false,
 
+      // Apariencia
+      monthRowHeight: 18,
+
    };
 
    const DEFAULT_ENTRY_OPTIONS = {
@@ -769,9 +772,6 @@ const TimeGrid = ( function () {
          for (let j = i + 1; j < entries.length; j++) {
             const entryA = entries[i];
             const entryB = entries[j];
-
-            console.table(entryB)
-
             if (
                entryA.start < entryB.end &&
                entryA.end > entryB.start
@@ -953,8 +953,7 @@ const TimeGrid = ( function () {
       function inicializarListenersHeader() {
          Object.values(controles.views).forEach(input => {
                input.addEventListener("change", function () {
-                  estado.view = this.value;
-                  cambiarVista()
+                  cambiarVista(this.value);
 
                });
 
@@ -988,7 +987,9 @@ const TimeGrid = ( function () {
          inicializarListenersHeader();
       }
 
-      inicializarListenersNavigation();
+      if (opciones.navigation) {
+         inicializarListenersNavigation();
+      }
 
    }
 
@@ -1001,16 +1002,33 @@ const TimeGrid = ( function () {
    // Render principal  
    function render() {
 
+      const tgHeaderHeight = estado.view === "month" ? 50 : 85;
+
+      const duracionTotal = (opciones.endHour + 1 - opciones.startHour) * 60;
+
+      const cantidadIntervalos = duracionTotal / opciones.interval;
+
+      let tgRowHeight = 6;
+
+      if (cantidadIntervalos < 6) {
+         tgRowHeight = 10;
+      } else if (cantidadIntervalos <= 8) {
+         tgRowHeight = 8;
+      }
+
       controles.container.innerHTML = `
-         <div class="tg-container">
+         <div
+               class="tg-container"
+               style="
+                  --tg-header-height: ${tgHeaderHeight}px;
+                  --tg-row-height: ${tgRowHeight}px;
+               ">
 
-            <div class="tg-header"></div>
+               <div class="tg-header"></div>
 
-            <div class="tg-body">
-               <div class="tg-grid">
+               <div class="tg-body">
+                  <div class="tg-grid"></div>
                </div>
-               
-            </div>
 
          </div>
       `;
@@ -1018,7 +1036,7 @@ const TimeGrid = ( function () {
       renderHeader();
       renderGrid();
       renderEntries();
-   } 
+   }
 
    function renderHeader() {
       function renderTitle() {
@@ -1550,7 +1568,6 @@ const TimeGrid = ( function () {
       const agrupacionesRestantes  = lineasPintar - lineasVisibles
       let lineasPintadas = 0;
 
-     
    
       return `
          <div
@@ -1708,6 +1725,7 @@ const TimeGrid = ( function () {
       for (const entry of entriesVisibles) {
 
          const fecha = entry.start.toDateString();
+         
          if (!entriesPorDia[fecha]) {
             const indiceDia = diasMes.findIndex(dia =>
                esMismaFecha(dia.fecha, entry.start)
@@ -1830,26 +1848,28 @@ const TimeGrid = ( function () {
    // funciones publicas 
 
    function navegarFecha(direccion) {
-      const fecha = new Date(estado.date);
+      let fecha = new Date(estado.date);
+
       switch (estado.view) {
 
          case "day":
-            fecha.setDate(
-               fecha.getDate() + direccion
-            );
-            break;
+               fecha.setDate(
+                  fecha.getDate() + direccion
+               );
+               break;
 
          case "week":
          case "workweek":
-            fecha.setDate(
-               fecha.getDate() + (direccion * 7)
-            );
-            break;
+               fecha.setDate(
+                  fecha.getDate() + (direccion * 7)
+               );
+               break;
+
          case "month":
-            estado.date = sumarMeses(fecha, direccion);
-            actualizar();
-            return;
+               fecha = sumarMeses(fecha, direccion);
+               break;
       }
+
       cambiarFecha(fecha);
       actualizar();
    }
@@ -2131,8 +2151,10 @@ const TimeGrid = ( function () {
       const inicioVisible = diasMes[0].fecha;
       const finVisible = new Date(diasMes[diasMes.length - 1].fecha);
 
+      finVisible.setDate(finVisible.getDate() + 1);
+
       return (
-         entry.start <= finVisible &&
+         entry.start < finVisible &&
          entry.end > inicioVisible
       );
 

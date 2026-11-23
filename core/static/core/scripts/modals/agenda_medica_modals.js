@@ -250,39 +250,44 @@ const ManejarPeriodoLaboral = (function (){
 
     async function procesarGuardado() {
         Swal.resetValidationMessage();
-        
-        const formData = validarCampos();
-        if (!formData){
-            return
-        }
-        const resultadoImpacto = await validarImpactoPeriodo(formData);
 
-        if (!resultadoImpacto){
+        const formData = validarCampos();
+        if (!formData) {
             return false;
         }
 
-        if (!resultadoImpacto.resultado){
-            const guardado  = await guardarPeriodo(formData);
-            return manejarResultadoGuardado(guardado);
-        } 
-        
+        const resultadoImpacto = await validarImpactoPeriodo(formData);
+        if (!resultadoImpacto) {
+            return false;
+        }
 
+        const impacto = resultadoImpacto.resultado;
+
+        // Sin impacto: guardar directamente
+        if (!impacto) {
+            const guardado = await guardarPeriodo(formData);
+            return manejarResultadoGuardado(guardado);
+        }
+
+        // Con impacto: solicitar confirmación
         const confirmado = await confirmarAccion({
-            titulo: resultadoImpacto.resultado.titulo,
-            mensajes: resultadoImpacto.resultado.mensajes,
+            titulo: impacto.titulo,
+            mensajes: impacto.mensajes,
             icono: "warning"
         });
-        
-        if (!confirmado){
-            return false;
-        }else{
 
-            formData.fechaModificadoImpacto = resultadoImpacto.resultado.fecha_modificado;
-            formData.fecha_modificado = resultadoImpacto.resultado.fecha_modificado
-            const guardado  = await guardarPeriodo(formData);
-            return manejarResultadoGuardado(guardado);
-            // llmar a guardar
+        if (!confirmado) {
+            return false;
         }
+
+        // Conservar la referencia utilizada durante el análisis
+        formData.fechaModificadoImpacto = impacto.fecha_modificado;
+        formData.fecha_modificado = impacto.fecha_modificado;
+
+        const guardado = await guardarPeriodo(formData);
+
+        return manejarResultadoGuardado(guardado);
+
     }
 
     async function traerPeriodo() {
@@ -292,7 +297,10 @@ const ManejarPeriodoLaboral = (function (){
         }
 
         try {
+
             const response = await fetch(
+
+
                 `${API_URLS.obtenerPeriodoLaboral}?id=${modalPeriodoID}`,
                 {
                     method: "GET",
@@ -387,7 +395,7 @@ const ManejarPeriodoLaboral = (function (){
                 iconoEstado.classList.add('icon-verde');
                 break;
 
-            case EstadoTemporalPeriodo.FINALIZADO:
+            case EstadoTemporalPeriodo.CONCLUIDO:
                 textoEstado.textContent = 'Finalizado';
                 iconoEstado.classList.add('icon-gris');
                 break;
@@ -484,8 +492,6 @@ const ManejarPeriodoLaboral = (function (){
     }
 
     async function validarImpactoPeriodo(formData){
-
-
         if (!formData){
             return
         }
@@ -944,8 +950,6 @@ const ManejarDiaLaboral = (function (){
 
             const id = Number(fila.dataset.tipoAtencionId);
 
-            console.table(fila.dataset);
-
             const botonEditar = e.target.closest('.botonTablaEditar');
             const botonEliminar = e.target.closest('.botonTablaEliminar');
             const botonSubir = e.target.closest('.botonTablaSubir');
@@ -1312,6 +1316,25 @@ const ManejarDiaLaboral = (function (){
     function construirMensajesImpacto(impactos) {
 
         const mensajes = [];
+        if (impactos.agregar?.length) {
+
+            let html = `
+                <strong>Adiciones</strong>
+                <ul>
+            `;
+
+            impactos.agregar.forEach(item => {
+                html += `
+                    <li>
+                        <strong>${item.tipoAtencion}</strong><br>
+                        Se agregarán <strong>${item.cupos}</strong> cupos a la agenda.
+                    </li>
+                `;
+            });
+
+            html += "</ul>";
+            mensajes.push(html);
+        }
 
         if (impactos.eliminar?.length) {
 
@@ -1565,7 +1588,6 @@ const ManejarDiaLaboral = (function (){
     return {  open };
 
 })();
-
 
 
 
@@ -1862,8 +1884,6 @@ const ManejarAusencia = (function (){
                 ? await editarAusencia(formData)
                 : await registrarAusencia(formData);
 
-            
-
             if (!resultado?.resultado?.success) {
                 return false;
             }
@@ -1905,29 +1925,18 @@ const ManejarAusencia = (function (){
 
     async function traerAusencia() {
 
-        if (!modalAusenciaID){
+        if (!modalAusenciaID) {
             return;
         }
 
         try {
-            const response = await fetch(
-                `${API_URLS.obtenerAusencia}?id=${modalAusenciaID}`,
-                {
-                    method: "GET",
-                    headers: {
-                        "Content-Type": "application/json",
-                    }
-                }
-            );
-
-            const data = await response.json();
-            if (!response.ok){
-                throw new Error(data.error);
-            }
-
+            const data = await fetchData(API_URLS.obtenerAusencia,
+                                        { id: modalAusenciaID }
+                                        );
             return data;
+
         } catch (error) {
-            toastr.error(
+            toastr.error( 
                 error.message,
                 "Error al obtener la ausencia"
             );
@@ -2197,7 +2206,7 @@ const ManejarAusencia = (function (){
                     ${impacto.citas.sin_cupo > 0
                         ? `<li>
                             <strong>${impacto.citas.sin_cupo}</strong>
-                            citas quedarán sin cupo.
+                            citas quedarán sin un cupo de atención asignado.
                         </li>`
                         : ""}
                 </ul>

@@ -34,10 +34,15 @@ function slugify(text) {
       */
 async function fetchData(url, params = {}) {
    const queryString = new URLSearchParams(params).toString();
-   const response = await fetch(`${url}?${queryString}`);
 
-   if (!response.ok)
-      throw new Error(`Error en la red: ${response.statusText}`);
+   const response = await fetch(
+      queryString ? `${url}?${queryString}` : url
+   );
+
+   if (!response.ok) {
+      throw new Error(`Error en la red: ${response.status} ${response.statusText}`);
+   }
+
    return response.json();
 }
 
@@ -66,6 +71,19 @@ function escaparHTML(valor) {
    );
 }
 
+
+function construirURL(url, { id = null, slug = null } = {}) {
+
+   if (id !== null) {
+      url = url.replace('0', encodeURIComponent(id));
+   }
+
+   if (slug !== null) {
+      url = url.replace('slug', encodeURIComponent(slug));
+   }
+
+   return url;
+}
 
 
 //#region  Busquedas publicas
@@ -278,6 +296,7 @@ const API_URLS = {
    listarTiposAusencia: urls["listarTiposAusencia"],
    validarImpactoAusencia: urls["validarImpactoAusencia"],
    editarAusencia: urls["editarAusencia"],
+   obtenerAusencia: urls["obtenerAusencia"],
 
    
 
