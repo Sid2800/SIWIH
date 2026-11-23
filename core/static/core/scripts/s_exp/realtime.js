@@ -54,127 +54,87 @@
     let sesionExpirada = false;           // si se pierde la sesión, deja de hacer requests
 
     // -----------------------------------------------------------------
-    // Banner flotante "Hay N novedades — Actualizar"
+    // Recarga automatica sin pisar lo que el usuario tiene abierto
+    //
+    // Antes, las pantallas de administracion mostraban un banner "hay
+    // novedades" y esperaban un clic, para no borrar lo que el admin estaba
+    // marcando. Ahora recargan solas, pero solo cuando no hay nada a medias:
+    // si hay un modal abierto (SweetAlert) o una fila expandida, la recarga
+    // espera a que se cierre. Asi la pantalla se mueve sola, como un chat,
+    // sin que se pierda una auditoria a medio llenar.
     // -----------------------------------------------------------------
-    function _asegurarContenedorBanner() {
-        let cont = document.getElementById('realtime-banners');
-        if (!cont) {
-            cont = document.createElement('div');
-            cont.id = 'realtime-banners';
-            cont.style.cssText =
-                'position:fixed;right:1.5rem;bottom:1.5rem;z-index:9000;' +
-                'display:flex;flex-direction:column;gap:0.5rem;pointer-events:none;';
-            document.body.appendChild(cont);
+    const ESPERA_AGRUPAR_MS = 300;   // varios avisos seguidos -> una recarga
+    const REVISAR_LIBRE_MS = 1000;   // comprobacion local, sin red
 
-            // Estilos para el banner (una sola vez)
-            if (!document.getElementById('realtime-banner-styles')) {
-                const st = document.createElement('style');
-                st.id = 'realtime-banner-styles';
-                st.textContent = `
-                    .rt-banner {
-                        background: var(--colorFondoModal, #1f2937);
-                        color: var(--colorTextoModal, #fff);
-                        border: 1px solid rgba(255,255,255,0.1);
-                        border-radius: 12px;
-                        padding: 0.8rem 1.1rem;
-                        box-shadow: 0 8px 24px rgba(0,0,0,0.25);
-                        display: flex;
-                        align-items: center;
-                        gap: 0.9rem;
-                        font-size: 1.3rem;
-                        animation: rt-banner-in 0.25s ease-out;
-                        pointer-events: auto;
-                        max-width: 420px;
-                    }
-                    @keyframes rt-banner-in {
-                        from { transform: translateY(20px); opacity: 0; }
-                        to { transform: translateY(0); opacity: 1; }
-                    }
-                    .rt-banner__dot {
-                        width: 0.7rem; height: 0.7rem;
-                        background: #22c55e; border-radius: 50%;
-                        flex-shrink: 0;
-                        animation: rt-pulse 1.4s ease-in-out infinite;
-                    }
-                    @keyframes rt-pulse {
-                        0%, 100% { opacity: 1; transform: scale(1); }
-                        50% { opacity: 0.55; transform: scale(0.85); }
-                    }
-                    .rt-banner__text { flex: 1; line-height: 1.3; }
-                    .rt-banner__btn {
-                        background: var(--colorBoton, #3b82f6);
-                        color: var(--colorTextoBoton, #fff);
-                        border: none;
-                        border-radius: 8px;
-                        padding: 0.45rem 0.9rem;
-                        font-size: 1.2rem;
-                        font-weight: 600;
-                        cursor: pointer;
-                        display: inline-flex;
-                        align-items: center;
-                        gap: 0.4rem;
-                    }
-                    .rt-banner__btn:hover { filter: brightness(1.1); }
-                    .rt-banner__close {
-                        background: transparent;
-                        color: inherit;
-                        border: none;
-                        cursor: pointer;
-                        opacity: 0.6;
-                        font-size: 1.5rem;
-                        line-height: 1;
-                        padding: 0 0.25rem;
-                    }
-                    .rt-banner__close:hover { opacity: 1; }
-                    @media (max-width: 600px) {
-                        #realtime-banners {
-                            left: 1rem; right: 1rem; bottom: 1rem;
-                        }
-                        .rt-banner { max-width: none; font-size: 1.4rem; }
-                    }
-                `;
-                document.head.appendChild(st);
-            }
+    const recargasPendientes = new Map();  // nombre -> { fn, timer }
+
+    function ocupado() {
+        if (global.Swal && typeof global.Swal.isVisible === 'function' && global.Swal.isVisible()) {
+            return true;
         }
-        return cont;
+        // Fila de DataTables con su detalle desplegado.
+        return !!document.querySelector('tr.shown');
     }
 
-    function _mostrarBannerActualizacion(nombre, cantidad, etiqueta, onActualizar) {
-        const cont = _asegurarContenedorBanner();
-        const bannerId = 'rt-banner-' + nombre;
-        let banner = document.getElementById(bannerId);
-
-        const palabra = cantidad === 1 ? etiqueta.replace(/s$/, '') : etiqueta;
-        const textoHtml = `<strong>${cantidad}</strong> ${cantidad === 1 ? 'novedad' : 'novedades'}` +
-                          (etiqueta && etiqueta !== 'novedades' ? ` en ${etiqueta}` : '');
-
-        if (banner) {
-            // Actualizar contador (no recrear el banner)
-            const txt = banner.querySelector('.rt-banner__text');
-            if (txt) txt.innerHTML = textoHtml;
-            return;
-        }
-
-        banner = document.createElement('div');
-        banner.id = bannerId;
-        banner.className = 'rt-banner';
-        banner.innerHTML = `
-            <span class="rt-banner__dot"></span>
-            <span class="rt-banner__text">${textoHtml}</span>
-            <button type="button" class="rt-banner__btn"><i class="bi bi-arrow-clockwise"></i> Actualizar</button>
-            <button type="button" class="rt-banner__close" title="Descartar">&times;</button>
-        `;
-
-        const btnRefresh = banner.querySelector('.rt-banner__btn');
-        const btnClose = banner.querySelector('.rt-banner__close');
-
-        btnRefresh.addEventListener('click', function () {
-            try { onActualizar(); } catch (e) { console.error(e); }
-            banner.remove();
+    // Las tarjetas plegables (.sexp-card-collapsible) se pintan plegadas al
+    // recargar. Se recuerda cuales estaban abiertas por su titulo y se
+    // vuelven a abrir, junto con la posicion de scroll.
+    function _capturarEstadoVista() {
+        const abiertas = new Set();
+        document.querySelectorAll('.sexp-card-collapsible:not(.sexp-collapsed)').forEach(function (card) {
+            const t = card.querySelector('h3, h4');
+            if (t) abiertas.add(t.textContent.trim());
         });
-        btnClose.addEventListener('click', function () { banner.remove(); });
+        return { abiertas: abiertas, scrollY: global.scrollY };
+    }
 
-        cont.appendChild(banner);
+    function _restaurarEstadoVista(estado) {
+        if (estado.abiertas.size) {
+            document.querySelectorAll('.sexp-card-collapsible.sexp-collapsed').forEach(function (card) {
+                const t = card.querySelector('h3, h4');
+                if (t && estado.abiertas.has(t.textContent.trim())) {
+                    card.classList.remove('sexp-collapsed');
+                }
+            });
+        }
+        global.scrollTo(0, estado.scrollY);
+    }
+
+    function _ejecutarRecarga(nombre, fn) {
+        const estado = _capturarEstadoVista();
+        let restaurado = false;
+        const restaurar = function () {
+            if (restaurado) return;
+            restaurado = true;
+            _restaurarEstadoVista(estado);
+        };
+
+        try { fn(); }
+        catch (e) { console.error('[Realtime] Error en recarga "' + nombre + '":', e); }
+
+        // Las recargas son AJAX: se restaura cuando terminan todas.
+        if (global.jQuery && global.jQuery.active > 0) {
+            global.jQuery(document).one('ajaxStop', restaurar);
+            setTimeout(restaurar, 5000);
+        } else {
+            restaurar();
+        }
+    }
+
+    function _recargarCuandoLibre(nombre, fn) {
+        const previa = recargasPendientes.get(nombre);
+        if (previa) clearTimeout(previa.timer);
+
+        const intentar = function () {
+            if (ocupado()) {
+                recargasPendientes.set(nombre, { fn: fn, timer: setTimeout(intentar, REVISAR_LIBRE_MS) });
+                return;
+            }
+            recargasPendientes.delete(nombre);
+            _ejecutarRecarga(nombre, fn);
+        };
+
+        recargasPendientes.set(nombre, { fn: fn, timer: setTimeout(intentar, ESPERA_AGRUPAR_MS) });
     }
 
     function _ejecutar(nombre) {
@@ -224,6 +184,10 @@
     // Pantalla -> { seccion, alCambiar }. Lo llenan registrarConTrigger y
     // registrarConAutoReload; lo lee el socket para saber a quien avisar.
     const manejadores = new Map();
+
+    // Quien quiera ver cada mensaje del socket tal cual (los avisos en
+    // pantalla lo usan para saber que accion ocurrio).
+    const suscriptores = [];
 
     let socket = null;
     let socketConectado = false;
@@ -297,6 +261,10 @@
 
             if (datos && datos.tipo === 'cambio' && datos.seccion) {
                 _despacharCambio(datos.seccion);
+                suscriptores.forEach(function (fn) {
+                    try { fn(datos); }
+                    catch (e) { console.error('[Realtime] Error en suscriptor:', e); }
+                });
             }
         };
 
@@ -354,9 +322,8 @@
         /**
          * Registra una pantalla con AUTO-RELOAD cuando hay cambios.
          *
-         * A diferencia de registrarConTrigger (que muestra banner), esta versión
-         * recarga directamente la UI cuando el backend reporta cambios. Útil para
-         * vistas de usuario donde no hay interacción crítica en curso (ej: Mis Solicitudes).
+         * Recarga la UI cuando el backend reporta cambios, esperando a que no
+         * haya un modal abierto ni una fila expandida.
          *
          * @param {string} nombre - Identificador único
          * @param {string} seccion - 'solicitudes' | 'prestamos' | 'devoluciones' | 'global'
@@ -374,8 +341,7 @@
             manejadores.set(nombre, {
                 seccion: seccion,
                 alCambiar: function () {
-                    try { funcionRecarga(); }
-                    catch (e) { console.error(`[Realtime] Error en "${nombre}":`, e); }
+                    _recargarCuandoLibre(nombre, funcionRecarga);
                 },
             });
 
@@ -401,8 +367,7 @@
 
                         if (tsActual && tsActual !== ultimoTs) {
                             ultimoTs = tsActual;
-                            try { funcionRecarga(); }
-                            catch (e) { console.error(`[Realtime auto] Error "${nombre}":`, e); }
+                            _recargarCuandoLibre(nombre, funcionRecarga);
                         }
                         resolve();
                     }).fail(function () {
@@ -417,12 +382,10 @@
         /**
          * Registra una pantalla con TRIGGER inteligente.
          *
-         * En lugar de recargar siempre, consulta un endpoint ULTRA LIGERO que
-         * devuelve timestamps por sección. Si hubo cambios, NO recarga
-         * automáticamente: muestra un BANNER flotante con un botón "Actualizar".
-         *
-         * El usuario decide cuándo aplicar el refresh, sin interrumpir su trabajo
-         * actual (revisar/aprobar/expandir tarjetas).
+         * Se entera de los cambios por el socket (o, sin socket, por el
+         * endpoint ligero de timestamps) y recarga sola en cuanto no hay nada
+         * a medias. Conserva la firma de antes para no tocar las pantallas;
+         * 'opts.etiqueta' ya no se usa (era el texto del banner).
          *
          * @param {string} nombre - Identificador único de la pantalla
          * @param {string} seccion - 'solicitudes' | 'prestamos' | 'devoluciones' | 'global'
@@ -434,25 +397,13 @@
             opts = opts || {};
             let ultimoTs = null;
             let primeraEjecucion = true;
-            let cambiosPendientes = 0;
 
-            // Igual que arriba, pero esta variante no recarga sola: acumula y
-            // ofrece el banner, para no interrumpir a quien esta revisando o
-            // aprobando algo en ese momento.
+            // Ya no hay banner: la pantalla se actualiza sola en cuanto no
+            // hay nada a medias (ver _recargarCuandoLibre).
             manejadores.set(nombre, {
                 seccion: seccion,
                 alCambiar: function () {
-                    cambiosPendientes++;
-                    _mostrarBannerActualizacion(
-                        nombre,
-                        cambiosPendientes,
-                        opts.etiqueta || 'novedades',
-                        function () {
-                            try { funcionRecarga(); }
-                            catch (e) { console.error(`[Realtime] Error en recarga "${nombre}":`, e); }
-                            cambiosPendientes = 0;
-                        }
-                    );
+                    _recargarCuandoLibre(nombre, funcionRecarga);
                 },
             });
 
@@ -477,21 +428,8 @@
                         }
 
                         if (tsActual && tsActual !== ultimoTs) {
-                            // Hay cambios — incrementar contador y mostrar banner
                             ultimoTs = tsActual;
-                            cambiosPendientes++;
-                            _mostrarBannerActualizacion(nombre, cambiosPendientes,
-                                opts.etiqueta || 'novedades',
-                                function () {
-                                    // Al hacer clic en "Actualizar":
-                                    try {
-                                        funcionRecarga();
-                                    } catch (e) {
-                                        console.error(`[Realtime] Error en recarga "${nombre}":`, e);
-                                    }
-                                    cambiosPendientes = 0;
-                                }
-                            );
+                            _recargarCuandoLibre(nombre, funcionRecarga);
                         }
                         resolve();
                     }).fail(function () {
@@ -509,6 +447,9 @@
         desregistrar(nombre) {
             const p = pantallas.get(nombre);
             if (p && p.timer) clearTimeout(p.timer);
+            const r = recargasPendientes.get(nombre);
+            if (r) clearTimeout(r.timer);
+            recargasPendientes.delete(nombre);
             pantallas.delete(nombre);
             manejadores.delete(nombre);
         },
@@ -549,6 +490,14 @@
          * (no renuevan la sesión del usuario)
          */
         ajax: pollingAjax,
+
+        /** Si hay algo a medias (modal abierto, fila expandida). */
+        ocupado: ocupado,
+
+        /** Suscribirse a cada mensaje 'cambio' que llega por el socket. */
+        onMensaje(fn) {
+            if (typeof fn === 'function') suscriptores.push(fn);
+        },
 
         /**
          * Inserta un indicador "Live" sutil dentro del selector indicado
