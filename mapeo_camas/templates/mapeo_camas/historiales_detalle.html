@@ -24,6 +24,10 @@
       <button type="button" class="dt-button" id="btn-vista-tabla" title="Vista tabla">
         <i class="bi bi-table boton-exportacion"></i>
       </button>
+
+        <button type="button" class="dt-button" id="btn-detalle-pdf" title="Generar detalle PDF">
+        <i class="bi bi-filetype-pdf boton-exportacion"></i>
+      </button>
     </div>
     <div id="detalle-meta" class="detalle-meta"></div>
   </div>
@@ -101,7 +105,8 @@
 <script>
   window.MAPA_CFG = {
     urls: {
-      cards: "{% url 'mapeo_camas_historiales_cards' %}"
+      cards: "{% url 'mapeo_camas_historiales_cards' %}",
+      reporte: "{% url 'reporte_mapeo_sesion' sesion_id=0  %}"
     }
   };
 </script>

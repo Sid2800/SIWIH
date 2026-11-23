@@ -46,10 +46,12 @@ class ReportePdfBaseService:
         usuario_nombre,
         pagina_actual,
         total_paginas,
+        # 'vertical' va noveno porque mapeo_camas lo pasa por posicion.
+        vertical=True,
         mostrar_paginacion=True,
         etiqueta_usuario="POR -> ",
     ):
-        y = alto - 750  
+        y = alto - 750 if vertical else alto - 570
         pdf.setFillColor(colors.black)
         
 
@@ -105,27 +107,38 @@ class ReportePdfBaseService:
             )
 
         try:
-            watermark = os.path.join(settings.BASE_DIR, 'core/static/core/img/SIWIFINAL.png')
-
-            pdf.saveState()                
-            pdf.setFillAlpha(0.08)         # Opacidad suave 
-            
-            # Centramos la marca de agua
-            pdf.translate(265, 40)  
-        
-            pdf.drawImage(
-                watermark,
-                x=0, y=0,            
-                width=80, height=80,     
-                preserveAspectRatio=True,
-                mask='auto'
+            watermark = os.path.join(
+                settings.BASE_DIR,
+                "core/static/core/img/SIWIFINAL.png",
             )
 
-            pdf.restoreState()             
-        except Exception as e:
+            if os.path.exists(watermark):
+                marca_ancho = 80
+                marca_alto = 80
+
+                # Centrar la marca de agua en la página
+                marca_x = (ancho - marca_ancho) / 2
+                marca_y = y
+
+                pdf.saveState()
+                pdf.setFillAlpha(0.08)
+
+                pdf.drawImage(
+                    watermark,
+                    x=marca_x,
+                    y=marca_y,
+                    width=marca_ancho,
+                    height=marca_alto,
+                    preserveAspectRatio=True,
+                    mask="auto",
+                )
+
+                pdf.restoreState()
+
+        except Exception:
             log_warning(
                 "Error dibujando marca de agua en PDF",
-                app=LogApp.REPORTE
+                app=LogApp.REPORTE,
             )
 
 

@@ -79,7 +79,8 @@ def _resolver_ingreso_operativo(*, ingreso_id=None):
             "Paciente_id ya no es válido como pivote operativo."
         )
     return (
-        Ingreso.objects.filter(pk=ingreso_id)
+        # [2026-09-15] Solo se pueden asignar ingresos vigentes desde el mapa.
+        Ingreso.objects.filter(pk=ingreso_id, estado=1, fecha_egreso__isnull=True)
         .select_related("paciente")
         .first()
     )

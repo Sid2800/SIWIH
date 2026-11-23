@@ -1,0 +1,815 @@
+
+@media (min-width: 50rem) {
+   main {
+      margin-left: 0;
+   }
+}
+
+
+.contenedor {
+   width: min(96%, 170rem);
+   margin-top: 1.5rem;
+   margin-bottom: 1.5rem;
+
+}
+
+
+.labor-parto{
+   grid-template-rows: minmax(0, 1fr) auto;
+}
+
+
+.labor-parto__listado{
+   grid-row: 1/-1;
+}
+
+.labor-parto__detalle-vacio{
+   height: 100%;
+}
+
+.labor-parto__pie-informativo{
+   align-self: flex-end;
+}
+
+
+/* Pantalla pública */
+.pantalla-labor-parto {
+   min-height: 100%;
+   padding: 1rem;
+   box-sizing: border-box;
+   background: var(--colorContendor);
+   border-radius: 1rem;
+   box-shadow: var(--sombra-card)
+}
+
+/* Encabezado */
+.encabezado-labor-parto {
+   display: flex;
+   align-items: center;
+   justify-content: space-between;
+   gap: 2rem;
+
+   padding: .5rem 1rem;
+   max-height: 10rem;
+}
+
+.encabezado-labor-parto__identidad{
+   display: grid;
+   grid-template-columns:auto 1fr;
+   column-gap: .5rem;
+   align-items: center;
+
+}
+
+
+.encabezado-labor-parto__icono{
+   height: 100%;
+   border-right: .15rem solid var(--color-Scroll);
+}
+
+.encabezado-labor-parto__icono svg{
+   width: auto;
+   height: 9rem;
+   display: block;
+   color: var(--lp-color-primario);
+}
+
+.encabezado-labor-parto__titulo{
+   padding-left: 1rem;
+}
+
+
+.encabezado-labor-parto__titulo span {
+   margin: 0;
+   font-size: clamp(1.5rem, 2vw, 3.5rem);
+   font-weight: 750;
+   text-transform: uppercase;
+   font-family: var(--fuenteTablaTitulo);
+}
+
+.encabezado-labor-parto__titulo p {
+   margin: 0.25rem 0 0;
+   color: var(--colorTextoMenu);
+   font-size: clamp(0.9rem, 1.2vw, 1.8rem);
+}
+
+.encabezado-labor-parto__informacion{
+   display: flex;
+   column-gap: 4rem;
+
+}
+
+.encabezado-labor-parto__reloj{
+   display: flex;
+   flex-direction: column;
+   justify-content: center;
+   align-items: center;
+}
+
+#fecha-actual{
+   font-weight: 500;
+}
+
+
+#hora-actual{
+   font-weight: 700;
+   font-size: 3rem;
+   letter-spacing: .15rem;
+   color: var(--lp-color-azul-institucional);
+}
+
+.encabezado-labor-parto__estado{
+   display: flex;
+   flex-direction: column;
+   border-radius: 1rem;
+   padding: .6rem 1.5rem;
+   row-gap: .4rem;
+}
+
+.encabezado-labor-parto__envivo{
+   display: flex;
+   font-weight: 750;
+   font-size: 2rem;
+   display: flex;
+   column-gap: 1rem;
+   justify-content: center ;
+   align-items: center;
+   
+}
+
+
+.encabezado-labor-parto__envivo i{ 
+   font-size: 3rem;
+
+}
+
+.encabezado-labor-parto__descripcion{
+   color: var(--colorTextoMenu);
+   text-align: center;
+   font-size: 1.1rem;
+
+}
+
+
+
+/* reescritura reglas heredadas sitio administrativo */
+
+.labor-parto {
+   height: calc(99vh - 16rem);
+   grid-template-columns: 35% 1fr;
+}
+
+.labor-parto__detalle-contenido{
+   row-gap: 2rem;
+}
+
+
+
+/* reglas propias */
+
+.labor-parto__resumen{
+   display: flex;
+   column-gap: 1rem;
+   align-items: center;
+   justify-content: center;
+   font-size: 1.3rem;
+}
+
+
+.labor-parto__detalle-contenido {
+   max-height: 100%;
+   overflow: hidden;
+}
+
+.detalle-episodio__paciente{
+   display: flex;
+   column-gap: 1.5rem;
+   align-items: center;
+}
+
+.detalle-episodio__avatar{
+   color: var(--lp-color-icono-paciente);
+   background: var(--lp-fondo-icono-paciente);
+   border-radius: 50%;
+   margin: .5rem;
+   font-weight: 300;
+}
+
+.detalle-episodio__avatar span{
+   font-size: 5rem;
+}
+
+
+.detalle-episodio__nombre {
+   margin: 0;
+   font-weight: 600;
+   letter-spacing: .08rem;
+   font-size: 3rem;
+   font-family: var(--fuenteCuerpo);
+   color: var(--lp-color-azul-institucional);
+}
+
+.detalle-episodio__resumen {
+   display: grid;
+   grid-template-columns: 1.9fr .9fr;
+   gap: 1rem;
+   align-items: stretch;
+}
+
+.detalle-episodio__estado{
+   display: grid;
+   grid-template-columns: .7fr 1.6fr;
+   padding: 1.5rem 2.5rem;
+   border-radius: 1rem;
+   justify-content: center;
+   align-items: center;
+   column-gap: 2.5rem;
+   background-color: var(--fondo-estado);
+   color: var(--color-estado);
+}
+
+.detalle-episodio__estado-actual-icono{
+   border-radius: 3rem;
+   height: 13rem;
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   border: .15rem solid var(--borde-estado);
+   background-color: var(--fondo-estado);
+
+   width: auto;
+
+}
+
+.detalle-episodio__estado-actual-icono svg{
+   height: 100%;
+}
+
+
+.detalle-episodio__indicadores{
+   display: flex;
+   column-gap: 1.5rem;
+}
+
+
+.detalle-episodio__etiqueta{
+   color: var(--blanco-apagado);
+   background-color: var(--color-estado);
+   text-transform: uppercase;
+   border-radius: 1rem;
+   text-align: center;
+   padding: .5rem 1rem;
+   align-self: flex-start;
+   font-size: 1.4rem;
+}
+
+
+.detalle-episodio__estado-info{
+   display: flex;
+   flex-direction: column;
+   row-gap: 1rem;
+   justify-content: space-between;
+   align-items: flex-start;
+   height: 100%;
+}
+
+
+.detalle-episodio__estado-info .salida{
+   color: var(--color-estado);
+   background-color: var(--fondo-estado);
+   border: .08rem solid var(--borde-estado);
+   font-weight: 600;
+}
+
+
+
+.detalle-episodio__estado-info #detalleNombreEstado{
+   font-weight: 750;
+   letter-spacing: .35rem;
+   font-size: 2.9rem;
+}
+
+
+.detalle-episodio__estado-info #detalleDescripcionEstado{
+   font-size: 1.6rem;
+   text-align: justify;
+
+}
+
+
+.detalle-episodio__informacion {
+   display: flex;
+   flex-direction: column;
+   gap: .4rem;
+}
+
+.detalle-episodio__dato {
+   display: grid;
+   grid-template-columns: 5.2rem minmax(0, 1fr);
+   align-items: center;
+   column-gap: .5rem;
+   padding: .6rem 1rem;
+   border: 1px solid var(--colorLinea);
+   border-radius: 1.2rem;
+   background-color: var(--blanco-apagado);
+   min-width: 0;
+}
+
+.detalle-episodio__dato-icono {
+   width: 3.4rem;
+   height: 3.4rem;
+   display: grid;
+   place-items: center;
+   border-radius: 50%;
+   background-color: var(--lp-fondo-fila-hover);
+   color: var(--lp-color-azul-institucional);
+}
+
+.detalle-episodio__dato-icono .material-symbols-outlined {
+   font-size: 2.8rem;
+}
+
+.detalle-episodio__dato-contenido {
+   display: flex;
+   flex-direction: column;
+   align-items: flex-start;
+   gap: .3rem;
+   min-width: 0;
+}
+
+.detalle-episodio__dato-contenido > span {
+   font-size: 1.3rem;
+   color: var(--colorTextoMenu);
+}
+
+.detalle-episodio__dato-contenido > strong {
+   font-size: 1.6rem;
+   font-weight: 600;
+   color: var(--lp-color-azul-institucional);
+   overflow-wrap: anywhere;
+}
+
+/* time line */
+
+
+.detalle-episodio__evolucion-titulo{
+   display: flex;
+   align-items: center;
+   column-gap: 2rem;
+}
+
+.detalle-episodio-evolucion-titulo__icono{
+   color: var(--lp-color-azul-institucional);
+   background-color: var(--lp-fondo-fila-hover);
+   border-radius: 50%;
+   width: 3.4rem;
+   height: 3.4rem;
+   display: flex;
+   justify-content: center;
+   align-items: center;
+
+}
+
+
+
+.detalle-episodio__linea-tiempo {
+   position: relative;
+   display: flex;
+   align-items: flex-start;
+   justify-content: space-between;
+   gap: .5rem 1rem;
+   width: 100%;
+   padding: 1.5rem 0;
+   overflow-x: auto;
+
+}
+
+
+.detalle-episodio-evolucion__evento {
+   position: relative;
+   display: flex;
+   flex: 1;
+   z-index: 1;
+   flex-direction: column;
+   align-items: center;
+   gap: 1.2rem;
+   min-width: 0;
+   text-align: center;
+}
+
+
+.detalle-episodio__icono {
+   position: relative;
+   z-index: 2;
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   width: 11.5rem;
+   height: 11.5rem;
+   flex-shrink: 0;
+   border-radius: 50%;
+
+   padding: .3rem;
+   background-color: var(--blanco-apagado);
+
+   color: var(--color-estado);
+
+   border: .20rem solid var(--borde-estado);
+}
+
+
+.detalle-episodio__evento--futuro .detalle-episodio__icono {
+   background-color: var(--blanco-apagado);
+   border: 2px dashed var(--colorLinea);
+   color: var(--colorTextoMenu);
+}
+
+.detalle-episodio__evento--futuro .detalle-episodio__icono span {
+   font-size: 4rem;
+   color: var(--colorTextoMenu);
+}
+
+
+.detalle-episodio__evento--actual .detalle-episodio__icono {
+   animation: pulso-estado 2s ease-out infinite;
+}
+
+   @keyframes pulso-estado {
+   0%, 100% {
+      box-shadow:
+         0 0 0 8px color-mix(in srgb, var(--color-estado) 15%, transparent),
+         0 0 0 16px color-mix(in srgb, var(--color-estado) 7%, transparent);
+   }
+
+   50% {
+      box-shadow:
+         0 0 0 11px color-mix(in srgb, var(--color-estado) 12%, transparent),
+         0 0 0 21px color-mix(in srgb, var(--color-estado) 3%, transparent);
+   }
+}
+
+
+
+.detalle-episodio-evolucion__informacion{
+   display: flex;
+   flex-direction: column;
+   row-gap: .1rem;
+}
+
+.detalle-episodio-evolucion__informacion span{
+   margin: 0;
+   text-transform: uppercase;
+   font-weight: 700;
+   color: var(--color-estado);
+   font-size: 1.5rem;
+
+}
+
+
+.detalle-episodio-evolucion__informacion p{
+   margin: 0;
+   font-size: 1.3rem;
+   color: var(--colorTextoMenu);
+
+}
+
+
+.detalle-episodio__verificacion {
+   position: absolute;
+   top: -.9rem;
+   right: calc(50% - 4rem);
+   /* right: -.5rem; */
+
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   width: 2.75rem;
+   height: 2.75rem;
+   font-size: 2rem;
+   color: var(--blanco);
+   background-color: var(--colorRadioBotonActivo);
+   border: 2px solid var(--blanco);
+   border-radius: 50%;
+   z-index: 2;
+}
+
+
+
+.detalle-episodio__conexion {
+   position: absolute;
+   top: 6.8rem;
+   left: 7rem;
+   right: 7rem;
+   height: 4px;
+   background-color: var(--colorSwitchBase);
+   border-radius: 10px;
+   z-index: 0;
+}
+
+/* INFORMACIÓN DEL BEBÉ */
+/* CONTENEDOR GENERAL */
+.detalle-episodio__bebe {
+   display: grid;
+   grid-template-columns: 28rem minmax(0, 1fr);
+   align-items: stretch;
+   gap: 1.25rem;
+
+   padding: 1rem;
+   border: 1px dashed var(--colorSwitchBase);
+   border-radius: 12px;
+   background-color: var(--blanco-apagado);
+}
+
+/* ENCABEZADO */
+.detalle-episodio__bebe-encabezado {
+   display: flex;
+   align-items: center;
+   column-gap: 1rem;
+   row-gap: .5rem;
+
+   padding-right: 1.25rem;
+   border-right: 2px solid var(--colorLinea);
+}
+
+.detalle-episodio__bebe-encabezado-icono {
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   flex-shrink: 0;
+
+   width: 6rem;
+   height: 6rem;
+
+   color: var(--lp-color-unidad-seleccionada);
+   background-color: var(--lp-fondo-unidad-seleccionada);
+   border-radius: 14px;
+}
+
+.detalle-episodio__bebe-encabezado-icono span {
+   font-size: 4.5rem;
+}
+
+.detalle-episodio__bebe-encabezado-informacion h4 {
+   margin: 0 0 0.65rem;
+   color: var(--lp-color-unidad-seleccionada);
+   font-size: 1.5rem;
+   font-weight: 600;
+   line-height: 1.35;
+   text-transform: uppercase;
+}
+
+.detalle-episodio__bebe-cantidad {
+   display: inline-block;
+   padding: 0.5rem 1rem;
+
+   color: var(--blanco);
+   background-color: var(--lp-color-unidad-seleccionada);
+   border-radius: 20px;
+
+   font-size: 1.2rem;
+   font-weight: 600;
+   white-space: nowrap;
+}
+
+/* CONTENIDO DINÁMICO */
+.detalle-episodio__bebe-contenido {
+   display: flex;
+   flex-wrap: wrap;
+   align-content: center;
+   align-items: center;
+   gap: 0.75rem;
+   min-width: 0;
+}
+
+/* TARJETA INDIVIDUAL */
+.detalle-episodio__bebe-tarjeta {
+   display: flex;
+    flex: 0 1 340px;
+   align-items: center;
+   gap: 1rem;
+   min-width: 0;
+   max-width: 31rem;
+
+   padding: 0.85rem 1rem;
+
+   border: 1px solid color-mix(in srgb, var(--color-bebe) 20%, var(--blanco-apagado));
+   border-radius: 14px;
+
+   background-color: color-mix(in srgb, var(--color-bebe) 4%, var(--blanco-apagado));
+}
+
+/* ICONO DEL BEBÉ */
+.detalle-episodio__bebe-icono {
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   flex-shrink: 0;
+
+   width: 5.5rem;
+   height: 5.5rem;
+   padding: .2rem;
+
+   color: var(--color-bebe);
+   background-color: color-mix(in srgb, var(--color-bebe) 12%, var(--blanco-apagado));
+   border-radius: 50%;
+}
+
+.detalle-episodio__bebe-icono svg {
+   display: block;
+}
+
+/* DATOS */
+.detalle-episodio__bebe-datos {
+   flex: 1;
+   min-width: 0;
+
+  
+}
+
+.detalle-episodio__bebe-datos h4 {
+   margin: 0 0 0.5rem;
+   color: var(--color-bebe);
+   font-size: 1.6rem;
+   
+   text-transform: uppercase;
+
+   font-weight: 700;
+}
+
+.detalle-episodio__bebe-detalle {
+   display: flex;
+   align-items: center;
+   gap: 0.4rem;
+   min-width: 0;
+}
+
+.detalle-episodio__bebe-detalle span {
+   flex-shrink: 0;
+   color: var(--color-bebe);
+   font-size: 2rem;
+}
+
+.detalle-episodio__bebe-detalle p {
+   margin: 0;
+   color: var(--negro-suave);
+   font-size: 1.3rem;
+}
+
+/* SEXO */
+.detalle-episodio__bebe-sexo {
+   flex-shrink: 0;
+   padding: 0.5rem 1rem;
+
+   color: var(--blanco);
+   background-color: var(--color-bebe);
+   border-radius: 20px;
+
+   font-size: 1.2rem;
+   font-weight: 700;
+   text-transform: uppercase;
+   white-space: nowrap;
+}
+
+/* ESTADO VACÍO */
+.detalle-episodio__bebe-vacio {
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   gap: 1rem;
+
+   min-height: 7.4rem;
+   padding: 1rem;
+
+   border: 1px dashed var(--colorSwitchBase);
+   border-radius: 14px;
+   background-color: var(--blanco-apagado);
+}
+
+.detalle-episodio__bebe-vacio > span {
+   flex-shrink: 0;
+   color:var(--colorSwitchBase);
+   font-size: 3.5rem;
+}
+
+.detalle-episodio__bebe-vacio h4 {
+   margin: 0 0 0.4rem;
+   color: var(--lp-color-azul-institucional);
+   font-size: 1.5rem;
+   font-weight: 700;
+}
+
+.detalle-episodio__bebe-vacio p {
+   margin: 0;
+   color: var(--colorTextoBloqueado);
+   font-size: 1.2rem;
+   line-height: 1.4;
+}
+
+
+
+
+/* ============================================
+   PIE INFORMATIVO DEL MONITOR
+============================================ */
+
+.labor-parto__pie-informativo {
+   display: flex;
+   align-items: center;
+   justify-content: space-between;
+   gap: 1.5rem;
+   width: 100%;
+   min-height: 58px;
+   padding: 0.5rem 1rem;
+   border-radius: 10px;
+   background: linear-gradient(
+      100deg,
+      var(--lp-fondo-pie-informativo-inicio) 0%,
+      var(--lp-fondo-pie-informativo-fin) 100%
+   );
+}
+
+/* ============================================
+   AVISO DE PRIVACIDAD
+============================================ */
+
+.labor-parto__aviso-privacidad {
+   display: flex;
+   align-items: center;
+   gap: 0.75rem;
+   min-width: 0;
+}
+
+.labor-parto__aviso-privacidad > span {
+   flex-shrink: 0;
+   font-size: 3.5rem;
+   color: var(--lp-color-azul-institucional);
+}
+
+.labor-parto__aviso-privacidad p {
+   margin: 0;
+   color: var(--lp-color-azul-institucional);
+   font-size: 1.2rem;
+   line-height: 1.4;
+}
+
+/* ============================================
+   INDICADOR DE ACTUALIZACIÓN
+============================================ */
+
+.labor-parto__actualizacion {
+   display: flex;
+   align-items: center;
+   justify-content: flex-end;
+   gap: 1.5rem;
+   flex-shrink: 0;
+}
+
+.labor-parto__actualizacion-spinner {
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   color: var(--lp-color-primario);
+}
+
+.labor-parto__actualizacion-spinner span {
+   font-size: 3rem;
+   animation: girarActualizacion 2.5s linear infinite;
+}
+
+@keyframes girarActualizacion {
+   to {
+      transform: rotate(360deg);
+   }
+}
+
+.labor-parto__actualizacion-texto {
+   color: var(--colorTextoBloqueado);
+   font-size: 1.4rem;
+   white-space: nowrap;
+}
+
+.labor-parto__actualizacion-texto strong {
+   color: var(--lp-color-azul-institucional);
+   font-weight: 700;
+}
+
+/* ============================================
+   BARRA DE PROGRESO
+============================================ */
+
+.labor-parto__actualizacion-progreso {
+   width: 9rem;
+   height: .9rem;
+   overflow: hidden;
+   border-radius: 20px;
+   background-color: var(--lp-fondo-fila-seleccionada);
+}
+
+.labor-parto__actualizacion-progreso-valor {
+   width: 0%;
+   height: 100%;
+   border-radius: inherit;
+   background: var(--lp-color-primario);
+   transition: width 0.3s linear;
+}
+

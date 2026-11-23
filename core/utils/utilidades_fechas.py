@@ -35,7 +35,7 @@ def configurar_locale():
         if platform.system() == "Windows":
             locale.setlocale(locale.LC_TIME, "Spanish_Spain.1252")
         else:
-            locale.setlocale(locale.LC_TIME, "es_ES.UTF-8")
+            locale.setlocale(locale.LC_TIME, "es_HN.utf8")
     except locale.Error:
         # Evita fallos en servidores sin locale español configurado
         pass
@@ -58,7 +58,7 @@ def convertir_fecha(fecha):
     return fecha
 
 
-def calcular_edad_texto(fecha_nacimiento):
+def calcular_edad_texto(fecha_nacimiento, solo_anios=False):
     hoy = datetime.now()
     # Si viene como date, convertir a datetime
     if isinstance(fecha_nacimiento, date):
@@ -82,15 +82,107 @@ def calcular_edad_texto(fecha_nacimiento):
         anios -= 1
         meses += 12
 
+    if solo_anios:
+        return f"{anios} {'año' if anios == 1 else 'años'}"
+
     partes = []
+
     if anios > 0:
-        partes.append(f"{anios} {'año' if anios == 1 else 'años'}")
+        partes.append(
+            f"{anios} {'año' if anios == 1 else 'años'}"
+        )
+
     if meses > 0:
-        partes.append(f"{meses} {'mes' if meses == 1 else 'meses'}")
+        partes.append(
+            f"{meses} {'mes' if meses == 1 else 'meses'}"
+        )
+
     if dias > 0:
-        partes.append(f"{dias} {'día' if dias == 1 else 'días'}")
+        partes.append(
+            f"{dias} {'día' if dias == 1 else 'días'}"
+        )
 
     return ", ".join(partes) if partes else "0 días"
+
+
+
+def calcular_diferencia_fechas(fecha_inicio, fecha_fin=None):
+    """
+    Calcula la diferencia entre dos fechas.
+    Devuelve días, horas y minutos.
+    """
+
+    if fecha_inicio is None:
+        return None
+
+    fecha_fin = fecha_fin or timezone.now()
+
+    diferencia = fecha_fin - fecha_inicio
+
+    minutos_totales = max(
+        0, int(diferencia.total_seconds() // 60)
+    )
+
+    dias, resto = divmod(minutos_totales, 1440)
+    horas, minutos = divmod(resto, 60)
+
+    return {
+        "dias": dias,
+        "horas": horas,
+        "minutos": minutos,
+    }
+
+
+def calcular_duracion_texto(fecha_inicio, fecha_fin=None):
+
+    diferencia = calcular_diferencia_fechas(
+        fecha_inicio,
+        fecha_fin
+    )
+
+    if diferencia is None:
+        return ""
+
+    dias = diferencia["dias"]
+    horas = diferencia["horas"]
+    minutos = diferencia["minutos"]
+
+    partes = []
+
+    if dias >= 365:
+        anios, dias = divmod(dias, 365)
+        meses, dias = divmod(dias, 30)
+
+        partes.append(f"{anios} años" if anios != 1 else "1 año")
+
+        if meses:
+            partes.append(f"{meses} meses" if meses != 1 else "1 mes")
+
+    elif dias >= 30:
+        meses, dias = divmod(dias, 30)
+
+        partes.append(f"{meses} meses" if meses != 1 else "1 mes")
+
+        if dias:
+            partes.append(f"{dias} días" if dias != 1 else "1 día")
+
+    elif dias:
+        partes.append(f"{dias} días" if dias != 1 else "1 día")
+
+        if horas:
+            partes.append(f"{horas} horas" if horas != 1 else "1 hora")
+
+    elif horas:
+        partes.append(f"{horas} horas" if horas != 1 else "1 hora")
+
+        if minutos:
+            partes.append(f"{minutos} minutos" if minutos != 1 else "1 minuto")
+
+    else:
+        partes.append(f"{minutos} minutos" if minutos != 1 else "1 minuto")
+
+    return " ".join(partes)
+
 
 
 def obtener_edad_con_indicador(fecha_nacimiento):
@@ -318,6 +410,9 @@ def obtener_fechas_por_dia_semana(fecha_inicio, fecha_fin, dia_semana ):
         fecha_actual += timedelta(days=1)
 
     return fechas
+
+
+
 # 2026-05-29: extraido de mapeo_camas/views.py (refactor B). Helpers globales
 def hora_local_iso(dt):
     """Convierte un datetime aware a ISO en zona horaria local; '' si es falsy."""

@@ -433,3 +433,33 @@ EQUIPOS_BAJA_UNIDADES = ["EQ"]
 # ordenes.
 EQUIPOS_MANTENIMIENTO_ROLES = ["admin", "digitador"]
 EQUIPOS_MANTENIMIENTO_UNIDADES = ["EQ"]
+
+
+
+# -----------------------------
+# COMUNICACION HOSPITALARIA
+# -----------------------------
+
+COMUNICACION_HOSPITALARIA_VISUALIZACION_ROLES = [
+   "admin",
+   "digitador",
+   "visitante",
+   "directivo",
+]
+
+COMUNICACION_HOSPITALARIA_VISUALIZACION_UNIDADES = [
+   "ENF",
+]
+
+
+COMUNICACION_HOSPITALARIA_EDICION_ROLES = [
+   "admin",
+   "digitador",
+]
+
+COMUNICACION_HOSPITALARIA_EDICION_UNIDADES = [
+   "ENF",
+]
+
+
+# -----------------------------

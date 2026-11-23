@@ -14,35 +14,31 @@ const TipoAtencionLoader = (function () {
             }
 
 
-            if (Array.isArray(data) && data.length > 0) {
+            const opciones = Array.isArray(data)
+                ? data.map(item => ({
+                    value: item.id,
+                    label: item.nombre_tipo_atencion,
+                    customData: item.prioridad_texto,
+                    description: item.prioridad_texto
+                }))
+                : [];
 
-            const opciones = data.map(item => ({
-                value: item.id,
-                label: item.nombre_tipo_atencion,
-                customData: item.prioridad_texto,
-                description: item.prioridad_texto
-            }));
+            if (opciones.length === 0) {
+                console.warn("No hay tipos de atención disponibles.");
+            }
 
             VirtualSelect.init({
-                        ele: `#${selectId}`,
-                        options: opciones,
-                        hasOptionDescription: true,
-                        searchPlaceholderText: 'Buscar...',
-                        search: true,
-                        placeholder: 'Seleccione',
-                        additionalClasses: 'custom-wrapper',
-                        additionalDropboxClasses: 'custom-dropbox',
-                        
-                    }); 
+                ele: `#${selectId}`,
+                options: opciones,
+                hasOptionDescription: true,
+                searchPlaceholderText: 'Buscar...',
+                search: true,
+                placeholder: 'Seleccione',
+                additionalClasses: 'custom-wrapper',
+                additionalDropboxClasses: 'custom-dropbox',
+            });
 
-            return //select.virtualSelect;
-
-
-
-            } else {
-                console.warn("No hay tipos de atencion disponibles.");
-                return null;
-            }
+            return opciones;
 
         } catch (error) {
             console.error("Error cargando tipos de atencion:", error);

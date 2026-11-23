@@ -7,12 +7,36 @@
 {% block content %}
     <div class="contenedor2 dataTables_wrapper"> 
 
-        <div class="tituloFormulario" style="margin-bottom: 2rem;">
-            <div class="tituloFormulario-texto"> 
-                <i class="bi bi-calendar-check"></i>
-                <h2 class="sin-margen">Listado de Periodos de Agenda Medica </h2>
-            
-            
+        <div class="tituloFormulario agenda-medica-header" style="margin-bottom: 2rem;">
+            <!-- Título -->
+            <div class="tituloFormulario-texto">
+
+                <i class="bi bi-calendar2-range"></i>
+
+                <div class="agenda-medica-titulos">
+                    <h2 class="sin-margen">Agenda Medica</h2>
+                    <span class="agenda-medica-subtitulo">
+                        Listado de períodos laborales
+                    </span>
+                </div>
+
+            </div>
+
+            <!-- Listados -->
+            <div class="agenda-medica-listados">
+
+                <a href="{% url 'listar_agenda_medica' %}"
+                        class="agenda-medica-listado activo periodo-laboral">
+                    <i class="bi bi-calendar2-range"></i>
+                    <span>Períodos laborales</span>
+                </a>
+
+                <a href="{% url 'listar_ausencias' %}"
+                        class="agenda-medica-listado ausencia">
+                    <i class="bi bi-calendar2-x"></i>
+                    <span>Ausencias</span>
+                </a>
+
             </div>
             <div class="tituloFormulario-subrallado"></div>
         </div>
@@ -58,6 +82,7 @@
 <script>
 {% if anios %} 
     const anios = {{ anios|safe }};
+    let esAusencia = false;
 {% endif %} 
 </script>
 {% endblock extra_js %}

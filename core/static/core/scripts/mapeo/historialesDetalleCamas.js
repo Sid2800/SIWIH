@@ -2,6 +2,8 @@ document.addEventListener("DOMContentLoaded", function () {
   // [2026-06-01] Endpoints inyectados por el template via window.MAPA_CFG — no hardcodear URLs aquí.
   var API_URLS = (window.MAPA_CFG && window.MAPA_CFG.urls) || {};
 
+
+
   var contenedor = document.getElementById("detalle-cards-contenedor");
   var estructuraContenedor = document.getElementById("detalle-estructura-contenedor");
   var tablaContenedor = document.getElementById("detalle-tabla-contenedor");
@@ -10,6 +12,8 @@ document.addEventListener("DOMContentLoaded", function () {
   var resumenComunEl = document.getElementById("detalle-resumen-comun");
   var btnVistaEstructura = document.getElementById("btn-vista-estructura");
   var btnVistaTabla = document.getElementById("btn-vista-tabla");
+  var btnDetallePdf = document.getElementById("btn-detalle-pdf")
+  
   var paginacionWrap = document.getElementById("detalle-paginacion");
   var btnPageFirst = document.getElementById("detalle-page-first");
   var btnPagePrev = document.getElementById("detalle-page-prev");
@@ -682,6 +686,19 @@ document.addEventListener("DOMContentLoaded", function () {
   if (btnVistaTabla) {
     btnVistaTabla.addEventListener("click", function () { aplicarVista("tabla"); });
   }
+  if (btnDetallePdf){
+    btnDetallePdf.addEventListener("click", function(){
+    var params = new URLSearchParams(window.location.search || "")
+    var id = (params.get("id") || "").trim();
+    imprimirFormatoGenerico(id, API_URLS.reporte );
+
+
+    })
+  }
+
+
+
+
 
   // Eventos filtros
   [dtfFechaInicio, dtfFechaFin].forEach(function (el) {

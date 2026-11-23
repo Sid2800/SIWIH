@@ -38,6 +38,7 @@ DEBUG = True if os.getenv("DEBUG", "0") == "1" else False
 
 # En desarrollo la IP puede cambiar entre redes. El script de demostracion
 # define ALLOWED_HOSTS sin obligar a guardar una IP temporal en el repositorio.
+# Los valores por defecto incluyen los de produccion (100.91.100.55).
 ALLOWED_HOSTS = [
     host.strip()
     for host in os.getenv(
@@ -45,7 +46,7 @@ ALLOWED_HOSTS = [
         (
             "SIWIH,localhost,127.0.0.1,"
             "192.168.88.8,192.168.88.28,192.168.88.173,"
-            "192.168.99.82,100.84.35.113"
+            "192.168.99.82,100.84.35.113,100.91.100.55"
         ),
     ).split(",")
     if host.strip()
@@ -62,6 +63,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'dal',
     'dal_select2',
+    'channels',
     'core',
     'servicio',
     'ubicacion',
@@ -75,11 +77,13 @@ INSTALLED_APPS = [
     'clinico',
     'usuario',
     'agenda_medica',
+    'cita',
     's_exp',
     'mapeo_camas',
     'rrhh',
     # Registra el modulo para que Django cargue modelos, admin, migraciones y templates.
     'equipos.apps.EquiposConfig',
+    'comunicacion_hospitalaria',
 ]
 
 MIDDLEWARE = [
@@ -115,6 +119,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'SIWI.wsgi.application'
+ASGI_APPLICATION = 'SIWI.asgi.application'
 
 
 # Database
@@ -229,7 +234,12 @@ def _silenciar_polling_filter(record):
     """
     msg = record.getMessage()
     # Solo silenciar respuestas exitosas (200, 304) a endpoints de polling
-    rutas_polling = ['/s_exp/api/changes-check/', '/s_exp/api/alertas/']
+    rutas_polling = [
+        '/s_exp/api/changes-check/',
+        '/s_exp/api/alertas/',
+        '/listar-episodios-publico-API/',
+        '/obtener-episodio-labor-parto/',
+    ]
     for ruta in rutas_polling:
         if ruta in msg:
             # No silenciar si hay error (4xx, 5xx)

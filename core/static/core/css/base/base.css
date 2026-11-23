@@ -50,7 +50,7 @@ main {
 
 
 .contenedor {
-   width: min(95%, 150rem);
+   width: min(96%, 150rem);
    margin: 0 auto;
    font-family: var(--fuenteTablaTitulo);
    height: 100%;
@@ -100,7 +100,7 @@ main {
    border-radius: 2rem;
    color: var(--colorTablacelda);
    width: 100%;
-   margin: 3rem 0 3rem 0;
+   margin: 1.5rem 0 1.5rem 0;
    transition: background-color 0.3s ease;
 }
 

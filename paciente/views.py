@@ -660,16 +660,6 @@ def busqueda_censo(request):
     })    
 
 
-class PacienteAutocomplete(autocomplete.Select2QuerySetView):
-
-    def get_queryset(self):
-        query = self.q
-        qs = PacienteService.obtener_pacientes(query)
-        return qs
-    
-    def get_result_label(self, result):
-        return f"{result.nombre_completo} {result.dni}"
-
 
 # Este API retorna datos de pacientes aptos para ingresos o cita mÃ©dica.
 def obtenerPacienteIngresoDNI(request):
@@ -1511,4 +1501,21 @@ def obtener_obitos_paciente(request):
 
     except Exception as e:
         return JsonResponse({"mensaje": str(e)}, status=500)
+
+
+@require_GET
+def buscarPacienteAPI(request):
+    valor_buscado = request.GET.get('valor_buscado')
+
+    print(request.GET)
+    if not valor_buscado:
+        return JsonResponse({'error': 'El parametro valor_buscado es requerido'}, status=400)
+    try:
+        data =PacienteService.obtener_pacientes(query=valor_buscado)
+
+        print(valor_buscado)
+        return JsonResponse(data, safe=False)
+    except Exception as e:
+        log_error(str(e), LogApp.PACIENTE)
+        return JsonResponse({"mensaje": "error interno en la busqueda"}, status=500)
 

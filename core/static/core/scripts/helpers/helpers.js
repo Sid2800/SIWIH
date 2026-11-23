@@ -34,9 +34,15 @@ function slugify(text) {
       */
 async function fetchData(url, params = {}) {
    const queryString = new URLSearchParams(params).toString();
-   const response = await fetch(`${url}?${queryString}`);
-   if (!response.ok)
-      throw new Error(`Error en la red: ${response.statusText}`);
+
+   const response = await fetch(
+      queryString ? `${url}?${queryString}` : url
+   );
+
+   if (!response.ok) {
+      throw new Error(`Error en la red: ${response.status} ${response.statusText}`);
+   }
+
    return response.json();
 }
 
@@ -49,6 +55,35 @@ function concatenarLimpio(...args) {
 }
 
 
+
+function escaparHTML(valor) {
+   const caracteres = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;"
+   };
+
+   return String(valor ?? "").replace(
+      /[&<>"']/g,
+      caracter => caracteres[caracter]
+   );
+}
+
+
+function construirURL(url, { id = null, slug = null } = {}) {
+
+   if (id !== null) {
+      url = url.replace('0', encodeURIComponent(id));
+   }
+
+   if (slug !== null) {
+      url = url.replace('slug', encodeURIComponent(slug));
+   }
+
+   return url;
+}
 
 
 //#region  Busquedas publicas
@@ -130,6 +165,66 @@ async function confirmarAccion(config = {}) {
 }
 
 
+async function informarCambios(config = {}) {
+
+   const {
+      titulo = "Cambios realizados",
+      mensajes = [],
+      icono = "info",
+      boton = "Entendido"
+   } = config;
+
+   const iconos = {
+      warning: "bi-exclamation-triangle",
+      danger: "bi-exclamation-octagon",
+      success: "bi-check-circle",
+      info: "bi-info-circle"
+   };
+
+   const claseIcono = iconos[icono] || "bi-info-circle";
+
+   const htmlMensajes = mensajes.map(
+      mensaje => `<li>${mensaje}</li>`
+   ).join("");
+
+   await Swal.fire({
+      title: `<i class="bi ${claseIcono}"></i>${titulo}`,
+      html: `
+         <div class="tituloFormulario-subrallado"></div>
+         <div class="contener-modal-mensajes-confirmacion">
+               <ul class="contener-modal-lista-confirmacion">
+                  ${htmlMensajes}
+               </ul>
+         </div>
+      `,
+      confirmButtonText: `<i class="bi bi-check-circle-fill"></i> ${boton}`,
+      customClass: {
+         icon: "contenedor-modal-icon",
+         popup: "contenedor-modal",
+         title: "contener-modal-titulo",
+         confirmButton: "contener-modal-boton-confirmar"
+      },
+      didOpen: () => {
+         const actionsContainer = document.querySelector(".swal2-actions");
+
+         if (actionsContainer) {
+               actionsContainer.classList.add(
+                  "contener-modal-contenedor-botones-min"
+               );
+         }
+
+         const htmlContainer = document.querySelector(".swal2-html-container");
+
+         if (htmlContainer) {
+               htmlContainer.classList.add(
+                  "contener-modal-contenedor-html"
+               );
+         }
+      }
+   });
+}
+
+
 function renderDatosContexto(containerId, datos = {}) {
 
    const header = document.getElementById(containerId);
@@ -155,6 +250,7 @@ const API_URLS = {
    procesarImagenUsuario: urls["procesarImagenUsuario"],
    obtenerPacienteCenso: urls["obtenerPacienteCenso"],
    busquedaCenso: urls["busquedaCenso"],
+   busquedaPacientes: urls["busquedaPacientes"],
    busquedaPaciente: urls["busquedaPaciente"],
    busquedaAvanzada: urls["busquedaAvanzada"],
    obtenerDefuncion: urls["obtenerDefuncion"],
@@ -179,17 +275,42 @@ const API_URLS = {
    listarObitosPaciente: urls["listarObitosPaciente"],
    listarUnidadClinica: urls["listarUnidadClinica"],
    listarAgendaMedicaAPI: urls["listarAgendaMedicaAPI"],
+   listarAusenciasAPI: urls["listarAusenciasAPI"],
    listarPersonalClinicoAPI: urls["listarPersonalClinicoAPI"],
    listarJornadaLaboralAPI: urls["listarJornadaLaboralAPI"],
    guardarPeriodoLaboral: urls["guardarPeriodoLaboral"],
    validarImpactoPeriodoLaboral: urls["validarImpactoPeriodoLaboral"],
    validarImpactoDiaLaboral: urls["validarImpactoDiaLaboral"],
    obtenerPeriodoLaboral: urls["obtenerPeriodoLaboral"],
+   obtenerAusencia: urls["obtenerAusencia"],
    listarTiposAtencion: urls["listarTiposAtencion"],
-   guardarDiaPeriodoLaboral: urls["guardarDiaPeriodoLaboral"],
+   guardarDiaLaboral: urls["guardarDiaLaboral"],
+   guardarAusencia: urls["guardarAusencia"],
+   eliminarDiaLaboral: urls["eliminarDiaLaboral"],
    obtenerDiaLaboral: urls["obtenerDiaLaboral"],
    editarPeriodoLaboral: urls["editarPeriodoLaboral"],
+   configurarPeridoLaboral: urls["configurarPeridoLaboral"],
+   agendaMedicaAPI: urls["agendaMedicaAPI"],
+   definirDiaQuirugico: urls["definirDiaQuirugico"],
+   quitarDiaQuiurgico: urls["quitarDiaQuiurgico"],
+   listarTiposAusencia: urls["listarTiposAusencia"],
+   validarImpactoAusencia: urls["validarImpactoAusencia"],
+   editarAusencia: urls["editarAusencia"],
+   obtenerAusencia: urls["obtenerAusencia"],
 
+   
+
+   listarEpisodiosAPI: urls["listarEpisodiosAPI"],
+   obtenerEpisodioLaborParto: urls['obtenerEpisodioLaborParto'],
+   obtenerMovimientoLaborParto: urls['obtenerMovimientoLaborParto'],
+   guardarEpisodioLaborParto: urls['guardarEpisodioLaborParto'],
+   procesarMovimientoLaborParto: urls['procesarMovimientoLaborParto'],
+   gestionarMovimientoLaborParto: urls['gestionarMovimientoLaborParto'],
+   registrarAltaLaborParto: urls['registrarAltaLaborParto'],
+   procesarBebeLaborParto: urls['procesarBebeLaborParto'],
+   obtenerBebeLaborParto: urls['obtenerBebeLaborParto'],
+   registrarSalidaTemporalLaborParto: urls['registrarSalidaTemporalLaborParto'],
+   listarEpisodiosPublicoAPI: urls['listarEpisodiosPublicoAPI'],
 };
 
 /**
@@ -255,7 +376,7 @@ async function mostrasBusquedaPaciente() {
             style: 'single'  // Permitir solo la selección de una fila a la vez
             },
          ajax: {
-         url: API_URLS.busquedaPaciente, //API_URLS.busquedaCenso,
+         url: API_URLS.busquedaPacientes, //API_URLS.busquedaCenso,
          type: "GET",
          data: function(d) {      // parametros de busqueda 
             d.search_value = $('#search-input').val();

@@ -1,4 +1,4 @@
-
+from django.core.exceptions import ValidationError
 from django.db import models
 
 
@@ -16,6 +16,21 @@ class TipoUnidad(models.IntegerChoices):
     # CLINICA = 1, "CLINICA"
     ADMINISTRATIVA = 2, "ADMINISTRATIVA"
     APOYO = 3, "APOYO"
+
+
+class Sexo(models.TextChoices):
+    HOMBRE = "H", "Hombre"
+    MUJER = "M", "Mujer"
+    NO_IDENTIFICADO = "N", "No identificado"
+
+    @classmethod
+    def validar(cls, sexo):
+        if sexo not in cls.values:
+            raise ValidationError(
+                "El sexo seleccionado no es válido."
+            )
+
+        return cls(sexo)
 
 
 class EstadoCama(models.IntegerChoices):
@@ -102,6 +117,27 @@ class EstadoCupoAgenda(models.IntegerChoices):
     # eliminación de configuración o cambios de horario
     INACTIVO = 4, "INACTIVO"
 
+class TipoMovimientoCita(models.IntegerChoices):
+
+    # Se utiliza cuando una cita obtiene un cupo por primera vez.
+    ASIGNACION = 1, "ASIGNACION"
+
+    # Se utiliza cuando la cita pierde el cupo que tenía asignado
+    # por una situación de agenda, pero la cita continúa vigente
+    # y debe ser reprogramada.
+    CANCELACION_CUPO = 2, "CANCELACION CUPO"
+
+    # Se utiliza cuando una cita cambia de un cupo a otro.
+    # Puede ocurrir directamente por solicitud del paciente,
+    # por decisión del personal o después de una cancelación de cupo.
+    REPROGRAMACION = 3, "REPROGRAMACION"
+
+    # Se utiliza cuando se cancela definitivamente la cita.
+    # El cupo que tenía asignado se libera para poder ser utilizado
+    # por otra cita.
+    CANCELACION_CITA = 4, "CANCELACION CITA"
+
+    
 
 class TipoAusencia(models.IntegerChoices):
     VACACIONES = 1, "VACACIONES"
@@ -109,7 +145,26 @@ class TipoAusencia(models.IntegerChoices):
     PERMISO = 3, "PERMISO"
     CAPACITACION = 4, "CAPACITACIÓN"
     CONGRESO = 5, "CONGRESO"
-    OTROS = 6, "OTROS"
+    PROFILACTICA = 6, "PROFILÁCTICA"
+    OTROS = 7, "OTROS"
+    FERIADO = 8, "FERIADO"
+
+    @classmethod
+    def opciones(cls):
+        return [
+            {
+                "value": value,
+                "texto": label
+            }
+            for value, label in cls.choices
+        ]
+
+    @classmethod
+    def validar(cls, tipo):
+        if tipo not in cls.values:
+            raise ValidationError("El tipo de ausencia no es válido.")
+
+        return cls(tipo)
 
 
 class EstadoMapeoCategoria(models.TextChoices):
@@ -117,3 +172,102 @@ class EstadoMapeoCategoria(models.TextChoices):
     ESTADO_SESION = "ESTADO_SESION", "Estado de sesion"
     TIPO_ACCION = "TIPO_ACCION", "Tipo de accion"
     OBSERVACION = "OBSERVACION", "Observacion"
+
+
+
+class EstadoLaborParto(models.IntegerChoices):
+    LABOR = 1, "TRABAJO DE PARTO"
+    EXPULSIVO = 2, "EXPULSIVO"
+    PUERPERIO_INMEDIATO = 3, "PUERPERIO INMEDIATO"
+    INTERMEDIO = 4, "CUIDADOS INTERMEDIOS"
+
+    @classmethod
+    def opciones(cls):
+        return [
+            {
+                "value": value,
+                "texto": label,
+                **cls.obtener_color(value),
+            }
+            for value, label in cls.choices
+        ]
+
+    @classmethod
+    def obtener_texto(cls, estado):
+        return cls(estado).label
+
+    @classmethod
+    def obtener_color(cls, estado):
+
+        colores = {
+
+            cls.LABOR: {
+                "color": "rgb(83, 108, 166)",
+                "fondo": "rgba(83, 108, 166, 0.06)",
+                "borderColor": "rgba(83, 108, 166, 0.50)",
+                "icono": "trabajo_parto",
+            },
+
+            cls.EXPULSIVO: {
+                "color": "rgb(150, 63, 82)",
+                "fondo": "rgba(150, 63, 82, 0.07)",
+                "borderColor": "rgba(150, 63, 82, 0.50)",
+                "icono": "expulsivo",
+            },
+
+            cls.PUERPERIO_INMEDIATO: {
+                "color": "rgb(65, 137, 113)",
+                "fondo": "rgba(65, 137, 113, 0.06)",
+                "borderColor": "rgba(65, 137, 113, 0.50)",
+                "icono": "puerperio_inmediato",
+            },
+
+            cls.INTERMEDIO: {
+                "color": "rgb(143, 103, 166)",
+                "fondo": "rgba(143, 103, 166, 0.06)",
+                "borderColor": "rgba(143, 103, 166, 0.50)",
+                "icono": "cuidados_intermedios",
+            },
+        }
+
+        return colores.get(estado)
+
+    @classmethod
+    def validar(cls, estado):
+        if estado not in cls.values:
+            raise ValidationError(
+                "El estado de Labor y Parto no es válido."
+            )
+
+        return cls(estado)
+
+    @classmethod
+    def obtener_descripcion(cls, estado):
+        descripciones = {
+            cls.LABOR: (
+                "La paciente se encuentra en trabajo de parto "
+                "y permanece bajo atención del personal de salud."
+            ),
+            cls.EXPULSIVO: (
+                "La paciente se encuentra en la etapa del nacimiento "
+                "del bebé, bajo atención del personal de salud."
+            ),
+            cls.PUERPERIO_INMEDIATO: (
+                "Después del nacimiento, la mamá permanece bajo "
+                "vigilancia y recibe cuidados durante las primeras "
+                "horas de recuperación."
+            ),
+            cls.INTERMEDIO: (
+                "La paciente recibe atención y vigilancia "
+                "en la unidad de cuidados intermedios."
+            ),
+        }
+
+        return descripciones.get(estado, "")
+
+
+
+class TipoMovimientoLaborParto(models.IntegerChoices):
+    CAMBIO_ESTADO = 1, "CAMBIO DE ESTADO"
+    SALIDA = 2, "SALIDA"
+    RETORNO = 3, "RETORNO"

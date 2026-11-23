@@ -78,53 +78,11 @@
 
             <div class="contenedor-dias-semana">
                 {% for dia in dias_configurados %}
+
                     {% if dia.configurado %}
-                        <div class="configurar-periodo-dia-tarjeta"  data-dia-semana="{{ dia.numero_dia }}"
-                                    data-id-dia-laboral="{{ dia.id }}">
-
-                            <div class="configurar-periodo-dia-tarjeta-header">
-                                <div class="configurar-periodo-dia-tarjeta-header-titulo">
-                                    {{ dia.nombre_dia }}
-                                </div>
-
-                                <div class="configurar-periodo-dia-tarjeta-header-estado" >
-
-                                    <i class="bi bi-circle-fill icon-verde" title="Día configurado"></i>
-                                </div>
-                            </div>
-
-                            <div class="configurar-periodo-dia-tarjeta-body">
-
-                                <div class="dia-info-item">
-                                    <i class="bi bi-clock-fill"></i>
-                                    <span>{{ dia.hora_inicio|time:"H:i" }} - {{ dia.hora_fin|time:"H:i" }}</span>
-                                </div>
-
-                                <div class="dia-info-item">
-                                    <i class="bi bi-people-fill"></i>
-                                    <span>{{ dia.total_cupos }} Cupos</span>
-                                </div>
-
-                                <div class="dia-info-item">
-                                    <i class="bi bi-grid-fill"></i>
-                                    <span>{{ dia.total_tipos }} Tipos Atención</span>
-                                </div>
-
-                            </div>
-
-                            <div class="configurar-periodo-dia-tarjeta-footer">
-                                <button type="button"
-                                        class="configurar-periodo-dia-tarjeta-boton">
-                                    <i class="bi bi-pencil-fill"></i>
-                                    <span>Editar</span>
-                                </button>
-                            </div>
-
-                        </div>
-                    {% else %}
-                        <!-- TARJETA VACIA -->
-                        <div class="configurar-periodo-dia-tarjeta tarjeta-no-configurada" data-dia-semana="{{ dia.numero_dia }}"
-                                    data-id-dia-laboral="">
+                        <div class="configurar-periodo-dia-tarjeta
+                        {% if dia.quirurgico %}quirugico{% endif %}
+                        " data-dia-semana="{{ dia.numero_dia }}" data-id-dia-laboral="{{ dia.id }}">
 
                             <div class="configurar-periodo-dia-tarjeta-header">
                                 <div class="configurar-periodo-dia-tarjeta-header-titulo">
@@ -132,9 +90,106 @@
                                 </div>
 
                                 <div class="configurar-periodo-dia-tarjeta-header-estado">
-                                    <i class="bi bi-circle-fill icon-amarillo" title="Día configurado"></i>
+
+                                    {% if dia.quirurgico %}
+                                        <span class="material-symbols-outlined" title="Día quirúrgico">medical_mask</span>
+                                    {% else %}
+
+                                        <i class="bi bi-people-fill icon" title="Día configurado"></i>
+                                    {% endif %}
+
                                 </div>
+
                             </div>
+
+
+                            <div class="configurar-periodo-dia-tarjeta-body">
+
+                                <div class="dia-info-item">
+                                    <i class="bi bi-clock-fill"></i>
+                                    <span>
+                                        {{ dia.hora_inicio|time:"H:i" }}
+                                        -
+                                        {{ dia.hora_fin|time:"H:i" }}
+                                    </span>
+                                </div>
+
+                                {% if dia.quirurgico %}
+
+                                    <div class="dia-info-item">
+                                        <span class="material-symbols-outlined">medical_mask</span>
+                                        <span>Quirúrgico</span>
+                                    </div>
+
+                                {% else %}
+
+                                    <div class="dia-info-item">
+                                        <i class="bi bi-people-fill"></i>
+                                        <span>{{ dia.total_cupos }} Cupos</span>
+                                    </div>
+
+                                    <div class="dia-info-item">
+                                        <i class="bi bi-grid-fill"></i>
+                                        <span>{{ dia.total_tipos }} Tipos Atención</span>
+                                    </div>
+
+                                {% endif %}
+
+                            </div>
+
+
+                            <div class="configurar-periodo-dia-tarjeta-footer">
+
+                                {% if not dia.quirurgico %}
+
+                                    <button type="button" class="configurar-periodo-dia-tarjeta-boton" 
+                                    title="Editar día laboral">
+                                        <i class="bi bi-pencil-fill"></i>
+                                        <span>Editar</span>
+                                    </button>
+
+                                    <button type="button" class="configurar-periodo-dia-tarjeta-boton configurar-periodo-dia-tarjeta-boton-secundario eliminar"
+                                    title="Eliminar día laboral">
+                                        <i class="bi bi-trash-fill"></i>
+                                    </button>
+
+
+                                {% else %}
+
+                                    <button type="button" class="configurar-periodo-dia-tarjeta-boton quitar-quirurgico"
+                                    title="Quitar día quirúrgico">
+                                        <i class="bi bi-trash-fill"></i>
+                                        <span>Quitar</span>
+                                    </button>
+
+                                {% endif %}
+
+                            </div>
+
+                        </div>
+
+                    {% else %}
+
+                        <div
+                            class="configurar-periodo-dia-tarjeta tarjeta-no-configurada"
+                            data-dia-semana="{{ dia.numero_dia }}"
+                            data-id-dia-laboral=""
+                        >
+
+                            <div class="configurar-periodo-dia-tarjeta-header">
+
+                                <div class="configurar-periodo-dia-tarjeta-header-titulo">
+                                    {{ dia.nombre_dia }}
+                                </div>
+
+                                <div class="configurar-periodo-dia-tarjeta-header-estado">
+
+                                    <i class="bi bi-exclamation-triangle-fill" title="Día sin configurar"></i>
+                        
+                                </div>
+
+                            </div>
+
 
                             <div class="configurar-periodo-dia-tarjeta-body tarjeta-no-configurada">
 
@@ -143,23 +198,40 @@
                                     <span>SIN CONFIGURAR</span>
                                 </div>
 
-                            
                             </div>
 
+
                             <div class="configurar-periodo-dia-tarjeta-footer">
-                                <button type="button"
-                                        class="configurar-periodo-dia-tarjeta-boton">
+
+                                <button
+                                    type="button"
+                                    class="configurar-periodo-dia-tarjeta-boton"
+                                    title="Definir día laboral"
+                                >
                                     <i class="bi bi-gear-fill"></i>
                                     <span>Definir</span>
                                 </button>
+
+                                {% if periodo.personal_salud.puede_operar %}
+
+                                <button
+                                    type="button"
+                                    class="configurar-periodo-dia-tarjeta-boton configurar-periodo-dia-tarjeta-boton-secundario definir-quirurgico"
+                                    title="Configurar día quirúrgico"
+                                >
+                                    <span class="material-symbols-outlined">
+                                    medical_mask
+                                    </span>
+                                </button>
+
+                            {% endif %}
+
+
                             </div>
 
                         </div>
-                        
 
                     {% endif %}
-
-
 
                 {% endfor %}
                 <!-- TARJETA -->
@@ -211,6 +283,7 @@
 };
 </script>
 <script src="{% static 'core/scripts/helpers/clinico_helpers.js' %}"></script>
+<script src="{% static 'core/scripts/helpers/agenda_helpers.js' %}"></script>
 <script src="{% static 'core/scripts/modals/agenda_medica_modals.js' %}"></script>
 <script src="{% static 'core/scripts/features/configurarDialaboral.js' %}"></script>
 
