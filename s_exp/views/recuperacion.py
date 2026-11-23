@@ -258,6 +258,17 @@ def recuperar_expedientes_api(request):
             f'Finalizadas: {finalizadas or "ninguna"}. Motivo: {observaciones or "—"}',
             'SolicitudPrestamo', detalles[0].solicitud_id
         )
+
+        # El apunte solo apunta a una solicitud, pero la recuperacion puede
+        # tocar las de varias personas: cada una tiene que enterarse.
+        from s_exp.models import SolicitudPrestamo
+        from s_exp.signals import avisar_usuarios
+        avisar_usuarios(
+            SolicitudPrestamo.objects.filter(id__in=solicitudes_tocadas)
+            .values_list('usuario_id', flat=True),
+            'EXPEDIENTES_RECUPERADOS',
+        )
+
         log_info(
             f"Recuperación de urgencia: {len(detalles)} expediente(s) por {request.user.username}",
             app=LogApp.S_EXP

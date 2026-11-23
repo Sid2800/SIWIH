@@ -173,3 +173,99 @@ class ConexionDelSocketTests(TestCase):
         conectado, _ = self._conectar(self.usuario)
 
         self.assertTrue(conectado)
+
+
+class ParidadConElPollingTests(TestCase):
+    """El socket tiene que avisar lo mismo que avisaba el polling.
+
+    El polling se apaga en cuanto el socket conecta. Cualquier aviso que el
+    socket no dé es una pantalla que se queda quieta sin que nadie lo note.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.usuario = User.objects.create_user(
+            username="zz_paridad", password="clave-de-prueba"
+        )
+
+    def test_accion_sin_seccion_propia_va_a_global(self):
+        """Antes, 'global' se movia con cualquier apunte de la bitacora."""
+        from s_exp.signals import secciones_de
+
+        self.assertEqual(secciones_de("REVISION_ENTREGA"), ("global",))
+        self.assertEqual(secciones_de("UNA_ACCION_FUTURA"), ("global",))
+        self.assertEqual(secciones_de("SOLICITUD_CREADA"), ("solicitudes",))
+
+    def test_global_va_al_grupo_de_administradores(self):
+        """El ritmo de trabajo del archivo no es asunto de cualquier usuario."""
+        from unittest import mock
+
+        from s_exp import signals
+
+        enviados = []
+
+        class CapaFalsa:
+            async def group_send(self, grupo, evento):
+                enviados.append((grupo, evento))
+
+        with mock.patch("channels.layers.get_channel_layer", return_value=CapaFalsa()):
+            signals._emitir("global", "ts", "REVISION_ENTREGA", actor_id=7)
+
+        self.assertEqual(len(enviados), 1)
+        grupo, evento = enviados[0]
+        self.assertEqual(grupo, grupo_de_seccion("admin_global"))
+        self.assertEqual(evento["actor_id"], 7)
+
+    def _recibe(self, grupo, evento):
+        """Conecta al usuario, manda un evento al grupo y dice si le llego."""
+        from channels.layers import get_channel_layer
+
+        async def probar():
+            com = WebsocketCommunicator(CambiosConsumer.as_asgi(), "/ws/s_exp/cambios/")
+            com.scope["user"] = self.usuario
+            await com.connect()
+            await com.receive_json_from()  # {'tipo': 'conectado'}
+            await get_channel_layer().group_send(grupo, dict(evento, type="cambio"))
+            nada = await com.receive_nothing(timeout=0.2)
+            await com.disconnect()
+            return not nada
+
+        return asyncio.new_event_loop().run_until_complete(probar())
+
+    def test_usuario_normal_no_entra_a_admin_global(self):
+        llego = self._recibe(
+            grupo_de_seccion("admin_global"),
+            {"seccion": "global", "ts": "t", "accion": "REVISION_ENTREGA", "actor_id": None},
+        )
+        self.assertFalse(llego)
+
+    def test_el_actor_no_recibe_su_propio_aviso_global(self):
+        """El polling excluia los apuntes propios en 'global' y 'prestamos'."""
+        llego = self._recibe(
+            grupo_de_usuario(self.usuario.id),
+            {"seccion": "global", "ts": "t", "accion": "X", "actor_id": self.usuario.id},
+        )
+        self.assertFalse(llego)
+
+    def test_el_actor_si_recibe_lo_de_mis_solicitudes(self):
+        """mis_solicitudes no excluia al propio usuario en el polling."""
+        llego = self._recibe(
+            grupo_de_usuario(self.usuario.id),
+            {"seccion": "mis_solicitudes", "ts": "t", "accion": "X", "actor_id": self.usuario.id},
+        )
+        self.assertTrue(llego)
+
+    def test_recuperacion_avisa_a_cada_dueno(self):
+        """Una recuperacion toca solicitudes de varias personas a la vez."""
+        from unittest import mock
+
+        from s_exp import signals
+
+        with mock.patch.object(signals, "_emitir") as emitir:
+            with self.captureOnCommitCallbacks(execute=True):
+                signals.avisar_usuarios([3, 4, 3], "EXPEDIENTES_RECUPERADOS")
+
+        destinatarios = sorted(c.kwargs["usuario_id"] for c in emitir.call_args_list)
+        self.assertEqual(destinatarios, [3, 4])
+        for c in emitir.call_args_list:
+            self.assertEqual(c.args[0], "mis_solicitudes")

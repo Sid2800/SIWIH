@@ -30,6 +30,11 @@ SECCIONES = ('solicitudes', 'prestamos', 'devoluciones', 'mis_solicitudes', 'glo
 # al proyecto, asi que conviene que digan de quien son.
 PREFIJO_GRUPO = 's_exp'
 
+# Secciones en las que el polling excluia los apuntes del propio usuario
+# (exclude(usuario=user) en changes_check_api). Sin esto, el admin que
+# entrega un prestamo recibiria el aviso de su propia entrega.
+SECCIONES_SIN_AUTOAVISO = ('prestamos', 'global')
+
 
 def grupo_de_seccion(seccion):
     """Nombre del grupo que recibe los avisos de una seccion."""
@@ -70,6 +75,7 @@ class CambiosConsumer(AsyncJsonWebsocketConsumer):
                 grupo_de_seccion('solicitudes'),
                 grupo_de_seccion('prestamos'),
                 grupo_de_seccion('devoluciones'),
+                grupo_de_seccion('admin_global'),
             ]
 
         self.grupos.append(grupo_de_seccion('global'))
@@ -108,6 +114,12 @@ class CambiosConsumer(AsyncJsonWebsocketConsumer):
         emite -'cambio'-, porque asi es como Channels enruta los mensajes de
         grupo a un metodo del consumer.
         """
+        seccion = evento.get('seccion')
+        actor = evento.get('actor_id')
+
+        if actor and actor == getattr(self, 'user_id', None) and seccion in SECCIONES_SIN_AUTOAVISO:
+            return
+
         await self.send_json({
             'tipo': 'cambio',
             'seccion': evento.get('seccion'),
