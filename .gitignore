@@ -46,3 +46,5 @@ scratch/generar_reporte_word.py
 
 # Prompts
 .github\prompts\siwih-refactor-persona-a-ingreso.prompt.md
+venv/
+ESTADO-TRABAJO.md
