@@ -47,6 +47,38 @@
     });
 })();
 
+// Alertas por tiempo (vence en 10 / 5 min, vencido cada 5 min): no las
+// provoca ninguna acción, así que el socket no avisa. El servidor dice cuándo
+// toca la siguiente y aquí se programa UNA espera hasta ese momento, en lugar
+// de preguntar cada pocos segundos.
+let __sexpTimerAlertasTiempo = null;
+
+function programarChequeoPorTiempo(segundos) {
+    clearTimeout(__sexpTimerAlertasTiempo);
+    __sexpTimerAlertasTiempo = null;
+    if (typeof segundos === 'number' && segundos > 0) {
+        __sexpTimerAlertasTiempo = setTimeout(verificarAlertasGlobales, segundos * 1000);
+    }
+}
+
+// Tras cerrar un modal y marcarlo como leído, mirar si queda otra alerta.
+// Antes esto lo hacía el ciclo de 5 s del polling; con el socket no hay ciclo.
+function siguienteAlerta() {
+    setTimeout(verificarAlertasGlobales, 300);
+}
+
+// Si la pestaña está oculta, el modal no se ve: aviso del sistema (o título).
+function avisarSiOculta(titulo, mensaje) {
+    if (document.hidden && window.AvisosSExp) {
+        window.AvisosSExp.mostrar({
+            titulo: titulo,
+            mensaje: mensaje,
+            url: window.urls && window.urls.s_exp_seguimiento,
+            enPantalla: false,
+        });
+    }
+}
+
 function verificarAlertasGlobales() {
     if (!window.urls || !window.urls.s_exp_alertas_api) return;
 
@@ -78,6 +110,8 @@ function verificarAlertasGlobales() {
             // IMPACTO EN RENDIMIENTO:
             //   Igual de ligero que antes (un solo request a /alertas/), pero
             //   sin crear/destruir modales innecesarios en el mismo ciclo.
+            programarChequeoPorTiempo(resp.proximo_chequeo_seg);
+
             if (!resp.alertas || !resp.alertas.length) return;
 
             // Si ya hay un modal sticky abierto, esperar a que se acepte.
@@ -94,6 +128,7 @@ function verificarAlertasGlobales() {
             if (!pendiente) return;
 
             if (pendiente.tipo_alerta === 'vencimiento' && pendiente.prestamo_id) {
+                avisarSiOculta('Préstamo vencido', 'Tiene expedientes pendientes de devolver.');
                 mostrarModalAlertaVencimiento(pendiente);
             } else if (pendiente.tipo_alerta === 'recuperacion' && pendiente.detalle_id) {
                 // Va ANTES del caso genérico: esta alerta también trae
@@ -189,6 +224,7 @@ function marcarRecuperacionLeida(detalleId) {
         headers: { 'X-CSRFToken': window.CSRF_TOKEN },
         contentType: 'application/json',
         data: JSON.stringify({ detalle_id: detalleId }),
+        complete: siguienteAlerta,
         error: function (xhr) {
             console.error('[Alertas] No se pudo marcar la recuperación como leída:', xhr && xhr.status);
         }
@@ -202,9 +238,7 @@ function marcarAlertaLeida(solicitudId) {
         headers: { 'X-CSRFToken': window.CSRF_TOKEN },
         contentType: 'application/json',
         data: JSON.stringify({ solicitud_id: solicitudId }),
-        success: function (resp) {
-            // No hacemos nada, la alerta ya no vendrá en la siguiente consulta
-        },
+        complete: siguienteAlerta,
         error: function () {
             console.error("Error al marcar alerta como leída");
         }
@@ -251,9 +285,8 @@ function marcarVencimientoLeido(prestamoId) {
         headers: { 'X-CSRFToken': window.CSRF_TOKEN },
         contentType: 'application/json',
         data: JSON.stringify({ prestamo_id: prestamoId }),
-        success: function (resp) {
-            // Aceptado temporalmente por 5 minutos
-        },
+        // Leído por 5 minutos; el servidor ya cuenta eso en proximo_chequeo_seg.
+        complete: siguienteAlerta,
         error: function () {
             console.error("Error al marcar alerta de vencimiento como leída");
         }
