@@ -269,3 +269,172 @@ class ParidadConElPollingTests(TestCase):
         self.assertEqual(destinatarios, [3, 4])
         for c in emitir.call_args_list:
             self.assertEqual(c.args[0], "mis_solicitudes")
+
+
+# ---------------------------------------------------------------------------
+# Datos de prueba para Devoluciones y Reportes
+# ---------------------------------------------------------------------------
+
+class DatosDePrestamoMixin:
+    """Crea admin con su ficha de RRHH y préstamos con expedientes.
+
+    El permiso de administración exige la cadena completa de RRHH, igual que
+    en LimitesDeLaListaTests; sin ella las vistas responden 403.
+    """
+
+    @classmethod
+    def crear_admin(cls, username):
+        from rrhh.models import Empleado, PersonalNoClinico
+        from servicio.models import Unidad
+
+        admin = User.objects.create_superuser(username=username, password="clave-de-prueba")
+        unidad = Unidad.objects.create(
+            nombre_unidad="UNIDAD " + username, tipo=1, estado=1,
+            creado_por=admin, modificado_por=admin,
+        )
+        empleado = Empleado.objects.create(
+            dni=str(abs(hash(username)))[:13].rjust(13, "0"),
+            primer_nombre="PRUEBA", primer_apellido="ADMIN", estado=1,
+            usuario=admin, creado_por=admin, modificado_por=admin,
+        )
+        PersonalNoClinico.objects.create(
+            empleado=empleado, tipo=1, servicio_unidad=unidad,
+            creado_por=admin, modificado_por=admin,
+        )
+        cls.unidad = unidad
+        return admin
+
+    _numero = 0
+
+    @classmethod
+    def crear_prestamo(cls, admin, estado_sol, estado_prestamo, n_detalles=2,
+                       devueltos=0, minutos_limite=60, usuario=None):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from expediente.models import Expediente
+        from s_exp.models import (
+            EstadoExpedienteFisico, EstadoPrestamo, EstadoSolicitud,
+            ExpedientePrestamo, MotivoSolicitud, Prestamo,
+            SolicitudExpedienteDetalle, SolicitudPrestamo,
+        )
+
+        solicitud = SolicitudPrestamo.objects.create(
+            usuario=usuario or admin,
+            estado_flujo_id=EstadoSolicitud.id_de(estado_sol),
+            motivo=MotivoSolicitud.objects.first(),
+            servicio_unidad=cls.unidad,
+        )
+        for i in range(n_detalles):
+            DatosDePrestamoMixin._numero += 1
+            exp = Expediente.objects.create(
+                numero=900000 + DatosDePrestamoMixin._numero,
+                creado_por=admin, modificado_por=admin,
+            )
+            ep = ExpedientePrestamo.objects.create(
+                expediente=exp,
+                estado_id=EstadoExpedienteFisico.id_de('EXP_PRESTADO'),
+            )
+            SolicitudExpedienteDetalle.objects.create(
+                solicitud=solicitud, expediente_prestamo=ep,
+                aprobado=True, devuelto=i < devueltos,
+            )
+        prestamo = Prestamo.objects.create(
+            solicitud=solicitud, admin_aprobador=admin,
+            estado_id=EstadoPrestamo.id_de(estado_prestamo),
+            fecha_limite=timezone.now() + timedelta(minutes=minutos_limite),
+        )
+        return prestamo
+
+
+class DevolucionesTests(DatosDePrestamoMixin, TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.admin = cls.crear_admin("zz_devol")
+
+    def setUp(self):
+        self.client.force_login(self.admin)
+
+    def _crear(self, n):
+        return [
+            self.crear_prestamo(self.admin, 'SOL_EN_DEVOLUCION', 'Entregado')
+            for _ in range(n)
+        ]
+
+    def _pedir(self):
+        return self.client.get(reverse("s_exp_prestamos_devolucion_api"))
+
+    def test_devoluciones_consultas_constantes(self):
+        """Antes eran unas tres consultas por préstamo."""
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        self._crear(3)
+        self._pedir()  # calienta cachés de catálogos
+        with CaptureQueriesContext(connection) as con3:
+            self.assertEqual(self._pedir().status_code, 200)
+        self._crear(3)
+        with CaptureQueriesContext(connection) as con6:
+            self.assertEqual(self._pedir().status_code, 200)
+
+        self.assertEqual(len(con3), len(con6))
+
+    def test_devoluciones_forma_y_total(self):
+        self._crear(3)
+        datos = self._pedir().json()
+
+        self.assertEqual(datos["total"], 3)
+        self.assertEqual(datos["mostrando"], 3)
+        fila = datos["data"][0]
+        self.assertEqual(set(fila), {
+            "id", "solicitud_id", "usuario", "usuario_nombre", "unidad", "estado",
+            "detalles_expedientes", "cant_expedientes", "cant_devueltos",
+            "fecha_limite", "esta_vencido",
+        })
+        self.assertEqual(fila["cant_expedientes"], 2)
+        self.assertEqual(fila["cant_devueltos"], 0)
+        self.assertEqual(len(fila["detalles_expedientes"]), 2)
+
+    def test_procesar_devolucion_es_atomico(self):
+        """Un fallo a mitad no puede dejar expedientes devueltos sin cerrar."""
+        import json
+        from unittest import mock
+
+        from s_exp.models import Devolucion
+
+        prestamo = self._crear(1)[0]
+        detalle = prestamo.solicitud.detalles.first()
+
+        with mock.patch.object(Devolucion.objects, "create", side_effect=RuntimeError("boom")):
+            r = self.client.post(
+                reverse("s_exp_procesar_devolucion_api"),
+                data=json.dumps({"prestamo_id": prestamo.id, "detalles_recibidos": [detalle.id]}),
+                content_type="application/json",
+            )
+
+        self.assertEqual(r.status_code, 500)
+        detalle.refresh_from_db()
+        self.assertFalse(detalle.devuelto)
+
+    def test_procesar_devolucion_completa_cierra_el_prestamo(self):
+        """El camino normal sigue igual dentro de la transacción."""
+        import json
+
+        from s_exp.models import EstadoPrestamo, EstadoSolicitud
+
+        prestamo = self._crear(1)[0]
+        ids = list(prestamo.solicitud.detalles.values_list("id", flat=True))
+        r = self.client.post(
+            reverse("s_exp_procesar_devolucion_api"),
+            data=json.dumps({"prestamo_id": prestamo.id, "detalles_recibidos": ids}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(r.status_code, 200)
+        prestamo.refresh_from_db()
+        prestamo.solicitud.refresh_from_db()
+        self.assertEqual(EstadoPrestamo.codigo_de(prestamo.estado_id), "Cerrado")
+        self.assertEqual(EstadoSolicitud.codigo_de(prestamo.solicitud.estado_flujo_id), "SOL_FINALIZADA")
+        self.assertEqual(prestamo.devoluciones.count(), 1)

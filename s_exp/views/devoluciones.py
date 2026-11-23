@@ -7,6 +7,8 @@ Parte del paquete s_exp.views (antes views.py monolitico).
 
 import json
 
+from django.db import transaction
+from django.db.models import Prefetch
 from django.http import JsonResponse
 from django.utils import timezone
 from django.views.decorators.http import require_POST, require_GET
@@ -34,6 +36,11 @@ from core.constants.domain_constants import LogApp
 # APIs ADMIN - Control de Devoluciones
 # ============================================
 
+# Techo de seguridad. Es una cola de trabajo: se muestra entera, pero si un
+# dia se acumulan cientos, el navegador no tiene que pagarlo. La respuesta
+# dice cuantas hay en total para que el corte nunca pase por "no hay mas".
+LIMITE_DEVOLUCIONES = 200
+
 @require_GET
 def prestamos_para_devolucion_api(request):
     """Lista préstamos que están pendientes de devolución."""
@@ -42,10 +49,24 @@ def prestamos_para_devolucion_api(request):
 
     try:
         # Mostrar solicitudes marcadas para devolución O con devoluciones incompletas pendientes
-        qs = Prestamo.objects.select_related('solicitud__usuario').filter(
+        base = Prestamo.objects.filter(
             solicitud__estado_flujo_id=EstadoSolicitud.id_de('SOL_EN_DEVOLUCION'),
             estado_id__in=EstadoPrestamo.ids_de(['Entregado', 'Vencido', 'DevolucionParcial'])
-        ).order_by('fecha_limite')
+        )
+        total = base.count()
+
+        # Los detalles aprobados se traen de una vez para todos los préstamos.
+        # Antes se pedian dentro del bucle, y encadenar select_related/filter
+        # sobre la relacion construye un queryset nuevo que anula cualquier
+        # prefetch: unas tres consultas por préstamo.
+        aprobados = SolicitudExpedienteDetalle.objects.filter(aprobado=True).select_related(
+            'expediente_prestamo__expediente', 'expediente_prestamo__estado', 'paciente'
+        )
+        qs = base.select_related(
+            'solicitud__usuario', 'solicitud__servicio_unidad'
+        ).prefetch_related(
+            Prefetch('solicitud__detalles', queryset=aprobados, to_attr='detalles_aprobados')
+        ).order_by('fecha_limite')[:LIMITE_DEVOLUCIONES]
 
         # Importamos los servicios — acceso unificado a datos del detalle
         from s_exp.services.datos_solicitud import DatosDetalleSolicitud, DatosSolicitud
@@ -54,9 +75,8 @@ def prestamos_para_devolucion_api(request):
         for p in qs:
             detalles = []
             # Mostrar TODOS los expedientes aprobados (devueltos y pendientes)
-            for d in p.solicitud.detalles.select_related(
-                'expediente_prestamo__expediente', 'expediente_prestamo__estado', 'paciente'
-            ).filter(aprobado=True):
+            aprobados_p = p.solicitud.detalles_aprobados
+            for d in aprobados_p:
                 estado_fisico_id = EstadoExpedienteFisico.codigo_de(d.expediente_prestamo.estado_id)
                 # Estado de devolución para el front:
                 #   - 'pendiente'  : aún no devuelto
@@ -95,13 +115,13 @@ def prestamos_para_devolucion_api(request):
                 "unidad": DatosSolicitud.unidad_nombre(p.solicitud),
                 "estado": EstadoPrestamo.codigo_de(p.estado_id),
                 "detalles_expedientes": detalles,
-                "cant_expedientes": p.solicitud.detalles.filter(aprobado=True).count(),
-                "cant_devueltos": p.solicitud.detalles.filter(aprobado=True, devuelto=True).count(),
+                "cant_expedientes": len(aprobados_p),
+                "cant_devueltos": sum(1 for d in aprobados_p if d.devuelto),
                 "fecha_limite": p.fecha_limite.isoformat() if p.fecha_limite else None,
                 "esta_vencido": p.esta_vencido,
             })
 
-        return JsonResponse({"data": data})
+        return JsonResponse({"data": data, "total": total, "mostrando": len(data)})
 
     except Exception as e:
         log_error(f"Error en prestamos_para_devolucion_api: {e}", app=LogApp.S_EXP)
@@ -236,144 +256,153 @@ def procesar_devolucion_api(request):
             v = comentarios_por_detalle.get(str(det_id)) or comentarios_por_detalle.get(det_id)
             return (v or '').strip() or None
 
-        prestamo = Prestamo.objects.get(id=prestamo_id)
-        solicitud = prestamo.solicitud
+        # Todo o nada. Antes, un fallo a mitad (la base, un expediente sin
+        # préstamo, lo que sea) dejaba unos expedientes marcados como devueltos
+        # y la solicitud, el préstamo y el registro de devolución sin cerrar.
+        # select_for_update evita que dos admins auditen el mismo préstamo a la vez.
+        with transaction.atomic():
+            prestamo = Prestamo.objects.select_for_update().get(id=prestamo_id)
+            solicitud = prestamo.solicitud
 
-        # 1. Procesar los que llegaron (Disponibles)
-        esta_vencido = prestamo.esta_vencido
+            # 1. Procesar los que llegaron (Disponibles)
+            esta_vencido = prestamo.esta_vencido
 
-        # Resolver UNA sola vez la ubicación ADMISION (catálogo nuevo).
-        # Al devolver, el expediente regresa a ADMISION.
-        from expediente.services.ubicaciones import CatalogoUbicaciones
-        ubicacion_admision = None
-        try:
-            ubicacion_admision = CatalogoUbicaciones.ubicacion_admision()
-        except Exception as _e:
-            log_warning(f"No se pudo resolver ubicacion ADMISION: {_e}", app=LogApp.S_EXP)
+            # Resolver UNA sola vez la ubicación ADMISION (catálogo nuevo).
+            # Al devolver, el expediente regresa a ADMISION.
+            from expediente.services.ubicaciones import CatalogoUbicaciones
+            ubicacion_admision = None
+            try:
+                # Savepoint: si esto falla en la base, el error no puede
+                # envenenar la transacción de toda la auditoría.
+                with transaction.atomic():
+                    ubicacion_admision = CatalogoUbicaciones.ubicacion_admision()
+            except Exception as _e:
+                log_warning(f"No se pudo resolver ubicacion ADMISION: {_e}", app=LogApp.S_EXP)
 
-        # Hora de ESTA auditoría: se sella en cada expediente recibido ahora.
-        # Clave para las devoluciones parciales: cada tanda queda con su propia
-        # fecha, así se sabe cuándo regresó realmente cada expediente.
-        ahora_dev = timezone.now()
+            # Hora de ESTA auditoría: se sella en cada expediente recibido ahora.
+            # Clave para las devoluciones parciales: cada tanda queda con su propia
+            # fecha, así se sabe cuándo regresó realmente cada expediente.
+            ahora_dev = timezone.now()
 
-        for det_id in detalles_recibidos:
-            detalle = SolicitudExpedienteDetalle.objects.get(id=det_id, solicitud=solicitud)
-            if not detalle.devuelto:
-                detalle.devuelto = True
-                detalle.fecha_devolucion = ahora_dev
-                if esta_vencido:
-                    detalle.fuera_de_tiempo = True
-                detalle.comentario_devolucion = _comentario(det_id)
-                detalle.save()
+            for det_id in detalles_recibidos:
+                detalle = SolicitudExpedienteDetalle.objects.get(id=det_id, solicitud=solicitud)
+                if not detalle.devuelto:
+                    detalle.devuelto = True
+                    detalle.fecha_devolucion = ahora_dev
+                    if esta_vencido:
+                        detalle.fuera_de_tiempo = True
+                    detalle.comentario_devolucion = _comentario(det_id)
+                    detalle.save()
 
+                    ep = detalle.expediente_prestamo
+                    estado_ant = ep.estado
+                    ep.estado_id = EstadoExpedienteFisico.id_de('EXP_DISPONIBLE')
+                    # NUEVO: regresar al catálogo unificado → ADMISION (FK por id)
+                    if ubicacion_admision is not None:
+                        ep.ubicacion = ubicacion_admision
+                    ep.save()
+
+                    # Actualizar la ubicación del expediente a ADMISION:
+                    #  - NUEVO: expediente.ubicacion (FK catálogo) = ADMISION
+                    #  - LEGACY: expediente.localizacion (texto) sincronizado
+                    try:
+                        with transaction.atomic():
+                            _set_ubicacion_admision(ep.expediente, request.user, ubicacion_obj=ubicacion_admision)
+                    except Exception as _e:
+                        log_warning(f"No se pudo regresar a ADMISION al devolver: {_e}", app=LogApp.S_EXP)
+
+                    ExpedienteEstadoLog.objects.create(
+                        expediente=ep.expediente,
+                        estado_anterior=estado_ant,
+                        estado_nuevo_id=EstadoExpedienteFisico.id_de('EXP_DISPONIBLE'),
+                        usuario=request.user,
+                        solicitud=solicitud,
+                        observacion="Devuelto correctamente" + (" (Fuera de tiempo)" if esta_vencido else "")
+                    )
+
+            # 2. Procesar los perdidos (Cuentan como procesados/cerrados para la solicitud)
+            for det_id in detalles_perdidos:
+                detalle = SolicitudExpedienteDetalle.objects.get(id=det_id, solicitud=solicitud)
+                if not detalle.devuelto:
+                    detalle.devuelto = True  # Se marca como procesado
+                    # Fecha en que se cerró el expediente (aunque sea como perdido).
+                    detalle.fecha_devolucion = ahora_dev
+                    detalle.comentario_devolucion = _comentario(det_id) or 'Marcado como perdido'
+                    detalle.save()
+                
+                    ep = detalle.expediente_prestamo
+                    estado_ant = ep.estado
+                    ep.estado_id = EstadoExpedienteFisico.id_de('EXP_PERDIDO')
+                    ep.save()
+                
+                    ExpedienteEstadoLog.objects.create(
+                        expediente=ep.expediente,
+                        estado_anterior=estado_ant,
+                        estado_nuevo_id=EstadoExpedienteFisico.id_de('EXP_PERDIDO'),
+                        usuario=request.user,
+                        solicitud=solicitud,
+                        observacion="Marcado como perdido durante auditoría"
+                    )
+
+            # 3. Procesar los NO recibidos (Siguen pendientes)
+            for det_id in detalles_no_recibidos:
+                detalle = SolicitudExpedienteDetalle.objects.get(id=det_id, solicitud=solicitud)
                 ep = detalle.expediente_prestamo
-                estado_ant = ep.estado
-                ep.estado_id = EstadoExpedienteFisico.id_de('EXP_DISPONIBLE')
-                # NUEVO: regresar al catálogo unificado → ADMISION (FK por id)
-                if ubicacion_admision is not None:
-                    ep.ubicacion = ubicacion_admision
-                ep.save()
-
-                # Actualizar la ubicación del expediente a ADMISION:
-                #  - NUEVO: expediente.ubicacion (FK catálogo) = ADMISION
-                #  - LEGACY: expediente.localizacion (texto) sincronizado
-                try:
-                    _set_ubicacion_admision(ep.expediente, request.user, ubicacion_obj=ubicacion_admision)
-                except Exception as _e:
-                    log_warning(f"No se pudo regresar a ADMISION al devolver: {_e}", app=LogApp.S_EXP)
-
                 ExpedienteEstadoLog.objects.create(
                     expediente=ep.expediente,
-                    estado_anterior=estado_ant,
-                    estado_nuevo_id=EstadoExpedienteFisico.id_de('EXP_DISPONIBLE'),
+                    estado_anterior=ep.estado,
+                    estado_nuevo_id=EstadoExpedienteFisico.id_de('EXP_PRESTADO'),
                     usuario=request.user,
                     solicitud=solicitud,
-                    observacion="Devuelto correctamente" + (" (Fuera de tiempo)" if esta_vencido else "")
+                    observacion="Auditado como NO RECIBIDO (Sigue en préstamo)"
                 )
 
-        # 2. Procesar los perdidos (Cuentan como procesados/cerrados para la solicitud)
-        for det_id in detalles_perdidos:
-            detalle = SolicitudExpedienteDetalle.objects.get(id=det_id, solicitud=solicitud)
-            if not detalle.devuelto:
-                detalle.devuelto = True  # Se marca como procesado
-                # Fecha en que se cerró el expediente (aunque sea como perdido).
-                detalle.fecha_devolucion = ahora_dev
-                detalle.comentario_devolucion = _comentario(det_id) or 'Marcado como perdido'
-                detalle.save()
-                
-                ep = detalle.expediente_prestamo
-                estado_ant = ep.estado
-                ep.estado_id = EstadoExpedienteFisico.id_de('EXP_PERDIDO')
-                ep.save()
-                
-                ExpedienteEstadoLog.objects.create(
-                    expediente=ep.expediente,
-                    estado_anterior=estado_ant,
-                    estado_nuevo_id=EstadoExpedienteFisico.id_de('EXP_PERDIDO'),
-                    usuario=request.user,
-                    solicitud=solicitud,
-                    observacion="Marcado como perdido durante auditoría"
-                )
+            # 4. Determinar estado final de la solicitud (solo expedientes aprobados cuentan)
+            total_exp = solicitud.detalles.filter(aprobado=True).count()
+            devueltos_ahora = solicitud.detalles.filter(aprobado=True, devuelto=True).count()
+            hay_no_recibidos = len(detalles_no_recibidos) > 0
+        
+            if devueltos_ahora >= total_exp and not hay_no_recibidos:
+                # Todo procesado: ver si fue vencido
+                if prestamo.esta_vencido:
+                    solicitud.estado_flujo_id = EstadoSolicitud.id_de('SOL_FINALIZADA')
+                    prestamo.estado_id = EstadoPrestamo.id_de('DevueltoVencido')
+                else:
+                    solicitud.estado_flujo_id = EstadoSolicitud.id_de('SOL_FINALIZADA')
+                    prestamo.estado_id = EstadoPrestamo.id_de('Cerrado')
+                prestamo.fecha_devolucion_real = timezone.now()
+            else:
+                # Faltan expedientes (no_recibidos pendientes)
+                solicitud.estado_flujo_id = EstadoSolicitud.id_de('SOL_INCOMPLETA')
+                prestamo.estado_id = EstadoPrestamo.id_de('DevolucionParcial')
+            
+            solicitud.save()
+            prestamo.save()
 
-        # 3. Procesar los NO recibidos (Siguen pendientes)
-        for det_id in detalles_no_recibidos:
-            detalle = SolicitudExpedienteDetalle.objects.get(id=det_id, solicitud=solicitud)
-            ep = detalle.expediente_prestamo
-            ExpedienteEstadoLog.objects.create(
-                expediente=ep.expediente,
-                estado_anterior=ep.estado,
-                estado_nuevo_id=EstadoExpedienteFisico.id_de('EXP_PRESTADO'),
-                usuario=request.user,
-                solicitud=solicitud,
-                observacion="Auditado como NO RECIBIDO (Sigue en préstamo)"
+            # Registrar devolución parcial
+            Devolucion.objects.create(
+                prestamo=prestamo,
+                cantidad_esperada=total_exp,
+                cantidad_recibida=devueltos_ahora,
+                # estado_id (FK al catálogo EstadoDevolucion). El código string es el PK.
+                estado_id=EstadoDevolucion.id_de('Completa') if devueltos_ahora >= total_exp and not hay_no_recibidos else EstadoDevolucion.id_de('Incompleta'),
+                notas_admin=notas
             )
 
-        # 4. Determinar estado final de la solicitud (solo expedientes aprobados cuentan)
-        total_exp = solicitud.detalles.filter(aprobado=True).count()
-        devueltos_ahora = solicitud.detalles.filter(aprobado=True, devuelto=True).count()
-        hay_no_recibidos = len(detalles_no_recibidos) > 0
-        
-        if devueltos_ahora >= total_exp and not hay_no_recibidos:
-            # Todo procesado: ver si fue vencido
-            if prestamo.esta_vencido:
-                solicitud.estado_flujo_id = EstadoSolicitud.id_de('SOL_FINALIZADA')
-                prestamo.estado_id = EstadoPrestamo.id_de('DevueltoVencido')
-            else:
-                solicitud.estado_flujo_id = EstadoSolicitud.id_de('SOL_FINALIZADA')
-                prestamo.estado_id = EstadoPrestamo.id_de('Cerrado')
-            prestamo.fecha_devolucion_real = timezone.now()
-        else:
-            # Faltan expedientes (no_recibidos pendientes)
-            solicitud.estado_flujo_id = EstadoSolicitud.id_de('SOL_INCOMPLETA')
-            prestamo.estado_id = EstadoPrestamo.id_de('DevolucionParcial')
-            
-        solicitud.save()
-        prestamo.save()
-
-        # Registrar devolución parcial
-        Devolucion.objects.create(
-            prestamo=prestamo,
-            cantidad_esperada=total_exp,
-            cantidad_recibida=devueltos_ahora,
-            # estado_id (FK al catálogo EstadoDevolucion). El código string es el PK.
-            estado_id=EstadoDevolucion.id_de('Completa') if devueltos_ahora >= total_exp and not hay_no_recibidos else EstadoDevolucion.id_de('Incompleta'),
-            notas_admin=notas
-        )
-
-        # Registrar log de auditoría — esto también dispara el changes-check
-        # para que las pantallas conectadas (Mis Solicitudes, etc.) detecten
-        # el cambio y se actualicen automáticamente.
-        descripcion_log = (
-            f"Auditoría de devolución del préstamo #{prestamo.id}: "
-            f"{devueltos_ahora}/{total_exp} expedientes devueltos. "
-            f"Estado solicitud: {EstadoSolicitud.codigo_de(solicitud.estado_flujo_id)}."
-        )
-        _registrar_log(
-            request.user,
-            'DEVOLUCION_PROCESADA',
-            descripcion_log,
-            'Prestamo', prestamo.id
-        )
+            # Registrar log de auditoría — esto también dispara el changes-check
+            # para que las pantallas conectadas (Mis Solicitudes, etc.) detecten
+            # el cambio y se actualicen automáticamente.
+            descripcion_log = (
+                f"Auditoría de devolución del préstamo #{prestamo.id}: "
+                f"{devueltos_ahora}/{total_exp} expedientes devueltos. "
+                f"Estado solicitud: {EstadoSolicitud.codigo_de(solicitud.estado_flujo_id)}."
+            )
+            _registrar_log(
+                request.user,
+                'DEVOLUCION_PROCESADA',
+                descripcion_log,
+                'Prestamo', prestamo.id
+            )
 
         return JsonResponse({"success": True, "estado": EstadoSolicitud.codigo_de(solicitud.estado_flujo_id)})
 
