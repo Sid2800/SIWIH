@@ -302,8 +302,14 @@
          * @param {number} intervalSegundos - Intervalo en segundos (default 5)
          */
         registrar(nombre, funcionRecarga, intervalSegundos = 5) {
-            // Si ya estaba registrada, limpiar primero
-            this.desregistrar(nombre);
+            // Si ya estaba registrada, limpiar solo su temporizador. No se
+            // llama a desregistrar(): borraria el manejador del socket que
+            // registrarConTrigger / registrarConAutoReload acaban de guardar,
+            // y la pantalla dejaria de enterarse de los avisos en silencio
+            // (el socket conectado apaga el polling, asi que nada la movia).
+            const previa = pantallas.get(nombre);
+            if (previa && previa.timer) clearTimeout(previa.timer);
+            pantallas.delete(nombre);
 
             const intervalMs = Math.max(1000, intervalSegundos * 1000);
 
