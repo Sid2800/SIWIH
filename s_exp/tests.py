@@ -438,3 +438,62 @@ class DevolucionesTests(DatosDePrestamoMixin, TestCase):
         self.assertEqual(EstadoPrestamo.codigo_de(prestamo.estado_id), "Cerrado")
         self.assertEqual(EstadoSolicitud.codigo_de(prestamo.solicitud.estado_flujo_id), "SOL_FINALIZADA")
         self.assertEqual(prestamo.devoluciones.count(), 1)
+
+
+class ReportesTests(DatosDePrestamoMixin, TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.admin = cls.crear_admin("zz_reportes")
+
+    def setUp(self):
+        self.client.force_login(self.admin)
+
+    def _pedir(self):
+        return self.client.get(reverse("s_exp_reportes_data_api"))
+
+    def test_inconsistencias_no_suma_acumulados(self):
+        """Cada auditoría guarda el total acumulado, no lo de esa tanda.
+
+        3 aprobados; primera auditoría recibe 1 (cantidad_recibida=1), la
+        segunda otro más (cantidad_recibida=2). Sumar daba 3 devueltos y
+        "0 faltantes" cuando en realidad falta uno.
+        """
+        from s_exp.models import Devolucion, EstadoDevolucion
+
+        p = self.crear_prestamo(self.admin, 'SOL_INCOMPLETA', 'DevolucionParcial',
+                                n_detalles=3, devueltos=2)
+        for recibida in (1, 2):
+            Devolucion.objects.create(
+                prestamo=p, cantidad_esperada=3, cantidad_recibida=recibida,
+                estado_id=EstadoDevolucion.id_de('Incompleta'),
+            )
+
+        fila = self._pedir().json()["inconsistencias"][0]
+
+        self.assertEqual(fila["total_expedientes"], 3)
+        self.assertEqual(fila["devueltos"], 2)
+        self.assertEqual(fila["faltantes"], 1)
+
+    def test_reportes_consultas_constantes(self):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        def crear(n):
+            for _ in range(n):
+                self.crear_prestamo(self.admin, 'SOL_RECHAZADA', 'Cerrado', n_detalles=1)
+                self.crear_prestamo(self.admin, 'SOL_INCOMPLETA', 'DevolucionParcial', devueltos=1)
+                self.crear_prestamo(self.admin, 'SOL_EN_PRESTAMO', 'Entregado', minutos_limite=-30)
+
+        crear(2)
+        self._pedir()
+        with CaptureQueriesContext(connection) as c2:
+            self.assertEqual(self._pedir().status_code, 200)
+        crear(3)
+        with CaptureQueriesContext(connection) as c5:
+            datos = self._pedir().json()
+
+        self.assertEqual(len(c2), len(c5))
+        self.assertEqual(datos["rechazos_total"], 5)
+        self.assertEqual(datos["morosidad_total"], 5)
+        self.assertEqual(datos["inconsistencias_total"], 5)
