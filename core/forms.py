@@ -8,7 +8,14 @@ class CustomLoginForm(AuthenticationForm):
         queryset=Zona.objects.filter(estado=1), 
         required=True, 
         empty_label=None,
-        initial=Zona.objects.get(codigo=1),
+        # Se resuelve al construir el formulario, no al importar el modulo.
+        # Tal como estaba -una llamada suelta en el cuerpo de la clase- la
+        # consulta salia en el import: rompia con la base vacia (un despliegue
+        # nuevo, o las pruebas, que empiezan sin catalogos) y ademas congelaba
+        # la zona al arrancar el proceso, asi que cambiarla en base no se veia
+        # hasta reiniciar. filter().first() en vez de get() porque la ausencia
+        # de la zona 1 no debe tumbar la pantalla de login.
+        initial=lambda: Zona.objects.filter(codigo=1).first(),
         to_field_name="codigo"
     )
 

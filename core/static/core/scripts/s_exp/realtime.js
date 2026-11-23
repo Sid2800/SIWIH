@@ -201,12 +201,128 @@
             p.fallosConsecutivos++;
         }
 
-        // Programar el siguiente tick (backoff exponencial si hay fallos)
-        if (!pausado && pantallas.has(nombre)) {
+        // Programar el siguiente tick (backoff exponencial si hay fallos).
+        // Con el socket conectado no se programa nada: el servidor avisa, y
+        // preguntar ademas seria hacer el trabajo dos veces.
+        if (!pausado && !socketConectado && pantallas.has(nombre)) {
             const factor = Math.min(8, Math.pow(2, p.fallosConsecutivos));
             const delay = p.intervalMs * factor;
             p.timer = setTimeout(() => _ejecutar(nombre), delay);
         }
+    }
+
+
+    // =====================================================================
+    // WebSocket: el servidor avisa en lugar de que el navegador pregunte
+    //
+    // Mientras el socket este vivo, los temporizadores no se programan. Si
+    // se cae -se reinicia el servidor, se va la red, un proxy corta la
+    // conexion- vuelve el polling automaticamente, porque una pantalla que
+    // deja de enterarse en silencio es peor que una que gasta de mas.
+    // =====================================================================
+
+    // Pantalla -> { seccion, alCambiar }. Lo llenan registrarConTrigger y
+    // registrarConAutoReload; lo lee el socket para saber a quien avisar.
+    const manejadores = new Map();
+
+    let socket = null;
+    let socketConectado = false;
+    let reintentos = 0;
+    let socketTimer = null;
+
+    // Espera antes de reintentar, creciendo con cada fallo hasta medio
+    // minuto. Reintentar cada segundo contra un servidor caido es la forma
+    // de que, cuando vuelva, se lo encuentre con todos los navegadores del
+    // hospital llamando a la vez.
+    function _esperaReintento() {
+        return Math.min(30000, 1000 * Math.pow(2, Math.min(reintentos, 5)));
+    }
+
+    function _urlSocket() {
+        const esquema = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        return `${esquema}//${window.location.host}/ws/s_exp/cambios/`;
+    }
+
+    function _despacharCambio(seccion) {
+        manejadores.forEach(function (m) {
+            if (m.seccion === seccion || m.seccion === 'global') {
+                try { m.alCambiar(); }
+                catch (e) { console.error('[Realtime] Error atendiendo cambio:', e); }
+            }
+        });
+    }
+
+    function _detenerTemporizadores() {
+        pantallas.forEach(function (p) {
+            if (p.timer) {
+                clearTimeout(p.timer);
+                p.timer = null;
+            }
+        });
+    }
+
+    function _arrancarTemporizadores() {
+        if (pausado) return;
+
+        pantallas.forEach(function (p, nombre) {
+            if (!p.timer) {
+                p.timer = setTimeout(() => _ejecutar(nombre), p.intervalMs);
+            }
+        });
+    }
+
+    function conectarSocket() {
+        if (sesionExpirada) return;
+        if (socket && (socket.readyState === 0 || socket.readyState === 1)) return;
+
+        try {
+            socket = new WebSocket(_urlSocket());
+        } catch (e) {
+            // Navegador sin WebSocket o URL invalida: el polling se queda.
+            return;
+        }
+
+        socket.onopen = function () {
+            socketConectado = true;
+            reintentos = 0;
+            // Ya no hace falta preguntar.
+            _detenerTemporizadores();
+        };
+
+        socket.onmessage = function (evento) {
+            let datos;
+
+            try { datos = JSON.parse(evento.data); }
+            catch (e) { return; }
+
+            if (datos && datos.tipo === 'cambio' && datos.seccion) {
+                _despacharCambio(datos.seccion);
+            }
+        };
+
+        socket.onclose = function (evento) {
+            socketConectado = false;
+
+            // 4401 es el cierre que manda el servidor cuando no hay sesion.
+            // Reintentar con la sesion caducada solo produce un bucle de
+            // conexiones rechazadas.
+            if (evento && evento.code === 4401) {
+                sesionExpirada = true;
+                return;
+            }
+
+            // Mientras no haya socket, se vuelve a preguntar.
+            _arrancarTemporizadores();
+
+            reintentos++;
+            clearTimeout(socketTimer);
+            socketTimer = setTimeout(conectarSocket, _esperaReintento());
+        };
+
+        socket.onerror = function () {
+            // onclose viene detras y se encarga del respaldo; aqui no hay
+            // nada que hacer salvo no dejar el error sin manejar.
+        };
     }
 
     const RealtimeSExp = {
@@ -250,6 +366,18 @@
         registrarConAutoReload(nombre, seccion, funcionRecarga, intervalSegundos = 5) {
             let ultimoTs = null;
             let primeraEjecucion = true;
+
+            // Lo que hay que hacer cuando esta seccion cambia, venga el aviso
+            // por socket o por polling. Guardarlo aqui es lo que permite que
+            // el socket dispare exactamente el mismo comportamiento sin
+            // duplicar la logica de cada pantalla.
+            manejadores.set(nombre, {
+                seccion: seccion,
+                alCambiar: function () {
+                    try { funcionRecarga(); }
+                    catch (e) { console.error(`[Realtime] Error en "${nombre}":`, e); }
+                },
+            });
 
             const wrapper = function () {
                 if (!window.urls || !window.urls.s_exp_changes_check_api) {
@@ -308,6 +436,26 @@
             let primeraEjecucion = true;
             let cambiosPendientes = 0;
 
+            // Igual que arriba, pero esta variante no recarga sola: acumula y
+            // ofrece el banner, para no interrumpir a quien esta revisando o
+            // aprobando algo en ese momento.
+            manejadores.set(nombre, {
+                seccion: seccion,
+                alCambiar: function () {
+                    cambiosPendientes++;
+                    _mostrarBannerActualizacion(
+                        nombre,
+                        cambiosPendientes,
+                        opts.etiqueta || 'novedades',
+                        function () {
+                            try { funcionRecarga(); }
+                            catch (e) { console.error(`[Realtime] Error en recarga "${nombre}":`, e); }
+                            cambiosPendientes = 0;
+                        }
+                    );
+                },
+            });
+
             const wrapper = function () {
                 if (!window.urls || !window.urls.s_exp_changes_check_api) {
                     return funcionRecarga();
@@ -362,6 +510,7 @@
             const p = pantallas.get(nombre);
             if (p && p.timer) clearTimeout(p.timer);
             pantallas.delete(nombre);
+            manejadores.delete(nombre);
         },
 
         /**
@@ -380,6 +529,13 @@
          */
         reanudar() {
             pausado = false;
+
+            if (socketConectado) {
+                // El socket se mantiene al cambiar de pestaña, asi que al
+                // volver no hay nada que reanudar ni nada que recuperar.
+                return;
+            }
+
             pantallas.forEach((p, nombre) => {
                 if (!p.timer) {
                     // Ejecutar inmediatamente al volver
@@ -455,6 +611,31 @@
         pantallas.clear();
     });
 
+    // Cerrar el socket al salir, para que el servidor libere el grupo en el
+    // acto en lugar de esperar a que la conexion caduque sola.
+    window.addEventListener('beforeunload', function () {
+        clearTimeout(socketTimer);
+        if (socket) {
+            try { socket.close(); } catch (e) { /* la pagina ya se va */ }
+        }
+    });
+
+    // Estado del socket, para diagnosticar desde la consola.
+    RealtimeSExp.socket = function () {
+        return {
+            conectado: socketConectado,
+            reintentos: reintentos,
+            secciones: Array.from(manejadores.entries()).map(([k, v]) => ({
+                pantalla: k, seccion: v.seccion,
+            })),
+        };
+    };
+
     // Exportar al global
     global.RealtimeSExp = RealtimeSExp;
+
+    // Se conecta en cuanto carga el modulo. Hasta que el socket abra, las
+    // pantallas que se registren usan sus temporizadores; al abrir, se
+    // apagan solos.
+    conectarSocket();
 })(window);
