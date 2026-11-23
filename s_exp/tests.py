@@ -497,3 +497,36 @@ class ReportesTests(DatosDePrestamoMixin, TestCase):
         self.assertEqual(datos["rechazos_total"], 5)
         self.assertEqual(datos["morosidad_total"], 5)
         self.assertEqual(datos["inconsistencias_total"], 5)
+
+
+class ProximoChequeoDeAlertasTests(DatosDePrestamoMixin, TestCase):
+    """Los avisos de 10 / 5 minutos salen del reloj, no de una acción.
+
+    Con polling aparecían de rebote con cualquier movimiento del sistema;
+    con el socket, el navegador necesita saber cuándo volver a mirar.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.admin = cls.crear_admin("zz_alertas")
+
+    def setUp(self):
+        self.client.force_login(self.admin)
+
+    def _proximo(self):
+        return self.client.get(reverse("s_exp_alertas_api")).json()["proximo_chequeo_seg"]
+
+    def test_sin_prestamos_no_hay_chequeo(self):
+        self.assertIsNone(self._proximo())
+
+    def test_entregado_espera_al_umbral_de_diez_minutos(self):
+        self.crear_prestamo(self.admin, 'SOL_EN_PRESTAMO', 'Entregado', minutos_limite=30)
+        self.assertAlmostEqual(self._proximo(), 20 * 60, delta=5)
+
+    def test_dentro_de_los_diez_minutos_espera_al_de_cinco(self):
+        self.crear_prestamo(self.admin, 'SOL_EN_PRESTAMO', 'Entregado', minutos_limite=8)
+        self.assertAlmostEqual(self._proximo(), 3 * 60, delta=5)
+
+    def test_vencido_repite_cada_cinco_minutos(self):
+        self.crear_prestamo(self.admin, 'SOL_EN_PRESTAMO', 'Vencido', minutos_limite=-30)
+        self.assertAlmostEqual(self._proximo(), 300, delta=2)
