@@ -43,12 +43,34 @@ class CatalogoCodigoMixin(models.Model):
     _cache_codigo = None    # { id: codigo }
 
     @classmethod
+    def _cargar_cache(cls):
+        """Trae el catalogo entero de una vez y llena los dos mapas.
+
+        Son tablas de unas pocas filas, asi que traerlas completas cuesta una
+        consulta y resuelve todos los codigos. Antes se pedia codigo por
+        codigo: un ids_de() con cinco codigos eran cinco consultas, y la
+        primera pantalla que se abria tras arrancar el proceso las pagaba
+        todas.
+        """
+        filas = list(cls.objects.values('id', 'codigo'))
+        cls._cache_id = {f['codigo']: f['id'] for f in filas}
+        cls._cache_codigo = {f['id']: f['codigo'] for f in filas}
+
+    @classmethod
     def id_de(cls, codigo):
         """Devuelve el id ENTERO correspondiente a un código (cacheado)."""
         if cls._cache_id is None:
-            cls._cache_id = {}
+            cls._cargar_cache()
+
         if codigo not in cls._cache_id:
+            # Puede ser un codigo creado despues de llenarse la cache: el
+            # modulo los crea al vuelo con get_or_create cuando aparece una
+            # accion nueva. Sin esta segunda oportunidad, ese codigo no se
+            # encontraria hasta reiniciar el proceso. Si tampoco esta en base,
+            # objects.get lanza DoesNotExist, que es lo que id_de_seguro
+            # espera atrapar.
             cls._cache_id[codigo] = cls.objects.get(codigo=codigo).pk
+
         return cls._cache_id[codigo]
 
     @classmethod
@@ -86,10 +108,18 @@ class CatalogoCodigoMixin(models.Model):
         """Devuelve el CÓDIGO (texto) a partir de un id, sin query (cacheado)."""
         if not id_:
             return ''
+
         if cls._cache_codigo is None:
-            cls._cache_codigo = {
-                row['id']: row['codigo'] for row in cls.objects.values('id', 'codigo')
-            }
+            cls._cargar_cache()
+
+        if id_ not in cls._cache_codigo:
+            # Mismo caso que en id_de: una fila creada despues de cargarse la
+            # cache. Devolver '' sin mirar haria que un aviso de cambio se
+            # perdiera en silencio, porque el codigo vacio no casa con ninguna
+            # seccion.
+            fila = cls.objects.filter(pk=id_).values('codigo').first()
+            cls._cache_codigo[id_] = fila['codigo'] if fila else ''
+
         return cls._cache_codigo.get(id_, '')
 
     @classmethod
