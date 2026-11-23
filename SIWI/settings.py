@@ -40,6 +40,10 @@ ALLOWED_HOSTS = ['SIWIH', '127.0.0.1', '192.168.88.28', '192.168.88.173', '100.9
 # Application definition
 
 INSTALLED_APPS = [
+    # Primero, antes de staticfiles: hace que 'manage.py runserver' sirva
+    # HTTP y WebSocket (ASGI) en local. En produccion no cambia nada, alli
+    # se arranca Daphne directamente detras de nginx.
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
