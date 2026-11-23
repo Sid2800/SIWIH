@@ -13,9 +13,9 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST, require_GET
 from django.views.decorators.csrf import csrf_protect
 
-from django.db.models import Q
+from django.db.models import Prefetch, Q
 
-from s_exp.models import Prestamo, ExpedienteEstadoLog
+from s_exp.models import Prestamo, SolicitudExpedienteDetalle, ExpedienteEstadoLog
 
 
 from .comunes import (
@@ -27,6 +27,9 @@ from .comunes import (
 
 
 from s_exp.models import EstadoSolicitud, EstadoExpedienteFisico, EstadoPrestamo, EstadoDevolucion
+
+# Estaban importados dentro del bucle que arma la respuesta.
+from s_exp.services.datos_solicitud import DatosSolicitud, DatosDetalleSolicitud
 
 
 from core.utils.utilidades_logging import log_info, log_warning, log_error
@@ -51,7 +54,21 @@ def prestamos_activos_api(request):
         estado_filtro = request.GET.get('estado', '')
 
         qs = Prestamo.objects.select_related(
-            'solicitud__usuario', 'solicitud__motivo', 'solicitud__servicio_unidad'
+            'solicitud__usuario', 'solicitud__motivo', 'solicitud__servicio_unidad',
+            'solicitud__estado_flujo',
+        ).prefetch_related(
+            # Los detalles se pedian dentro del bucle, una consulta por
+            # prestamo. Se traen aqui ya filtrados por aprobado y con su
+            # expediente y paciente, que es lo que necesita el enriquecido.
+            # to_attr deja la lista colgada del objeto; sin el, filtrar
+            # despues volveria a la base y el prefetch no serviria de nada.
+            Prefetch(
+                'solicitud__detalles',
+                queryset=SolicitudExpedienteDetalle.objects.select_related(
+                    'expediente_prestamo__expediente', 'paciente'
+                ).filter(aprobado=True),
+                to_attr='detalles_aprobados',
+            )
         ).filter(
             estado_id__in=EstadoPrestamo.ids_de(['Activo', 'Entregado', 'Vencido', 'DevolucionParcial', 'DevueltoVencido'])
         )
@@ -86,12 +103,9 @@ def prestamos_activos_api(request):
             # estado de cada expediente (devuelto / pendiente / fuera de tiempo /
             # préstamo pendiente) para poder colorear cada tag. Antes se enviaba
             # solo values_list(numero), por eso todos salían sin color.
-            from s_exp.services.datos_solicitud import DatosSolicitud, DatosDetalleSolicitud
             numeros = [
                 DatosDetalleSolicitud.enriquecer(d)
-                for d in p.solicitud.detalles.select_related(
-                    'expediente_prestamo__expediente', 'paciente'
-                ).filter(aprobado=True)
+                for d in p.solicitud.detalles_aprobados
             ]
             data.append({
                 "id": p.id,

@@ -190,6 +190,9 @@ function generarReportes() {
             renderRechazos(data.rechazos);
             renderMorosidad(data.morosidad);
             renderInconsistencias(data.inconsistencias);
+            mostrarContador('#tbody-rechazos', (data.rechazos || []).length, data.rechazos_total);
+            mostrarContador('#tbody-morosidad', (data.morosidad || []).length, data.morosidad_total);
+            mostrarContador('#tbody-inconsistencias', (data.inconsistencias || []).length, data.inconsistencias_total);
         },
         error: function () {
             toastr.error("Error al cargar los reportes");
@@ -198,6 +201,28 @@ function generarReportes() {
 }
 
 /* ========== RENDERERS ========== */
+
+/** Texto escrito por personas (motivos, usuarios) nunca va crudo al HTML. */
+function escaparHtml(valor) {
+    return String(valor == null ? '' : valor)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+/**
+ * Las tablas de detalle traen como mucho 200 filas. Si hay más, se dice:
+ * una tabla recortada sin aviso parece completa.
+ */
+function mostrarContador(selectorTbody, mostrando, total) {
+    const $tabla = $(selectorTbody).closest('table');
+    $tabla.next('.sexp-contador-lista').remove();
+    if (total && total > mostrando) {
+        $tabla.after(
+            `<p class="sexp-contador-lista" style="opacity:0.7;font-size:1.2rem;margin-top:0.6rem;">` +
+            `Mostrando ${mostrando} de ${total}</p>`
+        );
+    }
+}
 
 function renderKPIs(r) {
     $('#kpi-total-solicitudes').text(r.total_solicitudes);
@@ -245,10 +270,10 @@ function renderRechazos(data) {
     let html = '';
     (data || []).forEach(function (r) {
         html += `<tr>
-            <td>#${r.solicitud_id}</td>
-            <td>${r.usuario}</td>
-            <td>${r.fecha}</td>
-            <td>${r.motivo_rechazo || '-'}</td>
+            <td>#${escaparHtml(r.solicitud_id)}</td>
+            <td>${escaparHtml(r.usuario)}</td>
+            <td>${escaparHtml(r.fecha)}</td>
+            <td>${escaparHtml(r.motivo_rechazo || '-')}</td>
         </tr>`;
     });
     $('#tbody-rechazos').html(html || '<tr><td colspan="4" style="opacity:0.5;">Sin rechazos</td></tr>');
@@ -258,9 +283,9 @@ function renderMorosidad(data) {
     let html = '';
     (data || []).forEach(function (m) {
         html += `<tr>
-            <td>#${m.prestamo_id}</td>
-            <td>${m.usuario}</td>
-            <td>${m.area || '-'}</td>
+            <td>#${escaparHtml(m.prestamo_id)}</td>
+            <td>${escaparHtml(m.usuario)}</td>
+            <td>${escaparHtml(m.area || '-')}</td>
             <td style="color:#ef4444;font-weight:600;">${m.dias_vencido} días</td>
         </tr>`;
     });
@@ -271,8 +296,8 @@ function renderInconsistencias(data) {
     let html = '';
     (data || []).forEach(function (i) {
         html += `<tr>
-            <td>#${i.prestamo_id}</td>
-            <td>${i.usuario}</td>
+            <td>#${escaparHtml(i.prestamo_id)}</td>
+            <td>${escaparHtml(i.usuario)}</td>
             <td>${i.total_expedientes}</td>
             <td>${i.devueltos}</td>
             <td style="color:#f97316;font-weight:600;">${i.faltantes}</td>

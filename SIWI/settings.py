@@ -55,6 +55,10 @@ ALLOWED_HOSTS = [
 # Application definition
 
 INSTALLED_APPS = [
+    # Primero, antes de staticfiles: hace que 'manage.py runserver' sirva
+    # HTTP y WebSocket (ASGI) en local. En produccion no cambia nada, alli
+    # se arranca Daphne directamente detras de nginx.
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -120,6 +124,43 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'SIWI.wsgi.application'
 ASGI_APPLICATION = 'SIWI.asgi.application'
+
+
+# ---------------------------------------------------------------------------
+# Capa de canales (WebSockets)
+#
+# Es el bus por el que una peticion HTTP -aprobar una solicitud, procesar una
+# devolucion- avisa a los navegadores que estan mirando. Sin el, los consumers
+# se conectan pero nadie puede mandarles nada desde una vista.
+#
+# Hay dos backends y la diferencia importa en produccion:
+#
+#   InMemory  el bus vive dentro de UN proceso. Si el servidor corre con mas
+#             de un worker, un aviso emitido en el worker A no llega a los
+#             navegadores conectados al worker B, y el resultado es una
+#             pantalla que no se entera de la mitad de los cambios. Sirve para
+#             desarrollo, donde hay un solo proceso.
+#
+#   Redis     el bus vive fuera, asi que todos los workers comparten los
+#             mismos avisos. Es lo que hace falta en el hospital.
+#
+# Se elige por REDIS_URL para que el codigo sea el mismo en los dos sitios y
+# la decision quede en el despliegue. Sin la variable, desarrollo sigue
+# funcionando sin instalar nada.
+# ---------------------------------------------------------------------------
+REDIS_URL = os.getenv('REDIS_URL', '').strip()
+
+if REDIS_URL:
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {'hosts': [REDIS_URL]},
+        },
+    }
+else:
+    CHANNEL_LAYERS = {
+        'default': {'BACKEND': 'channels.layers.InMemoryChannelLayer'},
+    }
 
 
 # Database

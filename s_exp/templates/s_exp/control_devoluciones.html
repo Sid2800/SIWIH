@@ -102,6 +102,14 @@ function cargarDevoluciones(esPolling = false) {
         cache: false,
         success: function(resp) {
             renderDevoluciones(resp.data);
+            // La cola se muestra entera salvo que pase del techo de seguridad.
+            // Si se corta, se dice: una lista recortada sin aviso parece completa.
+            if (resp.total > resp.mostrando) {
+                $('#lista-devoluciones').prepend(
+                    `<p class="sexp-contador-lista" style="opacity:0.7;text-align:center;margin:0 0 1rem;">` +
+                    `Mostrando ${resp.mostrando} de ${resp.total} devoluciones (las más próximas a vencer primero).</p>`
+                );
+            }
         },
         error: function(xhr) {
             // En recarga manual (no polling) avisamos del error para no dejar

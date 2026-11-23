@@ -10,10 +10,10 @@ from django.http import JsonResponse
 from django.views.generic import TemplateView
 from django.views.decorators.http import require_GET
 
-from django.db.models import Count, Q
+from django.db.models import Count, Prefetch, Q
 
 from s_exp.models import (
-    SolicitudPrestamo, ExpedienteEstadoLog,
+    SolicitudPrestamo, SolicitudExpedienteDetalle, ExpedienteEstadoLog,
     EstadoSolicitud, EstadoPrestamo,
 )
 
@@ -27,6 +27,10 @@ from .comunes import (
 
 from core.utils.utilidades_logging import log_info, log_warning, log_error
 from core.constants.domain_constants import LogApp
+
+# Estaba importado dentro del bucle que arma la respuesta: Python resolvia el
+# modulo una vez por fila.
+from s_exp.services.datos_solicitud import DatosSolicitud
 
 
 # ============================================
@@ -51,7 +55,21 @@ def historial_solicitudes_api(request):
         estado_filtro = request.GET.get('estado', '')
 
         qs = SolicitudPrestamo.objects.select_related(
-            'usuario', 'estado_flujo', 'motivo'
+            'usuario', 'estado_flujo', 'motivo',
+            # servicio_unidad lo pide unidad_nombre() en cada fila, y prestamo
+            # se consultaba dentro del bucle con un try/except. Los dos eran
+            # una consulta por solicitud que no se veia al leer la vista.
+            'servicio_unidad', 'prestamo',
+        ).prefetch_related(
+            # Los numeros de expediente y el conteo de faltantes salian de dos
+            # consultas mas por fila. Con los detalles ya en memoria, ambos se
+            # resuelven en Python.
+            Prefetch(
+                'detalles',
+                queryset=SolicitudExpedienteDetalle.objects.select_related(
+                    'expediente_prestamo__expediente'
+                ),
+            )
         ).annotate(cant_exp=Count('detalles'))
 
         if estado_filtro:
@@ -79,9 +97,15 @@ def historial_solicitudes_api(request):
 
         data = []
         for s in solicitudes:
-            numeros = list(
-                s.detalles.values_list('expediente_prestamo__expediente__numero', flat=True)
-            )
+            # Se recorre detalles.all() para usar el prefetch. Un values_list()
+            # aqui volveria a la base por cada fila y dejaria el prefetch sin
+            # efecto, que es justo lo que se esta corrigiendo.
+            detalles = list(s.detalles.all())
+            numeros = [
+                d.expediente_prestamo.expediente.numero
+                for d in detalles
+                if d.expediente_prestamo_id and d.expediente_prestamo.expediente_id
+            ]
             # Eventos resumen (incompleta, devuelto fuera de tiempo).
             # Comparamos por id usando id_de() (cacheado, sin query extra), ya
             # que estado_flujo_id/estado_id son enteros (PK de los catálogos).
@@ -96,14 +120,14 @@ def historial_solicitudes_api(request):
             except Exception:
                 prestamo = None
             if s.estado_flujo_id == EstadoSolicitud.id_de('SOL_INCOMPLETA'):
-                faltantes = s.detalles.filter(devuelto=False).count()
+                # Se cuenta sobre lo ya traido, no con otra consulta.
+                faltantes = sum(1 for d in detalles if not d.devuelto)
                 evento = f"⚠️ Incompleta: {faltantes} expediente(s) sin devolver"
             elif prestamo and prestamo.estado_id == EstadoPrestamo.id_de('DevueltoVencido'):
                 evento = "🕒 Devuelto fuera del tiempo acordado"
             elif s.estado_flujo_id == EstadoSolicitud.id_de('SOL_FINALIZADA'):
                 evento = "✅ Finalizada correctamente"
 
-            from s_exp.services.datos_solicitud import DatosSolicitud
             data.append({
                 "id": s.id,
                 "usuario": DatosSolicitud.usuario_username(s),

@@ -11,7 +11,7 @@ from django.http import JsonResponse
 from django.utils import timezone
 from django.views.decorators.http import require_GET
 
-from django.db.models import Count, F
+from django.db.models import Count, F, Q
 
 from s_exp.models import (
     SolicitudPrestamo, SolicitudExpedienteDetalle, Prestamo,
@@ -39,6 +39,11 @@ from core.constants.domain_constants import LogApp
 
 # ============================================
 # APIs - Reportes
+
+# Techo de las tablas de detalle (rechazos, morosidad, inconsistencias). Los
+# totales del resumen no se cortan; estas listas sí, y la respuesta dice
+# cuántas hay para que la pantalla pueda avisarlo.
+LIMITE_FILAS_REPORTE = 200
 
 @require_GET
 def reportes_data_api(request):
@@ -150,9 +155,12 @@ def reportes_data_api(request):
         # --- RECHAZOS CON DETALLE ---
         rechazos_qs = qs_solicitudes.filter(
             estado_flujo_id=EstadoSolicitud.id_de('SOL_RECHAZADA')
-        ).select_related('usuario')
+        )
+        rechazos_total = rechazos_qs.count()
+        # select_related de 'prestamo' (inverso uno-a-uno): antes era una
+        # consulta por rechazo.
         rechazos = []
-        for s in rechazos_qs:
+        for s in rechazos_qs.select_related('usuario', 'prestamo')[:LIMITE_FILAS_REPORTE]:
             try:
                 motivo_r = s.prestamo.motivo_rechazo or ""
             except Prestamo.DoesNotExist:
@@ -177,6 +185,8 @@ def reportes_data_api(request):
             fecha_limite__lt=ahora,
             **filtros_prestamo
         ).select_related('solicitud__usuario', 'solicitud__servicio_unidad')
+        morosidad_total = morosos.count()
+        morosos = morosos.order_by('fecha_limite')[:LIMITE_FILAS_REPORTE]
 
         from s_exp.services.datos_solicitud import DatosSolicitud
         morosidad = []
@@ -191,15 +201,27 @@ def reportes_data_api(request):
             })
 
         # --- INCONSISTENCIAS (devoluciones parciales) ---
+        # Se cuenta sobre el estado real de cada expediente. Antes se sumaba
+        # cantidad_recibida de todas las Devolucion, pero cada una guarda el
+        # acumulado de su auditoría: dos tandas de 1 y 2 sumaban 3 y el reporte
+        # decía "0 faltantes" cuando faltaba uno. Y el total contaba también
+        # los expedientes no aprobados, que nunca salieron del archivo.
         parciales = Prestamo.objects.filter(
             estado_id=EstadoPrestamo.id_de('DevolucionParcial'),
             **filtros_prestamo
-        ).select_related('solicitud__usuario')
+        )
+        inconsistencias_total = parciales.count()
+        parciales = parciales.select_related('solicitud__usuario').annotate(
+            n_aprobados=Count('solicitud__detalles', filter=Q(solicitud__detalles__aprobado=True)),
+            n_devueltos=Count('solicitud__detalles', filter=Q(
+                solicitud__detalles__aprobado=True, solicitud__detalles__devuelto=True
+            )),
+        ).order_by('id')[:LIMITE_FILAS_REPORTE]
 
         inconsistencias = []
         for p in parciales:
-            total_exp = p.solicitud.detalles.count()
-            devueltos = sum(d.cantidad_recibida for d in p.devoluciones.all())
+            total_exp = p.n_aprobados
+            devueltos = p.n_devueltos
             inconsistencias.append({
                 "prestamo_id": p.id,
                 "usuario": p.solicitud.usuario.username,
@@ -223,6 +245,9 @@ def reportes_data_api(request):
             "rechazos": rechazos,
             "morosidad": morosidad,
             "inconsistencias": inconsistencias,
+            "rechazos_total": rechazos_total,
+            "morosidad_total": morosidad_total,
+            "inconsistencias_total": inconsistencias_total,
         })
 
     except Exception as e:

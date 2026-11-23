@@ -252,11 +252,50 @@ def alertas_usuario_api(request):
                 "solicitud_id": s.id,
             })
 
-        return JsonResponse({"alertas": alertas})
+        return JsonResponse({
+            "alertas": alertas,
+            "proximo_chequeo_seg": _proximo_chequeo_seg(prestamos_usuario, prestamos_vencidos),
+        })
 
     except Exception as e:
         log_error(f"Error en alertas_usuario_api: {e}", app=LogApp.S_EXP)
         return JsonResponse({"alertas": []})
+
+
+def _proximo_chequeo_seg(prestamos_entregados, prestamos_vencidos):
+    """Segundos hasta que alguna alerta por tiempo cambie, o None.
+
+    Los avisos de "vence en 10 / 5 minutos" no los provoca ninguna acción: los
+    provoca el reloj. Con el polling aparecían de rebote; con el socket nadie
+    avisa, así que el navegador programa una sola espera hasta este momento en
+    lugar de preguntar cada pocos segundos.
+    """
+    from datetime import timedelta
+
+    ahora = timezone.now()
+    candidatos = []
+
+    for p in prestamos_entregados:
+        if not p.fecha_limite:
+            continue
+        momentos = [
+            p.fecha_limite - timedelta(minutes=10),
+            p.fecha_limite - timedelta(minutes=5),
+            p.fecha_limite,
+        ]
+        if p.fecha_entrega:
+            momentos.append(p.fecha_entrega + (p.fecha_limite - p.fecha_entrega) * 0.9)
+        candidatos += [(m - ahora).total_seconds() for m in momentos]
+
+    # Los vencidos reaparecen cada 5 minutos hasta que se devuelvan.
+    if prestamos_vencidos.exists():
+        candidatos.append(300)
+
+    futuros = [c for c in candidatos if c > 0]
+    if not futuros:
+        return None
+    # Un segundo de margen para no llegar justo antes del umbral.
+    return int(min(futuros)) + 1
 
 
 @csrf_exempt
