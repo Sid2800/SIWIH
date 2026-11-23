@@ -58,8 +58,16 @@ $(document).ready(function () {
  * @param {string} fechaInicio - Fecha inicio (YYYY-MM-DD) cuando filtro='rango'.
  * @param {string} fechaFin - Fecha fin (YYYY-MM-DD) cuando filtro='rango'.
  */
-function cargarMisSolicitudes(filtro = '', fechaInicio = '', fechaFin = '', esPolling = false) {
-    const params = {};
+// Cuantas filas pide la pantalla por tanda. El servidor impone su propio
+// techo; esto solo dice cuanto se muestra de entrada.
+const SOLICITUDES_POR_TANDA = 10;
+
+// Lo que ya esta en pantalla, para poder pedir la tanda siguiente y para que
+// el modal de devolucion parcial siga encontrando sus expedientes.
+let solicitudesCargadas = [];
+
+function cargarMisSolicitudes(filtro = '', fechaInicio = '', fechaFin = '', esPolling = false, desde = 0) {
+    const params = { limite: SOLICITUDES_POR_TANDA, desde: desde };
     if (filtro) params.filtro = filtro;
     if (fechaInicio) params.fecha_inicio = fechaInicio;
     if (fechaFin) params.fecha_fin = fechaFin;
@@ -67,13 +75,28 @@ function cargarMisSolicitudes(filtro = '', fechaInicio = '', fechaFin = '', esPo
     const headers = {};
     if (esPolling) headers['X-Polling-Request'] = 'true';
 
+    // Una tanda siguiente se agrega a lo que ya hay; cualquier otra carga
+    // -cambio de filtro, refresco- empieza de cero. Sin esta distincion,
+    // pulsar "ver mas" y que luego entre un refresco dejaria la lista
+    // duplicada.
+    const anexar = desde > 0;
+
     $.ajax({
         url: window.urls.s_exp_mis_solicitudes_api,
         method: 'GET',
         data: params,
         headers: headers,
         success: function (resp) {
-            renderSolicitudes(resp.data, filtro);
+            const filas = resp.data || [];
+
+            solicitudesCargadas = anexar
+                ? solicitudesCargadas.concat(filas)
+                : filas;
+
+            renderSolicitudes(solicitudesCargadas, filtro, {
+                total: resp.total,
+                hayMas: resp.hay_mas,
+            });
         },
         error: function () {
             // Solo notificar en cargas iniciales, no en polling silencioso
@@ -82,7 +105,21 @@ function cargarMisSolicitudes(filtro = '', fechaInicio = '', fechaFin = '', esPo
     });
 }
 
-function renderSolicitudes(data, filtro = '') {
+// "Ver mas" pide la tanda siguiente contando lo que ya hay en pantalla.
+$(document).on('click', '#btn-ver-mas-solicitudes', function () {
+    const boton = $(this);
+    boton.prop('disabled', true).text('Cargando...');
+
+    cargarMisSolicitudes(
+        filtroActual,
+        fechaInicioActual,
+        fechaFinActual,
+        false,
+        solicitudesCargadas.length
+    );
+});
+
+function renderSolicitudes(data, filtro = '', meta = {}) {
     const container = $('#timeline-solicitudes');
 
     if (!data.length) {
@@ -252,6 +289,24 @@ function renderSolicitudes(data, filtro = '') {
 
         html += `</div></div>`;
     });
+
+    // Pie: cuanto se esta viendo del total, y el boton para traer mas. Sin
+    // decir el total, una lista de diez es indistinguible de "solo hay diez",
+    // que es justo la confusion que un limite introduce si no se avisa.
+    if (meta && typeof meta.total === 'number') {
+        html += `<p style="opacity:0.6; text-align:center; margin-top:1rem;">
+                     Mostrando ${data.length} de ${meta.total}
+                 </p>`;
+
+        if (meta.hayMas) {
+            html += `<p style="text-align:center;">
+                         <button type="button" id="btn-ver-mas-solicitudes"
+                                 class="formularioBotones-boton">
+                             Ver más
+                         </button>
+                     </p>`;
+        }
+    }
 
     container.html(html);
 }

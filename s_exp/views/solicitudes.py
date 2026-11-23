@@ -14,7 +14,7 @@ from django.views.decorators.http import require_POST, require_GET
 from django.views.decorators.csrf import csrf_protect
 
 from django.db import transaction
-from django.db.models import Count, Q
+from django.db.models import Count, Prefetch, Q
 
 from s_exp.models import (
     MotivoSolicitud, ExpedientePrestamo, SolicitudPrestamo,
@@ -38,6 +38,21 @@ from .comunes import (
 
 
 from s_exp.models import EstadoSolicitud, EstadoExpedienteFisico, EstadoPrestamo, EstadoDevolucion
+
+# Estaban importados dentro del bucle que arma la respuesta, asi que Python
+# resolvia el modulo una vez por fila. Aqui se resuelve una sola vez.
+from s_exp.services.datos_solicitud import DatosDetalleSolicitud, DatosSolicitud
+
+# Cuantas filas devuelve una lista cuando nadie pide otra cosa. El listado no
+# es un archivo historico: quien abre "Mis solicitudes" quiere ver lo ultimo,
+# y para buscar algo viejo estan los filtros de fecha. Sin tope, la vista
+# devolvia todas las solicitudes del usuario desde siempre, y tanto el
+# servidor como el navegador cargaban con ellas en cada refresco.
+LIMITE_LISTA_POR_DEFECTO = 10
+
+# Techo duro. Evita que un parametro en la URL pida diez mil filas y tumbe la
+# pantalla, sea por error o a proposito.
+LIMITE_LISTA_MAXIMO = 100
 
 
 from core.utils.utilidades_logging import log_info, log_warning, log_error
@@ -857,7 +872,28 @@ def mis_solicitudes_api(request):
     try:
         qs = SolicitudPrestamo.objects.filter(
             usuario=request.user
-        ).select_related('servicio_unidad').order_by('-fecha_creacion')
+        ).select_related(
+            'servicio_unidad',
+            # Los nombres de motivo y estado salen de estos catalogos. Sin
+            # traerlos aqui, cada fila pedia los suyos por separado: dos
+            # consultas mas por solicitud que nadie veia venir, porque el
+            # acceso esta escondido dentro del servicio de datos.
+            'motivo',
+            'estado_flujo',
+            # prestamo es un OneToOne inverso: traerlo aqui evita una consulta
+            # por solicitud. Antes se accedia dentro del bucle con un
+            # try/except DoesNotExist, que es una consulta por fila.
+            'prestamo',
+        ).prefetch_related(
+            # Y esto evita la otra consulta por fila: los detalles de todas
+            # las solicitudes de la pagina se traen en una sola.
+            Prefetch(
+                'detalles',
+                queryset=SolicitudExpedienteDetalle.objects.select_related(
+                    'expediente_prestamo__expediente', 'paciente'
+                ),
+            )
+        ).order_by('-fecha_creacion')
 
         # --- Aplicar filtros de fecha (mismo patrón que reportes del módulo) ---
         filtro = request.GET.get('filtro', '').strip()
@@ -892,18 +928,37 @@ def mis_solicitudes_api(request):
                 qs = qs.filter(fecha_creacion__gte=fecha_inicio_str)
             if fecha_fin_str:
                 qs = qs.filter(fecha_creacion__lte=fecha_fin_str + ' 23:59:59')
-        # Si filtro está vacío retorna todas las solicitudes
-        data = []
-        for s in qs:
-            # Importamos los servicios para acceso unificado a datos
-            from s_exp.services.datos_solicitud import DatosDetalleSolicitud, DatosSolicitud
+        # Cuantas filas se devuelven. Cada boton de la pantalla -todos, hoy,
+        # esta semana, este mes, rango- trae su propia tanda; el filtro acota
+        # el periodo y el limite acota la cantidad dentro de ese periodo.
+        total = qs.count()
 
-            # Cada detalle se enriquece desde el FK paciente (no desde snapshots)
-            detalles_info = []
-            for d in s.detalles.select_related(
-                'expediente_prestamo__expediente', 'paciente'
-            ):
-                detalles_info.append(DatosDetalleSolicitud.enriquecer(d))
+        try:
+            limite = int(request.GET.get('limite') or LIMITE_LISTA_POR_DEFECTO)
+        except (TypeError, ValueError):
+            limite = LIMITE_LISTA_POR_DEFECTO
+
+        limite = max(1, min(limite, LIMITE_LISTA_MAXIMO))
+
+        try:
+            desde = max(0, int(request.GET.get('desde') or 0))
+        except (TypeError, ValueError):
+            desde = 0
+
+        # El corte va antes de armar la respuesta, no despues: cortar en
+        # Python obligaria a traer y enriquecer todas las filas igualmente,
+        # que es justo el trabajo que se quiere evitar.
+        pagina = qs[desde:desde + limite]
+
+        data = []
+        for s in pagina:
+            # Cada detalle se enriquece desde el FK paciente (no desde snapshots).
+            # Se recorre s.detalles.all() para aprovechar el prefetch: llamar a
+            # .select_related() aqui dispararia una consulta nueva por fila y
+            # dejaria el prefetch sin usar.
+            detalles_info = [
+                DatosDetalleSolicitud.enriquecer(d) for d in s.detalles.all()
+            ]
 
             prestamo_info = None
             try:
@@ -938,7 +993,16 @@ def mis_solicitudes_api(request):
                 "prestamo": prestamo_info,
             })
 
-        return JsonResponse({"data": data})
+        return JsonResponse({
+            "data": data,
+            # La pantalla necesita saber que hay mas para poder ofrecer "ver
+            # mas". Sin el total, un listado de diez es indistinguible de
+            # "solo tiene diez".
+            "total": total,
+            "desde": desde,
+            "limite": limite,
+            "hay_mas": (desde + len(data)) < total,
+        })
 
     except Exception as e:
         log_error(f"Error en mis_solicitudes_api: {e}", app=LogApp.S_EXP)
