@@ -11,5 +11,8 @@ urlpatterns = [
     path('listar_referencias/', views.listarReferencias.as_view(), name='listar_referencias'),
     path('listar-referencias-API/', views.listarReferenciaAPI, name='listar_referencias_API'),
 
+    path("verificar-duplicidad-referencia/", views.verificar_duplicidad_referencia, name="verificar_duplicidad_referencia"),
+
+
 
 ]

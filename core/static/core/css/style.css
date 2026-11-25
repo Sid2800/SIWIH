@@ -1334,10 +1334,11 @@ font-size: 1.6rem;
 .modal-procesos-tabla thead th ,
 .tabla-mantenimiento thead th {
    text-align: left;
-   padding: .3rem 0;
+   padding: .5rem .9rem;
    border-bottom: .3rem solid #ccc;
    font-weight: 700;
    font-size: 1.5rem;
+   text-transform: capitalize;
    font-family: var(--fuenteTablaTitulo);
    color: var(--negro);
 }
@@ -1355,7 +1356,7 @@ font-size: 1.6rem;
 .modal-procesos-tabla tbody td ,
 .tabla-mantenimiento tbody td {
    font-family: var(--fuenteTablaCuerpo);
-   padding: .6rem .4rem;
+   padding: .8rem .4rem;
    border-bottom: .15rem solid #ccc;
    text-transform: uppercase;
 }
@@ -1418,6 +1419,19 @@ font-size: 1.6rem;
    cursor: pointer;
    transition: background-color 0.15s ease, transform 0.1s ease;
 }
+
+.btn-modal-duplicados-ver-registro{
+   width: auto;
+   text-decoration: none;
+}
+
+/* oculta un columna por espacio */
+#duplicadosTablaModalHead th:nth-child(3),
+#duplicadosTablaModalBody td:nth-child(3) {
+   display: none !important;
+}
+
+
 
 .datatable-agenda-boton{
    padding-top: .7rem;
@@ -1520,6 +1534,17 @@ font-size: 1.6rem;
       font-size: 1.3rem;
       gap: 1rem;
       font-weight: bold;
+   }
+
+   /* oculta un columna por espacio */
+   #duplicadosTablaModalHead th:nth-child(3),
+   #duplicadosTablaModalBody td:nth-child(3) {
+      display: table-cell !important;
+   }
+
+   .btn-modal-duplicados-ver-registro{
+      padding: .6rem;
+      width: auto;
    }
 
 }
@@ -5037,6 +5062,7 @@ fieldset.referenciaRespuestaSeguimiento.ajustado {
 
 
 .modal-dato-label{
+   text-transform: capitalize;
    font-weight: 400;
    color: var(--colorInputReadonlyTexto);
    opacity: .8;

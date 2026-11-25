@@ -14,12 +14,6 @@
             </div>
             <div class="tituloFormularioReferencia-botones">
 
-                <!--
-                <a class="formularioBotones-boton oculto" id="formularioReferenciaBotonRegistrarRespuesta">
-                    <i class="bi bi-activity" class="formularioBotones-icono"></i>
-                    <span>REGISTRAR RESPUESTA</span> 
-                </a>
-                -->
 
             </div>
         </div>
@@ -786,6 +780,15 @@ const tipo = {{ form.tipo.value }};
 const modoUso = Number("{{ MD }}");
 const seguimiento = Number({{ seguimiento }});
 const idReferencia = Number({{ form_respuesta.idRespuesta.value }}); // ojo es el id de la referencia de seguimiento a una respuesta no la general
+
+
+const DATOS_PACIENTE = {
+        dni: "{{ form.dniPaciente.value|default:''|escapejs }}",
+        expediente: "{{ form.numeroExpediente.value|default:''|escapejs }}",
+        nombre: "{{ form.nombreCompletoPaciente.value|default:''|escapejs }}"
+    };
+
+
 
 {% if MD == 2 %} 
         {% if diagnosticos_referencia_actuales %} 

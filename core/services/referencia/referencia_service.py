@@ -4,8 +4,17 @@ from core.services.referencia.referencia_diagnostico_service import RefDiagnosti
 from core.constants.domain_constants import HEAC_INSTITUCION_ID
 from core.constants.domain_constants import LogApp
 from core.utils.utilidades_logging import *
+from core.utils.utilidades_fechas import formatear_fecha_dd_mm_yyyy
 from django.db import transaction
-
+from django.core.exceptions import ValidationError
+from django.db.models import (
+    Case,
+    When,
+    F,
+    Value,
+    CharField,
+)
+from django.db.models.functions import Concat
 
 
 class ReferenciaService:
@@ -225,5 +234,87 @@ class ReferenciaService:
             control.save()
 
 
+    @staticmethod
+    def buscar_duplicidad_referencia(criterios):
+        """
+        Busca posibles referencias duplicadas según:
+        - Paciente
+        - Fecha de recepción
+        - Fecha de elaboración
+        - Tipo de referencia
 
-        
+        Retorna la cantidad total y hasta cinco coincidencias.
+        """
+
+        # Validaciones básicas
+        if (
+            not criterios.paciente_id
+            or criterios.fecha_recepcion is None
+            or criterios.fecha_elaboracion is None
+            or criterios.tipo not in (0, 1)
+        ):
+            raise ValidationError(
+                "Buscar duplicidad: no se recibieron todos los criterios requeridos."
+            )
+
+        try:
+            qs = Referencia.objects.filter(
+                paciente_id=criterios.paciente_id,
+                fecha_recepcion__date=criterios.fecha_recepcion,
+                fecha_elaboracion__date=criterios.fecha_elaboracion,
+                tipo=criterios.tipo
+            ).annotate(
+                institucion=Case(
+                    When(
+                        tipo=0,
+                        then=Concat(
+                            F('institucion_origen__nivel_complejidad_institucional__siglas'),
+                            Value('-'),
+                            F('institucion_origen__nombre_institucion_salud')
+                        )
+                    ),
+                    When(
+                        tipo=1,
+                        then=Concat(
+                            F('institucion_destino__nivel_complejidad_institucional__siglas'),
+                            Value('-'),
+                            F('institucion_destino__nombre_institucion_salud')
+                        )
+                    ),
+                    default=Value('Sin Institucion'),
+                    output_field=CharField()
+                )
+            ).values(
+                "id",
+                "fecha_recepcion",
+                "fecha_elaboracion",
+                "institucion"
+            ).order_by("-id")
+
+            cantidad = qs.count()
+
+            duplicados = []
+
+            for referencia in qs[:5]:
+                referencia["N"] = referencia.pop("id")
+
+                referencia["recibida"] = formatear_fecha_dd_mm_yyyy(
+                    referencia.pop("fecha_recepcion")
+                )
+
+                referencia["elaborada"] = formatear_fecha_dd_mm_yyyy(
+                    referencia.pop("fecha_elaboracion")
+                )
+
+
+                duplicados.append(referencia)
+            return {
+                "cantidad": cantidad,
+                "referencias": duplicados
+            }
+
+        except Exception as e:
+            log_error(f"[duplicados referencia] {e}", LogApp.REFERENCIAS)
+            raise ValidationError(
+                f"Ocurrió un error al buscar posibles referencias duplicadas: {e}"
+            )

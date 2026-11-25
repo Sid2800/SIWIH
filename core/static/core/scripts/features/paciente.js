@@ -823,21 +823,23 @@ async function enviarFormulario() {
     
 
     // verificamos si existen pacientes con campos similares
-    const duplicado = await buscarPacienteSimilar(
-        idPaciente,
-        formData.get("primer_nombre"), 
-        formData.get("primer_apellido") ,
-        formData.get("fecha_nacimiento") , 
-        formData.get("sexo")
-    )
+    if (MD == 1){
+        const duplicado = await buscarPacienteSimilar(
+            idPaciente,
+            formData.get("primer_nombre"), 
+            formData.get("primer_apellido") ,
+            formData.get("fecha_nacimiento") , 
+            formData.get("sexo")
+        )
 
-    if (duplicado && Array.isArray(duplicado) && duplicado.length > 0) {
-        const confirmo = await mostrarDuplicadosEnSwal(duplicado);
-        
-        if (!confirmo) { 
-            toastr.info("No se guardó el paciente.");
-            habilitarBoton();
-            return; // NO guarda
+        if (duplicado && Array.isArray(duplicado) && duplicado.length > 0) {
+            const confirmo = await mostrarDuplicadosEnSwal(duplicado);
+            
+            if (!confirmo) { 
+                toastr.info("No se guardó el paciente.");
+                habilitarBoton();
+                return; // NO guarda
+            }
         }
     }
 

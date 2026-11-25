@@ -459,6 +459,7 @@ def guardarPeriodoLaboral(request):
         )
 
     except Exception as e:
+        print("error /////",e)
         return JsonResponse({'error': 'No se pudo guardar el periodo'}, status=500)
 
 

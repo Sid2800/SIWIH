@@ -22,7 +22,7 @@ from copy import deepcopy
 from django.core.serializers.json import DjangoJSONEncoder
 from core.constants import permisos
 from core.utils.utilidades_textos import generar_slug
-from core.utils.utilidades_fechas import formatear_fecha_dd_mm_yyyy_hh_mm
+from core.utils.utilidades_fechas import formatear_fecha_dd_mm_yyyy_hh_mm, parsear_fecha_iso
 from usuario.permisos import verificar_permisos_usuario
 from core.services.expediente_service import ExpedienteService
 from core.services.paciente_service import PacienteService
@@ -31,6 +31,9 @@ from core.services.referencia.referencia_service import ReferenciaService
 from core.utils.utilidades_request import cargar_json
 from core.constants.domain_constants import LogApp
 from core.utils.utilidades_logging import *
+from django.utils.dateparse import parse_date
+from django.views.decorators.http import require_GET
+from django.urls import reverse
 
 
 # Create your views here.
@@ -480,7 +483,6 @@ class RespuestaCreateUpdateView(View):
         else:
             return self.form_invalid(form)
         
-        
 
 class SeguimientoCreateUpdateView(View):
     
@@ -522,7 +524,6 @@ class SeguimientoCreateUpdateView(View):
             return JsonResponse({"guardo": False, "idSeguimiento": None, "mensaje": "Error interno, contacte al administrador"
     })
 
-    
 
 def obtener_seguimiento_tic(request):
     idSeguimiento = request.GET.get('id')
@@ -754,4 +755,65 @@ def listarReferenciaAPI(request):
         "recordsFiltered": filtered_records,
         "data": refrencias #evaluaciones
     })
-    
+
+
+@require_GET
+def verificar_duplicidad_referencia(request):
+    # Obtener parámetros del request GET
+    id_paciente = request.GET.get("idPaciente")
+    fecha_recepcion = parsear_fecha_iso(request.GET.get("fechaRecepcion"))
+    fecha_elaboracion = parsear_fecha_iso(request.GET.get("fechaElaboracion"))
+    tipo = request.GET.get("tipoReferencia")
+
+
+    # Validar campos obligatorios
+    if (
+        not id_paciente
+        or fecha_recepcion is None
+        or fecha_elaboracion is None
+        or tipo in (None, "")
+    ):
+        return JsonResponse({"error": "No se consignó la información requerida para comprobar duplicidad."}, status=400)
+
+    try:
+        criterios = SimpleNamespace(
+            paciente_id=int(id_paciente),
+            fecha_recepcion=fecha_recepcion,
+            fecha_elaboracion=fecha_elaboracion,
+            tipo=int(tipo)
+        )
+
+        if criterios.paciente_id <= 0 or criterios.tipo not in (0, 1):
+            return JsonResponse(
+                {"error": "Los criterios proporcionados no son válidos."},
+                status=400
+            )
+
+        resultado = ReferenciaService.buscar_duplicidad_referencia(criterios)
+
+        url_referencia = reverse(
+            "referencia_editar",
+            kwargs={
+                "pk": 0,
+                "slug": "referencia"
+            }
+        )
+        return JsonResponse({
+            "duplicado": resultado["cantidad"] > 0,
+            "cantidad": resultado["cantidad"],
+            "referencias": resultado["referencias"],
+            "url_referencia": url_referencia
+        })
+
+    except ValueError:
+        return JsonResponse(
+            {"error": "Los parámetros proporcionados no son válidos."},
+            status=400
+        )
+
+    except Exception as e:
+        log_info(e)
+        return JsonResponse(
+            {"error": "Ocurrió un error al comprobar posibles referencias duplicadas."},
+            status=500
+        )

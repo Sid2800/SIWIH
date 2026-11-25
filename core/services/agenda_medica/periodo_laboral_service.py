@@ -919,6 +919,7 @@ class PeriodoLaboralService :
         estructura_dias = {}
         dias_nuevos_por_semana = {}
 
+
         # Replicar días laborales y días quirúrgicos.
         for dia in dias_configurados:
             fechas = obtener_fechas_por_dia_semana(
@@ -1074,7 +1075,7 @@ class PeriodoLaboralService :
                     nuevo_periodo.fecha_fin
                 )
             ]
-
+            print("////////")
             cupos_trasladar = PeriodoLaboralService.obtener_cupos_historial_actual_periodo_reduccion(
                 periodo_afectado,
                 rangos_reduccion
@@ -1089,6 +1090,7 @@ class PeriodoLaboralService :
             # Generar cupos del tramo anterior al inicio original.
             fecha_fin_generacion = fecha_inicio_original - timedelta(days=1)
 
+            
             PeriodoLaboralService.generar_cupos_dias_laborales(
                 periodo=nuevo_periodo,
                 dias_laborales=dias_nuevos_por_semana,

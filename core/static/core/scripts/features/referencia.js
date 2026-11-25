@@ -451,6 +451,51 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+
+    /**
+     * Realiza la búsqueda de referencias similares.
+     */
+    async function buscarReferenciaSimilar(
+        idPaciente,
+        fechaRecepcion,
+        fechaElaboracion,
+        tipoReferencia
+    ) {
+        try {
+            const URL = API_URLS.verificarDuplicidadReferencia;
+
+            const parametros = {
+                idPaciente,
+                fechaRecepcion,
+                fechaElaboracion,
+                tipoReferencia
+            };
+
+            const data = await fetchData(URL, parametros);
+
+            if (data?.error) {
+                console.warn("Error del backend:", data.error);
+                return null;
+            }
+
+            if (typeof data?.duplicado !== "boolean") {
+                console.warn("Respuesta inesperada del backend:", data);
+                return null;
+            }
+
+            return data;
+
+        } catch (error) {
+            console.error("Error en buscarReferenciaSimilar:", error);
+            return null;
+        }
+    }
+
+
+
+
+
+
     /**
      * Aplicar las mascaras Identadad
      */
@@ -1587,11 +1632,52 @@ document.addEventListener('DOMContentLoaded', function () {
             formData.append("MotivoNoAtencion", idMotivoNoAtencion.value ? idMotivoNoAtencion.value : 0 );
         }
         
+
+
         // --- Envío ---
         botonGuardar.disabled = true;
         botonGuardar.innerHTML = `<span class="spinner"></span> Guardando...`;
 
-    
+        if (modoUso === 1){
+
+            // Verificación de posibles duplicados
+            const pacienteId = formData.get("idPaciente");
+            const fechaRecepcion = formData.get("fecha_recepcion");
+            const fechaElaboracion = formData.get("fecha_elaboracion");
+            const tipo = formData.get("tipo");
+
+            const resultado = await buscarReferenciaSimilar(
+                pacienteId,
+                fechaRecepcion,
+                fechaElaboracion,
+                tipo
+            );
+
+            if (resultado === null) {
+                habilitarBoton();
+                return;
+            }
+
+            if (resultado.duplicado) {
+                const config = {
+                    titulo: "Referencias similares encontradas",
+                    datos: DATOS_PACIENTE,
+                    duplicados: resultado.referencias,
+                    enlace: true,
+                    url: resultado.url_referencia
+                };
+
+                const continuar = await mostrarRegistrosDuplicados(config);
+
+                if (!continuar) {
+                    habilitarBoton();
+                    return;
+                }
+            }
+
+        }
+        
+
 
         try {
             const response = await fetch(formReferencia.action, {
@@ -1614,6 +1700,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 } else {
                     toastr.error("Ocurrió un error de validación.");
                 }
+
+                habilitarBoton();
                 return;
             }
 
@@ -1623,7 +1711,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         setTimeout(() => {
                             if(modoUso == 1){
                                 window.location.href = data.redirect_url;
-                            }else {
+                            }else { // se habilita solo es editar 
                                 location.reload();
                             }
                         }, 600);
@@ -1631,15 +1719,15 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             } else {
                 toastr.error(data.error || "Algo salió mal.");
+                habilitarBoton();
                 return;
             }
 
         } catch (error) {
             console.error("Error", error);
             toastr.error("Se presentó un error inesperado al registrar la referencia");
-        } finally {
             habilitarBoton();
-        }
+        } 
     }
 
 
@@ -1766,6 +1854,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 } else {
                     toastr.error("Ocurrió un error de validación.");
                 }
+                habilitarBoton();
                 return;
             }
 
@@ -1781,6 +1870,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             } else {
                 toastr.error(data.error || "Algo salió mal.");
+                habilitarBoton();
                 return;
             }
 
@@ -1788,11 +1878,8 @@ document.addEventListener('DOMContentLoaded', function () {
         } catch (error) {
             console.error("Error", error);
             toastr.error("Se presentó un error inesperado al registrar la respuesta");
-        } finally {
-            habilitarBoton();
-        }
-
-
+                habilitarBoton();
+        } 
     }
 
 //#endregion

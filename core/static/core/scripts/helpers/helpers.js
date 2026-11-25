@@ -39,10 +39,6 @@ async function fetchData(url, params = {}) {
       queryString ? `${url}?${queryString}` : url
    );
 
-   if (!response.ok) {
-      throw new Error(`Error en la red: ${response.status} ${response.statusText}`);
-   }
-
    return response.json();
 }
 
@@ -238,8 +234,8 @@ function renderDatosContexto(containerId, datos = {}) {
       fila.className = "modal-dato";
 
       fila.innerHTML = `
-         <span class="modal-dato-label">${label}</span>
-         <span class="modal-dato-valor">${value || ''}</span>
+         <span class="modal-dato-label">${escaparHTML(label)}</span>
+         <span class="modal-dato-valor">${escaparHTML(value) || ''}</span>
       `;
 
       header.appendChild(fila);
@@ -267,6 +263,7 @@ const API_URLS = {
    reporteHojaHospitalizacion: urls["ReporteHojaHospitalizacion"],
    reporteFormatoReferencia: urls["ReporteFormatoReferencia"],
    ReporteFormatoRespuesta: urls["ReporteFormatoRespuesta"],
+   verificarDuplicidadReferencia: urls["verificarDuplicidadReferencia"],
    obtenerPacienteRegistroExpediente: urls["obtenerPacienteRegistroExpediente"],
    obtenerPacienteRegistroDNI: urls["obtenerPacienteRegistroDNI"],
    agregar_ingreso: urls["agregarIngreso"],
@@ -2521,3 +2518,108 @@ async function agregarEditarEstudioDetalle(estudio, estudios) {
    return resultado;
 }
 //#endregion
+
+//  modal de presnetar duplicados reutiliazble 
+
+async function mostrarRegistrosDuplicados(config = {}) {
+
+   const {
+      titulo = "Posibles registros duplicados",
+      datos = null,
+      duplicados = [],
+      enlace = false,
+      url = null,
+   } = config;
+
+
+
+
+   const resultado = await Swal.fire({
+      title: `<i class="bi bi-exclamation-triangle"></i> ${titulo}`,
+      html: `
+         <div class="tituloFormulario-subrallado"></div>
+         <div class="modal-contendor-data">
+            <div class="modal-contendor-data-encabezado" id="modalRegistroDuplicados"></div>
+         
+            <div class="modal-procesos-contendor">
+               <table class="modal-procesos-tabla">
+                     <thead id="duplicadosTablaModalHead"></thead>
+                     <tbody id="duplicadosTablaModalBody"></tbody>
+               </table>
+            </div>
+         </div>
+         
+         
+      `,
+      showCancelButton: true,
+      confirmButtonText: `
+         <i class="bi bi-check-circle-fill"></i> Confirmar
+      `,
+      cancelButtonText: `
+         <i class="bi bi-x-circle-fill"></i> Cancelar
+      `,
+      customClass: {
+         popup: "contenedor-modal-procesos",
+         title: "contener-modal-titulo",
+         confirmButton: "contener-modal-boton-confirmar",
+         cancelButton: "contener-modal-boton-cancelar"
+      },
+      didOpen: () => {
+
+         console.log(datos)
+         if (datos) {
+               renderDatosContexto(
+                  "modalRegistroDuplicados",
+                  datos
+               );
+         }
+
+
+         function renderizarDuplicados() {
+            const head = document.getElementById("duplicadosTablaModalHead");
+            const body = document.getElementById("duplicadosTablaModalBody");
+
+            head.innerHTML = "";
+            body.innerHTML = "";
+
+            if (!duplicados.length) return;
+
+            const columnas = Object.keys(duplicados[0]);
+
+            head.innerHTML = `
+               <tr>
+                     ${columnas.map(columna => `
+                        <th>${escaparHTML(columna.replaceAll("_", " "))}</th>
+                     `).join("")}
+                     ${enlace ? "<th>Accion</th>" : ""}
+               </tr>
+            `;
+
+            body.innerHTML = duplicados.map(registro => `
+               <tr>
+                     ${columnas.map(columna => {
+                        return `<td>${escaparHTML(registro[columna])}</td>`;
+                     }).join("")}
+
+                     ${enlace && url ? `
+                        <td>
+                           <a href="${escaparHTML(url.replace("/0/", `/${registro.N}/`))}"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              class="modal-procesos-btn btn-modal-duplicados-ver-registro">
+                                 <i class="bi bi-eye-fill"></i> Ver
+                           </a>
+                        </td>
+                     ` : ""}
+               </tr>
+            `).join("");
+         }
+         
+
+         renderizarDuplicados();
+         
+      }
+   });
+
+   return resultado.isConfirmed;
+}
