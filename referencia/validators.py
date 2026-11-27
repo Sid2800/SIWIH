@@ -64,7 +64,8 @@ def validar_diagnosticos_json(diagnosticos_json):
 def validar_referencia_para_respuesta(id_referencia, id_paciente, tipo_referencia):
     referencia = Referencia.objects.filter(id=id_referencia,
         paciente_id=id_paciente, 
-        tipo=tipo_referencia).first()
+        tipo=tipo_referencia,
+        estado=1).first()
     if not referencia:
         raise ValidationError("Los datos indicados no coinciden con ninguna referencia existente.")
     if Respuesta.objects.filter(referencia_id=id_referencia).exists():
@@ -72,8 +73,10 @@ def validar_referencia_para_respuesta(id_referencia, id_paciente, tipo_referenci
     return referencia
 
 def validar_respuesta_vs_referencia(id_respuesta, id_referencia):
-    respuesta = Respuesta.objects.filter(id=id_respuesta,
-        referencia_id=id_referencia).first()
+    respuesta = Respuesta.objects.filter(
+        id=id_respuesta,
+        referencia_id=id_referencia,
+        referencia__estado=1).first()
     if not respuesta:
         raise ValidationError("Los datos indicados no coinciden con ninguna respuesta existente.")
     return respuesta
