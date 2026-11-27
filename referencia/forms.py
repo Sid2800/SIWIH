@@ -778,7 +778,15 @@ class RespuestaCreateForm(forms.ModelForm):
     def clean(self):
         cleaned_data = super().clean()
 
-      
+        if not self.referencia:
+            raise forms.ValidationError(
+                "Debe proporcionar una referencia válida."
+            )
+
+        if self.referencia.estado != 1:
+            raise forms.ValidationError(
+                "No se puede registrar una respuesta para una referencia inactiva."
+            )
 
         # Campos clave
         tipo_referencia = int(self.data.get("tipo")) if self.data.get("tipo") is not None else None
@@ -909,7 +917,6 @@ class RespuestaCreateForm(forms.ModelForm):
             if codigo not in estudios_existentes_ids:
                 raise forms.ValidationError(f"El código de diagnostico {codigo} no existe en la base de datos.")
 
-        print(f"sin validar {diagnosticos}") 
         self.diagnosticos_validados = diagnosticos
         
         return cleaned_data

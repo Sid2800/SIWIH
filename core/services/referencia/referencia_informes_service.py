@@ -509,7 +509,8 @@ class RefInformeService:
 
             qs = Respuesta.objects.filter(
                         referencia__tipo=0,
-                        **filtro_rango_fecha("fecha_atencion", inicio, fin)
+                        **filtro_rango_fecha("fecha_atencion", inicio, fin),
+                        referencia__estado=1
                     ).select_related(*select_related)
 
             resultado = RefInformeService.generar_tabla_calidad_respuesta_unidad(qs)
@@ -547,7 +548,8 @@ class RefInformeService:
 
             referencias_recibidas = Referencia.objects.filter(
                 tipo=0,
-                **filtro_rango_fecha("fecha_recepcion", inicio, fin)
+                **filtro_rango_fecha("fecha_recepcion", inicio, fin),
+                estado=1
             ).aggregate(
                 total=Count("id"),
                 con_respuesta=Count(
@@ -567,7 +569,8 @@ class RefInformeService:
             referencias_enviadas = Referencia.objects.filter(
                 tipo=1,
                 control_calidad__isnull=False,
-                **filtro_rango_fecha("fecha_elaboracion", inicio, fin)
+                **filtro_rango_fecha("fecha_elaboracion", inicio, fin),
+                estado=1
             ).annotate(
                 cumple_control=Case(
                     When(
@@ -600,7 +603,8 @@ class RefInformeService:
             respuestas = Respuesta.objects.filter(
                 referencia__tipo=0,
                 control_calidad__isnull=False,
-                **filtro_rango_fecha("fecha_atencion", inicio, fin)
+                **filtro_rango_fecha("fecha_atencion", inicio, fin),
+                referencia__estado=1
             ).annotate(
                 cumple_control=Case(
                     When(
@@ -632,7 +636,8 @@ class RefInformeService:
 
             sinar = Referencia.objects.filter(
                 tipo=0,
-                **filtro_rango_fecha("fecha_recepcion", inicio, fin)
+                **filtro_rango_fecha("fecha_recepcion", inicio, fin),
+                estado=1
             ).aggregate(
                 total=Count("id"),
                 si=Count(
@@ -699,7 +704,8 @@ class RefInformeService:
 
             qs = Referencia.objects.filter(
                         tipo=0,
-                        **filtro_rango_fecha("fecha_recepcion", inicio, fin)
+                        **filtro_rango_fecha("fecha_recepcion", inicio, fin),
+                        estado=1
                     ).select_related(*select_related)
 
             resumen_raw = (
@@ -1659,6 +1665,7 @@ class RefInformeService:
             "total_general": total_general,
         }
 
+
     @staticmethod
     def generarDataInformeRespuesta(mes, anio, indice =1):
 
@@ -1672,7 +1679,8 @@ class RefInformeService:
             Respuesta.objects
             .filter(
                 referencia__tipo=0,
-                **filtro_rango_fecha("fecha_atencion", inicio, fin)
+                **filtro_rango_fecha("fecha_atencion", inicio, fin),
+                referencia__estado=1
             )
             .select_related(
                 'referencia', 
@@ -1802,7 +1810,8 @@ class RefInformeService:
                         tipo=1,
                         fecha_elaboracion__range=(inicio, fin),
                         institucion_destino__nivel_complejidad_institucional__nivel_complejidad__gte=4,
-                        especialidad_destino_id=esp_id
+                        especialidad_destino_id=esp_id,
+                        estado=1
                     )
                     .exclude(
                         institucion_destino__nivel_complejidad_institucional__nivel_complejidad=8
@@ -1913,7 +1922,7 @@ class RefInformeService:
             referencia = (
                 Referencia.objects
                 .select_related(*relaciones)
-                .get(id=id_referencia)
+                .get(id=id_referencia, estado=1 )
             )
         except Referencia.DoesNotExist:
             log_warning(
@@ -2098,7 +2107,7 @@ class RefInformeService:
             respuesta = (
                 Respuesta.objects
                 .select_related(*relaciones)
-                .get(id=id_respuesta)
+                .get(id=id_respuesta, referencia__estado=1)
             )
 
         except Respuesta.DoesNotExist:

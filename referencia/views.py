@@ -495,7 +495,13 @@ class SeguimientoCreateUpdateView(View):
     def post(self, request, *args, **kwargs):
 
         usuario = request.user
-        data = cargar_json(request.body)
+        data, error = cargar_json(request)
+
+        if error:
+            return JsonResponse({
+                "success": False,
+                "message": error
+            }, status=400)
 
         try:
             seguimiento_obj = {

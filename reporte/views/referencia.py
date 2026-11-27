@@ -233,8 +233,6 @@ class InformesReferencia(View):
 
             self._agregar_observacion(informe,criterios)
 
-            for fila in dataReporte.get('tabla', []):
-                    print(fila)
 
             if tipo_documento == 1 :
                 return ServiceExcel.GenerarExcelReferenciaBase(criterios)
