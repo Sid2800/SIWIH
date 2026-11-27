@@ -919,7 +919,6 @@ class PeriodoLaboralService :
         estructura_dias = {}
         dias_nuevos_por_semana = {}
 
-
         # Replicar días laborales y días quirúrgicos.
         for dia in dias_configurados:
             fechas = obtener_fechas_por_dia_semana(
@@ -976,7 +975,38 @@ class PeriodoLaboralService :
             estado=EstadoRegistro.ACTIVO
         ).select_related("dia_laboral", "tipo_atencion")
 
+
+        # Obtener IDs de los días laborales nuevos.
+        dias_nuevos_ids = [
+            dia.pk for dia in dias_nuevos_por_semana.values()
+        ]
+
+        # Recuperar días laborales con sus configuraciones activas.
+        dias_nuevos = Dia_laboral.objects.filter(
+            id__in=dias_nuevos_ids
+        ).prefetch_related(
+            Prefetch(
+                "configuraciones_cupo",
+                queryset=Configuracion_cupo.objects.filter(
+                    estado=EstadoRegistro.ACTIVO
+                ).select_related("tipo_atencion"),
+                to_attr="configuraciones_activas"
+            )
+        )
+
+        # Reconstruir el diccionario con las instancias preparadas.
+        dias_nuevos_por_semana = {
+            dia.dia_semana: dia
+            for dia in dias_nuevos
+        }
+
+
         return configuraciones_nuevas, dias_nuevos_por_semana
+
+
+
+
+
 
 
     def _reasignar_cupos_configuraciones(cupos_trasladar, configuraciones_nuevas):
@@ -1075,7 +1105,7 @@ class PeriodoLaboralService :
                     nuevo_periodo.fecha_fin
                 )
             ]
-            print("////////")
+     
             cupos_trasladar = PeriodoLaboralService.obtener_cupos_historial_actual_periodo_reduccion(
                 periodo_afectado,
                 rangos_reduccion
@@ -1135,6 +1165,7 @@ class PeriodoLaboralService :
                 rangos_reduccion
             )
 
+            
             # Reasignar cupos a las nuevas configuraciones.
             PeriodoLaboralService._reasignar_cupos_configuraciones(
                 cupos_trasladar=cupos_trasladar,
@@ -1151,7 +1182,6 @@ class PeriodoLaboralService :
                 fecha_fin=nuevo_periodo.fecha_fin,
                 usuario=usuario
             )
-
 
             return True
         
@@ -1396,7 +1426,7 @@ class PeriodoLaboralService :
                     periodo_afectado.fecha_fin
                 )
                 
-        #pa crear
+            #pa crear
             if not resultado :
                 with transaction.atomic():
                     personal = PersonalSalud.objects.select_for_update().get(
